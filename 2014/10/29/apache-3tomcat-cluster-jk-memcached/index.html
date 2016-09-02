@@ -1,0 +1,957 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="apache,tomcat,集群,mod_jk,memcached,centos," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="注意本文不讨论原理，只讲述具体的搭建过程，而且步骤都经过了整理，否则过程可能会出现其他异常，请自行google。apache与tomcat整合的方式除了jk之外，使用apache自带的mod_ajp_proxy模块也可以很方便的完成。先来看一下架构图：属于正式环境中原session复制方案的改进。
+1. 所需软件包12345678910111213jrrt-3.1.2-1.6.0-linux-x6">
+<meta property="og:type" content="article">
+<meta property="og:title" content="apache+3tomcat+jk+memcached集群环境搭建">
+<meta property="og:url" content="http://seanlook.com/2014/10/29/apache-3tomcat-cluster-jk-memcached/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="注意本文不讨论原理，只讲述具体的搭建过程，而且步骤都经过了整理，否则过程可能会出现其他异常，请自行google。apache与tomcat整合的方式除了jk之外，使用apache自带的mod_ajp_proxy模块也可以很方便的完成。先来看一下架构图：属于正式环境中原session复制方案的改进。
+1. 所需软件包12345678910111213jrrt-3.1.2-1.6.0-linux-x6">
+<meta property="og:image" content="http://sean-images.qiniudn.com/apache_tomcat_cluster_msm.png">
+<meta property="og:updated_time" content="2015-03-25T16:46:23.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="apache+3tomcat+jk+memcached集群环境搭建">
+<meta name="twitter:description" content="注意本文不讨论原理，只讲述具体的搭建过程，而且步骤都经过了整理，否则过程可能会出现其他异常，请自行google。apache与tomcat整合的方式除了jk之外，使用apache自带的mod_ajp_proxy模块也可以很方便的完成。先来看一下架构图：属于正式环境中原session复制方案的改进。
+1. 所需软件包12345678910111213jrrt-3.1.2-1.6.0-linux-x6">
+<meta name="twitter:image" content="http://sean-images.qiniudn.com/apache_tomcat_cluster_msm.png">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title> apache+3tomcat+jk+memcached集群环境搭建 | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                apache+3tomcat+jk+memcached集群环境搭建
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2014-10-29T10:21:25+08:00" content="2014-10-29">
+              2014-10-29
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/Web-Server/" itemprop="url" rel="index">
+                    <span itemprop="name">Web_Server</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2014/10/29/apache-3tomcat-cluster-jk-memcached/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2014/10/29/apache-3tomcat-cluster-jk-memcached/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>注意本文不讨论原理，只讲述具体的搭建过程，而且步骤都经过了整理，否则过程可能会出现其他异常，请自行google。apache与tomcat整合的方式除了jk之外，使用apache自带的mod_ajp_proxy模块也可以很方便的完成。<br>先来看一下架构图：<br><img src="http://sean-images.qiniudn.com/apache_tomcat_cluster_msm.png" alt="apache_tomcat_cluster_msm"><br>属于正式环境中原session复制方案的改进。</p>
+<h1 id="1-所需软件包"><a href="#1-所需软件包" class="headerlink" title="1. 所需软件包"></a>1. 所需软件包</h1><figure class="highlight css"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line"><span class="selector-tag">jrrt-3</span><span class="selector-class">.1</span><span class="selector-class">.2-1</span><span class="selector-class">.6</span><span class="selector-class">.0-linux-x64</span><span class="selector-class">.bin</span>（或<span class="selector-tag">jdk1</span><span class="selector-class">.6</span><span class="selector-class">.0_33</span>）   <span class="selector-tag">jvm</span></div><div class="line"><span class="selector-tag">httpd-2</span><span class="selector-class">.2</span><span class="selector-class">.26</span><span class="selector-class">.tar</span><span class="selector-class">.gz</span>                              <span class="selector-tag">web</span>服务器，处理静态资源</div><div class="line"><span class="selector-tag">apache-tomcat-6</span><span class="selector-class">.0</span><span class="selector-class">.32</span><span class="selector-class">.tar</span><span class="selector-class">.gz</span>                      应用服务器，<span class="selector-tag">Servlet</span>容器处理动态请求</div><div class="line"><span class="selector-tag">tomcat-connectors-1</span><span class="selector-class">.2</span><span class="selector-class">.30-src</span><span class="selector-class">.tar</span><span class="selector-class">.gz</span>              <span class="selector-tag">apache</span>与<span class="selector-tag">tomcat</span>整合插件<span class="selector-tag">mod_jk</span><span class="selector-class">.so</span></div><div class="line"><span class="selector-tag">tomcat-native</span><span class="selector-class">.tar</span><span class="selector-class">.gz</span>                             <span class="selector-tag">APR</span>加速<span class="selector-tag">tomcat</span>，提高线程并发能力。使用<span class="selector-tag">tomcat</span>自带版本。</div><div class="line"><span class="selector-tag">memcached-session-manager</span>                        使用<span class="selector-tag">msm</span>解决多<span class="selector-tag">tomcat</span>集群时<span class="selector-tag">session</span>同步问题所需<span class="selector-tag">jar</span>包</div><div class="line">    <span class="selector-tag">asm-3</span><span class="selector-class">.2</span><span class="selector-class">.jar</span>, <span class="selector-tag">couchbase-client-1</span><span class="selector-class">.2</span><span class="selector-class">.2</span><span class="selector-class">.jar</span>, </div><div class="line">    <span class="selector-tag">kryo-1</span><span class="selector-class">.04</span><span class="selector-class">.jar</span>, <span class="selector-tag">kryo-serializers-0</span><span class="selector-class">.11</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">msm-kryo-serializer-1</span><span class="selector-class">.6</span><span class="selector-class">.5</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">memcached-session-manager-1</span><span class="selector-class">.6</span><span class="selector-class">.5</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">memcached-session-manager-tc6-1</span><span class="selector-class">.6</span><span class="selector-class">.5</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">minlog-1</span><span class="selector-class">.2</span><span class="selector-class">.jar</span>, <span class="selector-tag">reflectasm-1</span><span class="selector-class">.01</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">spymemcached-2</span><span class="selector-class">.10</span><span class="selector-class">.2</span><span class="selector-class">.jar</span></div></pre></td></tr></table></figure>
+<a id="more"></a>
+<h1 id="2-安装过程"><a href="#2-安装过程" class="headerlink" title="2. 安装过程"></a>2. 安装过程</h1><h2 id="2-1-JDK"><a href="#2-1-JDK" class="headerlink" title="2.1 JDK"></a>2.1 JDK</h2><p>下载将JRockit二进制安装文件，赋予可执行权限<br><figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># pwd</span></div><div class="line">/apps/test/java</div><div class="line"><span class="meta"># chmod o+x jrrt*.bin</span></div><div class="line"><span class="meta"># ./jrrt-3.1.2-1.6.0-linux-x64.bin</span></div></pre></td></tr></table></figure></p>
+<p>可不必为整个linux环境设置<code>JAVA_HOME=&quot;/apps/test/java/jrrt-3.1.2-1.6.0&quot;</code>，在tomcat中指定即可。</p>
+<h2 id="2-2-编译安装apache"><a href="#2-2-编译安装apache" class="headerlink" title="2.2 编译安装apache"></a>2.2 编译安装apache</h2><p>因为<code>tomcat-native</code>依赖于apr，所以这里先直接从 httpd-2.2.26/srclib 目录下安装apache自带的<code>apr</code>和<code>apr-util</code>。<br><figure class="highlight autoit"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">[root<span class="symbol">@cachets</span> httpd<span class="number">-2.2</span><span class="number">.26</span>]<span class="meta"># pwd</span></div><div class="line">/apps/test/soft_src/httpd<span class="number">-2.2</span><span class="number">.26</span></div><div class="line">[root<span class="symbol">@test</span> httpd<span class="number">-2.2</span><span class="number">.26</span>]<span class="meta"># cd srclib/apr</span></div><div class="line">[root<span class="symbol">@test</span> apr]<span class="meta"># ./configure --prefix=/usr/local/apr</span></div><div class="line">[root<span class="symbol">@test</span> apr]<span class="meta"># make &amp;&amp; make install</span></div><div class="line">[root<span class="symbol">@test</span> apr]<span class="meta"># cd ../apr-util/</span></div><div class="line">[root<span class="symbol">@test</span> apr-util]<span class="meta"># ./configure --prefix=/usr/local/apr-util --with-apr=/usr/local/apr</span></div><div class="line">[root<span class="symbol">@test</span> apr-util]<span class="meta"># make &amp;&amp; make install</span></div></pre></td></tr></table></figure></p>
+<p>建议将srclib下的<code>pcre</code>也装上，主要是考虑后面转发请求时可能要使用地址rewrite，需要正则语法的支持。默认CentOS6.x已经安装了这个库。</p>
+<p>安装apache：<br><figure class="highlight brainfuck"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="title">[</span><span class="comment">root@test</span> <span class="comment">httpd</span><span class="literal">-</span><span class="comment">2</span><span class="string">.</span><span class="comment">2</span><span class="string">.</span><span class="comment">26</span><span class="title">]</span><span class="comment">#</span> <span class="string">.</span><span class="comment">/configure</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">prefix=/apps/test/apache2</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">enable</span><span class="literal">-</span><span class="comment">mods</span><span class="literal">-</span><span class="comment">shared=all</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">enable</span><span class="literal">-</span><span class="comment">modules=so</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">enable</span><span class="literal">-</span><span class="comment">rewrite</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">enable</span><span class="literal">-</span><span class="comment">deflate</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">with</span><span class="literal">-</span><span class="comment">mpm=worker</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">with</span><span class="literal">-</span><span class="comment">apr=/usr/local/apr</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">with</span><span class="literal">-</span><span class="comment">apr</span><span class="literal">-</span><span class="comment">util=/usr/local/apr</span><span class="literal">-</span><span class="comment">util</span></div><div class="line"><span class="title">[</span><span class="comment">root@test</span> <span class="comment">httpd</span><span class="literal">-</span><span class="comment">2</span><span class="string">.</span><span class="comment">2</span><span class="string">.</span><span class="comment">26</span><span class="title">]</span><span class="comment">#</span> <span class="comment">make</span> <span class="comment">&amp;&amp;</span> <span class="comment">make</span> <span class="comment">install</span></div></pre></td></tr></table></figure></p>
+<h2 id="2-3-安装tomcat"><a href="#2-3-安装tomcat" class="headerlink" title="2.3 安装tomcat"></a>2.3 安装tomcat</h2><p>解压apache-tomcat-6.0.32.tar.gz拷贝至/app/test/tomcat0，不建议使用root用户管理tomcat.<br><figure class="highlight lsl"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">[test@cachets soft_src]$ tar -zxvf apache-tomcat<span class="number">-6.0</span><span class="number">.32</span>.tar.gz</div><div class="line">[test@cachets soft_src]$ cp -a apache-tomcat<span class="number">-6.0</span><span class="number">.32</span> /app/crm/tomcat0</div><div class="line"></div><div class="line"><span class="comment">// 安装tomcat-native（不用单独下载，在tomcat的bin目录中自带）</span></div><div class="line"># yum install -y openssl-devel apr-devel</div><div class="line">[root@cachets ~]# cd /app/test/soft_src/apache-tomcat<span class="number">-6.0</span><span class="number">.32</span>/bin</div><div class="line">[root@cachets bin]# tar -zxvf tomcat-native.tar.gz</div><div class="line">[root@cachets bin]# cd tomcat-native<span class="number">-1.1</span><span class="number">.20</span>-src/jni/native/</div><div class="line">[root@cachets native]# ./configure --with-apr=/usr/local/apr/bin/apr<span class="number">-1</span>-config --with-ssl --with-java-home=/apps/test/java/jrrt<span class="number">-3.1</span><span class="number">.2</span><span class="number">-1.6</span><span class="number">.0</span></div><div class="line">[root@cachets native]# make &amp;&amp; make install</div></pre></td></tr></table></figure></p>
+<p>配置tomcat：</p>
+<p>tomcat默认参数是为开发环境制定，而非适合生产环境，尤其是内存和线程的配置，默认都很低，容易成为性能瓶颈。下面是一些配置示例，需要根据实际需要更改。<br><figure class="highlight nix"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">[crm@cachets tomcat0]$ vi bin/setenv.sh</div><div class="line"><span class="attr">JAVA_OPTS="-XX:PermSize=128M</span> -XX:<span class="attr">MaxPermSize=256M</span> -Xms1536M -Xmx2048M -verbosegc <span class="string">"</span></div><div class="line">CATALINA_OPTS="-Dcom.sun.management.jmxremote.<span class="attr">port=7091</span> -Dcom.sun.management.jmxremote.<span class="attr">ssl=false</span> -Dcom.sun.management.jmxremote.<span class="attr">authenticate=false</span> -Djava.rmi.server.<span class="attr">hostname=192.168.10.100"</span></div><div class="line"><span class="attr">JAVA_HOME="/apps/test/java/jrrt-3.1.2-1.6.0"</span></div><div class="line"><span class="attr">CATALINA_OPTS="$CATALINA_OPTS</span> -Djava.library.<span class="attr">path=/usr/local/apr/lib"</span></div><div class="line">[crm@cachets tomcat0]$ chmod <span class="number">755</span> bin/setenv.sh</div></pre></td></tr></table></figure></p>
+<p>bin目录下新建的可执行文件<code>setenv.sh</code>会由tomcat自动调用。上面的<code>jmxremote.authenticate</code>在正式环境中请务必设为true并设置用户名/密码，减少安全隐患，或者注释掉<code>CATALINA_OPTS</code>。（有时候出于性能调优的目的，才需要设置JMX）。对于具体的连接协议有不同的优化属性，参考如下：<br>对HTTP：</p>
+<pre><code>&lt;Connector port=&quot;8080&quot; 
+           protocol=&quot;org.apache.coyote.http11.Http11NioProtocol&quot;
+           URIEncoding=&quot;UTF-8&quot;
+           enableLookups=&quot;false&quot;
+
+           maxThreads=&quot;400&quot;
+           minSpareTheads=&quot;50&quot;   
+           acceptCount=&quot;400&quot;
+           acceptorThreadCount=&quot;2&quot;              
+           connectionTimeout=&quot;30000&quot; 
+           disableUploadTimeout=&quot;true&quot;
+
+           compression=&quot;on&quot;
+           compressionMinSize=&quot;2048&quot;
+           maxHttpHeaderSize=&quot;16384&quot;
+           redirectPort=&quot;8443&quot;
+ /&gt;
+</code></pre><p>对AJP：</p>
+<pre><code>&lt;Connector port=&quot;8009&quot; protocol=&quot;AJP/1.3&quot; 
+           maxThreads=&quot;300&quot; minSpareThreads=&quot;50&quot;
+           connectionTimeout=&quot;30000&quot;
+           keepAliveTimeout=&quot;30000&quot;
+           acceptCount=&quot;200&quot;
+           URIEncoding=&quot;UTF-8&quot;
+           enableLookups=&quot;false&quot;
+           redirectPort=&quot;8443&quot; /&gt;
+</code></pre><h2 id="2-4-安装jk"><a href="#2-4-安装jk" class="headerlink" title="2.4 安装jk"></a>2.4 安装jk</h2><figure class="highlight livescript"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">[crm@test soft_src]$ tar -zxvf tomcat-connectors-<span class="number">1.2</span>.<span class="number">30</span>-src.tar.gz</div><div class="line">[crm@test soft_src]$ cd tomcat-connectors-<span class="number">1.2</span>.<span class="number">30</span>-src/<span class="keyword">native</span></div><div class="line">[root@test <span class="keyword">native</span>]<span class="comment"># ./configure --with-apxs=/apps/test/apache2/bin/apxs</span></div><div class="line">[root@test <span class="keyword">native</span>]<span class="comment"># make &amp;&amp; make install</span></div></pre></td></tr></table></figure>
+<p>此时可以看到在<code>/apps/test/apache2/modules</code>下有<code>mod_jk.so</code>文件，用于连接apache与tomcat。</p>
+<h2 id="2-5-配置（集群）负载均衡选项"><a href="#2-5-配置（集群）负载均衡选项" class="headerlink" title="2.5 配置（集群）负载均衡选项"></a>2.5 配置（集群）负载均衡选项</h2><h3 id="2-5-1-apache"><a href="#2-5-1-apache" class="headerlink" title="2.5.1 apache"></a>2.5.1 apache</h3><p>建立配置文件<code>httpd-jk.conf</code>：<br><figure class="highlight vim"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line">[root@cachets ~]# <span class="keyword">cd</span> /app/test/</div><div class="line">[root@cachets crm]# <span class="keyword">vi</span> apache2/<span class="keyword">conf</span>/extra/httpd-jk.<span class="keyword">conf</span></div><div class="line"># Load mod_jk module</div><div class="line">LoadModule jk_module modules/mod_jk.<span class="keyword">so</span></div><div class="line"># 指定保存了worker相关工作属性定义的配置文件</div><div class="line">JkWorkersFile <span class="keyword">conf</span>/extra/workers.properties</div><div class="line"># Specify jk <span class="built_in">log</span> <span class="keyword">file</span></div><div class="line">JkLogFile /app/test/apache2/logs/mod_jk.<span class="built_in">log</span></div><div class="line"># Specify jk <span class="built_in">log</span> level [<span class="keyword">debug</span>/error/info]</div><div class="line">JkLogLevel info</div><div class="line">#指定哪些请求交给tomcat处理,<span class="string">"controller"</span>为在workers.properties里指定的负载分配控制器名</div><div class="line"></div><div class="line">JkMount /servlet/* controller</div><div class="line">JkMount /*.jsp controller</div><div class="line">JkMount /*.<span class="keyword">do</span> controller</div><div class="line"></div><div class="line">// 在<span class="keyword">conf</span>/httpd.<span class="keyword">conf</span>最后加上</div><div class="line">Include <span class="keyword">conf</span>/extra/httpd-vhosts.<span class="keyword">conf</span></div><div class="line">Include <span class="keyword">conf</span>/extra/httpd-jk.<span class="keyword">conf</span></div></pre></td></tr></table></figure></p>
+<p>建立工作文件<code>workers.properties</code>：<br><figure class="highlight nix"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div></pre></td><td class="code"><pre><div class="line">[root@cachets crm]<span class="comment"># vi apache2/conf/extra/workers.properties</span></div><div class="line"><span class="comment"># servers</span></div><div class="line">worker.<span class="attr">list=controller</span></div><div class="line"><span class="comment"># ====== tomcat0 =======</span></div><div class="line">worker.tomcat0.<span class="attr">port=8009</span></div><div class="line">worker.tomcat0.<span class="attr">host=192.168.10.100</span></div><div class="line">worker.tomcat0.<span class="attr">type=ajp13</span></div><div class="line">worker.tomcat0.<span class="attr">lbfactor=1</span></div><div class="line"><span class="comment"># ====== tomcat1 =======</span></div><div class="line">worker.tomcat1.<span class="attr">port=8109</span></div><div class="line">worker.tomcat1.<span class="attr">host=192.168.10.100</span></div><div class="line">worker.tomcat1.<span class="attr">type=ajp13</span></div><div class="line">worker.tomcat1.<span class="attr">lbfactor=1</span></div><div class="line"><span class="comment"># ====== tomcat2 =======</span></div><div class="line">worker.tomcat2.<span class="attr">port=8209</span></div><div class="line">worker.tomcat2.<span class="attr">host=192.168.10.100</span></div><div class="line">worker.tomcat2.<span class="attr">type=ajp13</span></div><div class="line">worker.tomcat2.<span class="attr">lbfactor=1</span></div><div class="line"><span class="comment"># ====== controller ====</span></div><div class="line">worker.controller.<span class="attr">type=lb</span></div><div class="line">worker.controller.<span class="attr">balance_workers=tomcat0,tomcat1,tomcat2</span></div><div class="line">worker.controller.<span class="attr">sticky_session</span> = <span class="number">1</span></div></pre></td></tr></table></figure></p>
+<p>以上是3个tomcat的做负载均衡的情况，负载因子<code>lbfactor</code>都为1，session为sticky模式，apache与tomcat连接的协议采用AJP/1.3，同一台服务器上通过端口来区分tomcat0/tomcat1/tomcat2。</p>
+<h3 id="2-5-2-tomcat"><a href="#2-5-2-tomcat" class="headerlink" title="2.5.2 tomcat"></a>2.5.2 tomcat</h3><p>在<code>tomcat0/conf/server.xml</code>中加入<code>jvmRoute</code>属性，这个属性与上面的<code>workers.properties</code>的worker相同：<br><figure class="highlight applescript"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">&lt;Engine <span class="built_in">name</span>=<span class="string">"Catalina"</span> defaultHost=<span class="string">"localhost"</span> jvmRoute=<span class="string">"tomcat0"</span>&gt;</div></pre></td></tr></table></figure></p>
+<p>设置测试应用的访问路径，在<code>tomcat0/conf/server.xml</code>的<code>&lt;Host&gt;</code>节点下添加如下：<br><figure class="highlight xml"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"><span class="tag">&lt;<span class="name">Context</span> <span class="attr">path</span>=<span class="string">""</span> <span class="attr">docBase</span>=<span class="string">"/apps/test/testapp/TEST"</span> <span class="attr">reloadable</span>=<span class="string">"true"</span> /&gt;</span></div></pre></td></tr></table></figure></p>
+<h3 id="2-5-3-app-TEST"><a href="#2-5-3-app-TEST" class="headerlink" title="2.5.3 app-TEST"></a>2.5.3 app-TEST</h3><p>为了看到负载均衡的效果，在<code>/apps/test/testapp/TEST</code>目录下建立测试页面test.jsp：<br><figure class="highlight vbscript-html"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div></pre></td><td class="code"><pre><div class="line"><span class="xml"></span><span class="vbscript">&lt;%@ page contentType=<span class="string">"text/html; charset=UTF-8"</span> %&gt;</span><span class="xml"></span></div><div class="line"><span class="vbscript">&lt;%@ page import=<span class="string">"java.util.*"</span> %&gt;</span><span class="xml"></span></div><div class="line"><span class="tag">&lt;<span class="name">html</span>&gt;</span><span class="tag">&lt;<span class="name">head</span>&gt;</span><span class="tag">&lt;<span class="name">title</span>&gt;</span>Cluster App Test<span class="tag">&lt;/<span class="name">title</span>&gt;</span><span class="tag">&lt;/<span class="name">head</span>&gt;</span></div><div class="line"><span class="tag">&lt;<span class="name">body</span>&gt;</span></div><div class="line">Server Info:</div><div class="line"><span class="vbscript">&lt;%</span></div><div class="line">out.println(<span class="built_in">request</span>.getLocalAddr() + <span class="string">" : "</span> + <span class="built_in">request</span>.getLocalPort()+<span class="string">"&lt;br&gt;"</span>);%&gt;<span class="xml"></span></div><div class="line"><span class="vbscript">&lt;%</span></div><div class="line">  out.println(<span class="string">"&lt;br&gt; ID "</span> + session.getId()+<span class="string">"&lt;br&gt;"</span>);</div><div class="line">  // 如果有新的 Session 属性设置</div><div class="line">  <span class="built_in">String</span> dataName = <span class="built_in">request</span>.getParameter(<span class="string">"dataName"</span>);</div><div class="line">  <span class="keyword">if</span> (dataName != <span class="literal">null</span> &amp;&amp; dataName.length() &gt; <span class="number">0</span>) &#123;</div><div class="line">     <span class="built_in">String</span> dataValue = <span class="built_in">request</span>.getParameter(<span class="string">"dataValue"</span>);</div><div class="line">     session.setAttribute(dataName, dataValue);</div><div class="line">  &#125;</div><div class="line">  out.println(<span class="string">"&lt;b&gt;Session 列表&lt;/b&gt;&lt;br&gt;"</span>);</div><div class="line">  System.out.println(<span class="string">"============================"</span>);</div><div class="line">  Enumeration e = session.getAttributeNames();</div><div class="line">  <span class="keyword">while</span> (e.hasMoreElements()) &#123;</div><div class="line">     <span class="built_in">String</span> name = (<span class="built_in">String</span>)e.nextElement();</div><div class="line">     <span class="built_in">String</span> value = session.getAttribute(name).toString();</div><div class="line">     out.println( name + <span class="string">" = "</span> + value+<span class="string">"&lt;br&gt;"</span>);</div><div class="line">         System.out.println( name + <span class="string">" = "</span> + value);</div><div class="line">   &#125;</div><div class="line">%&gt;<span class="xml"></span></div><div class="line">  <span class="tag">&lt;<span class="name">form</span> <span class="attr">action</span>=<span class="string">"test.jsp"</span> <span class="attr">method</span>=<span class="string">"POST"</span>&gt;</span></div><div class="line">    CRM <span class="tag">&lt;<span class="name">br</span>&gt;</span></div><div class="line">    名称:<span class="tag">&lt;<span class="name">input</span> <span class="attr">type</span>=<span class="string">text</span> <span class="attr">size</span>=<span class="string">20</span> <span class="attr">name</span>=<span class="string">"dataName"</span>&gt;</span></div><div class="line">     <span class="tag">&lt;<span class="name">br</span>&gt;</span></div><div class="line">    值:<span class="tag">&lt;<span class="name">input</span> <span class="attr">type</span>=<span class="string">text</span> <span class="attr">size</span>=<span class="string">20</span> <span class="attr">name</span>=<span class="string">"dataValue"</span>&gt;</span></div><div class="line">     <span class="tag">&lt;<span class="name">br</span>&gt;</span></div><div class="line">    <span class="tag">&lt;<span class="name">input</span> <span class="attr">type</span>=<span class="string">submit</span>&gt;</span></div><div class="line">   <span class="tag">&lt;/<span class="name">form</span>&gt;</span></div><div class="line"><span class="tag">&lt;/<span class="name">body</span>&gt;</span></div><div class="line"><span class="tag">&lt;/<span class="name">html</span>&gt;</span></div></pre></td></tr></table></figure></p>
+<p>到这里还差一步就可以看到集群的效果，那就是3个tomcat之间session同步的问题。可以通过打开<code>&lt;Engine&gt;</code>节点下的<code>&lt;Cluster&gt;</code>标签的注释来简单的实现session复制：</p>
+<pre><code>&lt;Cluster className=&quot;org.apache.catalina.ha.tcp.SimpleTcpCluster&quot;/&gt;
+</code></pre><p>然后在<code>tomcat0/conf/web.xml</code>的<code>&lt;webapp&gt;</code>根节点下加入<code>&lt;distributable /&gt;</code></p>
+<p>复制tomcat0到tomcat1、tomcat2，修改<server> <connector>的端口避免冲突，修改对应的jvmRoute</connector></server></p>
+<p>启动apache和3个tomcat，就可以看到效果。但这里我们使用<code>memcached-session-manager</code>来同步session，所以不必打开<code>&lt;Cluster&gt;</code>这一步。</p>
+<h2 id="2-6-memcached-session-manager配置"><a href="#2-6-memcached-session-manager配置" class="headerlink" title="2.6 memcached-session-manager配置"></a>2.6 memcached-session-manager配置</h2><h3 id="2-6-1-安装memcached服务器"><a href="#2-6-1-安装memcached服务器" class="headerlink" title="2.6.1 安装memcached服务器"></a>2.6.1 安装memcached服务器</h3><p>这里memcached搭建在另外一台服务器上（192.168.10.20），也可以安装在本地。<br><figure class="highlight autoit"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">[root<span class="symbol">@cachets</span> msm]<span class="meta"># yum install libevent libevent-devel</span></div><div class="line">[root<span class="symbol">@cachets</span> msm]<span class="meta"># tar -zxvf memcached-1.4.19.tar.gz</span></div><div class="line">[root<span class="symbol">@cachets</span> msm]<span class="meta"># cd memcached-1.4.19 &amp;&amp; ./configure &amp;&amp; make &amp;&amp; make install</span></div><div class="line"></div><div class="line">// 启动两个memcached节点，端口分别为<span class="number">11211</span>、<span class="number">11212</span></div><div class="line">[root<span class="symbol">@cachets</span> ~]<span class="meta">#memcached -d -m 64 -p 11211 -u daemon -P /var/run/memcached.pid </span></div><div class="line">[root<span class="symbol">@cachets</span> ~]<span class="meta">#memcached -d -m 64 -p 11212 -u daemon -P /var/run/memcached2.pid</span></div></pre></td></tr></table></figure></p>
+<p>如果开启了防火墙，需要加入11211、11212端口的允许规则。</p>
+<h3 id="2-6-2-再次配置tomcat"><a href="#2-6-2-再次配置tomcat" class="headerlink" title="2.6.2 再次配置tomcat"></a>2.6.2 再次配置tomcat</h3><p>加入jar包</p>
+<p>将<code>asm-3.2.jar</code>, <code>couchbase-client-1.2.2.jar</code>, <code>kryo-1.04.jar</code>, <code>kryo-serializers-0.11.jar</code>, <code>msm-kryo-serializer-1.6.5.jar</code>, <code>memcached-session-manager-1.6.5.jar</code>, <code>memcached-session-manager-tc6-1.6.5.jar</code>, <code>minlog-1.2.jar</code>, <code>reflectasm-1.01.jar</code>, <code>spymemcached-2.10.2.jar</code>这些jar包加入tomcat0/lib/下。可以看到这里选用的session序列化策略采用的是kryo。另外要注意版本之间的兼容性，这里只针对tomcat6.x。<br>修改<code>conf/server.xml</code>：</p>
+<p>将<context>节点修改成：</context></p>
+<pre><code>&lt;Context path=&quot;&quot; docBase=&quot;/apps/test/testapp/TEST&quot; reloadable=&quot;true&quot; &gt;
+   &lt;Manager className=&quot;de.javakaffee.web.msm.MemcachedBackupSessionManager&quot;
+      memcachedNodes=&quot;n1:192.168.10.20:11211,n2:192.168.10.20:11212&quot;
+      failoverNodes=&quot;n1&quot;
+      sticky=&quot;true&quot;
+      requestUriIgnorePattern=&quot;.*\.(png|gif|jpg|css|js)$&quot;
+      sessionBackupAsync=&quot;false&quot;
+      sessionBackupTimeout=&quot;100&quot;
+      transcoderFactoryClass=&quot;de.javakaffee.web.msm.serializer.kryo.KryoTranscoderFactory&quot;
+      copyCollectionsForSerialization=&quot;false&quot; /&gt;
+&lt;/Context&gt;
+</code></pre><p>接着将tomcat0完整的复制2份（tomcat1，tomcat2），也可以放到另外一台服务器上。<br>修改为<code>workers.properties</code>中定义的AJP等端口：</p>
+<table>
+<thead>
+<tr>
+<th>node tomcat</th>
+<th>Server port</th>
+<th>Connector port http</th>
+<th>Connector port ajp</th>
+<th>Engine jvmRoute</th>
+<th>memcached failoverNodes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>tomcat0</td>
+<td>8005</td>
+<td>8080</td>
+<td>8009</td>
+<td>tomcat0</td>
+<td>n1</td>
+</tr>
+<tr>
+<td>tomcat1</td>
+<td>8105</td>
+<td>8081</td>
+<td>8109</td>
+<td>tomcat1</td>
+<td>n1</td>
+</tr>
+<tr>
+<td>tomcat2</td>
+<td>8205</td>
+<td>8082</td>
+<td>8209</td>
+<td>tomcat2</td>
+<td>n2</td>
+</tr>
+</tbody>
+</table>
+<h1 id="3-测试"><a href="#3-测试" class="headerlink" title="3. 测试"></a>3. 测试</h1><p>分别启动tomcat0、tomcat1、tomcat2和apache，注意观察tomcat的启动日志和memcached服务器的日志。<br><figure class="highlight stata"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">[<span class="keyword">test</span>@cachets ~]$ /apps/<span class="keyword">test</span>/tomcat0/bin/startup.<span class="keyword">sh</span></div><div class="line">[<span class="keyword">test</span>@cachets ~]$ /apps/<span class="keyword">test</span>/tomcat1/bin/startup.<span class="keyword">sh</span></div><div class="line">[<span class="keyword">test</span>@cachets ~]$ /apps/<span class="keyword">test</span>/tomcat2/bin/startup.<span class="keyword">sh</span></div><div class="line">[root@cachets ~]# /apps/<span class="keyword">test</span>/apache2/bin/apachectl start</div></pre></td></tr></table></figure></p>
+<p>在浏览器访问<code>http://192.168.10.100/test.jsp</code>。主要测试负载均衡与session共享。</p>
+<p><strong>参考</strong></p>
+<ul>
+<li><a href="https://people.apache.org/~mturk/docs/article/ftwai.html" target="_blank" rel="external">https://people.apache.org/~mturk/docs/article/ftwai.html</a></li>
+</ul>
+<hr>
+<p>原文链接地址：<a href="http://seanlook.com/2015/04/23/pfsense-usage/">http://seanlook.com/2015/04/23/pfsense-usage/</a></p>
+<hr>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/apache/" rel="tag">#apache</a>
+          
+            <a href="/tags/tomcat/" rel="tag">#tomcat</a>
+          
+            <a href="/tags/集群/" rel="tag">#集群</a>
+          
+            <a href="/tags/mod-jk/" rel="tag">#mod_jk</a>
+          
+            <a href="/tags/memcached/" rel="tag">#memcached</a>
+          
+            <a href="/tags/centos/" rel="tag">#centos</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2014/10/28/vsphere-recover-from-missing-vmdk/" rel="next" title="误删vSphere虚拟机.vmdk文件的恢复">
+                <i class="fa fa-chevron-left"></i> 误删vSphere虚拟机.vmdk文件的恢复
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2014/10/29/multiple-tomcats-service-script/" rel="prev" title="管理多tomcat服务shell脚本（CentOS）">
+                管理多tomcat服务shell脚本（CentOS） <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2014/10/29/apache-3tomcat-cluster-jk-memcached/"
+           data-title="apache+3tomcat+jk+memcached集群环境搭建" data-url="http://seanlook.com/2014/10/29/apache-3tomcat-cluster-jk-memcached/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-所需软件包"><span class="nav-text">1. 所需软件包</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-安装过程"><span class="nav-text">2. 安装过程</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-JDK"><span class="nav-text">2.1 JDK</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-编译安装apache"><span class="nav-text">2.2 编译安装apache</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-3-安装tomcat"><span class="nav-text">2.3 安装tomcat</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-4-安装jk"><span class="nav-text">2.4 安装jk</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-5-配置（集群）负载均衡选项"><span class="nav-text">2.5 配置（集群）负载均衡选项</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-5-1-apache"><span class="nav-text">2.5.1 apache</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-5-2-tomcat"><span class="nav-text">2.5.2 tomcat</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-5-3-app-TEST"><span class="nav-text">2.5.3 app-TEST</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-6-memcached-session-manager配置"><span class="nav-text">2.6 memcached-session-manager配置</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-6-1-安装memcached服务器"><span class="nav-text">2.6.1 安装memcached服务器</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-6-2-再次配置tomcat"><span class="nav-text">2.6.2 再次配置tomcat</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-测试"><span class="nav-text">3. 测试</span></a></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

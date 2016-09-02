@@ -1,0 +1,912 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="LDAP,slapd," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="本文采用的是从源码编译安装，适合Ubuntu和CentOS平台，通过apt-get或yum方式安装参考补充部分。openldap原理介绍参考这里。
+环境：Ubuntu: 14.04.1 (trusty), x86_64OpenLDAP: 2.4.31Berkery DB: 5.1.29
+1 安装1.1 准备编译环境和依赖包12# apt-get install build-essential# a">
+<meta property="og:type" content="article">
+<meta property="og:title" content="OpenLDAP(2.4.3x)服务器搭建及配置说明">
+<meta property="og:url" content="http://seanlook.com/2015/01/21/openldap-install-guide-ssl/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="本文采用的是从源码编译安装，适合Ubuntu和CentOS平台，通过apt-get或yum方式安装参考补充部分。openldap原理介绍参考这里。
+环境：Ubuntu: 14.04.1 (trusty), x86_64OpenLDAP: 2.4.31Berkery DB: 5.1.29
+1 安装1.1 准备编译环境和依赖包12# apt-get install build-essential# a">
+<meta property="og:image" content="http://sean-images.qiniudn.com/ldap_conn_session.png">
+<meta property="og:image" content="http://sean-images.qiniudn.com/ldap_trust_ca.png">
+<meta property="og:image" content="http://sean-images.qiniudn.com/ldap_browser.png">
+<meta property="og:image" content="http://sean-images.qiniudn.com/ldap_config_dit.png">
+<meta property="og:image" content="http://sean-images.qiniudn.com/ldap_slapd_config.png">
+<meta property="og:updated_time" content="2015-01-21T02:46:23.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="OpenLDAP(2.4.3x)服务器搭建及配置说明">
+<meta name="twitter:description" content="本文采用的是从源码编译安装，适合Ubuntu和CentOS平台，通过apt-get或yum方式安装参考补充部分。openldap原理介绍参考这里。
+环境：Ubuntu: 14.04.1 (trusty), x86_64OpenLDAP: 2.4.31Berkery DB: 5.1.29
+1 安装1.1 准备编译环境和依赖包12# apt-get install build-essential# a">
+<meta name="twitter:image" content="http://sean-images.qiniudn.com/ldap_conn_session.png">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title> OpenLDAP(2.4.3x)服务器搭建及配置说明 | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                OpenLDAP(2.4.3x)服务器搭建及配置说明
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2015-01-21T01:21:25+08:00" content="2015-01-21">
+              2015-01-21
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/OpenLDAP/" itemprop="url" rel="index">
+                    <span itemprop="name">OpenLDAP</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/01/21/openldap-install-guide-ssl/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/01/21/openldap-install-guide-ssl/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>本文采用的是从源码编译安装，适合Ubuntu和CentOS平台，通过<code>apt-get</code>或<code>yum</code>方式安装参考补充部分。openldap原理介绍参考<a href="http://seanlook.com/2015/01/15/openldap_introduction/">这里</a>。</p>
+<p>环境：<br>Ubuntu: 14.04.1 (trusty), x86_64<br>OpenLDAP: 2.4.31<br>Berkery DB: 5.1.29</p>
+<h1 id="1-安装"><a href="#1-安装" class="headerlink" title="1 安装"></a>1 安装</h1><h2 id="1-1-准备编译环境和依赖包"><a href="#1-1-准备编译环境和依赖包" class="headerlink" title="1.1 准备编译环境和依赖包"></a>1.1 准备编译环境和依赖包</h2><figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># apt-get install build-essential</span></div><div class="line"><span class="meta"># apt-get install libssl-dev</span></div></pre></td></tr></table></figure>
+<p>下载<a href="ftp://ftp.openldap.org/pub/OpenLDAP/openldap-release/openldap-2.4.31.tgz" target="_blank" rel="external"><code>openldap-2.4.31.tgz</code></a>和<a href="http://download.oracle.com/berkeley-db/db-5.1.29.NC.tar.gz" target="_blank" rel="external"><code>db-5.1.29.NC.tar.gz</code></a>并解压：</p>
+<figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># cd /usr/local/src</span></div><div class="line">src# wget ftp:<span class="comment">//ftp.openldap.org/pub/OpenLDAP/openldap-release/openldap-2.4.31.tgz</span></div><div class="line"><span class="meta"># wget http://download.oracle.com/berkeley-db/db-5.1.29.NC.tar.gz</span></div><div class="line"><span class="meta"># tar -zxf openldap-2.4.31.tgz</span></div><div class="line"><span class="meta"># tar -zxf db-5.1.29.NC.tar.gz</span></div><div class="line"></div><div class="line"><span class="meta"># cd db-5.1.29.NC/build_unix/</span></div><div class="line"><span class="meta"># ../dist/configure --prefix=/usr/local/berkeleydb-5.1</span></div><div class="line"><span class="meta"># make &amp;&amp; make install</span></div></pre></td></tr></table></figure>
+<p>建议人工指定<code>--prefix</code>，默认会安装到<code>/usr/local/BerkeleyDB.5.1</code>。上面的<code>make</code>过程会比较长，另外如果gcc版本在4.7及以上，可能会出现如下<a href="http://osdir.com/ml/freebsd-current/2012-05/msg00050.html" target="_blank" rel="external">warning</a>，可以忽略：<br><figure class="highlight groovy"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">..<span class="regexp">/src/</span>dbinc/atomic.<span class="string">h:</span><span class="number">179</span>:<span class="number">19</span>: <span class="string">warning:</span> conflicting types <span class="keyword">for</span> built-<span class="keyword">in</span> function</div><div class="line"> ‘__atomic_compare_exchange’ [enabled by <span class="keyword">default</span>]</div></pre></td></tr></table></figure></p>
+<h2 id="1-2-安装openldap"><a href="#1-2-安装openldap" class="headerlink" title="1.2 安装openldap"></a>1.2 安装openldap</h2><p>设置一些环境变量，修改<code>/etc/profile</code>或<code>/etc/bash.bashrc</code>：</p>
+<a id="more"></a>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="built_in">export</span> BERKELEYDB_HOME=<span class="string">"/usr/local/berkeleydb-5.1"</span></div><div class="line"><span class="built_in">export</span> CPPFLAGS=<span class="string">"-I<span class="variable">$BERKELEYDB_HOME</span>/include"</span></div><div class="line"><span class="built_in">export</span> LDFLAGS=<span class="string">"-L<span class="variable">$BERKELEYDB_HOME</span>/lib"</span></div><div class="line"><span class="built_in">export</span> LD_LIBRARY_PATH=<span class="string">"<span class="variable">$BERKELEYDB_HOME</span>/lib"</span></div><div class="line"></div><div class="line"><span class="built_in">export</span> LDAP_HOME=<span class="string">"/usr/local/openldap-2.4"</span></div><div class="line"><span class="built_in">export</span> PATH=<span class="string">"<span class="variable">$PATH</span>:<span class="variable">$BERKELEYDB_HOME</span>/bin:<span class="variable">$LDAP_HOME</span>/bin:<span class="variable">$LDAP_HOME</span>/sbin:<span class="variable">$LDAP_HOME</span>/libexec"</span></div></pre></td></tr></table></figure>
+<p>其实只要在后面编译openldap时能找到<code>lib</code>和<code>include</code>下的库就行了，不止上面设置环境变量一种办法，解决办法还有直接复制对应的库文件到<code>/usr/lib</code>和<code>/usr/include</code>，或修改<code>/etc/ld.so.conf.d</code>，选其一即可。</p>
+<p>编译安装：<br><figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">openldap<span class="number">-2.4</span><span class="number">.31</span># ./configure --prefix=/usr/local/openldap<span class="number">-2.4</span></div><div class="line"><span class="meta"># make depend</span></div><div class="line"><span class="meta"># make</span></div><div class="line"><span class="meta"># make install</span></div></pre></td></tr></table></figure></p>
+<p>出错提示解决：</p>
+<p>如果没设置<code>CPPFLAGS</code>，上面的configure过程可能会提示<code>configure: error: BDB/HDB: BerkeleyDB not available</code>。</p>
+<p>如果提示<br><figure class="highlight livecodeserver"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">configure: error: MozNSS <span class="keyword">not</span> found - please specify <span class="keyword">the</span> location <span class="built_in">to</span> <span class="keyword">the</span> NSPR <span class="keyword">and</span> NSS header <span class="built_in">files</span> </div><div class="line"><span class="keyword">in</span> CPPFLAGS <span class="keyword">and</span> <span class="keyword">the</span> location <span class="built_in">to</span> <span class="keyword">the</span> NSPR <span class="keyword">and</span> NSS libraries <span class="keyword">in</span> LDFLAGS (<span class="keyword">if</span> <span class="keyword">not</span> <span class="keyword">in</span> <span class="keyword">the</span> <span class="keyword">system</span> location)</div></pre></td></tr></table></figure></p>
+<p>或<br><figure class="highlight stata"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">configure: <span class="keyword">error</span>: <span class="keyword">no</span> acceptable C compiler found <span class="keyword">in</span> <span class="variable">$PATH</span></div></pre></td></tr></table></figure></p>
+<p>请检查第一步的依赖是否已经安装，查看openldap解压目录下的<code>README</code>看到REQUIRED SOFTWARE。</p>
+<h1 id="2-配置"><a href="#2-配置" class="headerlink" title="2 配置"></a>2 配置</h1><h2 id="2-1-基本配置"><a href="#2-1-基本配置" class="headerlink" title="2.1 基本配置"></a>2.1 基本配置</h2><p><code>/usr/local/openldap-2.4</code>目录结构：<br><figure class="highlight crystal"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">bin/      --客户端工具如ldapadd、ldapsearch</div><div class="line">etc/      --包含主配置文件slapd.conf、schema、DB_CONFIG等</div><div class="line"><span class="keyword">include</span>/</div><div class="line"><span class="class"><span class="keyword">lib</span>/</span></div><div class="line">libexec/  --服务端启动工具slapd</div><div class="line">sbin/     --服务端工具如slappasswd</div><div class="line">share/</div><div class="line">var/      --bdb数据、log存放目录</div></pre></td></tr></table></figure></p>
+<h3 id="2-1-1-配置root密码"><a href="#2-1-1-配置root密码" class="headerlink" title="2.1.1 配置root密码"></a>2.1.1 配置root密码</h3><figure class="highlight gauss"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># slappasswd </span></div><div class="line"><span class="keyword">New</span> password: </div><div class="line">Re-enter <span class="keyword">new</span> password: </div><div class="line">&#123;SSHA&#125;phAvkua+<span class="number">5</span>B7UNyIAuoTMgOgxF8kxekIk</div></pre></td></tr></table></figure>
+<h3 id="2-1-2-修改后的slapd-conf"><a href="#2-1-2-修改后的slapd-conf" class="headerlink" title="2.1.2 修改后的slapd.conf"></a>2.1.2 修改后的slapd.conf</h3><figure class="highlight groovy"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line">include		<span class="regexp">/usr/</span>local<span class="regexp">/openldap-2.4.31/</span>etc<span class="regexp">/openldap/</span>schema/core.schema</div><div class="line">include		<span class="regexp">/usr/</span>local<span class="regexp">/openldap-2.4.31/</span>etc<span class="regexp">/openldap/</span>schema/cosine.schema</div><div class="line">include		<span class="regexp">/usr/</span>local<span class="regexp">/openldap-2.4.31/</span>etc<span class="regexp">/openldap/</span>schema/inetorgperson.schema</div><div class="line"></div><div class="line">pidfile		<span class="regexp">/usr/</span>local<span class="regexp">/openldap-2.4.31/</span>var<span class="regexp">/run/</span>slapd.pid</div><div class="line">argsfile	<span class="regexp">/usr/</span>local<span class="regexp">/openldap-2.4.31/</span>var<span class="regexp">/run/</span>slapd.args</div><div class="line"></div><div class="line">loglevel <span class="number">256</span></div><div class="line">logfile  <span class="regexp">/usr/</span>local<span class="regexp">/openldap-2.4.31/</span>var/slapd.log </div><div class="line"></div><div class="line">database	bdb</div><div class="line">suffix		<span class="string">"dc=mydomain,dc=net"</span></div><div class="line">rootdn		<span class="string">"cn=root,dc=mydomain,dc=net"</span></div><div class="line">rootpw		&#123;SSHA&#125;UK4eGUq3ujR1EYrOL2MRzMBJmo7qGyY3</div><div class="line">directory	<span class="regexp">/usr/</span>local<span class="regexp">/openldap-2.4.31/</span>var/openldap-data</div><div class="line">index	objectClass	eq</div></pre></td></tr></table></figure>
+<p>根据自己的需要加入schema，suffix一般填入域名，rootdn处是管理ldap数据的管理员用户，rootpw便是使用slappasswd生成的加密密码。</p>
+<h3 id="2-1-3-启动slapd服务"><a href="#2-1-3-启动slapd服务" class="headerlink" title="2.1.3 启动slapd服务"></a>2.1.3 启动slapd服务</h3><figure class="highlight gradle"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"># <span class="regexp">/usr/</span>local<span class="regexp">/openldap-2.4.31/</span>libexec<span class="regexp">/slapd</span></div></pre></td></tr></table></figure>
+<p>会自动使用<code>etc/openldap/slapd.conf</code>作为配置文件启动，并写入<code>/usr/local/openldap-2.4.31/var/run/slapd.args</code>中。这里有个问题未解决，配置loglevel和logfile但始终都看不到记录的日志，启动时加入<code>-d 256</code>能正常输出到屏幕上。</p>
+<h3 id="2-1-4-测试数据"><a href="#2-1-4-测试数据" class="headerlink" title="2.1.4 测试数据"></a>2.1.4 测试数据</h3><p>编辑一个添加entries的文件test.ldif：<br><figure class="highlight ldif"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div></pre></td><td class="code"><pre><div class="line"><span class="attribute">dn</span>: dc=mydomain,dc=net</div><div class="line"><span class="attribute">objectClass</span>: dcObject</div><div class="line"><span class="attribute">objectClass</span>: organization</div><div class="line"><span class="attribute">dc</span>: mydomain</div><div class="line"><span class="attribute">o</span>: mydomain.Inc</div><div class="line"></div><div class="line"><span class="attribute">dn</span>: cn=root,dc=mydomain,dc=net</div><div class="line"><span class="attribute">objectClass</span>: organizationalRole</div><div class="line"><span class="attribute">cn</span>: root</div><div class="line"></div><div class="line"><span class="attribute">dn</span>: ou=itsection,dc=mydomain,dc=net</div><div class="line"><span class="attribute">ou</span>: itsection</div><div class="line"><span class="attribute">objectClass</span>: organizationalUnit</div><div class="line"></div><div class="line"><span class="attribute">dn</span>: cn=sean,ou=itsection,dc=mydomain,dc=net</div><div class="line"><span class="attribute">ou</span>: itsection</div><div class="line"><span class="attribute">cn</span>: sean</div><div class="line"><span class="attribute">sn</span>: zhouxiao</div><div class="line"><span class="attribute">objectClass</span>: inetOrgPerson</div><div class="line"><span class="attribute">objectClass</span>: organizationalPerson</div></pre></td></tr></table></figure></p>
+<p>插入数据：<br><figure class="highlight vim"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line">查看（匿名）</div><div class="line"># ldapsearch -<span class="keyword">x</span> -<span class="keyword">b</span> <span class="string">''</span> -s base <span class="string">'(objectclass=*)'</span> namingContexts</div><div class="line"></div><div class="line">添加（读入密码）</div><div class="line"># ldapadd -<span class="keyword">x</span> -D <span class="string">"cn=root,dc=mydomain,dc=net"</span> -W -<span class="keyword">f</span> test.ldif</div><div class="line"></div><div class="line">验证</div><div class="line"># ldapsearch -<span class="keyword">x</span> -<span class="keyword">b</span> <span class="string">'dc=mydomain,dc=net'</span> <span class="string">'(objectClass=*)'</span></div><div class="line"></div><div class="line">或手动添加条目</div><div class="line"># ldapadd -<span class="keyword">x</span> -D <span class="string">"cn=root,dc=mydomain,dc=net"</span> -W</div><div class="line">Enter LDAP Password: </div><div class="line">dn:<span class="keyword">cn</span>=Angelababy,<span class="keyword">ou</span>=itsection,dc=mydomain,dc=net</div><div class="line"><span class="keyword">cn</span>:Angelababy</div><div class="line"><span class="keyword">sn</span>:baby  </div><div class="line">objectClas<span class="variable">s:inetOrgPerson</span></div><div class="line">objectClas<span class="variable">s:organizationalPerson</span></div><div class="line"></div><div class="line">adding <span class="keyword">new</span> entry <span class="string">"cn=baby,ou=itsection,dc=mydomain,dc=net"</span></div></pre></td></tr></table></figure></p>
+<p>到这里，一个简易版的LDAP服务就搭建好了，下面介绍一些额外的高级配置。</p>
+<h2 id="2-2-配置TLS加密传输"><a href="#2-2-配置TLS加密传输" class="headerlink" title="2.2 配置TLS加密传输"></a>2.2 配置TLS加密传输</h2><p>在某些应用环境下可能需要加密传输ldap里的信息，配置TLS难点在于证书的生成。关于SSL加密证书的介绍请参考<a href="http://seanlook.com/2015/01/18/openssl-self-sign-ca">ssl-tls</a>，下面我们自己搭建CA，快速自签署ssl证书。</p>
+<h3 id="2-2-1-自签署ssl证书"><a href="#2-2-1-自签署ssl证书" class="headerlink" title="2.2.1 自签署ssl证书"></a>2.2.1 自签署ssl证书</h3><figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line">(<span class="number">1</span>) 生成根密钥</div><div class="line"><span class="meta"># cd /etc/ssl/demoCA/</span></div><div class="line"><span class="meta"># openssl genrsa -out private/cakey.pem 2048</span></div><div class="line"></div><div class="line">(<span class="number">2</span>) 生成根证书，位于/etc/ssl/demoCA/下（CentOS位于/etc/pki/CA）</div><div class="line"><span class="meta"># openssl req -new -x509 -key private/cakey.pem -out cacert.pem</span></div><div class="line"></div><div class="line">(<span class="number">3</span>) 初始化CA</div><div class="line">demoCA# mkdir <span class="keyword">private</span> newcerts</div><div class="line"><span class="meta"># touch newcerts index.txt serial</span></div><div class="line"><span class="meta"># echo "00" &gt; serial</span></div><div class="line"></div><div class="line">(<span class="number">4</span>) 在ldap服务器上生成ssl密钥（可以是/tmp/certs下）</div><div class="line"><span class="meta"># openssl genrsa -out ldap.key</span></div><div class="line"></div><div class="line">(<span class="number">5</span>) 为ldap生成证书签署请求（所填写内容尽量与第<span class="number">2</span>步相同）</div><div class="line">    Common Name填写主机名或域名，password留空</div><div class="line"><span class="meta"># openssl req -new -key ldap.key -out ldap.csr</span></div><div class="line"></div><div class="line">(<span class="number">6</span>) ca根据请求签发证书，得到.crt证书文件</div><div class="line"><span class="meta"># openssl ca -in ldap.key -out ldap.crt</span></div></pre></td></tr></table></figure>
+<p>如果在你的环境中已经有一个证书授权中心CA，那么只需要在ldap服务器上使用openssl生成密钥<code>.key</code>和签署请求<code>.csr</code>（第4、5步），然后将.csr发给CA服务器来生成证书<code>.crt</code>（第6步）。</p>
+<h3 id="2-2-2-在slapd-conf中加入TLS"><a href="#2-2-2-在slapd-conf中加入TLS" class="headerlink" title="2.2.2 在slapd.conf中加入TLS"></a>2.2.2 在slapd.conf中加入TLS</h3><figure class="highlight dts"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">可以是其它能访问的位置</div><div class="line"><span class="meta"># mkdir $OPENLDAP_HOME/etc/openldap/cacerts</span></div><div class="line"><span class="meta"># cp cacert.pem $OPENLDAP_HOME/etc/openldap/cacerts</span></div><div class="line"><span class="meta"># cp ldap.crt $OPENLDAP_HOME/etc/openldap/</span></div><div class="line"><span class="meta"># cp ldap.key $OPENLDAP_HOME/etc/openldap/</span></div><div class="line"></div><div class="line">在etc<span class="meta-keyword">/openldap/</span>slapd.conf中加入以下信息</div><div class="line">TLSCACertificateFile <span class="meta-keyword">/usr/</span>local/openldap<span class="number">-2.4</span><span class="meta-keyword">/etc/</span>openldap<span class="meta-keyword">/cacerts/</span>cacert.pem</div><div class="line">TLSCertificateFile <span class="meta-keyword">/usr/</span>local/openldap<span class="number">-2.4</span><span class="meta-keyword">/etc/</span>openldap/ldap.crt</div><div class="line">TLSCertificateKeyFile <span class="meta-keyword">/usr/</span>local/openldap<span class="number">-2.4</span><span class="meta-keyword">/etc/</span>openldap/ldap.key</div></pre></td></tr></table></figure>
+<h3 id="2-2-3-重新启动slapd"><a href="#2-2-3-重新启动slapd" class="headerlink" title="2.2.3 重新启动slapd"></a>2.2.3 重新启动slapd</h3><figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># killall slapd     关闭slapd standalone daemon</span></div><div class="line"><span class="meta"># ./libexec/slapd -h 'ldap://0.0.0.0:389/ ldaps://0.0.0.0:636/ ldapi:///'</span></div><div class="line">或只监听<span class="number">636</span>加密端口</div><div class="line"><span class="meta"># ./libexec/slapd -h 'ldaps://0.0.0.0:636/'</span></div></pre></td></tr></table></figure>
+<p>如果是正式环境使用加密的话，389端口前的IP换成127.0.0.1。</p>
+<h3 id="2-2-4-验证"><a href="#2-2-4-验证" class="headerlink" title="2.2.4 验证"></a>2.2.4 验证</h3><p><strong>ldapsearch</strong><br>使用自带的ldapsearch或ldapadd客户端工具来连接slapd，需要设置<code>ldap.conf</code>或<code>~/.ldaprc</code>文件中的<code>TLS_CACERT</code>为信任的根证书才能使用，否则会提示<br><figure class="highlight groovy"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">TLS certificate <span class="string">verification:</span> Error, self signed certificate <span class="keyword">in</span> certificate chain</div><div class="line">TLS <span class="string">trace:</span> SSL3 alert <span class="string">write:</span><span class="string">fatal:</span>unknown CA</div></pre></td></tr></table></figure></p>
+<p>所以在在使用ldapsearch的服务器上修改<code>/etc/ldap/ldap.conf</code>：（<code>man ldap.conf</code>）</p>
+<pre><code>BASE    dc=mydomain,dc=net
+URI     ldaps://apptest.mydomain.net:636
+TLS_CACERT /usr/local/openldap-2.4/etc/openldap/cacerts/cacert.pem
+</code></pre><p>（当然也可以<code>TLS_REQCERT never</code>来信任根证书）</p>
+<p>使用：</p>
+<pre><code>ldapsearch -x -D &quot;cn=root,dc=mydomain,dc=net&quot; -W -LLL
+或写全
+ldapsearch -x -b &apos;dc=mydomain,dc=net&apos; &apos;(objectClass=*)&apos; -H ldaps://apptest.mydomain.net:636 -D &quot;cn=root,dc=mydomain,dc=net&quot; -W
+</code></pre><p>需要注意的是，<code>URI</code>后的 Server name 必须与签署证书使用的 Common name 一致。另外在ldap server本地执行ldapsearch默认使用的客户端配置文件是<code>$LDAP_HOME/etc/openldap/ldap.conf</code>。</p>
+<p><strong>LDAPBrower</strong><br>另外一种方式是使用第三方LDAP客户端连接工具，如LDAPBrower：</p>
+<p>连接：<br><img src="http://sean-images.qiniudn.com/ldap_conn_session.png" alt="ldaps_conn_session"></p>
+<p>信任根证书：<br><img src="http://sean-images.qiniudn.com/ldap_trust_ca.png" alt="ldaps_trust_ca.png"></p>
+<p>查看（可Add entries）：<br><img src="http://sean-images.qiniudn.com/ldap_browser.png" alt="ldaps_browser"></p>
+<h1 id="3-补充"><a href="#3-补充" class="headerlink" title="3 补充"></a>3 补充</h1><h2 id="3-1-apt-get安装"><a href="#3-1-apt-get安装" class="headerlink" title="3.1 apt-get安装"></a>3.1 apt-get安装</h2><p>通过<code>apt-get</code>在Ubuntu上安装OpenLDAP。<br><figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># dpkg -l|grep libdb    查看berkeleydb是否安装</span></div><div class="line"><span class="meta"># apt-get install slapd ldap-utils</span></div></pre></td></tr></table></figure></p>
+<p>安装过程中会提示输入admin密码。</p>
+<p>安装完成后默认已经启动了slapd进程，与自己手动编译不同的是默认采用的配置文件有点区别：<br><figure class="highlight awk"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># ps -ef|grep slapd</span></div><div class="line">... <span class="regexp">/usr/</span>sbin<span class="regexp">/slapd -h ldap:/</span><span class="regexp">//</span> ldapi:<span class="regexp">//</span><span class="regexp">/ -g openldap -u openldap -F /</span>etc<span class="regexp">/ldap/</span>slapd.d</div></pre></td></tr></table></figure></p>
+<p><code>/etc/ldap/slapd.d</code> 是2.4.x版本新采用的配置文件目录，但手动编辑<code>slapd.d</code>目录下<code>ldif</code>是非常痛苦的，如果你不习惯新的配置目录格式，你可以通过修改<code>/etc/default/slapd</code>中的<code>SLAPD_CONF=</code>为<code>SLAPD_CONF=&quot;/etc/ldap/slapd.conf&quot;</code>。</p>
+<p><code>slapd.conf</code>配置形式官方已经废弃了但依然支持，你还可以选择在编辑完熟悉的<code>slapd.conf</code>后使用openldap提供的slaptest工具将它转换成<code>slapd.d</code>配置目录：<br><figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># mv /etc/ldap/slapd.d&#123;,.dist&#125;      先删除（备份）原目录</span></div><div class="line"><span class="meta"># slaptest -f /etc/ldap/slapd.conf -F /etc/ldap/slapd.d/  转换成新的配置目录格式</span></div><div class="line"><span class="meta"># chown -R openldap:openldap /etc/ldap/slapd.d/     修改权限</span></div></pre></td></tr></table></figure></p>
+<h2 id="3-2-slapd-config配置形式的说明"><a href="#3-2-slapd-config配置形式的说明" class="headerlink" title="3.2 slapd-config配置形式的说明"></a>3.2 slapd-config配置形式的说明</h2><p>我们把就的配置方式叫<code>slapd.conf</code>，新的配置方式叫<code>slapd-config</code>或olc（OpenLDAP Configuration，也可以理解为online config）。<code>slapd.d</code>目录内包含许多ldif文件，就是<code>slapd.conf</code>中的内容转化成ldif格式，以构成一棵根为<code>cn=config</code>的目录树，这棵树包含了许多结点，如：<code>cn=module{0}</code>, <code>cn=schema</code>, <code>olcDatabase={1}bdb</code>……所有配置信息就是这些结点的属性。结构如下图：<br><img src="http://sean-images.qiniudn.com/ldap_config_dit.png" alt="openldap_config_dit"></p>
+<p>使用这种新的配置目录的好处在于：</p>
+<ol>
+<li>通过Overlay截获修改这些目录属性的信息，然后对相应的数据结构进行修改，即管理员可以像修改其它目录属性一样修改<code>cn=config</code>目录树下的目录信息，并且修改后即时生效，无需重启服务器。</li>
+<li>管理员不用像以前那样对服务器的配置文件进行修改，而是可以在任何能够连上ldap服务器的地方对配置文件内容进行修改，没有地域的限制。</li>
+</ol>
+<p>但是当你需要配置多个backend时，<code>slapd-config</code>方式需要2.4.33版本以后才支持，此前的版本还只能使用<code>slapd.conf</code>方式。</p>
+<p>LDIF配置格式大致如下：<br><figure class="highlight ldif"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># global configuration settings</span></div><div class="line"><span class="attribute">dn</span>: cn=config</div><div class="line"><span class="attribute">objectClass</span>: olcGlobal</div><div class="line"><span class="attribute">cn</span>: config</div><div class="line">&lt;global config settings&gt;</div><div class="line"></div><div class="line"><span class="comment"># schema definitions</span></div><div class="line"><span class="attribute">dn</span>: cn=schema,cn=config</div><div class="line"><span class="attribute">objectClass</span>: olcSchemaConfig</div><div class="line"><span class="attribute">cn</span>: schema</div><div class="line">&lt;system schema&gt;</div><div class="line"></div><div class="line"><span class="attribute">dn</span>: cn=&#123;X&#125;core,cn=schema,cn=config</div><div class="line"><span class="attribute">objectClass</span>: olcSchemaConfig</div><div class="line"><span class="attribute">cn</span>: &#123;X&#125;core</div><div class="line">&lt;core schema&gt;</div><div class="line"></div><div class="line"><span class="comment"># additional user-specified schema</span></div><div class="line">...</div><div class="line"></div><div class="line"><span class="comment"># backend definitions</span></div><div class="line"><span class="attribute">dn</span>: olcBackend=&lt;typeA&gt;,cn=config</div><div class="line"><span class="attribute">objectClass</span>: olcBackendConfig</div><div class="line"><span class="attribute">olcBackend</span>: &lt;typeA&gt;</div><div class="line">&lt;backend-specific settings&gt;</div><div class="line"></div><div class="line"><span class="comment"># database definitions</span></div><div class="line"><span class="attribute">dn</span>: olcDatabase=&#123;X&#125;&lt;typeA&gt;,cn=config</div><div class="line"><span class="attribute">objectClass</span>: olcDatabaseConfig</div><div class="line"><span class="attribute">olcDatabase</span>: &#123;X&#125;&lt;typeA&gt;</div><div class="line">&lt;database-specific settings&gt;</div><div class="line"></div><div class="line"><span class="comment"># subsequent definitions and settings</span></div><div class="line">...</div></pre></td></tr></table></figure></p>
+<p>我们有时候会发现ldif里面会有一些条目是带<code>{0}</code>这样的数字，这是因为ldap数据库本身是无序的，这些索引一样的数字是用来强制一些依赖于其他配置的设置能够按照正确的顺序先后生效。不过它不用我们去关心，在添加entries时如果有需要会自动生成。</p>
+<p>ldif文件中大部分属性和objectClass是以<code>olc</code>开头的，与就的配置风格<code>slapd.conf</code>有着一对一的属性配置选项，如<code>olcDatabase: {1}hdb</code>与<code>database  bdb</code>对应。</p>
+<p>更多内容请参考 <a href="http://www.openldap.org/doc/admin24/slapdconf2.html" target="_blank" rel="external">OpenLDAP Software 2.4 Administrator’s Guide</a> 。<br><img src="http://sean-images.qiniudn.com/ldap_slapd_config.png" alt="ldap_slapd_config"></p>
+<h2 id="3-3-slapd-config修改示例-LDIF"><a href="#3-3-slapd-config修改示例-LDIF" class="headerlink" title="3.3 slapd-config修改示例(LDIF)"></a>3.3 slapd-config修改示例(LDIF)</h2><p>见 <a href="http://seanlook.com/2015/01/22/openldap_ldif_example/">LDIF修改ldap记录或配置示例</a>。</p>
+<h2 id="3-4-LDAP访问控制示例"><a href="#3-4-LDAP访问控制示例" class="headerlink" title="3.4 LDAP访问控制示例"></a>3.4 LDAP访问控制示例</h2><p>待续</p>
+<h2 id="3-5-OpenLDAP复制配置（replication）"><a href="#3-5-OpenLDAP复制配置（replication）" class="headerlink" title="3.5 OpenLDAP复制配置（replication）"></a>3.5 OpenLDAP复制配置（replication）</h2><p>待续</p>
+<h1 id="4-参考"><a href="#4-参考" class="headerlink" title="4 参考"></a>4 参考</h1><ul>
+<li><a href="https://www.lisenet.com/2014/install-and-configure-an-openldap-server-with-ssl-on-debian-wheezy/" target="_blank" rel="external">Install and Configure an OpenLDAP Server with SSL on Debian Wheezy</a></li>
+<li><a href="http://www.openldap.org/doc/admin24/quickstart.html" target="_blank" rel="external">openldap doc quickstart</a></li>
+<li><a href="http://my.oschina.net/aiguozhe/blog/151554" target="_blank" rel="external">OpenLDAP的安装和配置(含TLS和复制）</a></li>
+<li><a href="http://huizhen.blog.51cto.com/382964/100328" target="_blank" rel="external">openldap学习笔记(安装配置openldap-2.3.32)</a></li>
+</ul>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/LDAP/" rel="tag">#LDAP</a>
+          
+            <a href="/tags/slapd/" rel="tag">#slapd</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2015/01/18/openssl-self-sign-ca/" rel="next" title="基于OpenSSL自建CA和颁发SSL证书">
+                <i class="fa fa-chevron-left"></i> 基于OpenSSL自建CA和颁发SSL证书
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2015/01/22/openldap_ldif_example/" rel="prev" title="LDIF修改ldap记录或配置示例">
+                LDIF修改ldap记录或配置示例 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2015/01/21/openldap-install-guide-ssl/"
+           data-title="OpenLDAP(2.4.3x)服务器搭建及配置说明" data-url="http://seanlook.com/2015/01/21/openldap-install-guide-ssl/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-安装"><span class="nav-text">1 安装</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-准备编译环境和依赖包"><span class="nav-text">1.1 准备编译环境和依赖包</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-安装openldap"><span class="nav-text">1.2 安装openldap</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-配置"><span class="nav-text">2 配置</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-基本配置"><span class="nav-text">2.1 基本配置</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-1-配置root密码"><span class="nav-text">2.1.1 配置root密码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-2-修改后的slapd-conf"><span class="nav-text">2.1.2 修改后的slapd.conf</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-3-启动slapd服务"><span class="nav-text">2.1.3 启动slapd服务</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-4-测试数据"><span class="nav-text">2.1.4 测试数据</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-配置TLS加密传输"><span class="nav-text">2.2 配置TLS加密传输</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-1-自签署ssl证书"><span class="nav-text">2.2.1 自签署ssl证书</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-2-在slapd-conf中加入TLS"><span class="nav-text">2.2.2 在slapd.conf中加入TLS</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-3-重新启动slapd"><span class="nav-text">2.2.3 重新启动slapd</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-4-验证"><span class="nav-text">2.2.4 验证</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-补充"><span class="nav-text">3 补充</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-apt-get安装"><span class="nav-text">3.1 apt-get安装</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-slapd-config配置形式的说明"><span class="nav-text">3.2 slapd-config配置形式的说明</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-3-slapd-config修改示例-LDIF"><span class="nav-text">3.3 slapd-config修改示例(LDIF)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-4-LDAP访问控制示例"><span class="nav-text">3.4 LDAP访问控制示例</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-5-OpenLDAP复制配置（replication）"><span class="nav-text">3.5 OpenLDAP复制配置（replication）</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-参考"><span class="nav-text">4 参考</span></a></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

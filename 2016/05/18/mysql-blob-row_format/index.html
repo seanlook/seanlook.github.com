@@ -1,0 +1,877 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="mysql,schema设计," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="最近在排查现网Text与Blob类型，发现有不少，在《高性能MySQL(第3版)》看到对这两种变长数据类型的处理会涉及到在磁盘上创建临时表，性能开销比较大。于是把影响blob型数据存储方式了解了一下：row_format。
+1. InnoDB的Antelop与Barracuda文件格式Innodb存储引擎保存记录，是以行的形式存放的（与之对应的是像Google BigTable这种列数据库）。在I">
+<meta property="og:type" content="article">
+<meta property="og:title" content="InnoDB行格式对text/blob大变长字段的影响">
+<meta property="og:url" content="http://seanlook.com/2016/05/18/mysql-blob-row_format/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="最近在排查现网Text与Blob类型，发现有不少，在《高性能MySQL(第3版)》看到对这两种变长数据类型的处理会涉及到在磁盘上创建临时表，性能开销比较大。于是把影响blob型数据存储方式了解了一下：row_format。
+1. InnoDB的Antelop与Barracuda文件格式Innodb存储引擎保存记录，是以行的形式存放的（与之对应的是像Google BigTable这种列数据库）。在I">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/mysql-compact-768.png">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/mysql-barracuda-20-off-page.png">
+<meta property="og:updated_time" content="2016-05-18T08:32:49.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="InnoDB行格式对text/blob大变长字段的影响">
+<meta name="twitter:description" content="最近在排查现网Text与Blob类型，发现有不少，在《高性能MySQL(第3版)》看到对这两种变长数据类型的处理会涉及到在磁盘上创建临时表，性能开销比较大。于是把影响blob型数据存储方式了解了一下：row_format。
+1. InnoDB的Antelop与Barracuda文件格式Innodb存储引擎保存记录，是以行的形式存放的（与之对应的是像Google BigTable这种列数据库）。在I">
+<meta name="twitter:image" content="http://7q5fot.com1.z0.glb.clouddn.com/mysql-compact-768.png">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title> InnoDB行格式对text/blob大变长字段的影响 | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                InnoDB行格式对text/blob大变长字段的影响
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2016-05-18T16:32:49+08:00" content="2016-05-18">
+              2016-05-18
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/05/18/mysql-blob-row_format/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/05/18/mysql-blob-row_format/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>最近在排查现网Text与Blob类型，发现有不少，在《高性能MySQL(第3版)》看到对这两种变长数据类型的处理会涉及到在磁盘上创建临时表，性能开销比较大。于是把影响blob型数据存储方式了解了一下：row_format。<!-- 关于临时表的内容，请参考 --></p>
+<h2 id="1-InnoDB的Antelop与Barracuda文件格式"><a href="#1-InnoDB的Antelop与Barracuda文件格式" class="headerlink" title="1. InnoDB的Antelop与Barracuda文件格式"></a>1. InnoDB的Antelop与Barracuda文件格式</h2><p>Innodb存储引擎保存记录，是以行的形式存放的（与之对应的是像Google BigTable这种列数据库）。在InnoDB 1.0.x版本之前，InnoDB 存储引擎提供了 <code>Compact</code> 和 <code>Redundant</code> 两种格式来存放行记录数据，这也是目前使用最多的一种格式。Redundant 格式是为兼容之前版本而保留的。</p>
+<p>MySQL 5.1 中的 innodb_plugin 引入了新的<em>文件格式</em>：<code>Barracuda</code>（将以前的<em>行格式</em> compact 和 redundant 合称为<code>Antelope</code>），该文件格式拥有新的两种行格式：<code>compressed</code>和<code>dynamic</code>。</p>
+<p>在 MySQL 5.6 版本中，默认还是 Compact 行格式，也是目前使用最多的一种 ROW FORMAT。用户可以通过命令 <code>SHOW TABLE STATUS LIKE&#39;table_name&#39;</code> 来查看当前表使用的行格式，其中 <em>row_format</em> 列表示当前所使用的行记录结构类型。</p>
+<figure class="highlight asciidoc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div></pre></td><td class="code"><pre><div class="line"><span class="section">mysql&gt; show variables like "innodb_file_format";</span></div><div class="line">+--------------------+-----------+</div><div class="line"><span class="section">| Variable_name      | Value     |</span></div><div class="line">+--------------------+-----------+</div><div class="line"><span class="section">| innodb_file_format | Barracuda |</span></div><div class="line">+--------------------+-----------+</div><div class="line">1 row in set</div><div class="line"></div><div class="line">mysql&gt; show table status like "tablename%"\G</div><div class="line"><span class="bullet">*************************** </span>1. row ***************************</div><div class="line"><span class="code">           Name: t_rf_compact</span></div><div class="line"><span class="code">         Engine: InnoDB</span></div><div class="line"><span class="code">        Version: 10</span></div><div class="line"><span class="code">     Row_format: Compact</span></div><div class="line"><span class="code">           Rows: 4</span></div><div class="line"><span class="code"> Avg_row_length: 36864</span></div><div class="line"><span class="code">    Data_length: 147456</span></div><div class="line">Max<span class="emphasis">_data_</span>length: 0</div><div class="line"><span class="code">   Index_length: 0</span></div><div class="line"><span class="code">      Data_free: 0</span></div><div class="line"><span class="code"> Auto_increment: 7</span></div><div class="line"><span class="code">    Create_time: 2016-05-14 20:52:58</span></div><div class="line"><span class="code">    Update_time: NULL</span></div><div class="line"><span class="code">     Check_time: NULL</span></div><div class="line"><span class="code">      Collation: utf8_general_ci</span></div><div class="line"><span class="code">       Checksum: NULL</span></div><div class="line"><span class="code"> Create_options: </span></div><div class="line"><span class="code">        Comment: </span></div><div class="line">1 row in set (0.00 sec)</div></pre></td></tr></table></figure>
+<p>在 msyql 5.7.9 及以后版本，默认行格式由<code>innodb_default_row_format</code>变量决定，它的默认值是<code>DYNAMIC</code>，也可以在 create table 的时候指定<code>ROW_FORMAT=DYNAMIC</code>。</p>
+<a id="more"></a>
+<p>注意，如果要修改现有表的行模式为<code>compressed</code>或<code>dynamic</code>，必须先将文件格式设置成Barracuda：<code>set global innodb_file_format=Barracuda;</code>，再用<code>ALTER TABLE tablename ROW_FORMAT=COMPRESSED;</code>去修改才能生效，否则修改无效却无提示：</p>
+<figure class="highlight asciidoc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line">mysql&gt; ALTER TABLE tablename ROW<span class="emphasis">_FORMAT=COMPRESSED;</span></div><div class="line">Query OK, 0 rows affected</div><div class="line">Records: 0  Duplicates: 0  Warnings: 2</div><div class="line"></div><div class="line">修改失败</div><div class="line"><span class="section">mysql&gt; show warnings;</span></div><div class="line">+---------+------+-----------------------------------------------------------------------+</div><div class="line"><span class="section">| Level   | Code | Message                                                               |</span></div><div class="line">+---------+------+-----------------------------------------------------------------------+</div><div class="line">| Warning | 1478 | InnoDB: ROW<span class="emphasis">_FORMAT=COMPRESSED requires innodb_</span>file<span class="emphasis">_format &gt; Antelope. |</span></div><div class="line">| Warning | 1478 | InnoDB: assuming ROW_FORMAT=COMPACT.                                  |</div><div class="line"><span class="code">+---------+</span>------<span class="code">+-----------------------------------------------------------------------+</span></div><div class="line">2 rows in set</div></pre></td></tr></table></figure>
+<h2 id="2-对TEXT-BLOB这类大字段类型的影响"><a href="#2-对TEXT-BLOB这类大字段类型的影响" class="headerlink" title="2. 对TEXT/BLOB这类大字段类型的影响"></a>2. 对TEXT/BLOB这类大字段类型的影响</h2><h3 id="2-1-compact"><a href="#2-1-compact" class="headerlink" title="2.1 compact"></a>2.1 compact</h3><p>在 Antelope 两种行格式下，如果blob列值长度 &lt;= 768 bytes，就不会发生行溢出(page overflow)，内容都在数据页(B-tree Node)；如果列值长度 &gt; 768字节，那么前768字节依然在数据页，而剩余的则放在溢出页(off-page)，如下图：</p>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-compact-768.png" alt=""></p>
+<p>上面所讲的讲的blob或变长大字段类型包括blob,text,varchar，其中varchar列值长度大于某数N时也会存溢出页，在latin1字符集下N值可以这样计算：innodb的块大小默认为16kb，由于innodb存储引擎表为索引组织表，树底层的叶子节点为一双向链表，因此每个页中至少应该有两行记录，这就决定了innodb在存储一行数据的时候不能够超过8k，减去其它列值所占字节数，约等于N。</p>
+<p>我们知道对于InnoDB来说，内存是极为珍贵的，如果把768字节长度的blob都放在数据页，虽然可以节省部分IO，但相对来说能缓存行数就变少，也就是能缓存的索引值变少了，降低了索引效率。</p>
+<h3 id="2-2-dynamic"><a href="#2-2-dynamic" class="headerlink" title="2.2 dynamic"></a>2.2 dynamic</h3><p>Barracuda 的两种行格式对blob采用完全行溢出，即聚集索引记录（数据页）只保留20字节的指针，指向真实存放它的溢出段地址：<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-barracuda-20-off-page.png" alt=""></p>
+<p>dynamic行格式，列存储是否放到off-page页，主要取决于行大小，它会把行中最长的那一列放到off-page，直到数据页能存放下两行。TEXT/BLOB列 &lt;=40 bytes 时总是存放于数据页。这种方式可以避免compact那样把太多的大列值放到 B-tree Node，因为dynamic格式认为，只要大列值有部分数据放在off-page，那把整个值放入都放入off-page更有效。</p>
+<p><strong>compressed</strong> 物理结构上与dynamic类似，但是对表的数据行使用zlib算法进行了压缩存储。在long blob列类型比较多的情况下用，可以降低off-page的使用，减少存储空间（一般40%左右），但要求更高的CPU，buffer pool里面可能会同时存储数据的压缩版和非压缩版，所以也多占用部分内存。这里 <a href="http://dev.mysql.com/doc/refman/5.6/en/innodb-compression-internals.html" target="_blank" rel="external">MySQL 5.6 Manual innodb-compression-internals</a> 讲的十分清楚。 </p>
+<p>另外，由于<code>ROW_FORMAT=DYNAMIC</code> 和 <code>ROW_FORMAT=COMPRESSED</code> 是从 <code>ROW_FORMAT=COMPACT</code> 变化来的，所以他们处理 <code>CHAR</code>类型存储的方式和 COMPACT 一样。</p>
+<h2 id="3-对blob型字段存取优化"><a href="#3-对blob型字段存取优化" class="headerlink" title="3. 对blob型字段存取优化"></a>3. 对blob型字段存取优化</h2><p>如果一个查询涉及BLOB值，又需要使用临时表——不管它多小——它都会立即在磁盘上创建临时表。这样效率很低，尤其是对小而快的查询，临时表可能是查询中最大的开销。</p>
+<p>比如：创建一个带Text字段的compact表：<br><figure class="highlight asciidoc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div></pre></td><td class="code"><pre><div class="line">mysql&gt; CREATE TABLE <span class="code">`t_rf_compact`</span> (</div><div class="line"><span class="code">  `f_id` int(11) NOT NULL AUTO_INCREMENT,</span></div><div class="line"><span class="code">  `f_char` char(30) DEFAULT NULL,</span></div><div class="line"><span class="code">  `f_varchar` varchar(30) NOT NULL DEFAULT '',</span></div><div class="line"><span class="code">  `f_text` text NOT NULL,</span></div><div class="line"><span class="code">  PRIMARY KEY (`f_id`)</span></div><div class="line">) ENGINE=InnoDB DEFAULT CHARSET=utf8 ROW<span class="emphasis">_FORMAT=COMPACT;</span></div><div class="line"></div><div class="line">mysql&gt; insert into t<span class="emphasis">_rf_</span>compact(f<span class="emphasis">_char,f_</span>varchar,f<span class="emphasis">_text) values('aa','中中',repeat('b',700));</span></div><div class="line">mysql&gt; insert into t_rf<span class="emphasis">_compact(f_</span>char,f<span class="emphasis">_varchar,f_</span>text) values(<span class="emphasis">'aa'</span>,<span class="emphasis">'文'</span>,repeat(<span class="emphasis">'c'</span>,60000));</div><div class="line">第二条数据会行溢出，前768字节放在Clustered Index数据页，剩余的放扩展存储空间</div><div class="line"></div><div class="line"><span class="section">mysql&gt; explain select t1.f_id from t_rf_compact t1,t_rf_compact t2 where t1.f_id=t2.f_id order by t1.f_id limit 1; </span></div><div class="line">+----+-------------+-------+--------+---------------+---------+---------+-------------------+------+-------------+</div><div class="line"><span class="section">| id | select_type | table | type   | possible_keys | key     | key_len | ref               | rows | Extra       |</span></div><div class="line">+----+-------------+-------+--------+---------------+---------+---------+-------------------+------+-------------+</div><div class="line">|  1 | SIMPLE      | t1    | index  | PRIMARY       | PRIMARY | 4       | NULL              |    6 | Using index |</div><div class="line"><span class="section">|  1 | SIMPLE      | t2    | eq_ref | PRIMARY       | PRIMARY | 4       | d_ec_crm2.t1.f_id |    1 | Using index |</span></div><div class="line">+----+-------------+-------+--------+---------------+---------+---------+-------------------+------+-------------+</div><div class="line">2 rows in set (0.00 sec)</div><div class="line"></div><div class="line"></div><div class="line"><span class="section">mysql&gt; show status like "%tmp%tables";</span></div><div class="line">+-------------------------+-------+</div><div class="line"><span class="section">| Variable_name           | Value |</span></div><div class="line">+-------------------------+-------+</div><div class="line">| Created<span class="emphasis">_tmp_</span>disk<span class="emphasis">_tables | 7     |</span></div><div class="line">| Created_tmp<span class="emphasis">_tables      | 36    |</span></div><div class="line">+-------------------------+-------+</div><div class="line">2 rows in set (0.00 sec)</div><div class="line"></div><div class="line"><span class="section">mysql&gt; select t1.f_id from t_rf_compact t1,t_rf_compact t2 where t1.f_id=t2.f_id order by t1.f_id limit 1;</span></div><div class="line">+------+</div><div class="line"><span class="section">| f_id |</span></div><div class="line">+------+</div><div class="line"><span class="section">|    1 |</span></div><div class="line">+------+</div><div class="line">1 row in set (0.00 sec)</div><div class="line"></div><div class="line"><span class="section">mysql&gt; show status like "%tmp%tables";</span></div><div class="line">+-------------------------+-------+</div><div class="line"><span class="section">| Variable_name           | Value |</span></div><div class="line">+-------------------------+-------+</div><div class="line">| Created<span class="emphasis">_tmp_</span>disk<span class="emphasis">_tables | 7     |</span></div><div class="line">| Created_tmp<span class="emphasis">_tables      | 36    |</span></div><div class="line">+-------------------------+-------+</div><div class="line">2 rows in set (0.00 sec)</div></pre></td></tr></table></figure></p>
+<p>没有临时表产生，所以磁盘临时表无变化。让它产生临时表：（但不涉及text列）</p>
+<figure class="highlight asciidoc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line"><span class="section">mysql&gt; explain select t1.f_id from t_rf_compact t1,t_rf_compact t2 where t1.f_id=t2.f_id order by t2.f_id;</span></div><div class="line">+----+-------------+-------+--------+---------------+---------+---------+-------------------+------+----------------------------------------------+</div><div class="line"><span class="section">| id | select_type | table | type   | possible_keys | key     | key_len | ref               | rows | Extra                                        |</span></div><div class="line">+----+-------------+-------+--------+---------------+---------+---------+-------------------+------+----------------------------------------------+</div><div class="line">|  1 | SIMPLE      | t1    | index  | PRIMARY       | PRIMARY | 4       | NULL              |    6 | Using index; Using temporary; Using filesort |</div><div class="line"><span class="section">|  1 | SIMPLE      | t2    | eq_ref | PRIMARY       | PRIMARY | 4       | d_ec_crm2.t1.f_id |    1 | Using index                                  |</span></div><div class="line">+----+-------------+-------+--------+---------------+---------+---------+-------------------+------+----------------------------------------------+</div><div class="line">2 rows in set (0.00 sec)</div><div class="line"></div><div class="line">mysql&gt; select t1.f<span class="emphasis">_id from t_</span>rf<span class="emphasis">_compact t1,t_</span>rf<span class="emphasis">_compact t2 where t1.f_</span>id=t2.f<span class="emphasis">_id order by t2.f_</span>id;</div><div class="line"></div><div class="line"><span class="section">mysql&gt; show status like "%tmp%tables";</span></div><div class="line">+-------------------------+-------+</div><div class="line"><span class="section">| Variable_name           | Value |</span></div><div class="line">+-------------------------+-------+</div><div class="line">| Created<span class="emphasis">_tmp_</span>disk<span class="emphasis">_tables | 7     |</span></div><div class="line">| Created_tmp<span class="emphasis">_tables      | 37    |</span></div><div class="line">+-------------------------+-------+</div><div class="line">2 rows in set (0.00 sec)</div></pre></td></tr></table></figure>
+<p>虽然有<code>Using temporary</code>，但内存临时表还是够用，磁盘临时表还是无变化。返回TEXT列（也会使用临时表排序）：</p>
+<figure class="highlight asciidoc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line">mysql&gt; select t1.f<span class="emphasis">_text from t_</span>rf<span class="emphasis">_compact t1,t_</span>rf<span class="emphasis">_compact t2 where t1.f_</span>id=t2.f<span class="emphasis">_id order by t2.f_</span>id;</div><div class="line"><span class="section">mysql&gt; show status like "%tmp%tables";</span></div><div class="line">+-------------------------+-------+</div><div class="line"><span class="section">| Variable_name           | Value |</span></div><div class="line">+-------------------------+-------+</div><div class="line">| Created<span class="emphasis">_tmp_</span>disk<span class="emphasis">_tables | 8     |</span></div><div class="line">| Created_tmp<span class="emphasis">_tables      | 38    |</span></div><div class="line">+-------------------------+-------+</div><div class="line">2 rows in set (0.00 sec)</div></pre></td></tr></table></figure>
+<p><code>Created_tmp_disk_tables</code>磁盘临时表有增加，与上面结论相符：只有有TEXT/BLOB列参与，如果用到临时表，不管它多小，都会创建在磁盘上，从而带来性能消耗。</p>
+<p>注：磁盘临时表存储引擎一定是 MyISAM，与<code>select @@default_tmp_storage_engine;</code>（5.6.3开始）看到的<em>InnoDB</em>无关，它是控制<em>CREATE TEMPORARY TABLE</em>时的默认引擎。在 5.7.5 开始<code>internal_tmp_disk_storage_engine</code>选项可以定义磁盘临时表的引擎类型。关于临时表与内存表可以参考 <a href="http://imysql.com/2015/07/11/mysql-faq-how-using-temp-table.shtml" target="_blank" rel="external">[MySQL FAQ]系列 — 什么情况下会用到临时表 -老叶</a> 。</p>
+<p>有两种办法来减轻这种不利的情况：通过 <code>SUBSTRING()</code> 函数把值转换为 VARCHAR，或者让磁盘临时表更快一些。</p>
+<p>让磁盘临时表运行更快的方式是，把它们放在基于内存的文件系统tmpfs，tmpfs文件系统为了降低开销不会刷新内存数据到磁盘，读写速度也很快，而临时表也不需要持久存放。mysql的 tmpdir 参数控制临时文件存放位置，建议如果使用的话要监控空间使用率。另外如果BLOB列非常大或多，可以考虑调大InnoDB日志缓存大小<code>innodb_log_buffer_size</code>。</p>
+<p>如果使用BLOB这类变长大字段类型，需要以下后果考虑：</p>
+<blockquote>
+<ul>
+<li>大字段在InnoDB里可能浪费大量空间。例如，若存储字段值只是比行的要求多了一个字节，也会使用整个页面来存储剩下的字节，浪费了页面的大部分空间。同样的，如果有一个值只是稍微超过了32个页的大小，实际上就需要使用96个页面。</li>
+<li>扩展存储禁用了自适应哈希，因为需要完整的比较列的整个长度，才能发现是不是正确的数据（哈希帮助InnoDB非常快速的找到“猜测的位置”，但是必须检查“猜测的位置”是不是正确）。因为自适应哈希是完全的内存结构，并且直接指向Buffer Pool中访问“最”频繁的页面，但对于扩展存储空间却无法使用Adaptive Hash。</li>
+<li>太长的值可能使得在查询中作为WHERE条件不能使用索引，因而执行很慢。在应用WHERE条件之前，MySQL需要把所有的列读出来，所以可能导致MySQL要求InnoDB读取很多扩展存储，然后检查WHERE条件，丢弃所有不需要的数据。查询不需要的列绝对不是好主意，在这种特殊的场景下尤其需要避免这样做。如果发现查询正遇到这个限制带来的问题，可以尝试通过覆盖索引来解决部分问题。</li>
+<li>如果一张表里有很多大字段，最好是把它们组合起来单独存到一个列里面，比如说用XML文档格式存储。这让所有的大字段共享一个扩展存储空间，这比每个字段用自己的页要好。</li>
+<li>有时候可以把大字段用COMPRESS()压缩后再存为BLOB，或者在发送到MySQL前在应用程序中进行压缩，这可以获得显著的空间优势和性能收益。<br>—— 《高性能MySQL(第3版)》 P368</li>
+</ul>
+</blockquote>
+<p>对上面的解读就是：</p>
+<ul>
+<li>如果预期长度范围varchar就满足，就避免使用TEXT</li>
+<li>对于字段非常大的列可以在应用程序里压缩后再存到mysql，如果列值很长请考虑用单独的表存放</li>
+<li>一张表有多个类blob字段，把它们组合起来如<code>&lt;TEXT&gt;&lt;f_big_col1&gt;long..&lt;/f_big_col1&gt; &lt;f_content&gt;long..&lt;/f_content&gt;&lt;/TEXT&gt;</code>，再压缩存储。但要考虑是否使用全文索引，是否需要前缀索引。</li>
+</ul>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><ul>
+<li><a href="http://blog.opskumu.com/mysql-blob.html" target="_blank" rel="external">MySQL 大字段溢出导致数据回写失败</a></li>
+<li><a href="http://hidba.org/?p=551" target="_blank" rel="external">innodb使用大字段text，blob的一些优化建议 -玄惭</a></li>
+<li><a href="http://imysql.com/2014/09/28/mysql-optimization-case-blob-stored-in-innodb-optimization.shtml" target="_blank" rel="external">[MySQL优化案例]系列 — 优化InnoDB表BLOB列的存储效率 -老叶</a></li>
+<li><a href="http://blog.chinaunix.net/uid-24485075-id-3523032.html" target="_blank" rel="external">InnoDB 数据表压缩原理与限制 </a></li>
+<li><a href="http://dev.mysql.com/doc/refman/5.6/en/innodb-row-format-dynamic.html" target="_blank" rel="external">MySQL Manual DYNAMIC and COMPRESSED Row Formats </a></li>
+<li>《MySQL技术内幕·InnoDB存储引擎》 P</li>
+</ul>
+<hr>
+<p>原文链接地址：<a href="http://seanlook.com/2016/05/18/mysql-blob-row_format/">http://seanlook.com/2016/05/18/mysql-blob-row_format/</a></p>
+<hr>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/mysql/" rel="tag">#mysql</a>
+          
+            <a href="/tags/schema设计/" rel="tag">#schema设计</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2016/05/11/mysql-dev-principle-ec/" rel="next" title="MySQL数据库开发规范-EC">
+                <i class="fa fa-chevron-left"></i> MySQL数据库开发规范-EC
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2016/05/24/mysql-online-ddl-concept/" rel="prev" title="mysql 5.6 原生Online DDL解析">
+                mysql 5.6 原生Online DDL解析 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2016/05/18/mysql-blob-row_format/"
+           data-title="InnoDB行格式对text/blob大变长字段的影响" data-url="http://seanlook.com/2016/05/18/mysql-blob-row_format/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-InnoDB的Antelop与Barracuda文件格式"><span class="nav-text">1. InnoDB的Antelop与Barracuda文件格式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-对TEXT-BLOB这类大字段类型的影响"><span class="nav-text">2. 对TEXT/BLOB这类大字段类型的影响</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-compact"><span class="nav-text">2.1 compact</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-dynamic"><span class="nav-text">2.2 dynamic</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-对blob型字段存取优化"><span class="nav-text">3. 对blob型字段存取优化</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#参考"><span class="nav-text">参考</span></a></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

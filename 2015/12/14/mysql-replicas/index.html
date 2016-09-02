@@ -1,0 +1,943 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="mysql,主从复制,备份," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="1. 说明1.1 xtrabackupmysqldump对于导出10G以下的数据库或几个表，还是适用的，而且更快捷。一旦数据量达到100-500G，无论是对原库的压力还是导出的性能，mysqldump就力不从心了。Percona-Xtrabackup备份工具，是实现MySQL在线热备工作的不二选择，可进行全量、增量、单表备份和还原。（但当数据量更大时，可能需要考虑分库分表，或使用 LVM 快照来加">
+<meta property="og:type" content="article">
+<meta property="og:title" content="使用 Xtrabackup 在线对MySQL做主从复制">
+<meta property="og:url" content="http://seanlook.com/2015/12/14/mysql-replicas/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="1. 说明1.1 xtrabackupmysqldump对于导出10G以下的数据库或几个表，还是适用的，而且更快捷。一旦数据量达到100-500G，无论是对原库的压力还是导出的性能，mysqldump就力不从心了。Percona-Xtrabackup备份工具，是实现MySQL在线热备工作的不二选择，可进行全量、增量、单表备份和还原。（但当数据量更大时，可能需要考虑分库分表，或使用 LVM 快照来加">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/mysql-replica-concept.jpg">
+<meta property="og:updated_time" content="2015-12-13T16:46:23.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="使用 Xtrabackup 在线对MySQL做主从复制">
+<meta name="twitter:description" content="1. 说明1.1 xtrabackupmysqldump对于导出10G以下的数据库或几个表，还是适用的，而且更快捷。一旦数据量达到100-500G，无论是对原库的压力还是导出的性能，mysqldump就力不从心了。Percona-Xtrabackup备份工具，是实现MySQL在线热备工作的不二选择，可进行全量、增量、单表备份和还原。（但当数据量更大时，可能需要考虑分库分表，或使用 LVM 快照来加">
+<meta name="twitter:image" content="http://7q5fot.com1.z0.glb.clouddn.com/mysql-replica-concept.jpg">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title> 使用 Xtrabackup 在线对MySQL做主从复制 | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                使用 Xtrabackup 在线对MySQL做主从复制
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2015-12-14T10:21:25+08:00" content="2015-12-14">
+              2015-12-14
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/12/14/mysql-replicas/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/12/14/mysql-replicas/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h2 id="1-说明"><a href="#1-说明" class="headerlink" title="1. 说明"></a>1. 说明</h2><h3 id="1-1-xtrabackup"><a href="#1-1-xtrabackup" class="headerlink" title="1.1 xtrabackup"></a>1.1 xtrabackup</h3><p>mysqldump对于导出10G以下的数据库或几个表，还是适用的，而且更快捷。一旦数据量达到100-500G，无论是对原库的压力还是导出的性能，mysqldump就力不从心了。Percona-Xtrabackup备份工具，是实现MySQL在线热备工作的不二选择，可进行全量、增量、单表备份和还原。（但当数据量更大时，可能需要考虑分库分表，或使用 LVM 快照来加快备份速度了）</p>
+<p>2.2版本 xtrabackup 能对InnoDB和XtraDB存储引擎的数据库非阻塞地备份，innobackupex通过perl封装了一层xtrabackup，对MyISAM的备份通过加表读锁的方式实现。2.3版本 xtrabackup 命令直接支持MyISAM引擎。</p>
+<p>XtraBackup优势 ：</p>
+<ol>
+<li>无需停止数据库进行InnoDB热备</li>
+<li>增量备份MySQL</li>
+<li>流压缩到传输到其它服务器</li>
+<li>能比较容易地创建主从同步</li>
+<li>备份MySQL时不会增大服务器负载</li>
+</ol>
+<h3 id="1-2-replication"><a href="#1-2-replication" class="headerlink" title="1.2 replication"></a>1.2 replication</h3><ol>
+<li><p><strong>为什么要做主从复制？</strong><br>我想这是要在实施以前要想清楚的问题。是为了实现读写分离，减轻主库负载或数据分析？ 为了数据安全，做备份恢复？主从切换做高可用？<br>大部分场景下，以上三个问号一主一从都能够解决，而且任何生产环境都建议你至少要有一个从库，假如你的读操作压力特别大，甚至要做一主多从，还可以不同的slave扮演不同的角色，例如使用不同的索引，或者不同的存储引擎，或使用一个小内存server做slave只用于备份。（当然slave太多也会对master的负载和网络带宽造成压力，此时可以考虑级联复制，即 A-&gt;B-&gt;C ）</p>
+<p> 还有需要考虑的是，一主一从，一旦做了主从切换，不通过其它HA手段干预的话，业务访问的还是原IP，而且原主库很容易就作废了。于是 主-主 复制就产生了，凭借各自不同的 server-id ，可以避免 “A的变化同步到B，B应用变化又同步到A” 这样循环复制的问题。但建议是，主主复制，其中一个主库强制设置为只读，主从切换后架构依然是可用的。</p>
+<p> 复制过程是slave主动向master拉取，而不是master去推的，所以理想情况下做搭建主从时不需要master做出任何改变甚至停服，slave失败也不影响主库。</p>
+</li>
+</ol>
+<a id="more"></a>
+<ol>
+<li><p><strong>复制类型</strong></p>
+<ul>
+<li>基于语句的复制：<code>STATEMENT</code>，在主服务器上执行的SQL语句，在从服务器上执行同样的语句，有可能会由于SQL执行上下文环境不同而是数据不一致，例如调用NOW()函数。MySQL在5.7.7以前默认采用基于语句的复制，在 5.7.7 及以后版本默认改用 row-based。   </li>
+<li>基于行的复制：<code>ROW</code>，把改变的内容复制过去，而不是把命令在从服务器上执行一遍。从mysql5.0开始支持，能够严格保证数据完全一致，但此时用<code>mysqlbinlog</code>去分析日志就没啥意义。因为任何一条update语句，都会把涉及到的行数据全部set值，所以binlog文件会比较大。<br>（遇到的一个坑是，迁移时，从库改正了字段默认值定义，但数据在主库更改后，即使产生的新数据默认值是正确的，但基于行的复制依然用不正确的值字段全部更新了）</li>
+<li>混合类型的复制: <code>MIXED</code>，默认采用基于语句的复制，一旦发现基于语句的无法精确的复制时，就会采用基于行的复制。</li>
+</ul>
+<p>mysql系统库<code>mysql</code>库里面表的日志记录格式需要说明：在通过如INSERT、UPDATE、DELETE、TRUNCATE等方式直接修改数据的语句，使用<code>binlog_format</code>指定的方式记录，但使用GRANT、ALTER、CREATE、RENAME等改动的mysql库里数据的，会强制使用<code>statement-based</code>方式记录binlog。</p>
+<p>可以在线修改二进制日志类型，如<code>SET SESSION binlog_format=MIXED;</code>，需要<code>SUPER</code>权限。</p>
+<p> 复制类型还可以分为 异步复制和半同步复制。<br> 通常没说明指的都是异步，即主库执行完Commit后，在主库写入Binlog日志后即可成功返回客户端，无需等等Binlog日志传送给从库，一旦主库宕机，有可能会丢失日志。而半同步复制，是等待其中一个从库也接收到Binlog事务并成功写入Relay Log之后，才返回Commit操作成功给客户端；如此半同步就保证了事务成功提交后至少有两份日志记录，一份在主库Binlog上，另一份在从库的Relay Log上，从而进一步保证数据完整性；半同步复制很大程度取决于主从网络RTT（往返时延），以插件 semisync_master/semisync_slave 形式存在。</p>
+</li>
+</ol>
+<ol>
+<li><strong>原理</strong><br>(1) master将改变记录到二进制日志(binary log)中（这些记录叫做二进制日志事件，binary log events）；<br>(2) slave将master的binary log events拷贝到它的中继日志(relay log)；<br>(3) slave重做中继日志中的事件，将改变反映它自己的数据。</li>
+</ol>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-replica-concept.jpg" alt="mysql-replication"></p>
+<ul>
+<li>该过程的第一部分就是master记录二进制日志。在每个事务更新数据完成之前，master在二进制日志记录这些改变。MySQL将事务串行的写入二进制日志，即使事务中的语句都是交叉执行的。在事件写入二进制日志完成后，master通知存储引擎提交事务。</li>
+<li>下一步将master的binary log拷贝到它自己的中继日志。首先，slave开始一个工作线程——I/O线程。I/O线程在master上打开一个普通的连接，请求从指定日志文件的指定位置之后的日志内容，然后开始binlog dump process。Binlog dump process从master的二进制日志中读取事件，如果已经跟上master，它会睡眠并等待master产生新的事件。I/O线程将这些事件写入中继日志。</li>
+<li><p>SQL slave thread（SQL从线程）处理该过程的最后一步。SQL线程从中继日志读取事件，并重放其中的事件而更新slave的数据，使其与master中的数据一致。只要该线程与I/O线程保持一致，中继日志通常会位于OS的缓存中，所以中继日志的开销很小。</p>
+<p>此外，在master中也有一个工作线程：和其它MySQL的连接一样，slave在master中打开一个连接也会使得master开始一个线程。复制过程有一个很重要的限制——复制在slave上是串行化的，也就是说master上的并行更新操作不能在slave上并行操作。</p>
+</li>
+</ul>
+<p>补充:</p>
+<ul>
+<li>mysql 5.7开始加入了多源复制，这个特性对同时有很多个mysql实例是很有用的，阿里云RDS（迁移）实现了类似的方式。</li>
+<li>从MySQL 5.6.2开始，mysql binlog支持checksum校验，并且5.6.6默认启用（CRC32），这对自己模拟实现mysql复制的场景有影响。</li>
+</ul>
+<p><strong>下面开始配置主从</strong>：</p>
+<p>　　主从版本一致—&gt;主库授权复制帐号—&gt;确保开启binlog及主从server_id唯一—&gt;xtrabackup恢复到从库—&gt;记录xtrabackup_binlog_info中binlog名称及偏移量—&gt;从库change master to —&gt;slave start—&gt;检查两个yes</p>
+<h2 id="2-创建复制账号"><a href="#2-创建复制账号" class="headerlink" title="2. 创建复制账号"></a>2. 创建复制账号</h2><p>在主库上</p>
+<pre><code>mysql&gt; GRANT REPLICATION SLAVE ON *.* TO &apos;slave_ali&apos;@&apos;192.168.5.%&apos; IDENTIFIED BY &apos;slave_ali_pass&apos;;  
+mysql&gt; FLUSH PRIVILEGES;
+</code></pre><h2 id="3-使用Percona-Xtrabackup恢复数据"><a href="#3-使用Percona-Xtrabackup恢复数据" class="headerlink" title="3. 使用Percona-Xtrabackup恢复数据"></a>3. 使用Percona-Xtrabackup恢复数据</h2><p>这里假设比较简单的情况：全量备份，全量恢复，不涉及增量。</p>
+<p>安装和具体使用，见<a href="">文章</a>。</p>
+<p>赋予备份用户权限：<br><figure class="highlight oxygene"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">mysql&gt; <span class="keyword">CREATE</span> USER <span class="string">'bkpuser'</span>@<span class="string">'localhost'</span> IDENTIFIED <span class="keyword">BY</span> <span class="string">'bkppass'</span>;</div><div class="line">mysql&gt; GRANT RELOAD, LOCK TABLES, REPLICATION CLIENT,PROCESS,SUPER <span class="keyword">ON</span> *.* <span class="keyword">TO</span> <span class="string">'bkpuser'</span>@<span class="string">'localhost'</span>;</div><div class="line">mysql&gt; FLUSH PRIVILEGES;</div></pre></td></tr></table></figure></p>
+<p>完整的选项使用请执行innobackupex –-help，这里只介绍使用常用的选项进行完整备份及增量备份和还原。</p>
+<p>这一节是把数据恢复到从库，借此记录一下xtrabackup的使用（用了云之后，备份技能都丢了~）。生产环境你应该是早就有了xtrabackup的备份，做从库时只需要把备份拷过来，解压恢复。</p>
+<p>假设 MySQL 安装目录在<code>/opt/mysql</code>，my.cnf配置文件<code>/opt/mysql/my.cnf</code>，端口3306，数据目录<code>/opt/mysql_data</code>，sock位于<code>/opt/mysql_data/mysql.sock</code>。备份数据放在<code>/data/backup/mysql/</code>。</p>
+<h3 id="3-1-全量备份"><a href="#3-1-全量备份" class="headerlink" title="3.1 全量备份"></a>3.1 全量备份</h3><figure class="highlight dsconfig"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ <span class="string">export </span><span class="string">BKP_PASS=</span><span class="string">"bkppass"</span></div><div class="line">$ <span class="string">innobackupex </span><span class="built_in">--defaults-file=/opt/mysql/my.cnf</span> <span class="built_in">--host=localhost</span> <span class="built_in">--port=3306</span> <span class="built_in">--user=bkpuser</span> <span class="built_in">--password=$&#123;BKP_PASS&#125;</span> /<span class="string">data/</span><span class="string">backup/</span><span class="string">mysql</span></div></pre></td></tr></table></figure>
+<p>默认会以当天 日期+时间 戳命名备份目录，如 2015-09-16_00-00-02。一般会对它进行tar压缩，由于tar只能单进程，所以往往这个压缩过程会比备份过程耗时2倍还多。拷贝到需要恢复（做从库）的目录。</p>
+<pre><code>如果手头有一份未压缩的全备数据，要在另一台恢复，其实还不如直接 rsync 过来，将近400G的数据压缩与解压缩过程特别漫长。
+</code></pre><h3 id="3-2-全量恢复"><a href="#3-2-全量恢复" class="headerlink" title="3.2 全量恢复"></a>3.2 全量恢复</h3><p>在恢复的数据库服务器（从库）上：</p>
+<pre><code><figure class="highlight lsl"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">恢复准备</div><div class="line">$ innobackupex --use-memory=<span class="number">16</span>G --apply-log <span class="number">2015</span><span class="number">-09</span><span class="number">-16</span>_00<span class="number">-00</span><span class="number">-02</span></div><div class="line"></div><div class="line">确认数据库是关闭的，并且datadir，目录下为空</div><div class="line">$ innobackupex --defaults-file=/opt/mysql/my.cnf --use-memory=<span class="number">16</span>G --copy-back <span class="number">2015</span><span class="number">-09</span><span class="number">-16</span>_00<span class="number">-00</span><span class="number">-02</span></div></pre></td></tr></table></figure>
+
+第一步是恢复准备，apply-log应用全备时 log sequence number 之后的数据，完了后会输出类似 InnoDB: Last MySQL binlog file position 0 262484673, file name ./mysql-bin.000135 的信息，告诉我们了后面的从库应该从哪个地方开始复制。时间不会很长，但最好用screen之类的软件放到后台执行，以免终端断开，功亏一篑。
+
+第二步使用新的my.cnf文件，将完整的mysql数据文件拷贝到datadir下。
+</code></pre><h2 id="4-做从库"><a href="#4-做从库" class="headerlink" title="4. 做从库"></a>4. 做从库</h2><p>上面恢复过程最后一步<code>apply-log</code>完成之后，会得到一个lsn position 和binlog文件名：262484673、mysql-bin.000135。下面开始从库制作。</p>
+<p>一般在<code>copy-back</code>之后需要修改数据文件目录的属性：<br><figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># chown -R mysql.mysql /opt/mysql_data</span></div></pre></td></tr></table></figure></p>
+<h3 id="4-1-my-cnf"><a href="#4-1-my-cnf" class="headerlink" title="4.1 my.cnf"></a>4.1 my.cnf</h3><p>从库的配置文件简单一点可以从主库拷贝过来，但根据需要，要注意以下几处</p>
+<ul>
+<li><p>server-id一定不能与主库相同<br>否则，会出现如下错误：<br>Slave: received end packet FROM server, apparent master shutdown</p>
+</li>
+<li><p>从库一般作为只读库使用，所以为安全起见，设置只读 <code>set global read_only=1</code>;<br>可以在从服务器的 my.cnf 里加入<code>read-only</code>参数来实现这一点，唯一需要注意的一点事read-only仅对没有super权限的用户有效。所以最好核对一下连接从服务器的用户，确保其没有super权限。</p>
+</li>
+<li><p>关于从库的事件<br>MYSQL Replication 可以很好的达到你的预期：从库的事件不会自己去执行，主库会把event执行的结果直接同步。在statement模式下，复制的是 event BODY 里的SQL，在row模式下是主库事件执行完成后影响的行精确复制。</p>
+<p>  从库 event_scheduler 参数是被忽略的，并且每个event 状态会是 SLAVESIDE_DISABLED ，但CREATE/ALTER EVENT等操作语句是会复制。主从切换后，从库事件状态会变成ENABLE。</p>
+</li>
+<li><p>参数调整<br>从库是不允许写入的，否则数据就不一致了。从库实例的配置可以不要主库那么高，比如原16G的buffer pool，根据用途，从库可以设到4-8G（当时前提是将来你也不打算把它切换为主库用）。<br>相应的，read_buffer_size，sort_buffer_size, query_cache_size 这些读相关参数可以略微增大。当然我一般都懒得去改。</p>
+</li>
+<li><p>skip-slave-start<br>主从创建完成后，默认情况下次启动从库，会自动启动复制进程，一般这也正是我们需要的，但在维护阶段时你可能不想从库启动后立即开始复制，<code>--skip-slave-start</code>选项可以帮到你。</p>
+</li>
+<li><p>log-slave-updates<br>正常情况从库是不需要写回放日志产生的binlog，无形中增加服务器压力。但如果你想要实现级联复制即 <code>A -&gt; B -&gt; C</code> ，B同时是A的从库，也是C的主库，就需要开启 log-bin 和 log-slave-updates 。</p>
+<p>  另外，建议显示设置 <code>log-bin=mysql-bin</code> 确保主从正常切换。 <code>show variables like &#39;log%&#39;</code> 查看当前值。</p>
+</li>
+<li><p>关于过滤表见<a href="">mysql-replica-filter</a></p>
+</li>
+<li><p>sync_binlog<br>For the greatest possible durability and consistency in a replication setup using InnoDB with transactions, you should use innodb_flush_log_at_trx_commit=1 and sync_binlog=1 in the master my.cnf file.</p>
+<p>  上面的话同时也意味着性能最低。可以在这埋点，假如出现慢的情况，把两参数调成2。</p>
+</li>
+</ul>
+<h3 id="4-2-启动从库"><a href="#4-2-启动从库" class="headerlink" title="4.2 启动从库"></a>4.2 启动从库</h3><p>启动数据库，注意看日志<br><figure class="highlight gradle"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"># <span class="regexp">/opt/my</span>sql<span class="regexp">/bin/my</span>sqld_safe --defaults-<span class="keyword">file</span>=<span class="regexp">/opt/my</span>sql<span class="regexp">/my.cnf &amp;</span></div></pre></td></tr></table></figure></p>
+<p>提示：如果你不确定这个库是谁的从库，保守起见加上<code>--skip-slave-start</code>启动，兴许能防止数据不一致。</p>
+<h3 id="4-3-change-master"><a href="#4-3-change-master" class="headerlink" title="4.3 change master"></a>4.3 change master</h3><p>在从库上</p>
+<pre><code>$ mysql -uslave_ali -p&apos;slave_ali_pass&apos; -S /opt/mysql_data/mysql.sock
+mysql&gt; change master to master_host=MASTER_HOST, master_port=3306, 
+       master_user=&apos;slave_ali&apos;,master_password=&apos;slave_ali_pass&apos;,
+       master_log_file=&apos;mysql-bin.000135&apos;, master_log_pos=262484673;
+</code></pre><p>上面的 master_log_file 和 master_log_pos 即是输出的值，也可以在新的数据目录下<code>xtrabackup_binlog_info</code>找到信息。</p>
+<pre><code>mysql&gt; show slave status\G
+mysql&gt; start slave;
+mysql&gt; show slave status\G
+</code></pre><h3 id="4-4-验证同步延迟"><a href="#4-4-验证同步延迟" class="headerlink" title="4.4 验证同步延迟"></a>4.4 验证同步延迟</h3><p>从库执行 show slave status\G<br>节选：<br><figure class="highlight yaml"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line"><span class="attr">      Slave_IO_State:</span> Waiting for master to send event</div><div class="line"><span class="attr">      Master_Log_File:</span> mysql-bin<span class="number">.000004</span></div><div class="line"><span class="attr">  Read_Master_Log_Pos:</span> <span class="number">931</span></div><div class="line"><span class="attr">       Relay_Log_File:</span> slave1-relay-bin<span class="number">.000056</span></div><div class="line"><span class="attr">        Relay_Log_Pos:</span> <span class="number">950</span></div><div class="line"><span class="attr">Relay_Master_Log_File:</span> mysql-bin<span class="number">.000004</span></div><div class="line"><span class="attr">     Slave_IO_Running:</span> <span class="literal">Yes</span></div><div class="line"><span class="attr">    Slave_SQL_Running:</span> <span class="literal">Yes</span></div><div class="line"><span class="attr">   Exec_Master_Log_Pos:</span> <span class="number">931</span></div><div class="line"><span class="attr">      Relay_Log_Space:</span> <span class="number">408</span></div><div class="line"><span class="attr">Seconds_Behind_Master:</span> <span class="number">0</span></div></pre></td></tr></table></figure></p>
+<ul>
+<li><code>Master_Log_File</code>： I/O线程当前正在读取的主服务器二进制日志文件的名称</li>
+<li><code>Read_Master_Log_Pos</code>：本机I/O线程读取主服务器二进制日志位置<br>上面2各值，与在主库执行<code>show master status;</code>看到的值如果基本接近，说明从库<em>IO线程</em>已经赶上了主库的binlog。</li>
+<li><code>Relay_Master_Log_File</code>: 由SQL线程执行的包含多数近期事件的主服务器二进制日志文件的名称</li>
+<li><p><code>Exec_Master_Log_Pos</code>: SQL线程执行来自master的二进制日志最后一个事件位置<br>与上面的<code>Relay_Master_Log_File</code>一起，同<code>Master_Log_File</code>、<code>Read_Master_Log_Pos</code>比较，能看到<em>SQL线程</em>是否已经赶上从库本地的IO线程。</p>
+</li>
+<li><p><code>Slave_IO_Running</code>：I/O线程是否启动并成功连接到主服务器上<br>一般和下面的<code>Slave_IO_Running</code>和<code>Seconds_Behind_Master</code>一起监控主从健康状态</p>
+</li>
+<li><code>Slave_SQL_Running</code>：SQL线程是否启动</li>
+<li><code>Seconds_Behind_Master</code>: 从属服务器“落后”多少秒<br>官网的解释是：The number of seconds that the slave SQL thread is behind processing the master binary log。但是当 SBM 为 0 时也不代表一定没有延迟，因为可能因为网络慢的缘故，从库的IO线程传输binlog太慢，它的SQL线程应用日志很容易就赶上relay log，但实际主库产生的binlog比传输的快，就会造成为0的假象。<br>有时你反复status会发现 Seconds_Behind_Master 的值在0与一个很大的数之间波动，有可能是主库上执行了一个非常大的event，没执行完毕的时候从库SBM显示为0，event执行完成并传输完binlog后，就会显示SBM非常巨大。（我在从机房迁移mysql到阿里云上部分库老出现这种情况，应该跟网络和大event都有关系）。<br>另外，relay log 中event记录的时间戳是主库上的时间戳，而SQL thread的时间戳是从库上的，如果主库和从库的时间偏差较大，那么这个SBM的意义就基本不存在了。</li>
+</ul>
+<h2 id="5-参考"><a href="#5-参考" class="headerlink" title="5. 参考"></a>5. 参考</h2><ul>
+<li><a href="http://blog.csdn.net/hguisu/article/details/7325124" target="_blank" rel="external">高性能Mysql主从架构的复制原理及配置详解</a></li>
+<li><a href="https://www.percona.com/blog/2013/01/09/how-does-mysql-replication-really-work/" target="_blank" rel="external">How does MySQL Replication really work?</a></li>
+<li><a href="https://segmentfault.com/a/1190000003063874" target="_blank" rel="external">XtraBackup不停机不锁表搭建MySQL主从同步实践</a></li>
+<li><a href="http://www.simlinux.com/archives/236.html" target="_blank" rel="external">MySQL复制原理与配置</a></li>
+<li><a href="http://dev.mysql.com/doc/refman/5.6/en/replication-administration-status.html" target="_blank" rel="external">许多模糊的内容还是看官网的</a></li>
+</ul>
+<hr>
+<p>本文链接地址：<a href="http://seanlook.com/2015/12/14/mysql-replicas/">http://seanlook.com/2015/12/14/mysql-replicas/</a></p>
+<hr>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/mysql/" rel="tag">#mysql</a>
+          
+            <a href="/tags/主从复制/" rel="tag">#主从复制</a>
+          
+            <a href="/tags/备份/" rel="tag">#备份</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2015/11/01/nan-shan-hike/" rel="next" title="南山南">
+                <i class="fa fa-chevron-left"></i> 南山南
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2015/12/29/mysql_replica_pt-table-checksum/" rel="prev" title="生产环境使用 pt-table-checksum 检查MySQL数据一致性">
+                生产环境使用 pt-table-checksum 检查MySQL数据一致性 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2015/12/14/mysql-replicas/"
+           data-title="使用 Xtrabackup 在线对MySQL做主从复制" data-url="http://seanlook.com/2015/12/14/mysql-replicas/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-说明"><span class="nav-text">1. 说明</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-xtrabackup"><span class="nav-text">1.1 xtrabackup</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-replication"><span class="nav-text">1.2 replication</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-创建复制账号"><span class="nav-text">2. 创建复制账号</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-使用Percona-Xtrabackup恢复数据"><span class="nav-text">3. 使用Percona-Xtrabackup恢复数据</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-全量备份"><span class="nav-text">3.1 全量备份</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-全量恢复"><span class="nav-text">3.2 全量恢复</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-做从库"><span class="nav-text">4. 做从库</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-my-cnf"><span class="nav-text">4.1 my.cnf</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-启动从库"><span class="nav-text">4.2 启动从库</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-change-master"><span class="nav-text">4.3 change master</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-验证同步延迟"><span class="nav-text">4.4 验证同步延迟</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-参考"><span class="nav-text">5. 参考</span></a></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

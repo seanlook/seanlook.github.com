@@ -1,0 +1,829 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="linux,oracle," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="修改配置要达到oracle随开机自启动，一般使用11g自带的dbstart脚本：$ORACLE_HOME/bin/dbstart，但要先修改/etc/oratab的内容，将N改成Y，表示允许实例自启动，假如有2个实例要启动，再写一行：12$ vi /etc/oratabEXCRMPROD:/db/oracle/product/11.2.0/db_1:Y
+然后在oracle用户下执行$ORACLE_">
+<meta property="og:type" content="article">
+<meta property="og:title" content="配置 Oracle 11gR2 在 CentOS6 上开机自启动">
+<meta property="og:url" content="http://seanlook.com/2015/04/11/oracle_db_autostart_with_linux/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="修改配置要达到oracle随开机自启动，一般使用11g自带的dbstart脚本：$ORACLE_HOME/bin/dbstart，但要先修改/etc/oratab的内容，将N改成Y，表示允许实例自启动，假如有2个实例要启动，再写一行：12$ vi /etc/oratabEXCRMPROD:/db/oracle/product/11.2.0/db_1:Y
+然后在oracle用户下执行$ORACLE_">
+<meta property="og:updated_time" content="2015-04-11T07:21:25.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="配置 Oracle 11gR2 在 CentOS6 上开机自启动">
+<meta name="twitter:description" content="修改配置要达到oracle随开机自启动，一般使用11g自带的dbstart脚本：$ORACLE_HOME/bin/dbstart，但要先修改/etc/oratab的内容，将N改成Y，表示允许实例自启动，假如有2个实例要启动，再写一行：12$ vi /etc/oratabEXCRMPROD:/db/oracle/product/11.2.0/db_1:Y
+然后在oracle用户下执行$ORACLE_">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title> 配置 Oracle 11gR2 在 CentOS6 上开机自启动 | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                配置 Oracle 11gR2 在 CentOS6 上开机自启动
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2015-04-11T15:21:25+08:00" content="2015-04-11">
+              2015-04-11
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Oracle/" itemprop="url" rel="index">
+                    <span itemprop="name">Oracle</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/04/11/oracle_db_autostart_with_linux/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/04/11/oracle_db_autostart_with_linux/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h2 id="修改配置"><a href="#修改配置" class="headerlink" title="修改配置"></a>修改配置</h2><p>要达到oracle随开机自启动，一般使用11g自带的dbstart脚本：<code>$ORACLE_HOME/bin/dbstart</code>，但要先修改<code>/etc/oratab</code>的内容，将N改成Y，表示允许实例自启动，假如有2个实例要启动，再写一行：<br><figure class="highlight groovy"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ vi <span class="regexp">/etc/</span>oratab</div><div class="line"><span class="string">EXCRMPROD:</span><span class="regexp">/db/</span>oracle<span class="regexp">/product/</span><span class="number">11.2</span><span class="number">.0</span>/<span class="string">db_1:</span>Y</div></pre></td></tr></table></figure></p>
+<p>然后在oracle用户下执行<code>$ORACLE_HOME/bin/dbstart</code>即可启动，日志被记录在<code>$ORACLE_HOME/startup.log</code>。但是，默认情况<code>dbstart</code>和<code>dbshut</code>脚本不能自动启动或关闭监听，所以也要加以修改：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">$ vi /db/oracle/product/11.2.0/db_1/bin/dbstart</div><div class="line"><span class="comment">## 找到下面的代码(约第80行)，在实际脚本代码的前面</span></div><div class="line"><span class="comment"># First argument is used to bring up Oracle Net Listener</span></div><div class="line">ORACLE_HOME_LISTNER=<span class="variable">$1</span></div><div class="line"><span class="comment">## 将此处的 ORACLE_HOME_LISTNER=$1 修改为 ORACLE_HOME_LISTNER=$ORACLE_HOME</span></div><div class="line"><span class="keyword">if</span> [ ! <span class="variable">$ORACLE_HOME_LISTNER</span> ] ; <span class="keyword">then</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"ORACLE_HOME_LISTNER is not SET, unable to auto-start Oracle Net Listener"</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"Usage: <span class="variable">$0</span> ORACLE_HOME"</span></div><div class="line"><span class="keyword">else</span></div><div class="line">LOG=<span class="variable">$ORACLE_HOME_LISTNER</span>/listener.log</div></pre></td></tr></table></figure></p>
+<p>同样也修改dbshut脚本（约第50行）：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line">$ vi /db/oracle/product/11.2.0/db_1/bin/dbshut</div><div class="line"></div><div class="line"><span class="comment"># The this to bring down Oracle Net Listener</span></div><div class="line">ORACLE_HOME_LISTNER=<span class="variable">$ORACLE_HOME</span></div><div class="line"><span class="keyword">if</span> [ ! <span class="variable">$ORACLE_HOME_LISTNER</span> ] ; <span class="keyword">then</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"ORACLE_HOME_LISTNER is not SET, unable to auto-stop Oracle Net Listener"</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"Usage: <span class="variable">$0</span> ORACLE_HOME"</span></div><div class="line"><span class="keyword">else</span></div><div class="line">LOG=<span class="variable">$ORACLE_HOME_LISTNER</span>/listener.log</div></pre></td></tr></table></figure></p>
+<h2 id="开机启动"><a href="#开机启动" class="headerlink" title="开机启动"></a>开机启动</h2><p>这两个脚本在执行时会自动去搜索<code>/etc/oratab</code>文件的内容，将这两个命令分别加入开机启动和关闭脚本里。</p>
+<a id="more"></a>
+<p><strong>/etc/rc.local</strong><br>Linux系统开机初始化的最后过程会执行该脚本，加入以下内容：<br><figure class="highlight perl"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">su - oracle -<span class="keyword">lc</span> <span class="string">"$ORACLE_HOME/bin/dbstart"</span></div></pre></td></tr></table></figure></p>
+<p><strong>/etc/rc.local.shutdown</strong><br>这个脚本时系统里没有的，完成的功能是关机自动停止服务，<code>/etc/rc.d/rc.local.shutdown</code>：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#!/bin/bash</span></div><div class="line"></div><div class="line"><span class="comment"># chkconfig: - 00 00</span></div><div class="line"><span class="comment"># description: Do custom commands before shutdown or reboot</span></div><div class="line"></div><div class="line"><span class="comment">### BEGIN INIT INFO</span></div><div class="line"><span class="comment"># Provides: custom-halt</span></div><div class="line"><span class="comment"># Required-Start:</span></div><div class="line"><span class="comment"># Required-Stop:</span></div><div class="line"><span class="comment"># Default-Start: 0 6</span></div><div class="line"><span class="comment"># Default-Stop:</span></div><div class="line"><span class="comment"># Short-Description: Custom halt commands</span></div><div class="line"><span class="comment"># Description: Do custom commands before shutdown or reboot</span></div><div class="line"><span class="comment">### END INIT INFO</span></div><div class="line"></div><div class="line"><span class="built_in">export</span> ORACLE_BASE=/db/oracle</div><div class="line"><span class="built_in">export</span> ORACLE_HOME=<span class="variable">$ORACLE_BASE</span>/product/11.2.0/db_1</div><div class="line"><span class="built_in">export</span> ORACLE_SID=EXCRMPROD</div><div class="line"><span class="built_in">export</span> PATH=<span class="variable">$PATH</span>:<span class="variable">$ORACLE_HOME</span>/bin</div><div class="line"></div><div class="line">su - oracle -lc <span class="string">"<span class="variable">$ORACLE_HOME</span>/bin/dbshut /dev/null 2&gt;&amp;1"</span></div><div class="line"></div><div class="line"><span class="built_in">exit</span></div></pre></td></tr></table></figure></p>
+<p>让它运行在<code>0</code>和<code>6</code>运行级别runlevel：<br><figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># chmod 755 /etc/rc.d/rc.local.shutdown</span></div><div class="line"><span class="meta"># ln -s /etc/rc.d/rc.local.shutdown /etc/rc.local.shutdown</span></div><div class="line"><span class="meta"># ln -s /etc/rc.d/rc.local.shutdown /etc/init.d/custom-halt</span></div><div class="line"></div><div class="line"><span class="meta"># chkconfig --add custom-halt</span></div><div class="line"><span class="meta"># chkconfig --level 06 custom-halt on</span></div></pre></td></tr></table></figure></p>
+<p>另外网上也有文章不是利用 oracle 自带的 dbstart 来实现自启动，而是自己写 service 脚本，执行 sqlplus 然后运行 shutdown immediate ，个人觉得这有点重复做oracle的事情了；还有把通过类似<code>service oracle start/stop</code>这样的形式去管理，方便是方便一点，但要知道oracle数据库轻易不会频繁重启，如有需要，我们更愿意自己使用<code>sqlplus</code>连上数据库，自己执行<code>shutdown</code>命令，因为对数据库的操作还是以慎重为主，在配置了Active Data Guard等复杂环境下，对备库也不适用，所以这里就没做这个工作。</p>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/linux/" rel="tag">#linux</a>
+          
+            <a href="/tags/oracle/" rel="tag">#oracle</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2015/04/05/vmware-vcenter-vconverter/" rel="next" title="使用vmware vconverter从物理机迁移系统到虚拟机P2V（多图）">
+                <i class="fa fa-chevron-left"></i> 使用vmware vconverter从物理机迁移系统到虚拟机P2V（多图）
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2015/04/23/pfsense-usage/" rel="prev" title="图解pfSense软路由系统的使用（NAT功能）">
+                图解pfSense软路由系统的使用（NAT功能） <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2015/04/11/oracle_db_autostart_with_linux/"
+           data-title="配置 Oracle 11gR2 在 CentOS6 上开机自启动" data-url="http://seanlook.com/2015/04/11/oracle_db_autostart_with_linux/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#修改配置"><span class="nav-text">修改配置</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#开机启动"><span class="nav-text">开机启动</span></a></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

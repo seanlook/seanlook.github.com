@@ -1,0 +1,926 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="nignx,keepalived,高可用," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="公司内部 OA 系统要做线上高可用，避免单点故障，所以计划使用2台虚拟机通过 Keepalived 工具来实现 nginx 的高可用（High Avaiability），达到一台nginx入口服务器宕机，另一台备机自动接管服务的效果。（nginx做反向代理，实现后端应用服务器的负载均衡）快速搭建请直接跳至 第2节。
+1. Keepalived介绍Keepalived是一个基于VRRP协议来实现的服">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Nginx+Keepalived实现站点高可用">
+<meta property="og:url" content="http://seanlook.com/2015/05/18/nginx-keepalived-ha/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="公司内部 OA 系统要做线上高可用，避免单点故障，所以计划使用2台虚拟机通过 Keepalived 工具来实现 nginx 的高可用（High Avaiability），达到一台nginx入口服务器宕机，另一台备机自动接管服务的效果。（nginx做反向代理，实现后端应用服务器的负载均衡）快速搭建请直接跳至 第2节。
+1. Keepalived介绍Keepalived是一个基于VRRP协议来实现的服">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/nginx-keepalived-vrrp.jpg">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/nginx-keepalived-vip.png">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/nginx-keepalived-prio.png">
+<meta property="og:updated_time" content="2015-05-17T16:46:23.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Nginx+Keepalived实现站点高可用">
+<meta name="twitter:description" content="公司内部 OA 系统要做线上高可用，避免单点故障，所以计划使用2台虚拟机通过 Keepalived 工具来实现 nginx 的高可用（High Avaiability），达到一台nginx入口服务器宕机，另一台备机自动接管服务的效果。（nginx做反向代理，实现后端应用服务器的负载均衡）快速搭建请直接跳至 第2节。
+1. Keepalived介绍Keepalived是一个基于VRRP协议来实现的服">
+<meta name="twitter:image" content="http://7q5fot.com1.z0.glb.clouddn.com/nginx-keepalived-vrrp.jpg">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title> Nginx+Keepalived实现站点高可用 | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                Nginx+Keepalived实现站点高可用
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2015-05-18T01:21:25+08:00" content="2015-05-18">
+              2015-05-18
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/Nginx/" itemprop="url" rel="index">
+                    <span itemprop="name">Nginx</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/05/18/nginx-keepalived-ha/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/05/18/nginx-keepalived-ha/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>公司内部 OA 系统要做线上高可用，避免单点故障，所以计划使用2台虚拟机通过 Keepalived 工具来实现 nginx 的高可用（High Avaiability），达到一台nginx入口服务器宕机，另一台备机自动接管服务的效果。（nginx做反向代理，实现后端应用服务器的负载均衡）快速搭建请直接跳至 第2节。</p>
+<h1 id="1-Keepalived介绍"><a href="#1-Keepalived介绍" class="headerlink" title="1. Keepalived介绍"></a>1. Keepalived介绍</h1><p>Keepalived是一个基于VRRP协议来实现的服务高可用方案，可以利用其来避免IP单点故障，类似的工具还有heartbeat、corosync、pacemaker。但是它一般不会单独出现，而是与其它负载均衡技术（如lvs、haproxy、nginx）一起工作来达到集群的高可用。</p>
+<h2 id="1-1-VRRP协议"><a href="#1-1-VRRP协议" class="headerlink" title="1.1 VRRP协议"></a>1.1 VRRP协议</h2><p>VRRP全称 Virtual Router Redundancy Protocol，即 <a href="http://en.wikipedia.org/wiki/VRRP" target="_blank" rel="external">虚拟路由冗余协议</a>。可以认为它是实现路由器高可用的容错协议，即将N台提供相同功能的路由器组成一个路由器组(Router Group)，这个组里面有一个master和多个backup，但在外界看来就像一台一样，构成虚拟路由器，拥有一个虚拟IP（vip，也就是路由器所在局域网内其他机器的默认路由），占有这个IP的master实际负责ARP相应和转发IP数据包，组中的其它路由器作为备份的角色处于待命状态。master会发组播消息，当backup在超时时间内收不到vrrp包时就认为master宕掉了，这时就需要根据VRRP的优先级来选举一个backup当master，保证路由器的高可用。</p>
+<p>在VRRP协议实现里，虚拟路由器使用 00-00-5E-00-01-XX 作为<em>虚拟</em>MAC地址，XX就是唯一的 VRID （Virtual Router IDentifier），这个地址同一时间只有一个物理路由器占用。在虚拟路由器里面的物理路由器组里面通过多播IP地址 224.0.0.18 来定时发送通告消息。每个Router都有一个 1-255 之间的优先级别，级别最高的（highest priority）将成为主控（master）路由器。通过降低master的优先权可以让处于backup状态的路由器抢占（pro-empt）主路由器的状态，两个backup优先级相同的IP地址较大者为master，接管虚拟IP。</p>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/nginx-keepalived-vrrp.jpg" alt="nginx-keepalived-vrrp.jpg"></p>
+<h3 id="与heartbeat-corosync等比较"><a href="#与heartbeat-corosync等比较" class="headerlink" title="与heartbeat/corosync等比较"></a>与heartbeat/corosync等比较</h3><p>直接摘抄自 <a href="http://www.linuxidc.com/Linux/2013-08/89227.htm" target="_blank" rel="external">http://www.linuxidc.com/Linux/2013-08/89227.htm</a> ：</p>
+<a id="more"></a>
+<blockquote>
+<p>Heartbeat、Corosync、Keepalived这三个集群组件我们到底选哪个好，首先我想说明的是，Heartbeat、Corosync是属于同一类型，Keepalived与Heartbeat、Corosync，根本不是同一类型的。Keepalived使用的vrrp协议方式，虚拟路由冗余协议 (Virtual Router Redundancy Protocol，简称VRRP)；Heartbeat或Corosync是基于主机或网络服务的高可用方式；简单的说就是，Keepalived的目的是模拟路由器的高可用，Heartbeat或Corosync的目的是实现Service的高可用。</p>
+<p>所以一般Keepalived是实现前端高可用，常用的前端高可用的组合有，就是我们常见的LVS+Keepalived、Nginx+Keepalived、HAproxy+Keepalived。而Heartbeat或Corosync是实现服务的高可用，常见的组合有Heartbeat v3(Corosync)+Pacemaker+NFS+Httpd 实现Web服务器的高可用、Heartbeat v3(Corosync)+Pacemaker+NFS+MySQL 实现MySQL服务器的高可用。总结一下，Keepalived中实现轻量级的高可用，一般用于前端高可用，且不需要共享存储，一般常用于两个节点的高可用。而Heartbeat(或Corosync)一般用于服务的高可用，且需要共享存储，一般用于多节点的高可用。这个问题我们说明白了。</p>
+<p>又有博友会问了，那heartbaet与corosync我们又应该选择哪个好啊，我想说我们一般用corosync，因为corosync的运行机制更优于heartbeat，就连从heartbeat分离出来的pacemaker都说在以后的开发当中更倾向于corosync，所以现在corosync+pacemaker是最佳组合。</p>
+</blockquote>
+<h2 id="1-2-Keepalived-nginx"><a href="#1-2-Keepalived-nginx" class="headerlink" title="1.2 Keepalived + nginx"></a>1.2 Keepalived + nginx</h2><p>keepalived可以认为是VRRP协议在Linux上的实现，主要有三个模块，分别是core、check和vrrp。core模块为keepalived的核心，负责主进程的启动、维护以及全局配置文件的加载和解析。check负责健康检查，包括常见的各种检查方式。vrrp模块是来实现VRRP协议的。本文基于如下的拓扑图：</p>
+<figure class="highlight gherkin"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line">                   +-------------+</div><div class="line">                   |<span class="string">    uplink   </span>|</div><div class="line">                   +-------------+</div><div class="line">                          |<span class="string"></span></div><div class="line">                          +</div><div class="line">    MASTER            keep|<span class="string">alived         BACKUP</span></div><div class="line">172.29.88.224      172.29.88.222      172.29.88.225</div><div class="line">+-------------+    +-------------+    +-------------+</div><div class="line">|<span class="string">   nginx01   </span>|<span class="string">----</span>|<span class="string">  virtualIP  </span>|<span class="string">----</span>|<span class="string">   nginx02   </span>|</div><div class="line">+-------------+    +-------------+    +-------------+</div><div class="line">                          |<span class="string"></span></div><div class="line">       +------------------+------------------+</div><div class="line">       |<span class="string">                  </span>|<span class="string">                  </span>|</div><div class="line">+-------------+    +-------------+    +-------------+</div><div class="line">|<span class="string">    web01    </span>|<span class="string">    </span>|<span class="string">    web02    </span>|<span class="string">    </span>|<span class="string">    web03    </span>|</div><div class="line">+-------------+    +-------------+    +-------------+</div></pre></td></tr></table></figure>
+<h1 id="2-keepalived实现nginx高可用"><a href="#2-keepalived实现nginx高可用" class="headerlink" title="2. keepalived实现nginx高可用"></a>2. keepalived实现nginx高可用</h1><h2 id="2-1安装"><a href="#2-1安装" class="headerlink" title="2.1安装"></a>2.1安装</h2><p>我的环境是CentOS 6.2 X86_64，直接通过yum方式安装最简单：<br><figure class="highlight lsl"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"># yum install -y keepalived</div><div class="line"># keepalived -v</div><div class="line">Keepalived v1<span class="number">.2</span><span class="number">.13</span> (<span class="number">03</span>/<span class="number">19</span>,<span class="number">2015</span>)</div></pre></td></tr></table></figure></p>
+<h2 id="2-2-nginx监控脚本"><a href="#2-2-nginx监控脚本" class="headerlink" title="2.2 nginx监控脚本"></a>2.2 nginx监控脚本</h2><p>该脚本检测ngnix的运行状态，并在nginx进程不存在时尝试重新启动ngnix，如果启动失败则停止keepalived，准备让其它机器接管。</p>
+<p><code>/etc/keepalived/check_nginx.sh</code> ：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#!/bin/bash</span></div><div class="line">counter=$(ps -C nginx --no-heading|wc <span class="_">-l</span>)</div><div class="line"><span class="keyword">if</span> [ <span class="string">"<span class="variable">$&#123;counter&#125;</span>"</span> = <span class="string">"0"</span> ]; <span class="keyword">then</span></div><div class="line">    /usr/<span class="built_in">local</span>/bin/nginx</div><div class="line">    sleep 2</div><div class="line">    counter=$(ps -C nginx --no-heading|wc <span class="_">-l</span>)</div><div class="line">    <span class="keyword">if</span> [ <span class="string">"<span class="variable">$&#123;counter&#125;</span>"</span> = <span class="string">"0"</span> ]; <span class="keyword">then</span></div><div class="line">        /etc/init.d/keepalived stop</div><div class="line">    <span class="keyword">fi</span></div><div class="line"><span class="keyword">fi</span></div></pre></td></tr></table></figure></p>
+<p>你也可以根据自己的业务需求，总结出在什么情形下关闭keepalived，如 curl 主页连续2个5s没有响应则切换：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#!/bin/bash</span></div><div class="line"><span class="comment"># curl -IL http://localhost/member/login.htm</span></div><div class="line"><span class="comment"># curl --data "memberName=fengkan&amp;password=22" http://localhost/member/login.htm</span></div><div class="line"></div><div class="line">count = 0</div><div class="line"><span class="keyword">for</span> (( k=0; k&lt;2; k++ )) </div><div class="line"><span class="keyword">do</span> </div><div class="line">    check_code=$( curl --connect-timeout 3 <span class="_">-s</span>L -w <span class="string">"%&#123;http_code&#125;\\n"</span> http://localhost/login.html -o /dev/null )</div><div class="line">    <span class="keyword">if</span> [ <span class="string">"<span class="variable">$check_code</span>"</span> != <span class="string">"200"</span> ]; <span class="keyword">then</span></div><div class="line">        count = count +1</div><div class="line">        <span class="built_in">continue</span></div><div class="line">    <span class="keyword">else</span></div><div class="line">        count = 0</div><div class="line">        <span class="built_in">break</span></div><div class="line">    <span class="keyword">fi</span></div><div class="line"><span class="keyword">done</span></div><div class="line"><span class="keyword">if</span> [ <span class="string">"<span class="variable">$count</span>"</span> != <span class="string">"0"</span> ]; <span class="keyword">then</span></div><div class="line"><span class="comment">#   /etc/init.d/keepalived stop</span></div><div class="line">    <span class="built_in">exit</span> 1</div><div class="line"><span class="keyword">else</span></div><div class="line">    <span class="built_in">exit</span> 0</div><div class="line"><span class="keyword">fi</span></div></pre></td></tr></table></figure></p>
+<h2 id="2-3-keepalived-conf"><a href="#2-3-keepalived-conf" class="headerlink" title="2.3 keepalived.conf"></a>2.3 keepalived.conf</h2><figure class="highlight lsl"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div></pre></td><td class="code"><pre><div class="line">! Configuration File for keepalived</div><div class="line">global_defs &#123;</div><div class="line">    notification_email &#123;</div><div class="line">        zhouxiao@example.com</div><div class="line">        itsection@example.com</div><div class="line">    &#125;</div><div class="line">    notification_email_from itsection@example.com</div><div class="line">    smtp_server mail.example.com</div><div class="line">    smtp_connect_timeout <span class="number">30</span></div><div class="line">    router_id LVS_DEVEL</div><div class="line">&#125;</div><div class="line"></div><div class="line">vrrp_script chk_nginx &#123;</div><div class="line">#    script <span class="string">"killall -0 nginx"</span></div><div class="line">    script <span class="string">"/etc/keepalived/check_nginx.sh"</span> </div><div class="line">    interval <span class="number">2</span> </div><div class="line">    weight <span class="number">-5</span> </div><div class="line">    fall <span class="number">3</span>  </div><div class="line">    rise <span class="number">2</span> </div><div class="line">&#125;</div><div class="line"></div><div class="line">vrrp_instance VI_1 &#123;</div><div class="line">    <span class="section">state</span> MASTER</div><div class="line">    interface eth0</div><div class="line">    mcast_src_ip <span class="number">172.29</span><span class="number">.88</span><span class="number">.224</span></div><div class="line">    virtual_router_id <span class="number">51</span></div><div class="line">    priority <span class="number">101</span></div><div class="line">    advert_int <span class="number">2</span></div><div class="line">    authentication &#123;</div><div class="line">        auth_type PASS</div><div class="line">        auth_pass <span class="number">1111</span></div><div class="line">    &#125;</div><div class="line">    virtual_ipaddress &#123;</div><div class="line">        <span class="number">172.29</span><span class="number">.88</span><span class="number">.222</span></div><div class="line">    &#125;</div><div class="line">    track_script &#123;</div><div class="line">       chk_nginx </div><div class="line">    &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>在其它备机BACKUP上，只需要改变 <code>state MASTER</code> -&gt; <code>state BACKUP</code>，<code>priority 101</code> -&gt; <code>priority 100</code>，<code>mcast_src_ip 172.29.88.224</code> -&gt; <code>mcast_src_ip 172.29.88.225</code>即可。</p>
+<pre><code>service keepalived restart
+</code></pre><h2 id="2-4-配置选项说明"><a href="#2-4-配置选项说明" class="headerlink" title="2.4 配置选项说明"></a>2.4 配置选项说明</h2><p><strong>global_defs</strong></p>
+<ul>
+<li><code>notification_email</code> ： keepalived在发生诸如切换操作时需要发送email通知地址，后面的 smtp_server 相比也都知道是邮件服务器地址。也可以通过其它方式报警，毕竟邮件不是实时通知的。</li>
+<li><code>router_id</code> ： 机器标识，通常可设为hostname。故障发生时，邮件通知会用到</li>
+</ul>
+<p><strong>vrrp_instance</strong></p>
+<ul>
+<li><code>state</code> ： 指定instance(Initial)的初始状态，就是说在配置好后，这台服务器的初始状态就是这里指定的，但这里指定的不算，还是得要通过竞选通过优先级来确定。如果这里设置为MASTER，但如若他的优先级不及另外一台，那么这台在发送通告时，会发送自己的优先级，另外一台发现优先级不如自己的高，那么他会就回抢占为MASTER</li>
+<li><code>interface</code> ： 实例绑定的网卡，因为在配置虚拟IP的时候必须是在已有的网卡上添加的</li>
+<li><code>mcast_src_ip</code> ： 发送多播数据包时的源IP地址，这里注意了，这里实际上就是在那个地址上发送VRRP通告，这个非常重要，一定要选择稳定的网卡端口来发送，这里相当于heartbeat的心跳端口，如果没有设置那么就用默认的绑定的网卡的IP，也就是interface指定的IP地址</li>
+<li><code>virtual_router_id</code> ： 这里设置VRID，这里非常重要，相同的VRID为一个组，他将决定多播的MAC地址</li>
+<li><code>priority</code> ： 设置本节点的优先级，优先级高的为master</li>
+<li><code>advert_int</code> ： 检查间隔，默认为1秒。这就是VRRP的定时器，MASTER每隔这样一个时间间隔，就会发送一个advertisement报文以通知组内其他路由器自己工作正常</li>
+<li><code>authentication</code> ： 定义认证方式和密码，主从必须一样</li>
+<li><code>virtual_ipaddress</code> ： 这里设置的就是VIP，也就是虚拟IP地址，他随着state的变化而增加删除，当state为master的时候就添加，当state为backup的时候删除，这里主要是有优先级来决定的，和state设置的值没有多大关系，这里可以设置多个IP地址</li>
+<li><code>track_script</code> ： 引用VRRP脚本，即在 vrrp_script 部分指定的名字。定期运行它们来改变优先级，并最终引发主备切换。</li>
+</ul>
+<p><strong>vrrp_script</strong><br>告诉 keepalived 在什么情况下切换，所以尤为重要。可以有多个 vrrp_script </p>
+<ul>
+<li><code>script</code> ： 自己写的检测脚本。也可以是一行命令如<code>killall -0 nginx</code></li>
+<li><code>interval 2</code> ： 每2s检测一次</li>
+<li><code>weight -5</code> ： 检测失败（脚本返回非0）则优先级 -5 </li>
+<li><code>fall 2</code> ： 检测连续 2 次失败才算确定是真失败。会用weight减少优先级（1-255之间）</li>
+<li><code>rise 1</code> ： 检测 1 次成功就算成功。但不修改优先级</li>
+</ul>
+<p>这里要提示一下script一般有2种写法：</p>
+<ol>
+<li>通过脚本执行的返回结果，改变优先级，keepalived继续发送通告消息，backup比较优先级再决定</li>
+<li>脚本里面检测到异常，直接关闭keepalived进程，backup机器接收不到advertisement会抢占IP</li>
+</ol>
+<p>上文 vrrp_script 配置部分，<code>killall -0 nginx</code>属于第1种情况，<code>/etc/keepalived/check_nginx.sh</code>属于第2种情况（脚本中关闭keepalived）。个人更倾向于通过shell脚本判断，但有异常时exit 1，正常退出exit 0，然后keepalived根据动态调整的 vrrp_instance 优先级选举决定是否抢占VIP：</p>
+<ul>
+<li>如果脚本执行结果为0，并且weight配置的值大于0，则优先级相应的增加</li>
+<li>如果脚本执行结果非0，并且weight配置的值小于0，则优先级相应的减少</li>
+</ul>
+<p>其他情况，原本配置的优先级不变，即配置文件中priority对应的值。</p>
+<p>提示：</p>
+<ol>
+<li>优先级不会不断的提高或者降低</li>
+<li>可以编写多个检测脚本并为每个检测脚本设置不同的weight（在配置中列出就行）</li>
+<li>不管提高优先级还是降低优先级，最终优先级的范围是在[1,254]，不会出现优先级小于等于0或者优先级大于等于255的情况</li>
+<li>在MASTER节点的 vrrp_instance 中 配置 <code>nopreempt</code> ，当它异常恢复后，即使它 prio 更高也不会抢占，这样可以避免正常情况下做无谓的切换</li>
+</ol>
+<p>以上可以做到利用脚本检测业务进程的状态，并动态调整优先级从而实现主备切换。</p>
+<p><strong>配置结束</strong></p>
+<p>在默认的keepalive.conf里面还有 virtual_server,real_server 这样的配置，我们这用不到，它是为lvs准备的。 <code>notify</code> 可以定义在切换成MASTER或BACKUP时执行的脚本，如有需求请自行google。</p>
+<p>notify</p>
+<h2 id="2-5-nginx配置"><a href="#2-5-nginx配置" class="headerlink" title="2.5 nginx配置"></a>2.5 nginx配置</h2><p>当然nginx没有什么可配置的，因为它与keepalived并没有联系。但记住，2台nginx服务器上的配置应该是完全一样的（rsync同步），这样才能做到对用户透明，nginx.conf 里面的 <code>server_name</code> 尽量使用域名来代替，然后dns解析这个域名到虚拟IP 172.29.88.222。</p>
+<p>更多关于nginx内容配置请参考 <a href="http://seanlook.com/2015/05/17/nginx-install-and-config/">这里</a> 。</p>
+<h1 id="3-测试"><a href="#3-测试" class="headerlink" title="3. 测试"></a>3. 测试</h1><p>根据上面的配置，初始化状态：172.29.88.224 (itoatest1,MASTER,101)，172.29.88.222（itoatest2,BACKUP,100），nginx和keepalived都启动，虚拟IP 172.29.88.222 在 itoatest1 上：<br><figure class="highlight pf"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># 使用ip命令配置的地址，ifconfig查看不了</span></div><div class="line">[root@itoatest1 nginx-<span class="number">1.6</span>]<span class="comment"># ip a|grep eth0</span></div><div class="line"><span class="number">2</span>: eth0: <span class="variable">&lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt;</span> mtu <span class="number">1500</span> qdisc pfifo_fast <span class="keyword">state</span> UP qlen <span class="number">1000</span></div><div class="line">    <span class="keyword">inet</span> <span class="number">172.29</span>.<span class="number">88.224</span>/<span class="number">24</span> brd <span class="number">172.29</span>.<span class="number">88.255</span> scope <span class="keyword">global</span> eth0</div><div class="line">    <span class="keyword">inet</span> <span class="number">172.29</span>.<span class="number">88.222</span>/<span class="number">32</span> scope <span class="keyword">global</span> eth0</div></pre></td></tr></table></figure></p>
+<p>浏览器访问 172.29.88.222 或域名，OK。</p>
+<p>直接关闭 itoatest1 上的nginx：<code>/usr/local/nginx-1.6/sbin/nginx -s stop</code>：<br><figure class="highlight pf"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">[root@localhost keepalived]<span class="comment"># ip a|grep eth0</span></div><div class="line"><span class="number">2</span>: eth0: <span class="variable">&lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt;</span> mtu <span class="number">1500</span> qdisc pfifo_fast <span class="keyword">state</span> UP qlen <span class="number">1000</span></div><div class="line">    <span class="keyword">inet</span> <span class="number">172.29</span>.<span class="number">88.224</span>/<span class="number">24</span> brd <span class="number">172.29</span>.<span class="number">88.255</span> scope <span class="keyword">global</span> eth0</div></pre></td></tr></table></figure></p>
+<p>vip消失，漂移到 itoatest2：</p>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/nginx-keepalived-vip.png" alt="nginx-keepalived-vip.png"></p>
+<p>同时可以看到两台服务器上 <code>/var/log/messages</code>：<br><figure class="highlight css"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line">## <span class="selector-tag">itoatest1</span></div><div class="line"><span class="selector-tag">Jun</span>  5 16<span class="selector-pseudo">:44</span><span class="selector-pseudo">:01</span> <span class="selector-tag">itoatest1</span> <span class="selector-tag">Keepalived_vrrp</span><span class="selector-attr">[44875]</span>: <span class="selector-tag">VRRP_Instance</span>(<span class="selector-tag">VI_1</span>) <span class="selector-tag">Sending</span> <span class="selector-tag">gratuitous</span> <span class="selector-tag">ARPs</span> <span class="selector-tag">on</span> <span class="selector-tag">eth0</span> <span class="selector-tag">for</span> 172<span class="selector-class">.29</span><span class="selector-class">.88</span><span class="selector-class">.222</span></div><div class="line"><span class="selector-tag">Jun</span>  5 16<span class="selector-pseudo">:44</span><span class="selector-pseudo">:06</span> <span class="selector-tag">itoatest1</span> <span class="selector-tag">Keepalived_vrrp</span><span class="selector-attr">[44875]</span>: <span class="selector-tag">VRRP_Instance</span>(<span class="selector-tag">VI_1</span>) <span class="selector-tag">Sending</span> <span class="selector-tag">gratuitous</span> <span class="selector-tag">ARPs</span> <span class="selector-tag">on</span> <span class="selector-tag">eth0</span> <span class="selector-tag">for</span> 172<span class="selector-class">.29</span><span class="selector-class">.88</span><span class="selector-class">.222</span></div><div class="line"><span class="selector-tag">Jun</span>  5 16<span class="selector-pseudo">:44</span><span class="selector-pseudo">:46</span> <span class="selector-tag">itoatest1</span> <span class="selector-tag">Keepalived_vrrp</span><span class="selector-attr">[44875]</span>: <span class="selector-tag">VRRP_Script</span>(<span class="selector-tag">chk_nginx</span>) <span class="selector-tag">failed</span></div><div class="line"><span class="selector-tag">Jun</span>  5 16<span class="selector-pseudo">:44</span><span class="selector-pseudo">:48</span> <span class="selector-tag">itoatest1</span> <span class="selector-tag">Keepalived_vrrp</span><span class="selector-attr">[44875]</span>: <span class="selector-tag">VRRP_Instance</span>(<span class="selector-tag">VI_1</span>) <span class="selector-tag">Received</span> <span class="selector-tag">higher</span> <span class="selector-tag">prio</span> <span class="selector-tag">advert</span></div><div class="line"><span class="selector-tag">Jun</span>  5 16<span class="selector-pseudo">:44</span><span class="selector-pseudo">:48</span> <span class="selector-tag">itoatest1</span> <span class="selector-tag">Keepalived_vrrp</span><span class="selector-attr">[44875]</span>: <span class="selector-tag">VRRP_Instance</span>(<span class="selector-tag">VI_1</span>) <span class="selector-tag">Entering</span> <span class="selector-tag">BACKUP</span> <span class="selector-tag">STATE</span></div><div class="line"><span class="selector-tag">Jun</span>  5 16<span class="selector-pseudo">:44</span><span class="selector-pseudo">:48</span> <span class="selector-tag">itoatest1</span> <span class="selector-tag">Keepalived_vrrp</span><span class="selector-attr">[44875]</span>: <span class="selector-tag">VRRP_Instance</span>(<span class="selector-tag">VI_1</span>) <span class="selector-tag">removing</span> <span class="selector-tag">protocol</span> <span class="selector-tag">VIPs</span>.</div><div class="line"><span class="selector-tag">Jun</span>  5 16<span class="selector-pseudo">:44</span><span class="selector-pseudo">:48</span> <span class="selector-tag">itoatest1</span> <span class="selector-tag">Keepalived_healthcheckers</span><span class="selector-attr">[44874]</span>: <span class="selector-tag">Netlink</span> <span class="selector-tag">reflector</span> <span class="selector-tag">reports</span> <span class="selector-tag">IP</span> 172<span class="selector-class">.29</span><span class="selector-class">.88</span><span class="selector-class">.222</span> <span class="selector-tag">removed</span></div><div class="line"></div><div class="line">## <span class="selector-tag">itoatest2</span></div><div class="line"><span class="selector-tag">Jun</span>  5 16<span class="selector-pseudo">:44</span><span class="selector-pseudo">:00</span> <span class="selector-tag">itoatest2</span> <span class="selector-tag">Keepalived_vrrp</span><span class="selector-attr">[35555]</span>: <span class="selector-tag">VRRP_Instance</span>(<span class="selector-tag">VI_1</span>) <span class="selector-tag">Transition</span> <span class="selector-tag">to</span> <span class="selector-tag">MASTER</span> <span class="selector-tag">STATE</span></div><div class="line"><span class="selector-tag">Jun</span>  5 16<span class="selector-pseudo">:44</span><span class="selector-pseudo">:00</span> <span class="selector-tag">itoatest2</span> <span class="selector-tag">Keepalived_vrrp</span><span class="selector-attr">[35555]</span>: <span class="selector-tag">VRRP_Instance</span>(<span class="selector-tag">VI_1</span>) <span class="selector-tag">Received</span> <span class="selector-tag">higher</span> <span class="selector-tag">prio</span> <span class="selector-tag">advert</span></div><div class="line"><span class="selector-tag">Jun</span>  5 16<span class="selector-pseudo">:44</span><span class="selector-pseudo">:00</span> <span class="selector-tag">itoatest2</span> <span class="selector-tag">Keepalived_vrrp</span><span class="selector-attr">[35555]</span>: <span class="selector-tag">VRRP_Instance</span>(<span class="selector-tag">VI_1</span>) <span class="selector-tag">Entering</span> <span class="selector-tag">BACKUP</span> <span class="selector-tag">STATE</span></div><div class="line"><span class="selector-tag">Jun</span>  5 16<span class="selector-pseudo">:44</span><span class="selector-pseudo">:48</span> <span class="selector-tag">itoatest2</span> <span class="selector-tag">Keepalived_vrrp</span><span class="selector-attr">[35555]</span>: <span class="selector-tag">VRRP_Instance</span>(<span class="selector-tag">VI_1</span>) <span class="selector-tag">forcing</span> <span class="selector-tag">a</span> <span class="selector-tag">new</span> <span class="selector-tag">MASTER</span> <span class="selector-tag">election</span></div><div class="line"><span class="selector-tag">Jun</span>  5 16<span class="selector-pseudo">:44</span><span class="selector-pseudo">:48</span> <span class="selector-tag">itoatest2</span> <span class="selector-tag">Keepalived_vrrp</span><span class="selector-attr">[35555]</span>: <span class="selector-tag">VRRP_Instance</span>(<span class="selector-tag">VI_1</span>) <span class="selector-tag">forcing</span> <span class="selector-tag">a</span> <span class="selector-tag">new</span> <span class="selector-tag">MASTER</span> <span class="selector-tag">election</span></div><div class="line"><span class="selector-tag">Jun</span>  5 16<span class="selector-pseudo">:44</span><span class="selector-pseudo">:49</span> <span class="selector-tag">itoatest2</span> <span class="selector-tag">Keepalived_vrrp</span><span class="selector-attr">[35555]</span>: <span class="selector-tag">VRRP_Instance</span>(<span class="selector-tag">VI_1</span>) <span class="selector-tag">Transition</span> <span class="selector-tag">to</span> <span class="selector-tag">MASTER</span> <span class="selector-tag">STATE</span></div><div class="line"><span class="selector-tag">Jun</span>  5 16<span class="selector-pseudo">:44</span><span class="selector-pseudo">:50</span> <span class="selector-tag">itoatest2</span> <span class="selector-tag">Keepalived_vrrp</span><span class="selector-attr">[35555]</span>: <span class="selector-tag">VRRP_Instance</span>(<span class="selector-tag">VI_1</span>) <span class="selector-tag">Entering</span> <span class="selector-tag">MASTER</span> <span class="selector-tag">STATE</span></div><div class="line"><span class="selector-tag">Jun</span>  5 16<span class="selector-pseudo">:44</span><span class="selector-pseudo">:50</span> <span class="selector-tag">itoatest2</span> <span class="selector-tag">Keepalived_vrrp</span><span class="selector-attr">[35555]</span>: <span class="selector-tag">VRRP_Instance</span>(<span class="selector-tag">VI_1</span>) <span class="selector-tag">setting</span> <span class="selector-tag">protocol</span> <span class="selector-tag">VIPs</span>.</div><div class="line"><span class="selector-tag">Jun</span>  5 16<span class="selector-pseudo">:44</span><span class="selector-pseudo">:50</span> <span class="selector-tag">itoatest2</span> <span class="selector-tag">Keepalived_vrrp</span><span class="selector-attr">[35555]</span>: <span class="selector-tag">VRRP_Instance</span>(<span class="selector-tag">VI_1</span>) <span class="selector-tag">Sending</span> <span class="selector-tag">gratuitous</span> <span class="selector-tag">ARPs</span> <span class="selector-tag">on</span> <span class="selector-tag">eth0</span> <span class="selector-tag">for</span> 172<span class="selector-class">.29</span><span class="selector-class">.88</span><span class="selector-class">.222</span></div><div class="line"><span class="selector-tag">Jun</span>  5 16<span class="selector-pseudo">:44</span><span class="selector-pseudo">:50</span> <span class="selector-tag">itoatest2</span> <span class="selector-tag">Keepalived_healthcheckers</span><span class="selector-attr">[35554]</span>: <span class="selector-tag">Netlink</span> <span class="selector-tag">reflector</span> <span class="selector-tag">reports</span> <span class="selector-tag">IP</span> 172<span class="selector-class">.29</span><span class="selector-class">.88</span><span class="selector-class">.222</span> <span class="selector-tag">added</span></div><div class="line"><span class="selector-tag">Jun</span>  5 16<span class="selector-pseudo">:44</span><span class="selector-pseudo">:55</span> <span class="selector-tag">itoatest2</span> <span class="selector-tag">Keepalived_vrrp</span><span class="selector-attr">[35555]</span>: <span class="selector-tag">VRRP_Instance</span>(<span class="selector-tag">VI_1</span>) <span class="selector-tag">Sending</span> <span class="selector-tag">gratuitous</span> <span class="selector-tag">ARPs</span> <span class="selector-tag">on</span> <span class="selector-tag">eth0</span> <span class="selector-tag">for</span> 172<span class="selector-class">.29</span><span class="selector-class">.88</span><span class="selector-class">.222</span></div></pre></td></tr></table></figure></p>
+<p>你也可以通过在两台服务器上抓包来查看 优先级priority 的变化：<br><figure class="highlight css"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">## <span class="selector-tag">itoatest1</span> 上</div><div class="line">## 直接输出，或后加 <span class="selector-tag">-w</span> <span class="selector-tag">itoatest-kl</span><span class="selector-class">.cap</span>存入文件用<span class="selector-tag">wireshark</span>查看</div><div class="line"># <span class="selector-tag">tcpdump</span> <span class="selector-tag">-vvv</span> <span class="selector-tag">-n</span> <span class="selector-tag">-i</span> <span class="selector-tag">eth0</span> <span class="selector-tag">dst</span> 224<span class="selector-class">.0</span><span class="selector-class">.0</span><span class="selector-class">.18</span> <span class="selector-tag">and</span> <span class="selector-tag">src</span> 172<span class="selector-class">.29</span><span class="selector-class">.88</span><span class="selector-class">.224</span></div></pre></td></tr></table></figure></p>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/nginx-keepalived-prio.png" alt="nginx-keepalived-prio.png"></p>
+<p><strong>参考</strong></p>
+<ul>
+<li><a href="http://debugo.com/keepalived-nginx/" target="_blank" rel="external">使用Keepalived实现Nginx高可用性</a></li>
+<li><a href="http://nginx.com/resources/admin-guide/nginx-ha-keepalived/" target="_blank" rel="external">High Availability Support Based on keepalived</a></li>
+<li><a href="https://www.centos.bz/2012/02/nginx-keepalived-high-availability/" target="_blank" rel="external">nginx+keepalived实现双机热备的高可用</a></li>
+<li><a href="http://atong.blog.51cto.com/2393905/1351709" target="_blank" rel="external">LVS原理详解及部署之五：LVS+keepalived实现负载均衡&amp;高可用</a></li>
+<li><a href="http://xxrenzhe.blog.51cto.com/4036116/1405571" target="_blank" rel="external">Keepalived双主模型中vrrp_script中权重改变故障排查</a></li>
+<li><a href="http://zhaoyuqiang.blog.51cto.com/6328846/1166840" target="_blank" rel="external">虚拟路由器冗余协议【原理篇】VRRP详解</a></li>
+<li><a href="http://bbs.ywlm.net/thread-845-1-1.html" target="_blank" rel="external">Keepalived原理与实战精讲</a></li>
+</ul>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/nignx/" rel="tag">#nignx</a>
+          
+            <a href="/tags/keepalived/" rel="tag">#keepalived</a>
+          
+            <a href="/tags/高可用/" rel="tag">#高可用</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2015/05/17/nginx-location-rewrite/" rel="next" title="nginx配置location总结及rewrite规则写法">
+                <i class="fa fa-chevron-left"></i> nginx配置location总结及rewrite规则写法
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2015/05/28/nginx-ssl/" rel="prev" title="nginx配置ssl加密（单双向认证、部分https）">
+                nginx配置ssl加密（单双向认证、部分https） <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2015/05/18/nginx-keepalived-ha/"
+           data-title="Nginx+Keepalived实现站点高可用" data-url="http://seanlook.com/2015/05/18/nginx-keepalived-ha/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-Keepalived介绍"><span class="nav-text">1. Keepalived介绍</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-VRRP协议"><span class="nav-text">1.1 VRRP协议</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#与heartbeat-corosync等比较"><span class="nav-text">与heartbeat/corosync等比较</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-Keepalived-nginx"><span class="nav-text">1.2 Keepalived + nginx</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-keepalived实现nginx高可用"><span class="nav-text">2. keepalived实现nginx高可用</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1安装"><span class="nav-text">2.1安装</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-nginx监控脚本"><span class="nav-text">2.2 nginx监控脚本</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-3-keepalived-conf"><span class="nav-text">2.3 keepalived.conf</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-4-配置选项说明"><span class="nav-text">2.4 配置选项说明</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-5-nginx配置"><span class="nav-text">2.5 nginx配置</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-测试"><span class="nav-text">3. 测试</span></a></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

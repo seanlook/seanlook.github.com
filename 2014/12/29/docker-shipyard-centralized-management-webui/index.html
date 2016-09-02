@@ -1,0 +1,856 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="docker,linux,shipyard," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="Shipyard（github）是建立在docker集群管理工具Citadel之上的可以管理容器、主机等资源的web图形化工具。包括core和extension两个版本，core即shipyard主要是把多个 Docker host上的 containers 统一管理（支持跨越多个host），extension即shipyard-extensions添加了应用路由和负载均衡、集中化日志、部署等。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Docker集中化web界面管理平台shipyard">
+<meta property="og:url" content="http://seanlook.com/2014/12/29/docker-shipyard-centralized-management-webui/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="Shipyard（github）是建立在docker集群管理工具Citadel之上的可以管理容器、主机等资源的web图形化工具。包括core和extension两个版本，core即shipyard主要是把多个 Docker host上的 containers 统一管理（支持跨越多个host），extension即shipyard-extensions添加了应用路由和负载均衡、集中化日志、部署等。">
+<meta property="og:updated_time" content="2014-12-29T07:46:23.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Docker集中化web界面管理平台shipyard">
+<meta name="twitter:description" content="Shipyard（github）是建立在docker集群管理工具Citadel之上的可以管理容器、主机等资源的web图形化工具。包括core和extension两个版本，core即shipyard主要是把多个 Docker host上的 containers 统一管理（支持跨越多个host），extension即shipyard-extensions添加了应用路由和负载均衡、集中化日志、部署等。">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title> Docker集中化web界面管理平台shipyard | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                Docker集中化web界面管理平台shipyard
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2014-12-29T13:21:25+08:00" content="2014-12-29">
+              2014-12-29
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Virtualization/" itemprop="url" rel="index">
+                    <span itemprop="name">Virtualization</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Virtualization/Docker/" itemprop="url" rel="index">
+                    <span itemprop="name">Docker</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2014/12/29/docker-shipyard-centralized-management-webui/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2014/12/29/docker-shipyard-centralized-management-webui/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p><a href="http://shipyard-project.com/" target="_blank" rel="external">Shipyard</a>（<a href="https://github.com/shipyard/shipyard" target="_blank" rel="external">github</a>）是建立在docker集群管理工具<a href="https://github.com/citadel/citadel" target="_blank" rel="external">Citadel</a>之上的可以管理容器、主机等资源的web图形化工具。包括<a href="https://github.com/shipyard/shipyard" target="_blank" rel="external">core</a>和<a href="https://github.com/shipyard/shipyard-extensions" target="_blank" rel="external">extension</a>两个版本，core即shipyard主要是把多个 Docker host上的 containers 统一管理（支持跨越多个host），extension即shipyard-extensions添加了应用路由和负载均衡、集中化日志、部署等。</p>
+<h2 id="1-几个概念"><a href="#1-几个概念" class="headerlink" title="1. 几个概念"></a>1. 几个概念</h2><h3 id="engine"><a href="#engine" class="headerlink" title="engine"></a>engine</h3><p>一个shipyard管理的docker集群可以包含一个或多个<code>engine</code>（引擎），一个engine就是监听tcp端口的docker daemon。shipyard管理docker daemon、images、containers完全基于Docker API，不需要做其他的修改。另外，shipyard可以对每个engine做资源限制，包括CPU和内存；因为TCP监听相比Unix socket方式会有一定的安全隐患，所以shipyard还支持通过SSL证书与docker后台进程安全通信。</p>
+<h3 id="rethinkdb"><a href="#rethinkdb" class="headerlink" title="rethinkdb"></a>rethinkdb</h3><p><code>RethinkDB</code>是一个shipyard项目的一个docker镜像，用来存放账号（account）、引擎（engine）、服务密钥（service key）、扩展元数据（extension metadata）等信息，但不会存储任何有关容器或镜像的内容。一般会启动一个<code>shipyard/rethinkdb</code>容器shipyard-rethinkdb-data来使用它的<code>/data</code>作为数据卷供另外rethinkdb一个挂载，专门用于数据存储。</p>
+<h2 id="2-搭建过程"><a href="#2-搭建过程" class="headerlink" title="2. 搭建过程"></a>2. 搭建过程</h2><h3 id="修改tcp监听"><a href="#修改tcp监听" class="headerlink" title="修改tcp监听"></a>修改tcp监听</h3><p>Shipyard 要管理和控制 Docker host 的话需要先修改 Docker host 上的默认配置使其监听tcp端口(可以继续保持Unix socket）。有以下2种方式</p>
+<ol>
+<li><code>sudo docker -H tcp://0.0.0.0:4243 -H unix:///var/run/docker.sock -d</code> 启动docker daemon。如果为了避免每次启动都写这么长的命令，可以直接在<code>/etc/init/docker.conf</code>中修改。</li>
+<li>修改<code>/etc/default/docker</code>的<code>DOCKER_OPTS</code><br><code>DOCKER_OPTS=&quot;-H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock&quot;</code>。这种方式在我docker version 1.4.1 in ubuntu 14.04上并没有生效。</li>
+</ol>
+<a id="more"></a>
+<figure class="highlight autohotkey"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">重启服务</div><div class="line"><span class="symbol">$ sudo docker -H tcp://0.0.0.0:4243 -H unix:</span>///var/run/docker.sock -d</div><div class="line">验证</div><div class="line">$ netstat -ant  |grep <span class="number">4243</span></div><div class="line"><span class="symbol">tcp6       0      0 :::4243                 :::</span>*                    LISTEN</div><div class="line">``` </div><div class="line">### 启动rethinkdb ###</div><div class="line">shipyard（基于Python/Django）在v1版本时安装过程比较复杂，既可以通过在host上安装，也可以部署shipyard镜像（包括`shipyard-agent`、`shipyard-deploy`等组件）。v2版本简化了安装过程，启动两个镜像就完成：</div></pre></td></tr></table></figure>
+<p>获取一个/data的数据卷<br>$sudo docker run -it -d –name shipyard-rethinkdb-data \<br>  –entrypoint /bin/bash shipyard/rethinkdb -l</p>
+<p>使用数据卷/data启动RethinkDB<br>docker run -it -P -d –name shipyard-rethinkdb \<br>  –volumes-from shipyard-rethinkdb-data shipyard/rethinkdb<br><figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="meta">### 部署shipyard镜像 ###</span></div><div class="line">启动shipyard控制器：</div></pre></td></tr></table></figure></p>
+<p>sudo docker run -it -p 8080:8080 -d –name shipyard \<br>  –link shipyard-rethinkdb:rethinkdb shipyard/shipyard<br><figure class="highlight autohotkey"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="symbol">至此已经可以通过浏览器访问`http://host:</span><span class="number">8080</span>`来访问shipyard UI界面了。</div><div class="line"></div><div class="line">第一次`run`后，关闭再次启动时直接使用：</div></pre></td></tr></table></figure></p>
+<p>sudo docker stop shipyard shipyard-rethinkdb shipyard-rethinkdb-data<br>sudo docker start shipyard-rethinkdb-data shipyard-rethinkdb shipyard<br><figure class="highlight markdown"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line"></div><div class="line"><span class="section">### 图示 ###</span></div><div class="line"><span class="strong">**登录：**</span></div><div class="line">![<span class="string">docker-shipyard-login</span>][<span class="symbol">1</span>]</div><div class="line">默认用户名/密码为 admin/shipyard</div><div class="line"></div><div class="line"><span class="strong">**主界面：**</span></div><div class="line">![<span class="string">docker-shipyard</span>][<span class="symbol">2</span>]</div><div class="line">Dashboard展示在添加engine时指定的CPU以及内存的使用情况。</div><div class="line"></div><div class="line"><span class="strong">**容器：**</span></div><div class="line">![<span class="string">docker-shipyard-containers</span>][<span class="symbol">3</span>]</div><div class="line">shipyard管理的所有docker主机的所有容器，包括stop和running状态的。可以直接点击DEPLOY按钮来从镜像运行出其他容器，与<span class="code">`docker run`</span>的选项几乎相同，可以限制CPU和内存的使用，详见[<span class="string">shipyard的containers文档</span>](<span class="link">http://shipyard-project.com/docs/containers/</span>)。</div><div class="line"></div><div class="line"><span class="strong">**容器操作：**</span></div><div class="line">![<span class="string">docker-shipyard-containers2</span>][<span class="symbol">4</span>]</div><div class="line">可以<span class="code">`stop`</span>、<span class="code">`start`</span>、<span class="code">`restart`</span>容器，通过<span class="code">`LOGS`</span>可以看到容器日志输出，<span class="code">`SCALE`</span>可以批量（规模化）部署该容器，这个操作与容器的Type属性息息相关。因为shipyard可以管理多个host的docker容器，所以启动一个容器的type可以是：service——可以在具有相同label的engine上运行；unique——一个host上只允许某个镜像的一个实例运行；host——在指定的host上运行容器，启动的时候通过<span class="code">`--label host:&lt;host-id&gt;`</span>语法指定docker host。</div><div class="line"></div><div class="line"><span class="strong">**engine管理：**</span></div><div class="line">![<span class="string">docker-shipyard-engine</span>][<span class="symbol">5</span>]</div><div class="line">一个engine就是一个docker daemon，docker daemon下启动着多个containers，可以对engine限制一个整体的CPU和内存限制，shipyard通过TCP端口连接daemon。需要注意的是docker client与server的版本问题：（因为shipyard目前还在快速的完善过程，不同版本的docker应该是向下兼容的）</div></pre></td></tr></table></figure></p>
+<p>curl -X GET <a href="http://172.29.88.223:4243/v1.15/containers/json" target="_blank" rel="external">http://172.29.88.223:4243/v1.15/containers/json</a><br>client and server don’t have same version (client : 1.15, server: 1.13)<br><figure class="highlight stata"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"></div><div class="line">## 3. shipyard-<span class="keyword">cli</span> ##</div><div class="line">目前图形化界面能做的操作其实很少，正在强大的是通过shipyard提供的命令行窗口（称作`Shipyard <span class="keyword">CLI</span>`）进行管理，参考http:<span class="comment">//shipyard-project.com/docs/usage/cli/</span></div><div class="line">启动命令行交互模式：</div><div class="line"></div><div class="line">    sudo docker <span class="keyword">run</span> --<span class="keyword">rm</span> -it shipyard/shipyard-<span class="keyword">cli</span></div><div class="line"></div><div class="line">使用它甚至可以替代docker客户端。</div></pre></td></tr></table></figure></p>
+<p>sean@seanubt:~$ sudo docker run -it shipyard/shipyard-cli<br>shipyard cli&gt; shipyard help<br>NAME:<br>   shipyard - manage a shipyard cluster</p>
+<p>USAGE:<br>   shipyard [global options] command [command options] [arguments…]</p>
+<p>VERSION:<br>   2.0.8</p>
+<p>COMMANDS:<br>   login        login to a shipyard cluster<br>   change-password    update your password<br>   accounts        show accounts<br>   add-account        add account<br>   delete-account    delete account<br>   containers        list containers<br>   inspect        inspect container<br>   run            run a container<br>   stop            stop a container<br>   restart        restart a container<br>   scale        scale a container<br>   logs            show container logs<br>   destroy        destroy a container<br>   engines        list engines<br>   add-engine        add shipyard engine<br>   remove-engine    removes an engine<br>   inspect-engine    inspect an engine<br>   service-keys        list service keys<br>   add-service-key    adds a service key<br>   remove-service-key    removes a service key<br>   extensions        show extensions<br>   add-extension    add extension<br>   remove-extension    remove an extension<br>   webhook-keys        list webhook keys<br>   add-webhook-key    adds a webhook key<br>   remove-webhook-key    removes a webhook key<br>   info            show cluster info<br>   events        show cluster events<br>   help, h        Shows a list of commands or help for one command</p>
+<p>GLOBAL OPTIONS:<br>   –help, -h            show help<br>   –generate-bash-completion<br>   –version, -v        print the version</p>
+<p>登录shipyard<br>shipyard cli&gt; shipyard login<br>URL: <a href="http://172.29.88.205:8080" target="_blank" rel="external">http://172.29.88.205:8080</a><br>Username: admin<br>Password:</p>
+<p>查看containers<br>shipyard cli&gt; shipyard containers</p>
+<p>启动一个容器<br>shipyard cli&gt; shipyard run –name nginx:1.7.6 –container-name web_test \<br>    –cpus 0.2 \<br>    –memory 64 \<br>    –type service \<br>    –hostname nginx-test \<br>    –domain example.com \<br>    –link redis:db \<br>    –port tcp/172.29.88.205:81:8081 \<br>    –port tcp/::8000 \<br>    –restart “on-failure:5” \<br>    –env FOO=bar \<br>    –label dev \</p>
+<p>查看容器日志（只能接容器ID，暂不能使用容器名）<br>shipyard cli&gt; shipyard logs ff2761d</p>
+<p>关闭并移除容器<br>shipyard cli&gt; shipyard destroy <container_id><br>```<br>不一一列举。。。</container_id></p>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/docker/" rel="tag">#docker</a>
+          
+            <a href="/tags/linux/" rel="tag">#linux</a>
+          
+            <a href="/tags/shipyard/" rel="tag">#shipyard</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2014/12/18/docker-core-technology-preview/" rel="next" title="【转+改】Docker核心技术预览">
+                <i class="fa fa-chevron-left"></i> 【转+改】Docker核心技术预览
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2014/12/31/feel-2014-end/" rel="prev" title="只怕时间走的太过匆忙，忘记了躲在角落中的我">
+                只怕时间走的太过匆忙，忘记了躲在角落中的我 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2014/12/29/docker-shipyard-centralized-management-webui/"
+           data-title="Docker集中化web界面管理平台shipyard" data-url="http://seanlook.com/2014/12/29/docker-shipyard-centralized-management-webui/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-几个概念"><span class="nav-text">1. 几个概念</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#engine"><span class="nav-text">engine</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#rethinkdb"><span class="nav-text">rethinkdb</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-搭建过程"><span class="nav-text">2. 搭建过程</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#修改tcp监听"><span class="nav-text">修改tcp监听</span></a></li></ol></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

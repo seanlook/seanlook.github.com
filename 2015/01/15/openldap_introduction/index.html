@@ -1,0 +1,947 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="LDAP,sasl,Kerberos," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="1. 目录服务目录是一个为查询、浏览和搜索而优化的专业分布式数据库，它呈树状结构组织数据，就好象Linux/Unix系统中的文件目录一样。目录数据库和关系数据库不同，它有优异的读性能，但写性能差，并且没有事务处理、回滚等复杂功能，不适于存储修改频繁的数据。所以目录天生是用来查询的，就好象它的名字一样。
+目录服务是由目录数据库和一套访问协议组成的系统。类似以下的信息适合储存在目录中：
+
+企业员工信息">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LDAP服务器的概念和原理简单介绍">
+<meta property="og:url" content="http://seanlook.com/2015/01/15/openldap_introduction/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="1. 目录服务目录是一个为查询、浏览和搜索而优化的专业分布式数据库，它呈树状结构组织数据，就好象Linux/Unix系统中的文件目录一样。目录数据库和关系数据库不同，它有优异的读性能，但写性能差，并且没有事务处理、回滚等复杂功能，不适于存储修改频繁的数据。所以目录天生是用来查询的，就好象它的名字一样。
+目录服务是由目录数据库和一套访问协议组成的系统。类似以下的信息适合储存在目录中：
+
+企业员工信息">
+<meta property="og:image" content="http://sean-images.qiniudn.com/ldap_intro_dctree.png">
+<meta property="og:image" content="http://sean-images.qiniudn.com/ldap_objectclass.jpg">
+<meta property="og:image" content="http://sean-images.qiniudn.com/ldap_schema_attr_entry.jpg">
+<meta property="og:updated_time" content="2015-01-15T02:46:23.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="LDAP服务器的概念和原理简单介绍">
+<meta name="twitter:description" content="1. 目录服务目录是一个为查询、浏览和搜索而优化的专业分布式数据库，它呈树状结构组织数据，就好象Linux/Unix系统中的文件目录一样。目录数据库和关系数据库不同，它有优异的读性能，但写性能差，并且没有事务处理、回滚等复杂功能，不适于存储修改频繁的数据。所以目录天生是用来查询的，就好象它的名字一样。
+目录服务是由目录数据库和一套访问协议组成的系统。类似以下的信息适合储存在目录中：
+
+企业员工信息">
+<meta name="twitter:image" content="http://sean-images.qiniudn.com/ldap_intro_dctree.png">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title> LDAP服务器的概念和原理简单介绍 | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                LDAP服务器的概念和原理简单介绍
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2015-01-15T01:21:25+08:00" content="2015-01-15">
+              2015-01-15
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/OpenLDAP/" itemprop="url" rel="index">
+                    <span itemprop="name">OpenLDAP</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/01/15/openldap_introduction/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/01/15/openldap_introduction/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h2 id="1-目录服务"><a href="#1-目录服务" class="headerlink" title="1. 目录服务"></a>1. 目录服务</h2><p>目录是一个为查询、浏览和搜索而优化的专业分布式数据库，它呈树状结构组织数据，就好象Linux/Unix系统中的文件目录一样。目录数据库和关系数据库不同，它有优异的读性能，但写性能差，并且没有事务处理、回滚等复杂功能，不适于存储修改频繁的数据。所以目录天生是用来查询的，就好象它的名字一样。</p>
+<p>目录服务是由目录数据库和一套访问协议组成的系统。类似以下的信息适合储存在目录中：</p>
+<ul>
+<li>企业员工信息，如姓名、电话、邮箱等；</li>
+<li>公用证书和安全密钥；</li>
+<li>公司的物理设备信息，如服务器，它的IP地址、存放位置、厂商、购买时间等；</li>
+</ul>
+<p><a href="http://www.openldap.org/doc/admin24/intro.html" target="_blank" rel="external">LDAP</a>是轻量目录访问协议(Lightweight Directory Access Protocol)的缩写，LDAP是从X.500目录访问协议的基础上发展过来的，目前的版本是v3.0。与LDAP一样提供类似的目录服务软件还有<a href="http://directory.apache.org/apacheds/" target="_blank" rel="external">ApacheDS</a>、<a href="https://technet.microsoft.com/en-us/library/dd448614.aspx" target="_blank" rel="external">Active Directory</a>、<a href="http://www.redhat.com/en/technologies/cloud-computing/directory-server" target="_blank" rel="external">Red Hat Directory Service</a> 。</p>
+<h2 id="2-LDAP特点"><a href="#2-LDAP特点" class="headerlink" title="2. LDAP特点"></a>2. LDAP特点</h2><ul>
+<li>LDAP的结构用树来表示，而不是用表格。正因为这样，就不能用SQL语句了</li>
+<li>LDAP可以很快地得到查询结果，不过在写方面，就慢得多</li>
+<li>LDAP提供了静态数据的快速查询方式</li>
+<li>Client/server模型，Server 用于存储数据，Client提供操作目录信息树的工具</li>
+<li>这些工具可以将数据库的内容以文本格式（LDAP 数据交换格式，LDIF）呈现在您的面前</li>
+<li>LDAP是一种开放Internet标准，LDAP协议是跨平台的Interent协议</li>
+</ul>
+<h2 id="3-LDAP组织数据的方式"><a href="#3-LDAP组织数据的方式" class="headerlink" title="3. LDAP组织数据的方式"></a>3. LDAP组织数据的方式</h2><p><img src="http://sean-images.qiniudn.com/ldap_intro_dctree.png" alt="ldap_intro_dctree"></p>
+<a id="more"></a>
+<h2 id="4-基本概念"><a href="#4-基本概念" class="headerlink" title="4. 基本概念"></a>4. 基本概念</h2><p>在浏览LDAP相关文档时经常会遇见一些概念，下面是常见概念的简单解释。</p>
+<h3 id="4-1-Entry"><a href="#4-1-Entry" class="headerlink" title="4.1 Entry"></a>4.1 Entry</h3><p>条目，也叫记录项，是LDAP中最基本的颗粒，就像字典中的词条，或者是数据库中的记录。通常对LDAP的添加、删除、更改、检索都是以条目为基本对象的。</p>
+<p><code>dn</code>：每一个条目都有一个唯一的标识名（distinguished Name ，DN），如上图中一个 dn：”cn=baby,ou=marketing,ou=people,dc=mydomain,dc=org” 。通过DN的层次型语法结构，可以方便地表示出条目在LDAP树中的位置，通常用于检索。</p>
+<p><code>rdn</code>：一般指dn逗号最左边的部分，如cn=baby。它与RootDN不同，RootDN通常与RootPW同时出现，特指管理LDAP中信息的最高权限用户。</p>
+<p><code>Base DN</code>：LDAP目录树的最顶部就是根，也就是所谓的“Base DN”，如”dc=mydomain,dc=org”。</p>
+<h3 id="4-2-Attribute"><a href="#4-2-Attribute" class="headerlink" title="4.2 Attribute"></a>4.2 Attribute</h3><p>每个条目都可以有很多属性（Attribute），比如常见的人都有姓名、地址、电话等属性。每个属性都有名称及对应的值，属性值可以有单个、多个，比如你有多个邮箱。</p>
+<p>属性不是随便定义的，需要符合一定的规则，而这个规则可以通过schema制定。比如，如果一个entry没有包含在 inetorgperson 这个 schema 中的<code>objectClass: inetOrgPerson</code>，那么就不能为它指定employeeNumber属性，因为employeeNumber是在inetOrgPerson中定义的。</p>
+<p>LDAP为人员组织机构中常见的对象都设计了属性(比如commonName，surname)。下面有一些常用的别名：</p>
+<table>
+<thead>
+<tr>
+<th>属性</th>
+<th>别名</th>
+<th>语法</th>
+<th>描述</th>
+<th>值(举例)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>commonName</td>
+<td>cn</td>
+<td>Directory String</td>
+<td>姓名</td>
+<td>sean</td>
+</tr>
+<tr>
+<td>surname</td>
+<td>sn</td>
+<td>Directory  String</td>
+<td>姓</td>
+<td>Chow</td>
+</tr>
+<tr>
+<td>organizationalUnitName</td>
+<td>ou</td>
+<td>Directory String</td>
+<td>单位（部门）名称</td>
+<td>IT_SECTION</td>
+</tr>
+<tr>
+<td>organization</td>
+<td>　o</td>
+<td>Directory String</td>
+<td>组织（公司）名称</td>
+<td>example</td>
+</tr>
+<tr>
+<td>telephoneNumber</td>
+<td>　</td>
+<td>Telephone Number</td>
+<td>电话号码</td>
+<td>110</td>
+</tr>
+<tr>
+<td>objectClass</td>
+<td>　</td>
+<td>　</td>
+<td>内置属性</td>
+<td>organizationalPerson</td>
+</tr>
+</tbody>
+</table>
+<h3 id="4-3-ObjectClass"><a href="#4-3-ObjectClass" class="headerlink" title="4.3 ObjectClass"></a>4.3 ObjectClass</h3><p>对象类是属性的集合，LDAP预想了很多人员组织机构中常见的对象，并将其封装成对象类。比如人员（person）含有姓（sn）、名（cn）、电话(telephoneNumber)、密码(userPassword)等属性，单位职工(organizationalPerson)是人员(person)的继承类，除了上述属性之外还含有职务（title）、邮政编码（postalCode）、通信地址(postalAddress)等属性。</p>
+<p>通过对象类可以方便的定义条目类型。每个条目可以直接继承多个对象类，这样就继承了各种属性。如果2个对象类中有相同的属性，则条目继承后只会保留1个属性。对象类同时也规定了哪些属性是基本信息，必须含有(Must 活Required，必要属性)：哪些属性是扩展信息，可以含有（May或Optional，可选属性）。</p>
+<p>对象类有三种类型：结构类型（Structural）、抽象类型(Abstract)和辅助类型（Auxiliary）。结构类型是最基本的类型，它规定了对象实体的基本属性，每个条目属于且仅属于一个结构型对象类。抽象类型可以是结构类型或其他抽象类型父类，它将对象属性中共性的部分组织在一起，称为其他类的模板，条目不能直接集成抽象型对象类。辅助类型规定了对象实体的扩展属性。每个条目至少有一个结构性对象类。</p>
+<p>对象类本身是可以相互继承的，所以对象类的根类是top抽象型对象类。以常用的人员类型为例，他们的继承关系：<br><img src="http://sean-images.qiniudn.com/ldap_objectclass.jpg" alt="openldap_objectclass"></p>
+<p>下面是inetOrgPerson对象类的在schema中的定义，可以清楚的看到它的父类SUB和可选属性MAY、必要属性MUST(继承自organizationalPerson)，关于各属性的语法则在schema中的attributetype定义。<br><figure class="highlight elixir"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># inetOrgPerson</span></div><div class="line"><span class="comment"># The inetOrgPerson represents people who are associated with an</span></div><div class="line"><span class="comment"># organization in some way.  It is a structural class and is derived</span></div><div class="line"><span class="comment"># from the organizationalPerson which is defined in X.521 [X521].</span></div><div class="line">objectclass     ( <span class="number">2.16</span>.<span class="number">840.1</span>.<span class="number">113730.3</span>.<span class="number">2.2</span></div><div class="line">    NAME <span class="string">'inetOrgPerson'</span></div><div class="line">        DESC <span class="string">'RFC2798: Internet Organizational Person'</span></div><div class="line">    SUP organizationalPerson</div><div class="line">    STRUCTURAL</div><div class="line">        MAY (</div><div class="line">                audio <span class="variable">$ </span>businessCategory <span class="variable">$ </span>carLicense <span class="variable">$ </span>departmentNumber <span class="variable">$</span></div><div class="line">                displayName <span class="variable">$ </span>employeeNumber <span class="variable">$ </span>employeeType <span class="variable">$ </span>givenName <span class="variable">$</span></div><div class="line">                homePhone <span class="variable">$ </span>homePostalAddress <span class="variable">$ </span>initials <span class="variable">$ </span>jpegPhoto <span class="variable">$</span></div><div class="line">                labeledURI <span class="variable">$ </span>mail <span class="variable">$ </span>manager <span class="variable">$ </span>mobile <span class="variable">$ </span>o <span class="variable">$ </span>pager <span class="variable">$</span></div><div class="line">                photo <span class="variable">$ </span>roomNumber <span class="variable">$ </span>secretary <span class="variable">$ </span>uid <span class="variable">$ </span>userCertificate <span class="variable">$</span></div><div class="line">                x500uniqueIdentifier <span class="variable">$ </span>preferredLanguage <span class="variable">$</span></div><div class="line">                userSMIMECertificate <span class="variable">$ </span>userPKCS12 )</div><div class="line">        )</div></pre></td></tr></table></figure></p>
+<h3 id="4-4-Schema"><a href="#4-4-Schema" class="headerlink" title="4.4 Schema"></a>4.4 Schema</h3><p>对象类（ObjectClass）、属性类型（AttributeType）、语法（Syntax）分别约定了条目、属性、值，他们之间的关系如下图所示。所以这些构成了模式(Schema)——对象类的集合。条目数据在导入时通常需要接受模式检查，它确保了目录中所有的条目数据结构都是一致的。<br><img src="http://sean-images.qiniudn.com/ldap_schema_attr_entry.jpg" alt="ldap_schema_attr_entry"></p>
+<p>schema（一般在<code>/etc/ldap/schema/</code>目录）在导入时要注意前后顺序。</p>
+<h3 id="4-5-backend-amp-database"><a href="#4-5-backend-amp-database" class="headerlink" title="4.5 backend &amp; database"></a>4.5 backend &amp; database</h3><p>ldap的后台进程slapd接收、响应请求，但实际存储数据、获取数据的操作是由Backends做的，而数据是存放在database中，所以你可以看到往往你可以看到<code>backend</code>和<code>database</code>指令是一样的值如 bdb 。一个 backend 可以有多个 database instance，但每个 database 的 suffix 和 rootdn 不一样。openldap 2.4版本的模块是动态加载的，所以在使用backend时需要<code>moduleload      back_bdb</code>指令。</p>
+<p><code>bdb</code>是一个高性能的支持事务和故障恢复的数据库后端，可以满足绝大部分需求。许多旧文档里（包括官方）说建议将<code>bdb</code>作为首选后端服务（primary backend），但<a href="http://www.openldap.org/doc/admin24/backends.html" target="_blank" rel="external">2.4版文档</a>明确说<code>hdb</code>才是被首先推荐使用的，这从 2.4.40 版默认安装后的配置文件里也可以看出。hdb是基于bdb的，但是它通过扩展的索引和缓存技术可以加快数据访问，修改entries会更有效率，有兴趣可以访问上的链接或<a href="http://linux.die.net/man/5/slapd.backends" target="_blank" rel="external">slapd.backends</a>。</p>
+<p>另外<code>config</code>是特殊的backend，用来在运行时管理slapd的配置，它只能有一个实例，甚至无需显式在slapd.conf中配置。</p>
+<h3 id="4-6-TLS-amp-SASL"><a href="#4-6-TLS-amp-SASL" class="headerlink" title="4.6 TLS &amp; SASL"></a>4.6 TLS &amp; SASL</h3><p>分布式LDAP 是以明文的格式通过网络来发送信息的，包括client访问ldap的密码（当然一般密码已然是二进制的），SSL/TLS 的加密协议就是来保证数据传送的保密性和完整性。</p>
+<p>SASL （Simple Authenticaion and Security Layer）简单身份验证安全框架，它能够实现openldap客户端到服务端的用户验证，也是<code>ldapsearch</code>、<code>ldapmodify</code>这些标准客户端工具默认尝试与LDAP服务端认证用户的方式（前提是已经安装好 <a href="http://www.openldap.org/doc/admin24/sasl.html" target="_blank" rel="external">Cyrus SASL</a>）。SASL有几大工业实现标准：Kerberos V5、DIGEST-MD5、EXTERNAL、PLAIN、LOGIN。</p>
+<p>Kerberos V5是里面最复杂的一种，使用GSSAPI机制，必须配置完整的Kerberos V5安全系统，密码不再存放在目录服务器中，每一个dn与Kerberos数据库的主体对应。DIGEST-MD5稍微简单一点，密码通过saslpasswd2生成放在sasldb数据库中，或者将明文hash存到LDAP dn的userPassword中，每一个authid映射成目录服务器的dn，常和SSL配合使用。参考<a href="http://docs.oracle.com/cd/E19957-01/820-0293/6nc1tbp0h/index.html" target="_blank" rel="external">将 LDAP 客户端配置为使用安全性</a></p>
+<p>EXTERNAL一般用于初始化添加schema时使用，如<code>ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/core.ldif</code>。</p>
+<h3 id="4-7-LDIF"><a href="#4-7-LDIF" class="headerlink" title="4.7 LDIF"></a>4.7 LDIF</h3><p>LDIF（LDAP Data Interchange Format，数据交换格式）是LDAP数据库信息的一种文本格式，用于数据的导入导出，每行都是“属性: 值”对，见 <a href="http://seanlook.com/2015/01/22/openldap_ldif_example/">openldap ldif格式示例</a></p>
+<p>OpenLDAP(2.4.3x)服务器安装配置方法见<a href="http://seanlook.com/2015/01/21/openldap-install-guide-ssl/">这里</a>。</p>
+<p><strong>参考</strong></p>
+<ul>
+<li><a href="http://407711169.blog.51cto.com/6616996/1439623" target="_blank" rel="external">LDAP基础概念</a></li>
+<li><a href="http://www.tldp.org/HOWTO/LDAP-HOWTO/ldapbackends.html" target="_blank" rel="external">LDAP-HOWTO</a></li>
+<li><a href="http://www.openldap.org/doc/admin24/" target="_blank" rel="external">openldap doc admin24</a></li>
+</ul>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/LDAP/" rel="tag">#LDAP</a>
+          
+            <a href="/tags/sasl/" rel="tag">#sasl</a>
+          
+            <a href="/tags/Kerberos/" rel="tag">#Kerberos</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2015/01/15/openssl-certificate-encryption/" rel="next" title="OpenSSL 与 SSL 数字证书概念贴">
+                <i class="fa fa-chevron-left"></i> OpenSSL 与 SSL 数字证书概念贴
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2015/01/18/openssl-self-sign-ca/" rel="prev" title="基于OpenSSL自建CA和颁发SSL证书">
+                基于OpenSSL自建CA和颁发SSL证书 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2015/01/15/openldap_introduction/"
+           data-title="LDAP服务器的概念和原理简单介绍" data-url="http://seanlook.com/2015/01/15/openldap_introduction/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-目录服务"><span class="nav-text">1. 目录服务</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-LDAP特点"><span class="nav-text">2. LDAP特点</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-LDAP组织数据的方式"><span class="nav-text">3. LDAP组织数据的方式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-基本概念"><span class="nav-text">4. 基本概念</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-Entry"><span class="nav-text">4.1 Entry</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-Attribute"><span class="nav-text">4.2 Attribute</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-ObjectClass"><span class="nav-text">4.3 ObjectClass</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-Schema"><span class="nav-text">4.4 Schema</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-backend-amp-database"><span class="nav-text">4.5 backend & database</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-6-TLS-amp-SASL"><span class="nav-text">4.6 TLS & SASL</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-7-LDIF"><span class="nav-text">4.7 LDIF</span></a></li></ol></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

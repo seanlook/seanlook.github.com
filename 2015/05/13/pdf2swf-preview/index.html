@@ -1,0 +1,841 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="linux," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="在公司OA和CRM系统遇到要实现在线查看word/jpg等文件的功能，按照开发小组的要求搭建了一套解决方案：OpenOffice + JodConvertor  + SWFTool+ FlexPaper，其中OpenOffice + JodConvertor用于将文档转化为PDF格式文档，SwfTool用于将PDF转化为SWF文档，FlexPaper用于展示。使用这个解决方案的最大好处就是跨平台且">
+<meta property="og:type" content="article">
+<meta property="og:title" content="仿豆丁网文件在线浏览解决方案搭建">
+<meta property="og:url" content="http://seanlook.com/2015/05/13/pdf2swf-preview/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="在公司OA和CRM系统遇到要实现在线查看word/jpg等文件的功能，按照开发小组的要求搭建了一套解决方案：OpenOffice + JodConvertor  + SWFTool+ FlexPaper，其中OpenOffice + JodConvertor用于将文档转化为PDF格式文档，SwfTool用于将PDF转化为SWF文档，FlexPaper用于展示。使用这个解决方案的最大好处就是跨平台且">
+<meta property="og:updated_time" content="2015-05-12T16:46:23.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="仿豆丁网文件在线浏览解决方案搭建">
+<meta name="twitter:description" content="在公司OA和CRM系统遇到要实现在线查看word/jpg等文件的功能，按照开发小组的要求搭建了一套解决方案：OpenOffice + JodConvertor  + SWFTool+ FlexPaper，其中OpenOffice + JodConvertor用于将文档转化为PDF格式文档，SwfTool用于将PDF转化为SWF文档，FlexPaper用于展示。使用这个解决方案的最大好处就是跨平台且">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title> 仿豆丁网文件在线浏览解决方案搭建 | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                仿豆丁网文件在线浏览解决方案搭建
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2015-05-13T01:21:25+08:00" content="2015-05-13">
+              2015-05-13
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/05/13/pdf2swf-preview/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/05/13/pdf2swf-preview/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>在公司OA和CRM系统遇到要实现在线查看word/jpg等文件的功能，按照开发小组的要求搭建了一套解决方案：OpenOffice + JodConvertor  + SWFTool+ FlexPaper，其中OpenOffice + JodConvertor用于将文档转化为PDF格式文档，SwfTool用于将PDF转化为SWF文档，FlexPaper用于展示。使用这个解决方案的最大好处就是跨平台且较为简单。</p>
+<h2 id="1-1-安装openoffice"><a href="#1-1-安装openoffice" class="headerlink" title="1.1 安装openoffice"></a>1.1 安装openoffice</h2><p>openoffice需要jdk的支持，而且默认已经安装，如果没有，手动下载<code>Apache_OpenOffice_4.0.1_Linux_x86-64_install-rpm_zh-CN.tar.gz</code>到<code>/usr/local/src</code>（CentOS 6.4 x86_64）：<br><figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># tar -zxf Apache_OpenOffice_4.0.1_Linux_x86-64_install-rpm_zh-CN.tar.gz</span></div><div class="line"><span class="meta"># cd zh-CN/RPMS</span></div><div class="line"><span class="meta"># rpm –ivh *.rpm</span></div></pre></td></tr></table></figure></p>
+<p><strong>拷贝字体</strong><br>安装完成后把windows（<code>c:\windows\fonts</code>）下的一些常用字体拷贝到 <code>/opt/openoffice4/share/fonts/truetype</code> 目录下，如Arial, Calibri, Courier New, Consolas等，如果你想正确的保留原doc的中文字体，还需要把 黑体、微软雅黑、宋体 常规、新宋体 常规、幼圆、隶书、楷体 等中文字体拷贝进去（重启进程后生效）。</p>
+<p><strong>启动后台进程</strong><br>切换至普通用户，如wxcrm启动转换进程：<br><figure class="highlight awk"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">$ <span class="regexp">/opt/</span>openoffice4<span class="regexp">/program/</span>soffice -headless -accept=<span class="string">"socket,host=127.0.0.1,port=8100;urp;"</span> -nofirststartwizard &amp;</div><div class="line"></div><div class="line"><span class="comment"># ps –ef | grep soffice</span></div></pre></td></tr></table></figure></p>
+<h2 id="1-2-解压jodconverter"><a href="#1-2-解压jodconverter" class="headerlink" title="1.2 解压jodconverter"></a>1.2 解压jodconverter</h2><p>JODConverter是一个java的OpenDucument文件转换器，可以进行许多文件格式的转换工具，它利用OpenOffice来进行转换工作，它能完成以下转换：</p>
+<ol>
+<li>Microsoft Office格式转换为OpenDucument，以及OpenDucument转换为Microsoft Office</li>
+<li>OpenDucument转换为PDF，Word、Excel、PowerPoint转换为PDF，RTF转换为PDF等。</li>
+</ol>
+<p>从 <a href="http://sourceforge.net/projects/jodconverter/files/JODConverter/2.2.2/" target="_blank" rel="external">http://sourceforge.net/projects/jodconverter/files/JODConverter/2.2.2/</a> 下载<code>jodconverter-2.2.2.zip</code>解压到 /opt 目录下<code>/opt/jodconverter-2.2.2/</code>。手动转换测试，使用到的文件是安装包内的lib/jodconverter-cli-2.2.2.jar：<br><figure class="highlight crystal"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">java -jar /opt/jodconverter-<span class="number">2.2</span>.<span class="number">2</span>/<span class="class"><span class="keyword">lib</span>/<span class="title">jodconverter</span>-<span class="title">cli</span>-2.2.2.<span class="title">jar</span> /<span class="title">home</span>/<span class="title">oa</span>/<span class="title">docker</span>.<span class="title">docx</span> /<span class="title">home</span>/<span class="title">oa</span>/<span class="title">docker</span>.<span class="title">pdf</span></span></div></pre></td></tr></table></figure></p>
+<p>至此doc等文件格式可以成功转换成pdf。</p>
+<h2 id="2-1-swftool"><a href="#2-1-swftool" class="headerlink" title="2.1 swftool"></a>2.1 swftool</h2><p>swftool可以将pdf/jpg等转换成swf格式。搜索下载<code>swftools-0.9.1.tar.gz</code>（0.9.2在安装时可能需要错误处理）：</p>
+<a id="more"></a>
+<figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># yum install gcc* automake zlib-devel libjpeg-devel giflib-devel freetype-devel</span></div><div class="line"><span class="meta"># tar vxzf swftools-0.9.1.tar.gz</span></div><div class="line"><span class="meta"># cd swftools-0.9.1</span></div><div class="line"></div><div class="line"><span class="meta"># ./configure --prefix=/usr/local/swftools</span></div><div class="line"><span class="meta"># make &amp;&amp; make install</span></div></pre></td></tr></table></figure>
+<p>至此已安装完预览功能，可以通过：<br><figure class="highlight stylus"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">/usr/local/bin/pdf2swf -t docker4<span class="selector-class">.pdf</span> -o docker4<span class="selector-class">.swf</span> -T <span class="number">9</span> -f -z</div></pre></td></tr></table></figure></p>
+<p>测试转换。<code>-t</code> 后接待转换的pdf文件路径，<code>-o</code>接输出文件路径和名称，<code>-T 9</code> 设置使用flash版本9，这个设置主要是为了跟FlexPaper的版本对应； <code>-f</code> 保留字体，<code>-z</code>使用zlib进行压缩，这是最常用的几个命令，其他命令可以从SWF官网了解。</p>
+<h2 id="2-2-安装xpdf语言包"><a href="#2-2-安装xpdf语言包" class="headerlink" title="2.2 安装xpdf语言包"></a>2.2 安装xpdf语言包</h2><p>在转换包含中文的PDF文档成swf时，常常会因为缺少所需的字体而出现乱码，或者干脆就没有文字，就需要使用到xpdf的字体库。<br>到 <a href="http://www.foolabs.com/xpdf/download.html" target="_blank" rel="external">http://www.foolabs.com/xpdf/download.html</a> 下载<code>xpdf-chinese-simplified.tar.gz</code>，解压到<code>/usr/local</code>下，编辑add-to-xpdfrc文件，如下：<br><figure class="highlight dts"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># vi /usr/local/xpdf-chinese-simplified/add-to-xpdfrc</span></div><div class="line"><span class="meta">#----- begin Chinese Simplified support package (2011-sep-02)</span></div><div class="line">cidToUnicode    Adobe-GB1       <span class="meta-keyword">/usr/</span>local<span class="meta-keyword">/xpdf-chinese-simplified/</span>Adobe-GB1.cidToUnicode</div><div class="line">unicodeMap      ISO<span class="number">-2022</span>-CN     <span class="meta-keyword">/usr/</span>local<span class="meta-keyword">/xpdf-chinese-simplified/</span>ISO<span class="number">-2022</span>-CN.unicodeMap</div><div class="line">unicodeMap      EUC-CN          <span class="meta-keyword">/usr/</span>local<span class="meta-keyword">/xpdf-chinese-simplified/</span>EUC-CN.unicodeMap</div><div class="line">unicodeMap      GBK             <span class="meta-keyword">/usr/</span>local<span class="meta-keyword">/xpdf-chinese-simplified/</span>GBK.unicodeMap</div><div class="line">cMapDir         Adobe-GB1       <span class="meta-keyword">/usr/</span>local<span class="meta-keyword">/xpdf-chinese-simplified/</span>CMap</div><div class="line">toUnicodeDir                    <span class="meta-keyword">/usr/</span>local<span class="meta-keyword">/xpdf-chinese-simplified/</span>CMap</div><div class="line"></div><div class="line">fontDir <span class="meta-keyword">/usr/</span>share<span class="meta-keyword">/fonts/</span>win</div><div class="line">displayCIDFontTT    Adobe-GB1    <span class="meta-keyword">/usr/</span>share<span class="meta-keyword">/fonts/</span>win/SIMHEI.ttf</div><div class="line">displayCIDFontTT    Adobe-GB1    <span class="meta-keyword">/usr/</span>local<span class="meta-keyword">/xpdf-chinese-simplified/</span>CMap/gbsn00lp.ttf</div><div class="line">displayCIDFontTT    Adobe-GB1    <span class="meta-keyword">/usr/</span>local<span class="meta-keyword">/xpdf-chinese-simplified/</span>CMap/gkai00mp.ttf</div></pre></td></tr></table></figure></p>
+<p>可以使用xftp将常用的中文字体上传到/usr/share/fonts/win，如宋体、微软雅黑、黑体、楷体等。另外去 <a href="http://www.nginxs.com/download/font.zip" target="_blank" rel="external">网上下载</a> gkai00mp.ttf、gbsn00lp.ttf简体中文放到上面正确的路径下，参考<a href="http://shitouququ.blog.51cto.com/24569/1252930。" target="_blank" rel="external">http://shitouququ.blog.51cto.com/24569/1252930。</a></p>
+<p>转换时加上<code>-s languagedir=/usr/local/xpdf-chinese-simplified/</code>来加载语言包路径。</p>
+<p>另外据同事说在 windows 平台安装和转换效果会好一点，没有验证。</p>
+<p><strong>参考</strong></p>
+<ul>
+<li><a href="http://shitouququ.blog.51cto.com/24569/1252930" target="_blank" rel="external">linux安装openoffice与SWFtools工具</a></li>
+<li><a href="http://blog.csdn.net/xingkong22star/article/details/38269613" target="_blank" rel="external">仿豆丁网在线浏览文件方案openoffice.org 3+swftools+flexpaper</a></li>
+<li><a href="http://wiki.swftools.org/wiki/Installation" target="_blank" rel="external">swftools Installation</a></li>
+</ul>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/linux/" rel="tag">#linux</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2015/05/06/lsyncd-synchronize-realtime/" rel="next" title="lsyncd实时同步搭建指南——取代rsync+inotify">
+                <i class="fa fa-chevron-left"></i> lsyncd实时同步搭建指南——取代rsync+inotify
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2015/05/17/nginx-install-and-config/" rel="prev" title="nginx服务器安装及配置文件详解">
+                nginx服务器安装及配置文件详解 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2015/05/13/pdf2swf-preview/"
+           data-title="仿豆丁网文件在线浏览解决方案搭建" data-url="http://seanlook.com/2015/05/13/pdf2swf-preview/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-安装openoffice"><span class="nav-text">1.1 安装openoffice</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-解压jodconverter"><span class="nav-text">1.2 解压jodconverter</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-swftool"><span class="nav-text">2.1 swftool</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-安装xpdf语言包"><span class="nav-text">2.2 安装xpdf语言包</span></a></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

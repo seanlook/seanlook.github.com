@@ -1,0 +1,940 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="mysql,主从复制,percona," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="公司数据中心从托管机房迁移到阿里云，需要对mysql迁移（Replication）后的数据一致性进行校验，但又不能对生产环境使用造成影响，pt-table-checksum 成为了绝佳也是唯一的检查工具。
+pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、从库的数据是否一致。其原理是在主库执行基于statement的sql语句来生成主库数据块">
+<meta property="og:type" content="article">
+<meta property="og:title" content="生产环境使用 pt-table-checksum 检查MySQL数据一致性">
+<meta property="og:url" content="http://seanlook.com/2015/12/29/mysql_replica_pt-table-checksum/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="公司数据中心从托管机房迁移到阿里云，需要对mysql迁移（Replication）后的数据一致性进行校验，但又不能对生产环境使用造成影响，pt-table-checksum 成为了绝佳也是唯一的检查工具。
+pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、从库的数据是否一致。其原理是在主库执行基于statement的sql语句来生成主库数据块">
+<meta property="og:updated_time" content="2015-12-28T16:46:23.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="生产环境使用 pt-table-checksum 检查MySQL数据一致性">
+<meta name="twitter:description" content="公司数据中心从托管机房迁移到阿里云，需要对mysql迁移（Replication）后的数据一致性进行校验，但又不能对生产环境使用造成影响，pt-table-checksum 成为了绝佳也是唯一的检查工具。
+pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、从库的数据是否一致。其原理是在主库执行基于statement的sql语句来生成主库数据块">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title> 生产环境使用 pt-table-checksum 检查MySQL数据一致性 | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                生产环境使用 pt-table-checksum 检查MySQL数据一致性
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2015-12-29T10:21:25+08:00" content="2015-12-29">
+              2015-12-29
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/12/29/mysql_replica_pt-table-checksum/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/12/29/mysql_replica_pt-table-checksum/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>公司数据中心从托管机房迁移到阿里云，需要对mysql迁移（Replication）后的数据一致性进行校验，但又不能对生产环境使用造成影响，pt-table-checksum 成为了绝佳也是唯一的检查工具。</p>
+<p><code>pt-table-checksum</code> 是 Percona-Toolkit 的组件之一，用于检测MySQL主、从库的数据是否一致。其原理是在主库执行基于statement的sql语句来生成主库数据块的checksum，把相同的sql语句传递到从库执行，并在从库上计算相同数据块的checksum，最后，比较主从库上相同数据块的checksum值，由此判断主从数据是否一致。检测过程根据唯一索引将表按row切分为块（chunk），以为单位计算，可以避免锁表。检测时会自动判断复制延迟、 master的负载， 超过阀值后会自动将检测暂停，减小对线上服务的影响。</p>
+<p><code>pt-table-checksum</code> 默认情况下可以应对绝大部分场景，官方说，即使上千个库、上万亿的行，它依然可以很好的工作，这源自于设计很简单，一次检查一个表，不需要太多的内存和多余的操作；必要时，<code>pt-table-checksum</code> 会根据服务器负载动态改变 chunk 大小，减少从库的延迟。</p>
+<p>为了减少对数据库的干预，<code>pt-table-checksum</code>还会自动侦测并连接到从库，当然如果失败，可以指定<code>--recursion-method</code>选项来告诉从库在哪里。它的易用性还体现在，复制若有延迟，在从库 checksum 会暂停直到赶上主库的计算时间点（也通过选项<code>--</code>设定一个可容忍的延迟最大值，超过这个值也认为不一致）。 </p>
+<p>为了保证主数据库服务的安全，该工具实现了许多保护措施：</p>
+<ol>
+<li>自动设置 <code>innodb_lock_wait_timeout</code> 为1s，避免引起</li>
+<li>默认当数据库有25个以上的并发查询时，<code>pt-table-checksum</code>会暂停。可以设置 <code>--max-load</code> 选项来设置这个阀值</li>
+<li>当用 Ctrl+C 停止任务后，工具会正常的完成当前 chunk 检测，下次使用 <code>--resume</code> 选项启动可以恢复继续下一个 chunk</li>
+</ol>
+<h2 id="工作过程"><a href="#工作过程" class="headerlink" title="工作过程"></a>工作过程</h2><p>直接看 <a href="http://www.nettedfish.com/blog/2013/06/04/check-replication-consistency-by-pt-table-checksum/" target="_blank" rel="external">nettedfish</a> 的说明：</p>
+<blockquote>
+<p>1. 连接到主库：pt工具连接到主库，然后自动发现主库的所有从库。默认采用show full processlist来查找从库，但是这只有在主从实例端口相同的情况下才有效。<br>3. 查找主库或者从库是否有复制过滤规则：这是为了安全而默认检查的选项。你可以关闭这个检查，但是这可能导致checksum的sql语句要么不会同步到从库，要么到了从库发现从库没有要被checksum的表，这都会导致从库同步卡库。<br>5. 开始获取表，一个个的计算。<br>6. 如果是表的第一个chunk，那么chunk-size一般为1000；如果不是表的第一个chunk，那么采用19步中分析出的结果。<br>7. 检查表结构，进行数据类型转换等，生成checksum的sql语句。<br>8. 根据表上的索引和数据的分布，选择最合适的split表的方法。<br>9. 开始checksum表。<br>10. 默认在chunk一个表之前，先删除上次这个表相关的计算结果。除非–resume。<br>14. 根据explain的结果，判断chunk的size是否超过了你定义的chunk-size的上限。如果超过了，为了不影响线上性能，这个chunk将被忽略。<br>15. 把要checksum的行加上for update锁，并计算。<br>17-18. 把计算结果存储到master_crc master_count列中。<br>19. 调整下一个chunk的大小。<br>20. 等待从库追上主库。如果没有延迟备份的从库在运行，最好检查所有的从库，如果发现延迟最大的从库延迟超过max-lag秒，pt工具在这里将暂停。<br>21. 如果发现主库的max-load超过某个阈值，pt工具在这里将暂停。<br>22. 继续下一个chunk，直到这个table被chunk完毕。<br>23-24. 等待从库执行完checksum，便于生成汇总的统计结果。每个表汇总并统计一次。<br>25-26. 循环每个表，直到结束。<br>校验结束后，在每个从库上，执行如下的sql语句即可看到是否有主从不一致发生： </p>
+</blockquote>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">select</span> * <span class="keyword">from</span> percona.checksums <span class="keyword">where</span> master_cnt &lt;&gt; this_cnt <span class="keyword">OR</span> master_crc &lt;&gt; this_crc <span class="keyword">OR</span> </div><div class="line"><span class="keyword">ISNULL</span>(master_crc) &lt;&gt; <span class="keyword">ISNULL</span>(this_crc) \G</div></pre></td></tr></table></figure>
+<a id="more"></a>
+<h2 id="你需要知道的选项"><a href="#你需要知道的选项" class="headerlink" title="你需要知道的选项"></a>你需要知道的选项</h2><ul>
+<li><p><code>--replicate-check</code>：执行完 checksum 查询在percona.checksums表中，不一定马上查看结果呀 —— yes则马上比较chunk的crc32值并输出DIFFS列，否则不输出。默认yes，如果指定为<code>--noreplicate-check</code>，一般后续使用下面的<code>--replicate-check-only</code>去输出DIFF结果。</p>
+</li>
+<li><p><code>--replicate-check-only</code>：不在主从库做 checksum 查询，只在原有 <code>percona.checksums</code> 表中查询结果，并输出数据不一致的信息。周期性的检测一致性时可能用到。</p>
+</li>
+<li><p><code>--nocheck-binlog-format</code>：不检测日志格式。这个选项对于 ROW 模式的复制很重要，因为<code>pt-table-checksum</code>会在 Master和Slave 上设置<code>binlog_format=STATEMENT</code>（确保从库也会执行 checksum SQL），MySQL限制从库是无法设置的，所以假如行复制从库，再作为主库复制出新从库时（A-&gt;B-&gt;C），B的checksums数据将无法传输。（没验证）</p>
+</li>
+<li><p><code>--replicate=</code> 指定 checksum 计算结果存到哪个库表里，如果没有指定，默认是 percona.checksums 。<br>但是我们检查使用的mysql用户一般是没有 create table 权限的，所以你可能需要先手动创建：</p>
+  <figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">CREATE</span> <span class="keyword">DATABASE</span> <span class="keyword">IF</span> <span class="keyword">NOT</span> <span class="keyword">EXISTS</span> percona;</div><div class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="keyword">IF</span> <span class="keyword">NOT</span> <span class="keyword">EXISTS</span> percona.checksums (</div><div class="line">    db <span class="built_in">CHAR</span>(<span class="number">64</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,</div><div class="line">    tbl <span class="built_in">CHAR</span>(<span class="number">64</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,</div><div class="line">    <span class="keyword">chunk</span> <span class="built_in">INT</span> <span class="keyword">NOT</span> <span class="literal">NULL</span>,</div><div class="line">    chunk_time <span class="built_in">FLOAT</span> <span class="literal">NULL</span>,</div><div class="line">    chunk_index <span class="built_in">VARCHAR</span>(<span class="number">200</span>) <span class="literal">NULL</span>,</div><div class="line">    lower_boundary <span class="built_in">TEXT</span> <span class="literal">NULL</span>,</div><div class="line">    upper_boundary <span class="built_in">TEXT</span> <span class="literal">NULL</span>,</div><div class="line">    this_crc <span class="built_in">CHAR</span>(<span class="number">40</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,</div><div class="line">    this_cnt <span class="built_in">INT</span> <span class="keyword">NOT</span> <span class="literal">NULL</span>,</div><div class="line">    master_crc <span class="built_in">CHAR</span>(<span class="number">40</span>) <span class="literal">NULL</span>,</div><div class="line">    master_cnt <span class="built_in">INT</span> <span class="literal">NULL</span>,</div><div class="line">    ts <span class="keyword">TIMESTAMP</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="keyword">CURRENT_TIMESTAMP</span> <span class="keyword">ON</span> <span class="keyword">UPDATE</span> <span class="keyword">CURRENT_TIMESTAMP</span>,</div><div class="line">    PRIMARY <span class="keyword">KEY</span> (db,tbl,<span class="keyword">chunk</span>),</div><div class="line">    <span class="keyword">INDEX</span> ts_db_tbl(ts,db,tbl)</div><div class="line">) <span class="keyword">ENGINE</span>=<span class="keyword">InnoDB</span>;</div></pre></td></tr></table></figure>
+</li>
+</ul>
+<p>生产环境中数据库用户权限一般都是有严格管理的，假如连接用户是<code>repl_user</code>（即直接用复制用户来检查），它应该额外赋予对其它库的 SELECT ，LOCK TABLES 权限，如果后续要用 pt-table-sync 就就需要写权限了。对percona库有写权限：</p>
+<pre><code>GRANT ALL PRIVILEGEES on percona.* to repl_user@&apos;%&apos; IDENTIFIED BY &apos;repl_pass&apos;;
+GRANT SELECT,LOCK TABLES,PROCESS,SUPER on *.* to repl_user@&apos;%&apos;;
+</code></pre><p>注：</p>
+<ol>
+<li>为了减少不必要的麻烦，确保你的 repl_user@’xxx’ 用户能同时登陆主库和从库</li>
+<li><code>--create-replicate-table</code> 选项会自动创建 percona.checksums 表，但也意味着赋予额外的 <code>CREATE TABLE</code>权限给 percona_tk@’xxx’ 用户。默认yes</li>
+<li>PROCESS用于自动发现从库信息，SUPER权限用于set binlog_format。</li>
+</ol>
+<ul>
+<li><p><code>--no-check-replication-filters</code> 表示不需要检查 Master 配置里是否指定了 Filter。 默认会检查，如果配置了 Filter，如 replicate_do_db,replicate-wild-ignore-table,binlog_ignore_db 等，在从库checksum就与遇到表不存在而报错退出，所以官方默认是yes（<code>--check-replication-filters</code>）但我们实际在检测中时指定<code>--databases=</code>，所以就不存在这个问题，干脆不检测</p>
+</li>
+<li><p><code>--empty-replicate-table</code>：每个表checksum开始前，清空它之前的检测数据（不影响其它表的checksum数据），默认yes。当然如果使用<code>--resume</code>启动检测数据不会清空。<br>当启用<code>--noempty-replicate-table</code>即不清空时，不计算计算chunk,只计算。</p>
+</li>
+<li><p><code>--databases=</code>，<code>-d</code>：要检查的数据库，逗号分隔。用脚趾头想也知道 <code>--databases-regex</code> 正则匹配要检测的数据库，<code>--ignore-databases[-regex]</code>忽略检查的库。Filter选项。</p>
+</li>
+<li><p><code>--tables=</code>，<code>-t</code>：要检查的表，逗号分隔。如果要检查的表分布在不同的db中，可以用<code>--tables=dbname1.table1,dbnamd2.table2</code>的形式。同理有<code>--tables-regex</code>，<code>--ignore-tables</code>，<code>--ignore-tables-regex</code>。<code>--replicate</code>指定的checksum表始终会被过滤。</p>
+</li>
+<li><p><code>--recursion-method</code>：发现从库的方式。pt-table-checksum 默认可以在主库的 <code>processlist</code> 中找到从库复制进程，从而识别出有哪些从库，但如果使用是非标准3306端口，会导致找不到从库信息。此时就会自动采用<code>host</code>方式，但需要提前在从库 my.cnf 里面配置<code>report_host</code>、<code>report_port</code>信息，如：</p>
+<figure class="highlight ini"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="attr">report_host</span> = MASTER_HOST</div><div class="line"><span class="attr">report_port</span> = <span class="number">13306</span></div></pre></td></tr></table></figure>
+</li>
+</ul>
+<p>最终极的办法是<code>dsn</code>，dsn指定的是某个表（如 percona.dsns ），表行记录是改主库的（多个）从库的连接信息。适用以下任一情形：</p>
+<ol>
+<li>主库不能自动发现从库</li>
+<li>不想在从库添加额外配置（因为要重启）</li>
+<li>主从检测连接用户信息不一样</li>
+<li>多个从库时只想验证指定从库的一致</li>
+</ol>
+<p>我比较倾向使用DSN的方式。这个dsns表只需要在执行 <code>pt-table-checksum</code> 命令的服务器上能够访问到就行。这里纠正一个认识，网上很多人说 pt-table-checksum 要在主库上执行，其实不是的，我的mysql实例比较多，只需在某一台服务器上安装percona-toolkit，这台服务能够同时访问主库和从库就行了。具体用法见后面实例。</p>
+<h2 id="检测实例"><a href="#检测实例" class="headerlink" title="检测实例"></a>检测实例</h2><h3 id="同网段间主从一致检查"><a href="#同网段间主从一致检查" class="headerlink" title="同网段间主从一致检查"></a>同网段间主从一致检查</h3><p>场景：</p>
+<ol>
+<li>标准端口3306，只检查某一个库的关键表</li>
+<li>一主一从，binlog<strong>不</strong>是ROW模式</li>
+<li>同网段复制，percona_tk@’192.168.5.%’ 具备该有的权限：<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">GRANT</span> ALL PRIVILEGEES <span class="keyword">on</span> repl_user.* <span class="keyword">to</span> repl_user@<span class="string">'192.168.5.%'</span> <span class="keyword">IDENTIFIED</span> <span class="keyword">BY</span> <span class="string">'repl_pass'</span>;</div><div class="line"><span class="keyword">GRANT</span> <span class="keyword">SELECT</span>,<span class="keyword">LOCK</span> <span class="keyword">TABLES</span>,PROCESS,SUPER <span class="keyword">on</span> *.* <span class="keyword">to</span> repl_user@<span class="string">'192.168.5.%'</span>;</div></pre></td></tr></table></figure>
+</li>
+</ol>
+<p>这是最简单的方式，把要连接和检查的信息交代就行了：<br><figure class="highlight gams"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"># pt-<span class="keyword">table</span>-checksum <span class="comment">h=MASTER_HOST,u=repl_user,p=</span><span class="comment">'repl_pass'</span><span class="comment">,P=3306 \</span></div><div class="line">--databases=d_ts_profile --tables=t_user,t_user_detail,t_user_group --nocheck-replication-filters</div></pre></td></tr></table></figure></p>
+<p>如果是首次运行，会在主库自动创建 percona.checksums 表。</p>
+<p>输出结果：</p>
+<figure class="highlight tap"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">Replica lag is<span class="number"> 2307 </span>seconds on mysql-5.  Waiting.</div><div class="line">Checksumming d_ts_profile.t_user_account:   3% 54:48 remain</div><div class="line">            TS ERRORS  DIFFS     ROWS  CHUNKS SKIPPED    TIME TABLE</div><div class="line">12-18T16:07:48     <span class="number"> 0 </span>    <span class="number"> 0 </span> <span class="number"> 313641 </span>     <span class="number"> 9 </span>     <span class="number"> 0 </span>146.417 d_ts_profile.t_user</div><div class="line">12-18T16:08:00     <span class="number"> 0 </span>    <span class="number"> 0 </span> <span class="number"> 397734 </span>    <span class="number"> 12 </span>     <span class="number"> 0 </span> 11.747 d_ts_profile.t_user_detail</div><div class="line">12-18T16:08:24     <span class="number"> 0 </span>    <span class="number"> 0 </span><span class="number"> 1668327 </span>    <span class="number"> 20 </span>     <span class="number"> 0 </span> 23.941 d_ts_profile.t_user_group</div></pre></td></tr></table></figure>
+<ul>
+<li>TS ：完成检查的时间戳。</li>
+<li>ERRORS ：检查时候发生错误和警告的数量。 </li>
+<li>DIFFS ：不一致的chunk数量。当指定 <code>--no-replicate-check</code> 即检查完但不立即输出结果时，会一直为0；当指定 <code>--replicate-check-only</code> 即不检查只从checksums表中计算crc32，且只显示不一致的信息（毕竟输出的大部分应该是一致的，容易造成干扰）。</li>
+<li>ROWS ：比对的表行数。</li>
+<li>CHUNKS ：被划分到表中的块的数目。</li>
+<li>SKIPPED ：由于错误或警告或过大，则跳过块的数目。</li>
+<li>TIME ：执行的时间。</li>
+<li>TABLE ：被检查的表名</li>
+</ul>
+<h3 id="使用dsn跨数据中心检测"><a href="#使用dsn跨数据中心检测" class="headerlink" title="使用dsn跨数据中心检测"></a>使用dsn跨数据中心检测</h3><p>场景：</p>
+<ol>
+<li>非标准端口13306，只检查以 d_ts 开头的所有库</li>
+<li>一主二从，binlog<strong>是</strong>ROW模式，其中一从在阿里云ECS上，主库是无法直接访问该从库的</li>
+<li>检测用的账号因为不是%，所以不一样</li>
+<li>以下是我环境的情况<br>MASTER_HOST:13306 主库<br>REPLICA_HOST:3306    从库<br>PTCHECK_HOST pt-table-checksum所在服务器<br>DSN_DBHOST，记录从库（连接）dsns的数据库</li>
+</ol>
+<p>最优的方式就是dsn指定从库了。在从库或从库同网段主机里装上 percona-toolkit。</p>
+<p>在DSN_DBHOST 数据库实例上创建DSNs表：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">create</span> <span class="keyword">database</span> percona;</div><div class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="string">`percona`</span>.<span class="string">`dsns`</span> (</div><div class="line"><span class="string">`id`</span> <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span> AUTO_INCREMENT,</div><div class="line"><span class="string">`parent_id`</span> <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">DEFAULT</span> <span class="literal">NULL</span>,</div><div class="line"><span class="string">`dsn`</span> <span class="built_in">varchar</span>(<span class="number">255</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,</div><div class="line">PRIMARY <span class="keyword">KEY</span> (<span class="string">`id`</span>)</div><div class="line">);</div><div class="line"></div><div class="line"><span class="keyword">GRANT</span> ALL PRIVILEGEES <span class="keyword">on</span> percona.* <span class="keyword">to</span> percona_tk@<span class="string">'PTCHECK_HOST'</span> <span class="keyword">IDENTIFIED</span> <span class="keyword">BY</span> <span class="string">'percona_pass'</span>;</div></pre></td></tr></table></figure>
+<p>如果有多个实例要检查，可以创建多个类似的dsns表。上面的percona_tk用户只是用来访问dsn库。插入从库信息：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">use</span> percona;</div><div class="line"><span class="keyword">insert</span> <span class="keyword">into</span> dsns(dsn) <span class="keyword">values</span>(<span class="string">'h=REPLICA_HOST,P=3306,u=repl_user,p=repl_pass'</span>);</div></pre></td></tr></table></figure>
+<p>DSNs记录 dsn 列格式如 <code>h=REPLICA_HOST,u=repl_user,p=repl_pass</code></p>
+<p>在 PTCHECK_HOST 上执行检查命令：</p>
+<figure class="highlight oxygene"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"># pt-table-checksum --replicate=percona.checksums --nocheck-replication-filters --no-check-binlog-format \</div><div class="line">h=MASTER_HOST,u=repl_user,p=<span class="string">'repl_pass'</span>,P=<span class="number">13306</span> --databases-regex=d_ts.* \</div><div class="line">--recursion-<span class="function"><span class="keyword">method</span> <span class="title">dsn</span>=<span class="title">h</span>=<span class="title">DSN_DBHOST</span>,<span class="title">u</span>=<span class="title">percona_tk</span>,<span class="title">p</span>='<span class="title">percona_pass</span>',<span class="title">P</span>=3306,<span class="title">D</span>=<span class="title">percona</span>,<span class="title">t</span>=<span class="title">dsn</span></span></div></pre></td></tr></table></figure>
+<p>选项的意思就不多说了。</p>
+<p>检测完如果一致，其实是求个心安，特别是在做数据迁移的时候。如果不一致，那就需要借助 <code>pt-table-sync</code> 工具了，不作介绍。</p>
+<h2 id="常见错误"><a href="#常见错误" class="headerlink" title="常见错误"></a>常见错误</h2><ol>
+<li><p>Diffs cannot be detected because no slaves were found<br>不能自动找到从库，确认processlist或host或dsns方式用对了。</p>
+</li>
+<li><p>Cannot connect to h=slave1.<em>*</em>.com,p=…,u=percona_user<br>可以在<code>pt-table-checksum</code>命令前加<code>PTDEBUG=1</code>来看详细的执行过程，如端口、用户名、权限错误。</p>
+</li>
+<li><p>Waiting for the –replicate table to replicate to XXX<br>问题出在 percona.checksums 表在从库不存在，根本原因是没有从主库同步过来，所以看一下从库是否延迟严重。</p>
+</li>
+<li><p>Pausing because Threads_running=25<br>反复打印出类似上面停止检查的信息。这是因为当前数据库正在运行的线程数大于默认25，pt-table-checksum 为了减少对库的压力暂停检查了。等数据库压力过了就好了，或者也可以直接 Ctrl+C 终端，下一次加上<code>--resume</code>继续执行，或者加大<code>--max-load=</code>值。</p>
+</li>
+<li><p>字符集问题</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">Error checksumming table Error executing checksum query: DBD::mysql::st execute failed: Illegal mix of collations</div><div class="line">12-17T14:48:04 Error checksumming table d<span class="emphasis">_ec_</span>cs.t<span class="emphasis">_online_</span>cs: Error executing checksum query: </div><div class="line">DBD::mysql::st execute failed: Illegal mix of collations for operation 'concat_ws' [for Statement </div><div class="line">"REPLACE INTO <span class="code">`percona`</span>.<span class="code">`ali_checksum`</span> (db, tbl, chunk, chunk<span class="emphasis">_index, lower_</span>boundary, upper<span class="emphasis">_boundary, this_</span>cnt, this<span class="emphasis">_crc) SELECT ?, ?, ?, ?, ?, ?, COUNT(*) AS cnt, COALESCE(LOWER(CONV(BIT_</span>XOR(CAST(CRC32(CONCAT<span class="emphasis">_WS('#', `f_</span>cs<span class="emphasis">_id`, `f_</span>corp<span class="emphasis">_id`, `f_</span>valid<span class="code">`, `</span>f<span class="emphasis">_show_</span>name<span class="code">`, `</span>f<span class="emphasis">_online_</span>msg<span class="code">`, `</span>f<span class="emphasis">_offline_</span>msg<span class="code">`, `</span>f<span class="emphasis">_show_</span>mobile<span class="code">`, `</span>f<span class="emphasis">_group_</span>id<span class="code">`, `</span>f<span class="emphasis">_qq`, `f_</span>show<span class="emphasis">_qq`, `f_</span>msn<span class="code">`, `</span>f<span class="emphasis">_show_</span>msn<span class="code">`, `</span>f<span class="emphasis">_sms_</span>online<span class="code">`, `</span>f<span class="emphasis">_scheme`, `f_</span>tel<span class="code">`, `</span>f<span class="emphasis">_telno`, `f_</span>show<span class="emphasis">_tel`, `f_</span>contact<span class="code">`, `</span>f<span class="emphasis">_mobile`, `f_</span>position<span class="code">`, `</span>f<span class="emphasis">_other1`, `f_</span>other2<span class="code">`, `</span>f<span class="emphasis">_other_</span>text1<span class="code">`, `</span>f<span class="emphasis">_other_</span>text2<span class="code">`, `</span>f<span class="emphasis">_email`, `f_</span>qq<span class="emphasis">_first`, `f_</span>qq<span class="emphasis">_first_</span>type<span class="code">`, `</span>f<span class="emphasis">_aids_</span>open<span class="code">`, `</span>f<span class="emphasis">_aids_</span>qq<span class="code">`, `</span>f<span class="emphasis">_aids_</span>crmqq<span class="code">`, `</span>f<span class="emphasis">_aids_</span>yahoo<span class="code">`, `</span>f<span class="emphasis">_aids_</span>skype<span class="code">`, `</span>f<span class="emphasis">_aids_</span>aliww<span class="code">`, `</span>f<span class="emphasis">_aids_</span>msn<span class="code">`, `</span>f<span class="emphasis">_aids_</span>alibaba<span class="code">`, `</span>f<span class="emphasis">_aids_</span>alitrade<span class="code">`, CONCAT(ISNULL(`</span>f<span class="emphasis">_show_</span>name<span class="code">`), ISNULL(`</span>f<span class="emphasis">_group_</span>id<span class="code">`), ISNULL(`</span>f<span class="emphasis">_qq`), ISNULL(`f_</span>show<span class="emphasis">_qq`), ISNULL(`f_</span>sms<span class="emphasis">_online`), ISNULL(`f_</span>other<span class="emphasis">_text1`), ISNULL(`f_</span>other<span class="emphasis">_text2`), ISNULL(`f_</span>email<span class="code">`)) )) AS UNSIGNED)), 10, 16)), 0) AS crc FROM `</span>d<span class="emphasis">_ec_</span>cs<span class="code">`.`</span>t<span class="emphasis">_online_</span>cs` </div><div class="line">/<span class="emphasis">*checksum table*</span>/" with ParamValues: 0='d<span class="emphasis">_ts_</span>profile', 1='t<span class="emphasis">_user_</span>account', 2=1, 3=undef, 4=undef, 5=undef] at /usr/bin/pt-table-checksum line 10520.</div></pre></td></tr></table></figure>
+</li>
+</ol>
+<p>是个bug，暂时无法解决，<a href="https://bugs.launchpad.net/percona-toolkit/+bug/1427552" target="_blank" rel="external">Illegal mix of collations for operation ‘concat_ws’</a>。</p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><ul>
+<li><a href="https://www.percona.com/doc/percona-toolkit/2.2/pt-table-checksum.html" target="_blank" rel="external">pt-table-checksum</a></li>
+<li><a href="http://www.nettedfish.com/blog/2013/06/04/check-replication-consistency-by-pt-table-checksum/" target="_blank" rel="external">用pt-table-checksum校验数据一致性</a></li>
+<li><a href="http://blog.csdn.net/melody_mr/article/details/45224249" target="_blank" rel="external">使用pt-table-checksum及pt-table-sync校验复制一致性详细介绍</a></li>
+<li><a href="http://imysql.com/2015/04/19/mysql-faq-pt-table-checksum-use-case.shtml" target="_blank" rel="external">Pausing because Threads_running=0</a></li>
+</ul>
+<hr>
+<p>本文链接地址：<a href="http://seanlook.com/2015/12/29/mysql_replica_pt-table-checksum/">http://seanlook.com/2015/12/29/mysql_replica_pt-table-checksum/</a></p>
+<hr>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/mysql/" rel="tag">#mysql</a>
+          
+            <a href="/tags/主从复制/" rel="tag">#主从复制</a>
+          
+            <a href="/tags/percona/" rel="tag">#percona</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2015/12/14/mysql-replicas/" rel="next" title="使用 Xtrabackup 在线对MySQL做主从复制">
+                <i class="fa fa-chevron-left"></i> 使用 Xtrabackup 在线对MySQL做主从复制
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2016/01/18/mac-mini-zturn/" rel="prev" title="记一次Mac mini折腾过程（鼠键共享，更换SSD）">
+                记一次Mac mini折腾过程（鼠键共享，更换SSD） <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2015/12/29/mysql_replica_pt-table-checksum/"
+           data-title="生产环境使用 pt-table-checksum 检查MySQL数据一致性" data-url="http://seanlook.com/2015/12/29/mysql_replica_pt-table-checksum/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#工作过程"><span class="nav-text">工作过程</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#你需要知道的选项"><span class="nav-text">你需要知道的选项</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#检测实例"><span class="nav-text">检测实例</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#同网段间主从一致检查"><span class="nav-text">同网段间主从一致检查</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#使用dsn跨数据中心检测"><span class="nav-text">使用dsn跨数据中心检测</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#常见错误"><span class="nav-text">常见错误</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#参考"><span class="nav-text">参考</span></a></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

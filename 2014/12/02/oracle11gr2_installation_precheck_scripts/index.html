@@ -1,0 +1,880 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="centos,shell,oracle,installation," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="这是自己曾经写的一个oracle 11gR2在CentOS6 x86_64服务器上，一键配置安装环境的脚本，能快速完成安装前环境的配置。
+具体完成以下工作：
+
+备份系统配置文件，以防出错
+添加oracle用户和用户组
+创建安装目录
+关闭selinux
+在.bash_profile中修改环境变量
+修改sysctl.conf文件
+修改limits.conf文件
+修改PAM的login文件
+安装必要的依">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Oracle单实例安装环境一键配置脚本（CentOS6 + 11gR2 ）">
+<meta property="og:url" content="http://seanlook.com/2014/12/02/oracle11gr2_installation_precheck_scripts/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="这是自己曾经写的一个oracle 11gR2在CentOS6 x86_64服务器上，一键配置安装环境的脚本，能快速完成安装前环境的配置。
+具体完成以下工作：
+
+备份系统配置文件，以防出错
+添加oracle用户和用户组
+创建安装目录
+关闭selinux
+在.bash_profile中修改环境变量
+修改sysctl.conf文件
+修改limits.conf文件
+修改PAM的login文件
+安装必要的依">
+<meta property="og:updated_time" content="2014-12-02T16:46:23.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Oracle单实例安装环境一键配置脚本（CentOS6 + 11gR2 ）">
+<meta name="twitter:description" content="这是自己曾经写的一个oracle 11gR2在CentOS6 x86_64服务器上，一键配置安装环境的脚本，能快速完成安装前环境的配置。
+具体完成以下工作：
+
+备份系统配置文件，以防出错
+添加oracle用户和用户组
+创建安装目录
+关闭selinux
+在.bash_profile中修改环境变量
+修改sysctl.conf文件
+修改limits.conf文件
+修改PAM的login文件
+安装必要的依">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title> Oracle单实例安装环境一键配置脚本（CentOS6 + 11gR2 ） | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                Oracle单实例安装环境一键配置脚本（CentOS6 + 11gR2 ）
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2014-12-02T15:21:25+08:00" content="2014-12-02">
+              2014-12-02
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Oracle/" itemprop="url" rel="index">
+                    <span itemprop="name">Oracle</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2014/12/02/oracle11gr2_installation_precheck_scripts/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2014/12/02/oracle11gr2_installation_precheck_scripts/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>这是自己曾经写的一个oracle 11gR2在CentOS6 x86_64服务器上，一键配置安装环境的脚本，能快速完成安装前环境的配置。</p>
+<p>具体完成以下工作：</p>
+<ul>
+<li>备份系统配置文件，以防出错</li>
+<li>添加oracle用户和用户组</li>
+<li>创建安装目录</li>
+<li>关闭selinux</li>
+<li>在.bash_profile中修改环境变量</li>
+<li>修改<code>sysctl.conf</code>文件</li>
+<li>修改<code>limits.conf</code>文件</li>
+<li>修改PAM的login文件</li>
+<li>安装必要的依赖包</li>
+</ul>
+<p>使用注意事项：</p>
+<ul>
+<li>root的用户执行，<code>chmod +x oraclePreInstCheck.sh</code></li>
+<li><code>./oraclePreInstCheck.sh</code>运行后，请仔细阅读说明，再决定是否使用该脚本</li>
+<li>该脚本默认参数适用于2核4G内存的环境，你可以根据需要修改<code>kernelset()</code>部分</li>
+<li>执行完后，你检查一下你的安装目录及权限（默认<code>/db/oracle</code>）</li>
+<li>该脚本会有提示输入的地方，请不要挑战它的健壮性，比如输入安装根目录时，不要带入空格</li>
+<li>脚本只需执行一次，修改系统参数如sysctl.conf之前，都有备份成<code>xxx.ora_bak</code></li>
+<li>请<strong>确保</strong>可以通过yum方式安装软件包（使用挂载DVD镜像或联网）</li>
+<li>建议结合<code>tee</code>将执行过程记录在日志文件中，<code>./oraclePreInstCheck.sh | tee oraclePreInstCheck.log</code></li>
+</ul>
+<a id="more"></a>
+<p>oraclePreInstCheck.sh：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div><div class="line">78</div><div class="line">79</div><div class="line">80</div><div class="line">81</div><div class="line">82</div><div class="line">83</div><div class="line">84</div><div class="line">85</div><div class="line">86</div><div class="line">87</div><div class="line">88</div><div class="line">89</div><div class="line">90</div><div class="line">91</div><div class="line">92</div><div class="line">93</div><div class="line">94</div><div class="line">95</div><div class="line">96</div><div class="line">97</div><div class="line">98</div><div class="line">99</div><div class="line">100</div><div class="line">101</div><div class="line">102</div><div class="line">103</div><div class="line">104</div><div class="line">105</div><div class="line">106</div><div class="line">107</div><div class="line">108</div><div class="line">109</div><div class="line">110</div><div class="line">111</div><div class="line">112</div><div class="line">113</div><div class="line">114</div><div class="line">115</div><div class="line">116</div><div class="line">117</div><div class="line">118</div><div class="line">119</div><div class="line">120</div><div class="line">121</div><div class="line">122</div><div class="line">123</div><div class="line">124</div><div class="line">125</div><div class="line">126</div><div class="line">127</div><div class="line">128</div><div class="line">129</div><div class="line">130</div><div class="line">131</div><div class="line">132</div><div class="line">133</div><div class="line">134</div><div class="line">135</div><div class="line">136</div><div class="line">137</div><div class="line">138</div><div class="line">139</div><div class="line">140</div><div class="line">141</div><div class="line">142</div><div class="line">143</div><div class="line">144</div><div class="line">145</div><div class="line">146</div><div class="line">147</div><div class="line">148</div><div class="line">149</div><div class="line">150</div><div class="line">151</div><div class="line">152</div><div class="line">153</div><div class="line">154</div><div class="line">155</div><div class="line">156</div><div class="line">157</div><div class="line">158</div><div class="line">159</div><div class="line">160</div><div class="line">161</div><div class="line">162</div><div class="line">163</div><div class="line">164</div><div class="line">165</div><div class="line">166</div><div class="line">167</div><div class="line">168</div><div class="line">169</div><div class="line">170</div><div class="line">171</div><div class="line">172</div><div class="line">173</div><div class="line">174</div><div class="line">175</div><div class="line">176</div><div class="line">177</div><div class="line">178</div><div class="line">179</div><div class="line">180</div><div class="line">181</div><div class="line">182</div><div class="line">183</div><div class="line">184</div><div class="line">185</div><div class="line">186</div><div class="line">187</div><div class="line">188</div><div class="line">189</div><div class="line">190</div><div class="line">191</div><div class="line">192</div><div class="line">193</div><div class="line">194</div><div class="line">195</div><div class="line">196</div><div class="line">197</div><div class="line">198</div><div class="line">199</div><div class="line">200</div><div class="line">201</div><div class="line">202</div><div class="line">203</div><div class="line">204</div><div class="line">205</div><div class="line">206</div><div class="line">207</div><div class="line">208</div><div class="line">209</div><div class="line">210</div><div class="line">211</div><div class="line">212</div><div class="line">213</div><div class="line">214</div><div class="line">215</div><div class="line">216</div><div class="line">217</div><div class="line">218</div><div class="line">219</div><div class="line">220</div><div class="line">221</div><div class="line">222</div><div class="line">223</div><div class="line">224</div><div class="line">225</div><div class="line">226</div><div class="line">227</div><div class="line">228</div><div class="line">229</div><div class="line">230</div><div class="line">231</div><div class="line">232</div><div class="line">233</div><div class="line">234</div><div class="line">235</div><div class="line">236</div><div class="line">237</div><div class="line">238</div><div class="line">239</div><div class="line">240</div><div class="line">241</div><div class="line">242</div><div class="line">243</div><div class="line">244</div><div class="line">245</div><div class="line">246</div><div class="line">247</div><div class="line">248</div><div class="line">249</div><div class="line">250</div><div class="line">251</div><div class="line">252</div><div class="line">253</div><div class="line">254</div><div class="line">255</div><div class="line">256</div><div class="line">257</div><div class="line">258</div><div class="line">259</div><div class="line">260</div><div class="line">261</div><div class="line">262</div><div class="line">263</div><div class="line">264</div><div class="line">265</div><div class="line">266</div><div class="line">267</div><div class="line">268</div><div class="line">269</div><div class="line">270</div><div class="line">271</div><div class="line">272</div><div class="line">273</div><div class="line">274</div><div class="line">275</div><div class="line">276</div><div class="line">277</div><div class="line">278</div><div class="line">279</div><div class="line">280</div><div class="line">281</div><div class="line">282</div><div class="line">283</div><div class="line">284</div><div class="line">285</div><div class="line">286</div><div class="line">287</div><div class="line">288</div><div class="line">289</div><div class="line">290</div><div class="line">291</div><div class="line">292</div><div class="line">293</div><div class="line">294</div><div class="line">295</div><div class="line">296</div><div class="line">297</div><div class="line">298</div><div class="line">299</div><div class="line">300</div><div class="line">301</div><div class="line">302</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#!/bin/bash</span></div><div class="line"><span class="comment"># author       zhouxiao</span></div><div class="line"><span class="comment"># date         2014-03-07</span></div><div class="line"><span class="comment"># description  oracle 11g R2 for linux 6.0+ x86_64 安装辅助脚本</span></div><div class="line"></div><div class="line"><span class="comment">#定义常量</span></div><div class="line">SYSCTL=/etc/sysctl.conf</div><div class="line">LIMITS=/etc/security/limits.conf</div><div class="line">PAM=/etc/pam.d/login</div><div class="line">PROFILE=/etc/profile</div><div class="line">BASH_PROFILE=/home/oracle/.bash_profile</div><div class="line"><span class="comment">#循环变量</span></div><div class="line">i=1</div><div class="line"><span class="comment">#定义显示颜色</span></div><div class="line"><span class="comment">#颜色定义 信息(33黄色) 警示(31红色) 过程(36浅蓝)</span></div><div class="line"></div><div class="line"><span class="function"><span class="title">usage</span></span>()</div><div class="line">&#123;</div><div class="line">    <span class="built_in">echo</span> <span class="string">"Scripts: initialize the required env settings for Oracle 11gR2 installation on Linux 6.0+ x86_64"</span></div><div class="line">    <span class="built_in">echo</span> <span class="string">"Make sure you have prepared conditions list bellow:"</span></div><div class="line">    <span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"  \n\e[1;33m yum, hosts, user oracle's passwd, oralce SID, DISPLAY location \e[0m"</span></div><div class="line">    <span class="built_in">echo</span> <span class="string">"The Script will backup config files with .ora_bak in case failure "</span></div><div class="line">    <span class="built_in">echo</span> <span class="string">"The Script will set the following change:"</span></div><div class="line">    <span class="built_in">echo</span> <span class="string">"  - add user oracle and group oinstall/dba/oper, etc."</span></div><div class="line">    <span class="built_in">echo</span> <span class="string">"  - make directory ORACLE_HOME and change owner"</span></div><div class="line">    <span class="built_in">echo</span> <span class="string">"  - modify oracle .bash_profile"</span></div><div class="line">    <span class="built_in">echo</span> <span class="string">"  - modify /etc/sysctl.conf kernel parameters like shmall/shmmax"</span></div><div class="line">    <span class="built_in">echo</span> <span class="string">"  - modify /etc/security/limits.conf "</span></div><div class="line">    <span class="built_in">echo</span> <span class="string">"  - install necessary packages like libgcc/libaio/unixODBC, etc."</span></div><div class="line">    <span class="built_in">echo</span> <span class="string">"  - IF anything goes wrong, you need to recover ora_bak files manually."</span></div><div class="line">    <span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;33m Continue? (y/n [n]): \e[0m"</span></div><div class="line">    <span class="built_in">read</span> singal</div><div class="line">    <span class="keyword">if</span> [ <span class="variable">$singal</span> != <span class="string">"y"</span> ]; <span class="keyword">then</span></div><div class="line">        <span class="built_in">exit</span> 0</div><div class="line">    <span class="keyword">else</span></div><div class="line">        <span class="built_in">echo</span> <span class="string">"God Bless you! Settings started."</span></div><div class="line">        <span class="built_in">echo</span> <span class="string">""</span></div><div class="line">        <span class="built_in">echo</span> <span class="string">""</span></div><div class="line">    <span class="keyword">fi</span></div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="comment">#判断执行用户是否root</span></div><div class="line"><span class="function"><span class="title">isroot</span></span>()</div><div class="line">&#123;</div><div class="line">    <span class="keyword">if</span> [ <span class="variable">$USER</span> != <span class="string">"root"</span> ];<span class="keyword">then</span></div><div class="line">        <span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;31m the user must be root,and now you user is <span class="variable">$USER</span>,please su to root. \e[0m"</span></div><div class="line">        <span class="built_in">exit</span>4</div><div class="line">    <span class="keyword">else</span></div><div class="line">        <span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;36m check root ... OK! \e[0m"</span></div><div class="line">    <span class="keyword">fi</span></div><div class="line">&#125;</div><div class="line"><span class="comment">#挂在光盘到/mnt/cdrom目录下</span></div><div class="line"><span class="function"><span class="title">mount_cdrom</span></span>()</div><div class="line">&#123;</div><div class="line"><span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;31m please insert RHEL to CDROM,press any key ...\e[0m"</span></div><div class="line"><span class="built_in">read</span> -n 1</div><div class="line"><span class="keyword">if</span> [ <span class="_">-d</span> /mnt/cdrom ];<span class="keyword">then</span></div><div class="line">     mount -t auto -o ro /dev/cdrom /mnt/cdrom</div><div class="line"><span class="keyword">else</span></div><div class="line">    mkdir -p /mnt/cdrom</div><div class="line">    mount -t auto -o ro /dev/cdrom /mnt/cdrom</div><div class="line"><span class="keyword">fi</span></div><div class="line"><span class="keyword">if</span> [ $? <span class="_">-eq</span> 0 ];<span class="keyword">then</span></div><div class="line">    <span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;36m CDROM mount on /mnt/cdrom ... OK! \e[0m"</span></div><div class="line"><span class="keyword">fi</span></div><div class="line">&#125;</div><div class="line"><span class="comment">#设置yum本地光盘源</span></div><div class="line"><span class="function"><span class="title">yum_repo</span></span>()</div><div class="line">&#123;</div><div class="line">    rm -rf /etc/yum.repos.d/* &amp;&amp; cat &lt;&lt;EOF &gt;&gt; /etc/yum.repos.d/Server.repo</div><div class="line">[Server]</div><div class="line">name=MyRPM</div><div class="line">baseurl=file:///mnt/cdrom/Server</div><div class="line">enabled=1</div><div class="line">gpgkey=file:///mnt/cdrom/RPM-GPG-KEY-redhat-release</div><div class="line">EOF</div><div class="line"><span class="keyword">if</span> [ $? <span class="_">-eq</span> 0 ];<span class="keyword">then</span></div><div class="line"><span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;36m  /etc/yum.repos.d/Server.repo  ... OK! \e[0m"</span></div><div class="line"><span class="keyword">fi</span></div><div class="line">&#125;</div><div class="line"><span class="comment">#添加oracle用户，添加oracle用户所属组oinstall及附加组dba</span></div><div class="line"><span class="function"><span class="title">ouseradd</span></span>()</div><div class="line">&#123;</div><div class="line">    <span class="keyword">if</span> [[ `grep <span class="string">"oracle"</span> /etc/passwd` != <span class="string">""</span> ]];<span class="keyword">then</span></div><div class="line">        userdel -r oracle</div><div class="line">    <span class="keyword">fi</span></div><div class="line">    <span class="keyword">if</span> [[ `grep <span class="string">"oinstall"</span> /etc/group` = <span class="string">""</span> ]];<span class="keyword">then</span></div><div class="line">        groupadd -g 501 oinstall</div><div class="line">    <span class="keyword">fi</span></div><div class="line">    <span class="keyword">if</span> [[ `grep <span class="string">"dba"</span> /etc/group` = <span class="string">""</span> ]];<span class="keyword">then</span></div><div class="line">        groupadd -g 502 dba</div><div class="line">        groupadd -g 503 oper</div><div class="line">        groupadd -g 504 asmadmin</div><div class="line">        groupadd -g 506 asmdba</div><div class="line">        groupadd -g 505 asmoper</div><div class="line">    <span class="keyword">fi</span></div><div class="line">    useradd oracle -g oinstall -G dba,asmdba,oper &amp;&amp; <span class="built_in">echo</span> <span class="variable">$1</span> |passwd oracle --stdin</div><div class="line">    <span class="keyword">if</span> [ $? <span class="_">-eq</span> 0 ];<span class="keyword">then</span></div><div class="line">        <span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;36m oracle's password updated successfully  --- OK! \e[0m"</span></div><div class="line">    <span class="keyword">else</span></div><div class="line">        <span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;31m oracle's password set faild.   --- NO!\e[0m"</span></div><div class="line">    <span class="keyword">fi</span></div><div class="line">&#125;</div><div class="line"><span class="comment">#检查oracle所需软件包并安装</span></div><div class="line"><span class="function"><span class="title">packagecheck</span></span>()</div><div class="line">&#123;</div><div class="line"><span class="keyword">for</span> package <span class="keyword">in</span> binutils compat-libcap1 compat-libstdc++-33  compat-libstdc++-33*i686 gcc gcc-c++ glibc glibc-2*i686 glibc-devel glibc-devel-2*i686  glibc-headers-2.* libgcc libgcc-4*i686 libstdc++ libstdc++-4*i686 libstdc++-devel libstdc++-devel-4*i686 libaio-0* libaio-0*i686 libaio-devel libaio-devel-0*i686 unixODBC unixODBC-2*i686 unixODBC-devel unixODBC-devel-2*i686 make sysstat ksh </div><div class="line"><span class="keyword">do</span></div><div class="line">    rpm -q <span class="variable">$package</span> 2&gt; /dev/null</div><div class="line">    <span class="keyword">if</span> [ $? != 0 ];<span class="keyword">then</span></div><div class="line">        yum -y install <span class="variable">$package</span> 2&gt; /dev/null</div><div class="line">        <span class="built_in">echo</span>  <span class="_">-e</span> <span class="string">"\n\e[1;36m <span class="variable">$package</span> is installed ... OK! \e[0m"</span></div><div class="line">    <span class="keyword">fi</span></div><div class="line"><span class="keyword">done</span></div><div class="line">&#125;</div><div class="line"><span class="comment">#安装桌面套件 X Window System / Desktop</span></div><div class="line"><span class="function"><span class="title">xdesk</span></span>()</div><div class="line">&#123;</div><div class="line">    LANG=C yum -y groupinstall <span class="string">"X Window System"</span> <span class="string">"Desktop"</span></div><div class="line">    <span class="keyword">if</span> [ $? <span class="_">-eq</span> 0 ];<span class="keyword">then</span></div><div class="line">        <span class="built_in">echo</span>  <span class="_">-e</span> <span class="string">"\n\e[1;36m <span class="variable">$package</span> is already installed ... OK! \e[0m"</span></div><div class="line">    <span class="keyword">fi</span></div><div class="line">&#125;</div><div class="line"><span class="comment"># 设置内核参数</span></div><div class="line"><span class="comment"># shmall 物理内存&lt;8G =2097152     &gt;8G MemTotal/4kb</span></div><div class="line"><span class="comment"># shmmax 物理内存&lt;8G = 4294967296 &gt;8G 16GMemTotal = 10G=10*1024^3</span></div><div class="line"><span class="function"><span class="title">kernelset</span></span>()</div><div class="line">&#123;</div><div class="line">    cp <span class="variable">$SYSCTL</span>&#123;,.ora_bak&#125; &amp;&amp; cat &lt;&lt;EOF &gt;&gt;<span class="variable">$SYSCTL</span></div><div class="line">fs.aio-max-nr = 1048576</div><div class="line">fs.file-max = 6815744</div><div class="line">kernel.shmall = 2097152</div><div class="line">kernel.shmmax = 4294967296</div><div class="line">kernel.shmmni = 4096</div><div class="line">kernel.sem = 250 32000 100 128</div><div class="line">net.ipv4.ip_local_port_range = 9000 65500</div><div class="line">net.core.rmem_default = 262144</div><div class="line">net.core.rmem_max = 4194304</div><div class="line">net.core.wmem_default = 262144</div><div class="line">net.core.wmem_max = 1048576</div><div class="line">EOF</div><div class="line">    <span class="keyword">if</span> [ $? <span class="_">-eq</span> 0 ];<span class="keyword">then</span></div><div class="line">        <span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;36m kernel parameters updated successfully --- OK! \e[0m"</span></div><div class="line">    <span class="keyword">fi</span></div><div class="line">sysctl -p</div><div class="line">&#125;</div><div class="line"><span class="comment">#设置oracle资源限制</span></div><div class="line"><span class="function"><span class="title">oralimit</span></span>()</div><div class="line">&#123;</div><div class="line">    cp <span class="variable">$LIMITS</span>&#123;,.ora_bak&#125; &amp;&amp; cat &lt;&lt;EOF &gt;&gt; <span class="variable">$LIMITS</span></div><div class="line">oracle      soft    nproc   2047</div><div class="line">oracle      hard    nproc   16384</div><div class="line">oracle      soft    nofile  1024</div><div class="line">oracle      hard    nofile  65536</div><div class="line">oracle      soft    stack   10240</div><div class="line">EOF</div><div class="line">    <span class="keyword">if</span> [ $? <span class="_">-eq</span> 0 ];<span class="keyword">then</span></div><div class="line">        <span class="built_in">echo</span>  <span class="_">-e</span> <span class="string">"\n\e[1;36m <span class="variable">$LIMITS</span> updated successfully ... OK! \e[0m"</span></div><div class="line">    <span class="keyword">fi</span></div><div class="line">cat <span class="variable">$LIMITS</span> | grep <span class="string">'^o'</span></div><div class="line">&#125;</div><div class="line"><span class="comment">#设置login文件</span></div><div class="line"><span class="function"><span class="title">setlogin</span></span>()</div><div class="line">&#123;</div><div class="line">    cp <span class="variable">$PAM</span>&#123;,.ora_bak&#125; &amp;&amp; cat &lt;&lt;EOF &gt;&gt;<span class="variable">$PAM</span></div><div class="line">session     required    pam_limits.so</div><div class="line">EOF</div><div class="line">    <span class="keyword">if</span> [ $? <span class="_">-eq</span> 0 ];<span class="keyword">then</span></div><div class="line">        <span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;36m  <span class="variable">$PAM</span> updated successfully ... OK! \e[0m"</span></div><div class="line">    <span class="keyword">fi</span></div><div class="line">&#125;</div><div class="line"><span class="comment">#设置profile文件</span></div><div class="line"><span class="function"><span class="title">setprofile</span></span>()</div><div class="line">&#123;</div><div class="line">    cp <span class="variable">$PROFILE</span>&#123;,.ora_bak&#125; &amp;&amp; cat &lt;&lt;EOF &gt;&gt;<span class="variable">$PROFILE</span></div><div class="line"><span class="keyword">if</span> [ <span class="variable">$USER</span> = <span class="string">"oracle"</span> ];<span class="keyword">then</span></div><div class="line">    <span class="keyword">if</span> [ <span class="variable">$SHELL</span> = <span class="string">"/bin/ksh"</span> ];<span class="keyword">then</span></div><div class="line">        <span class="built_in">ulimit</span> -p 16384</div><div class="line">        <span class="built_in">ulimit</span> -n 65536</div><div class="line">    <span class="keyword">else</span></div><div class="line">        <span class="built_in">ulimit</span> -u 16384 -n 65536</div><div class="line">    <span class="keyword">fi</span></div><div class="line"><span class="keyword">fi</span></div><div class="line">EOF</div><div class="line">    <span class="keyword">if</span> [ $? <span class="_">-eq</span> 0 ];<span class="keyword">then</span></div><div class="line">        <span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;36m  <span class="variable">$PROFILE</span> updated successfully ... OK! \e[0m"</span></div><div class="line">    <span class="keyword">fi</span></div><div class="line">&#125;</div><div class="line"><span class="comment">#设置oracle的profile文件</span></div><div class="line"><span class="function"><span class="title">setbash_profile</span></span>()</div><div class="line">&#123;</div><div class="line">    cp <span class="variable">$BASH_PROFILE</span>&#123;,.ora_bak&#125; &amp;&amp; cat &lt;&lt;EOF &gt;&gt; <span class="variable">$BASH_PROFILE</span></div><div class="line"><span class="built_in">umask</span> 022</div><div class="line"></div><div class="line"><span class="comment">#oracle settings</span></div><div class="line">TMP=/tmp; <span class="built_in">export</span> TMP</div><div class="line"></div><div class="line">TMPDIR=\<span class="variable">$TMP</span>; <span class="built_in">export</span> TMPDIR</div><div class="line">ORACLE_BASE=<span class="variable">$1</span>/oracle</div><div class="line">ORACLE_HOME=\<span class="variable">$ORACLE_BASE</span>/product/11.2.0/db_1</div><div class="line">ORACLE_SID=<span class="variable">$2</span></div><div class="line">PATH=\<span class="variable">$ORACLE_HOME</span>/bin/:\<span class="variable">$PATH</span></div><div class="line">LANG=en_US.UTF-8</div><div class="line">ORACLE_TERM=xterm</div><div class="line"><span class="built_in">export</span> ORACLE_BASE ORACLE_HOME ORACLE_SID ORACLE_TERM</div><div class="line"></div><div class="line">LD_LIBRARY_PATH=\<span class="variable">$ORACLE_HOME</span>/lib:/lib:/usr/lib; <span class="built_in">export</span> LD_LIBRARY_PATH</div><div class="line">CLASSPATH=\<span class="variable">$ORACLE_HOME</span>/jre:\<span class="variable">$ORACLE_HOME</span>/jlib:\<span class="variable">$ORACLE_HOME</span>/rdbms/jlib</div><div class="line"><span class="built_in">export</span> CLASSPATH</div><div class="line"></div><div class="line">EOF</div><div class="line">    <span class="keyword">if</span> [ $? <span class="_">-eq</span> 0 ];<span class="keyword">then</span></div><div class="line">        <span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;36m <span class="variable">$BASH_PROFILE</span> updated successfully ... OK! \e[0m"</span></div><div class="line">    <span class="keyword">fi</span></div><div class="line">su - oracle -c <span class="built_in">source</span> <span class="variable">$BASH_PROFILE</span></div><div class="line">&#125;</div><div class="line"><span class="comment">#系统环境检查</span></div><div class="line"><span class="function"><span class="title">oscheck</span></span>()</div><div class="line">&#123;</div><div class="line"><span class="comment">#查看内存大小是否大于1G</span></div><div class="line"><span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n check MEM Size ..."</span></div><div class="line"><span class="keyword">if</span> [ `cat /proc/meminfo | grep MemTotal | awk <span class="string">'&#123;print $2&#125;'</span>` <span class="_">-lt</span> 1048576 ];<span class="keyword">then</span></div><div class="line">    <span class="built_in">echo</span>  <span class="_">-e</span> <span class="string">"\n\e[1;33m Memory Small \e[0m"</span></div><div class="line">    <span class="built_in">exit</span> 1</div><div class="line"><span class="keyword">else</span></div><div class="line">    <span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;36m Memory checked PASS \e[0m"</span></div><div class="line"><span class="keyword">fi</span></div><div class="line"><span class="comment">#查看tmp空间大小</span></div><div class="line"><span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n check tmpfs Size ..."</span></div><div class="line">cp /etc/fstab&#123;,.ora_bak&#125;</div><div class="line"><span class="keyword">while</span> <span class="literal">true</span>;<span class="keyword">do</span></div><div class="line"><span class="keyword">if</span> [ `df | awk <span class="string">'/tmpfs/ &#123;print $2&#125;'</span>` <span class="_">-lt</span> 1048576 ];<span class="keyword">then</span></div><div class="line">    <span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;33m tmpfs Smaill \e[0m"</span></div><div class="line">    sed -i <span class="string">'/tmpfs/s/defaults/defaults,size=1G/'</span> /etc/fstab &amp;&amp; mount -o remount /dev/shm</div><div class="line">    <span class="keyword">if</span> [ $? != 0 ];<span class="keyword">then</span></div><div class="line">    i=i+1</div><div class="line">        <span class="keyword">if</span> [ <span class="variable">$i</span> <span class="_">-eq</span> 3 ];<span class="keyword">then</span></div><div class="line">            <span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;31m set tmpfs faild. \e[0m"</span></div><div class="line">            <span class="built_in">exit</span> 3</div><div class="line">        <span class="keyword">fi</span></div><div class="line">    <span class="keyword">else</span></div><div class="line">        <span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;36 tmpfs updated successfully. \e[0m"</span></div><div class="line">        <span class="built_in">break</span></div><div class="line">    <span class="keyword">fi</span></div><div class="line"><span class="keyword">else</span></div><div class="line">    <span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;36m tmpfs checked PASS \e[0m"</span></div><div class="line">    <span class="built_in">break</span></div><div class="line"><span class="keyword">fi</span></div><div class="line"><span class="keyword">done</span></div><div class="line">&#125;</div><div class="line"></div><div class="line">usage</div><div class="line"></div><div class="line"><span class="comment">#停止防火墙IPTABLES</span></div><div class="line">service iptables stop</div><div class="line"><span class="comment">#chkconfig iptables off</span></div><div class="line"><span class="comment">#关闭SELINUX</span></div><div class="line">cp /etc/selinux/config&#123;,.ora_bak&#125; &amp;&amp; sed -i <span class="string">'/SELINUX/s/enforcing/disabled/;/SELINUX/s/permissive/disabled/'</span>   /etc/selinux/config</div><div class="line">setenforce 0</div><div class="line"><span class="comment">#执行以上函数</span></div><div class="line">isroot</div><div class="line"><span class="comment">#oscheck</span></div><div class="line"><span class="comment">#yum_repo</span></div><div class="line"><span class="comment">#mount_cdrom</span></div><div class="line">packagecheck</div><div class="line"><span class="comment">#xdesk</span></div><div class="line">kernelset</div><div class="line">oralimit</div><div class="line">setlogin</div><div class="line">setprofile</div><div class="line"><span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;33m please input oracle's user passwd: \e[0m"</span></div><div class="line"><span class="built_in">read</span> oraclepw</div><div class="line">ouseradd <span class="variable">$oraclepw</span></div><div class="line"></div><div class="line"><span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;33m please input oracle install PATH (default /db) \e[0m"</span></div><div class="line"><span class="built_in">read</span> oraclepath</div><div class="line"><span class="keyword">if</span> [ -z <span class="variable">$oraclepath</span> ];<span class="keyword">then</span></div><div class="line">    oraclepath=/db</div><div class="line"><span class="keyword">fi</span></div><div class="line"><span class="keyword">if</span> [ ! -x <span class="string">"<span class="variable">$oraclepath</span>"</span> ];<span class="keyword">then</span></div><div class="line">    mkdir -p <span class="string">"<span class="variable">$oraclepath</span>"</span></div><div class="line">    chown oracle.oinstall <span class="variable">$oraclepath</span></div><div class="line">    <span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;36 <span class="variable">$oraclepath</span> created. \e[0m"</span></div><div class="line"><span class="keyword">fi</span></div><div class="line"></div><div class="line"><span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;33m  please input oracle_sid, just for env (default TSDB) \e[0m"</span></div><div class="line"><span class="built_in">read</span> orasid</div><div class="line"><span class="keyword">if</span> [ -z orasid ];<span class="keyword">then</span></div><div class="line">    orasid=TSDB</div><div class="line"><span class="keyword">fi</span></div><div class="line">setbash_profile <span class="variable">$oraclepath</span> <span class="variable">$orasid</span></div><div class="line">mkdir -p <span class="variable">$oraclepath</span>/oracle/product/11.2.0/db_1 &amp;&amp; chown -R oracle:oinstall <span class="variable">$oraclepath</span> &amp;&amp; chmod -R 755 <span class="variable">$oraclepath</span></div><div class="line"><span class="built_in">unset</span> i</div><div class="line"></div><div class="line"><span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;33m please input where to display the X Window (default 127.0.0.1:0.0) \e[0m"</span> </div><div class="line"><span class="built_in">read</span> xdpy</div><div class="line"><span class="keyword">if</span> [ -z <span class="variable">$xdpy</span> ];<span class="keyword">then</span></div><div class="line">    xdpy=127.0.0.1:0.0</div><div class="line"><span class="keyword">fi</span></div><div class="line">su - oracle -c <span class="built_in">export</span> DISPLAY=<span class="variable">$xdpy</span> &amp;&amp; host +</div><div class="line"></div><div class="line"><span class="built_in">echo</span> <span class="_">-e</span> <span class="string">"\n\e[1;35m Oracle install pre-setting finish! &amp;&amp; please run oracle installer as user oracle \e[0m"</span></div></pre></td></tr></table></figure>
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/centos/" rel="tag">#centos</a>
+          
+            <a href="/tags/shell/" rel="tag">#shell</a>
+          
+            <a href="/tags/oracle/" rel="tag">#oracle</a>
+          
+            <a href="/tags/installation/" rel="tag">#installation</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2014/11/30/thoughts_about_graduate_from_course/" rel="next" title="关于研究生的一点担忧">
+                <i class="fa fa-chevron-left"></i> 关于研究生的一点担忧
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2014/12/05/mysql_incremental_backup_example/" rel="prev" title="MySQL增量备份与恢复实例">
+                MySQL增量备份与恢复实例 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2014/12/02/oracle11gr2_installation_precheck_scripts/"
+           data-title="Oracle单实例安装环境一键配置脚本（CentOS6 + 11gR2 ）" data-url="http://seanlook.com/2014/12/02/oracle11gr2_installation_precheck_scripts/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <p class="post-toc-empty">This post does not have a Table of Contents</p>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,875 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="backup,linux命令,tar," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="Linux上有功能强大的tar命令，tar最初是为了制作磁带备份（tape archive）而设计的，它的作用是把文件和目录备份到磁带中，然后从磁带中提取或恢复文件。现在我们可以使用tar来备份数据到任何存储介质上。它是文件级备份，不必考虑底层文件系统类别，并且支持增量备份。
+1. 部分常用选项
+-z, --gzip：使用gzip工具（解）压缩，后缀一般为.gz
+-c, --create：tar打">
+<meta property="og:type" content="article">
+<meta property="og:title" content="tar命令高级用法——备份数据">
+<meta property="og:url" content="http://seanlook.com/2014/12/08/tar_backup_filesystem/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="Linux上有功能强大的tar命令，tar最初是为了制作磁带备份（tape archive）而设计的，它的作用是把文件和目录备份到磁带中，然后从磁带中提取或恢复文件。现在我们可以使用tar来备份数据到任何存储介质上。它是文件级备份，不必考虑底层文件系统类别，并且支持增量备份。
+1. 部分常用选项
+-z, --gzip：使用gzip工具（解）压缩，后缀一般为.gz
+-c, --create：tar打">
+<meta property="og:updated_time" content="2014-12-08T16:46:23.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="tar命令高级用法——备份数据">
+<meta name="twitter:description" content="Linux上有功能强大的tar命令，tar最初是为了制作磁带备份（tape archive）而设计的，它的作用是把文件和目录备份到磁带中，然后从磁带中提取或恢复文件。现在我们可以使用tar来备份数据到任何存储介质上。它是文件级备份，不必考虑底层文件系统类别，并且支持增量备份。
+1. 部分常用选项
+-z, --gzip：使用gzip工具（解）压缩，后缀一般为.gz
+-c, --create：tar打">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title> tar命令高级用法——备份数据 | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                tar命令高级用法——备份数据
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2014-12-08T01:21:25+08:00" content="2014-12-08">
+              2014-12-08
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2014/12/08/tar_backup_filesystem/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2014/12/08/tar_backup_filesystem/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>Linux上有功能强大的tar命令，tar最初是为了制作磁带备份（tape archive）而设计的，它的作用是把文件和目录备份到磁带中，然后从磁带中提取或恢复文件。现在我们可以使用tar来备份数据到任何存储介质上。它是文件级备份，不必考虑底层文件系统类别，并且支持增量备份。</p>
+<h2 id="1-部分常用选项"><a href="#1-部分常用选项" class="headerlink" title="1. 部分常用选项"></a>1. 部分常用选项</h2><ul>
+<li><code>-z, --gzip</code>：使用gzip工具（解）压缩，后缀一般为<code>.gz</code></li>
+<li><code>-c, --create</code>：tar打包，后缀一般为<code>.tar</code></li>
+<li><code>-f, --file=</code>：后面立刻接打包或压缩后得到的文件名</li>
+<li><code>-x, --extract</code>：解包命令，与<code>-c</code>对应</li>
+<li><code>-p</code>：保留备份数据的原本权限和属性</li>
+<li><code>-g</code>：后接增量备份的快照文件</li>
+<li><code>-C</code>：指定解压缩的目录</li>
+<li><code>--exclude</code>：排除不打包的目录或文件，支持正则匹配</li>
+</ul>
+<p>其他</p>
+<ul>
+<li><code>-X, --exclude-from</code>：在一个文件中列出要排除的目录或文件（在<code>--exclude=</code>较多时使用）</li>
+<li><code>-t, --list</code>：列出备份档案中的文件列表，不与<code>-c</code>、<code>-x</code>同时出现</li>
+<li><code>-j, --bzip2</code>：使用bzip2工具（解）压缩，后缀一般为<code>.bz2</code></li>
+<li><code>-P</code>：保留绝对路径，解压时同样会自动解压到绝对路径下</li>
+<li><code>-v</code>：（解）压缩过程显示文件处理过程，常用但不建议对大型文件使用</li>
+</ul>
+<h2 id="2-增量备份（网站）数据"><a href="#2-增量备份（网站）数据" class="headerlink" title="2. 增量备份（网站）数据"></a>2. 增量备份（网站）数据</h2><p>许多系统（应用或网站）每天都有静态文件产生，对于一些比较重要的静态文件如果有进行定期备份的需求，就可以通过tar打包压缩备份到指定的地方，特别是对一些总文件比较大比较多的情况，还可以利用-g选项来做增量备份。</p>
+<p>备份的目录最好使用相对路径，也就是进入到需要备份的根目录下</p>
+<p>具体示例方法如下。<br><figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">备份当前目录下的所有文件</div><div class="line"><span class="meta"># tar -g /tmp/snapshot_data.snap -zcpf /tmp/data01.tar.gz .</span></div><div class="line"></div><div class="line">在需要恢复的目录下解压恢复</div><div class="line"><span class="meta"># tar -zxpf /tmp/data01.tar.gz -C .</span></div></pre></td></tr></table></figure></p>
+<p><code>-g</code>选项可以理解备份时给目录文件做一个快照，记录权限和属性等信息，第一次备份时<code>/tmp/snapshot_data.snap</code>不存在，会新建一个并做完全备份。当目录下的文件有修改后，再次执行第一条备份命令（记得修改后面的档案文件名），会自动根据<code>-g</code>指定的快照文件，增量备份修改过的文件，包括权限和属性，没有动过的文件不会重复备份。</p>
+<a id="more"></a>
+<p>另外需要注意上面的恢复，是“保留恢复”，即存在相同文件名的文件会被覆盖，而原目录下已存在（但备份档案里没有）的，会依然保留。所以如果你想完全恢复到与备份文件一模一样，需要清空原目录。如果有增量备份档案，则还需要使用同样的方式分别解压这些档案，而且要注意顺序。</p>
+<p>下面演示一个比较综合的例子，要求：</p>
+<ul>
+<li>备份<code>/tmp/data</code>目录，但<code>cache</code>目录以及临时文件排除在外</li>
+<li>由于目录比较大（&gt;4G），所以全备时分割备份的档案（如每个备份档案文件最大1G）</li>
+<li>保留所有文件的权限和属性，如用户组和读写权限</li>
+</ul>
+<figure class="highlight gradle"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line"># cd <span class="regexp">/tmp/</span>data</div><div class="line"></div><div class="line">做一次完全备份</div><div class="line"># rm -f <span class="regexp">/tmp/</span>snapshot_data.snap</div><div class="line"># tar -g <span class="regexp">/tmp/</span>snapshot_data.snap -zcpf - --<span class="keyword">exclude</span>=.<span class="regexp">/cache ./</span> | split -b <span class="number">1024</span>M - <span class="regexp">/tmp/</span>bak_data$(date -I).tar.gz_</div><div class="line">分割后文件名后会依次加上aa,ab,ac,...，上面最终的备份归档会保存成</div><div class="line">bak_data2014-<span class="number">12</span>-<span class="number">07</span>.tar.gz_aa</div><div class="line">bak_data2014-<span class="number">12</span>-<span class="number">07</span>.tar.gz_ab</div><div class="line">bak_data2014-<span class="number">12</span>-<span class="number">07</span>.tar.gz_ac</div><div class="line">...</div><div class="line"></div><div class="line">增量备份</div><div class="line">可以是与完全备份一模一样的命令，但需要注意的是假如你一天备份多次，可能导致档案文件名重复，那么就会导致</div><div class="line">备份实现，因为split依然会从aa,ab开始命名，如果一天的文件产生（修改）量不是特别大，那么建议增量部分不</div><div class="line">分割处理了：（ 一定要分割的话，文件名加入更细致的时间如$(date +%Y-%m-%d_%H) ）</div><div class="line"># tar -g <span class="regexp">/tmp/</span>snapshot_data.snap -zcpf <span class="regexp">/tmp/</span>bak_data2014-<span class="number">12</span>-<span class="number">07</span>.tar.gz --<span class="keyword">exclude</span>=.<span class="regexp">/cache ./</span></div><div class="line"></div><div class="line">第二天增备</div><div class="line"># tar -g <span class="regexp">/tmp/</span>snapshot_data.snap -zcpf <span class="regexp">/tmp/</span>bak_data2014-<span class="number">12</span>-<span class="number">08</span>.tar.gz --<span class="keyword">exclude</span>=.<span class="regexp">/cache ./</span></div></pre></td></tr></table></figure>
+<p>恢复过程<br><figure class="highlight haskell"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line">恢复完全备份的档案文件</div><div class="line">可以选择是否先清空/tmp/<span class="class"><span class="keyword">data</span>/目录</span></div><div class="line"><span class="meta"># cat /tmp/bak_data2014-12-07.tar.gz_* | tar -zxpf - -C /tmp/data/</span></div><div class="line"></div><div class="line">恢复增量备份的档案文件</div><div class="line">$ tar –zxpf /tmp/bak_data2014<span class="number">-12</span><span class="number">-07.</span>tar.gz -<span class="type">C</span> /tmp/<span class="class"><span class="keyword">data</span>/</span></div><div class="line">$ tar –zxpf /tmp/bak_data2014<span class="number">-12</span><span class="number">-08.</span>tar.gz -<span class="type">C</span> /tmp/<span class="class"><span class="keyword">data</span>/</span></div><div class="line">...</div><div class="line">一定要保证是按时间顺序恢复的，像下面文件名规则也可以使用上面通配符的形式</div></pre></td></tr></table></figure></p>
+<p>如果需要定期备份，如每周一次全备，每天一次增量备份，则可以结合crontab实现。</p>
+<h2 id="3-备份文件系统"><a href="#3-备份文件系统" class="headerlink" title="3. 备份文件系统"></a>3. 备份文件系统</h2><p>备份文件系统方法有很多，例如cpio, rsync, dump, tar，这里演示一个通过<code>tar</code>备份整个Linux系统的例子，整个备份与恢复过程与上面类似。<br>首先Linux（这里是CentOS）有一部分目录是没必要备份的，如<code>/proc</code>、<code>/lost+found</code>、<code>/sys</code>、<code>/mnt</code>、<code>/media</code>、<code>/dev</code>、<code>/proc</code>、<code>/tmp</code>，如果是备份到磁带<code>/dev/st0</code>则不必关心那么多，因为我这里是备份到本地<code>/backup</code>目录，所以也需要排除，还有其它一些NFS或者网络存储挂载的目录。</p>
+<figure class="highlight armasm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line">创建排除列表文件</div><div class="line"># vi /<span class="keyword">backup/backup_tar_exclude.list</span></div><div class="line">/<span class="keyword">backup</span></div><div class="line">/<span class="meta">proc</span></div><div class="line">/lost+found</div><div class="line">/sys</div><div class="line">/mnt</div><div class="line">/media</div><div class="line">/dev</div><div class="line">/tmp</div><div class="line"></div><div class="line">$ tar -zcpf /<span class="keyword">backup/backup_full.tar.gz </span>-g /<span class="keyword">backup/tar_snapshot.snap </span>--exclude-from=/<span class="keyword">backup/tar_exclude.list </span>/</div></pre></td></tr></table></figure>
+<h2 id="4-注意"><a href="#4-注意" class="headerlink" title="4. 注意"></a>4. 注意</h2><p>使用tar无论是备份数据还是文件系统，需要考虑是在原系统上恢复还是另一个新的系统上恢复。</p>
+<ul>
+<li>tar备份极度依赖于文件的atime属性，</li>
+<li>文件所属用户是根据用户ID来确定的，异机恢复需要考虑相同用户拥有相同USERID</li>
+<li>备份和恢复的过程尽量不要运行其他进程，可能会导致数据不一致</li>
+<li>软硬连接文件可以正常恢复</li>
+</ul>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><ul>
+<li><a href="https://lesca.me/archives/how-to-incrementally-backup-linux-with-gnu-tar.html" target="_blank" rel="external">tar高级教程：增量备份、定时备份、网络备份</a></li>
+<li><a href="http://tech.watchstor.com/backup-and-archiving-115687.htm" target="_blank" rel="external">Linux服务器数据备份恢复的详细讲解</a></li>
+</ul>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/backup/" rel="tag">#backup</a>
+          
+            <a href="/tags/linux命令/" rel="tag">#linux命令</a>
+          
+            <a href="/tags/tar/" rel="tag">#tar</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2014/12/05/mysql_mysqldump_options_examples/" rel="next" title="MySQL备份命令mysqldump参数说明与示例">
+                <i class="fa fa-chevron-left"></i> MySQL备份命令mysqldump参数说明与示例
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2014/12/12/rsync_inotify_setup/" rel="prev" title="Linux下同步工具inotify+rsync使用详解">
+                Linux下同步工具inotify+rsync使用详解 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2014/12/08/tar_backup_filesystem/"
+           data-title="tar命令高级用法——备份数据" data-url="http://seanlook.com/2014/12/08/tar_backup_filesystem/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-部分常用选项"><span class="nav-text">1. 部分常用选项</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-增量备份（网站）数据"><span class="nav-text">2. 增量备份（网站）数据</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-备份文件系统"><span class="nav-text">3. 备份文件系统</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-注意"><span class="nav-text">4. 注意</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#参考"><span class="nav-text">参考</span></a></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

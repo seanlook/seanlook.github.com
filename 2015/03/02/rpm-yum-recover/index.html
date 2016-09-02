@@ -1,0 +1,839 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="linux,troubleshooting,软件包," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="问题在 CentOS 6.4 x86_64 上无论通过yum或rpm安装软件时，出现以下错误：12345yum install glibc-devel...error: rpmts_HdrFromFdno: Header V3 RSA/SHA1 Signature, key ID c105b9de: BAD...Problem opening package *.el6.x86_64.rpm
+分析">
+<meta property="og:type" content="article">
+<meta property="og:title" content="rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD">
+<meta property="og:url" content="http://seanlook.com/2015/03/02/rpm-yum-recover/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="问题在 CentOS 6.4 x86_64 上无论通过yum或rpm安装软件时，出现以下错误：12345yum install glibc-devel...error: rpmts_HdrFromFdno: Header V3 RSA/SHA1 Signature, key ID c105b9de: BAD...Problem opening package *.el6.x86_64.rpm
+分析">
+<meta property="og:updated_time" content="2015-03-01T16:46:23.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD">
+<meta name="twitter:description" content="问题在 CentOS 6.4 x86_64 上无论通过yum或rpm安装软件时，出现以下错误：12345yum install glibc-devel...error: rpmts_HdrFromFdno: Header V3 RSA/SHA1 Signature, key ID c105b9de: BAD...Problem opening package *.el6.x86_64.rpm
+分析">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title> rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2015-03-02T01:21:25+08:00" content="2015-03-02">
+              2015-03-02
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/03/02/rpm-yum-recover/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/03/02/rpm-yum-recover/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h1 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h1><p>在 CentOS 6.4 x86_64 上无论通过yum或rpm安装软件时，出现以下错误：<br><figure class="highlight subunit"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">yum install glibc-devel</div><div class="line">...</div><div class="line"><span class="keyword">error: </span>rpmts_HdrFromFdno: Header V3 RSA/SHA1 Signature, key ID c105b9de: BAD</div><div class="line">...</div><div class="line">Problem opening package *.el6.x86_64.rpm</div></pre></td></tr></table></figure></p>
+<h2 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h2><p><code>rpm -ivh</code>单独去安装软件也提示上面的错误。<code>rpm -qa</code> 无法列出系统中安装过的软件包，但许多库文件和软件命令是存在的。也尝试过<code>rpm --rebuilddb</code>来重建数据库，但情况依然没有得到改善（centos官网说千万不要在系统broken的情况下rebuilddb，不然有可能变成destroy）</p>
+<p>由上面的推断可知问题出现在rpm这个软件包管理工具本身，但此时又无法通过rpm来重新安装自己，所以只能找到具体是什么因素导致的。好在官网的这篇较新的文章正好就是解决该BUG：<a href="https://www.centos.org/forums/viewtopic.php?p=214791&amp;f=13#p214791" target="_blank" rel="external">WARNING: nss-softokn-3.14.3-19.el6_6 updates may be broken</a> ：</p>
+<p>大致是说当你使用<code>yum update</code>去更新你的系统时，<code>nss-softokn</code>、<code>nss-softokn-freebl</code>和其它软件一起都得到更新，所以不会有问题。但如果单独去更新某一个软件，如<code>yum update nss-softokn</code>或<code>yum install &lt;software&gt;</code>引起它的依赖包也升级，使得<code>nss-softokn</code>和<code>nss-softokn-freebl</code>版本不匹配，就会导致 rpm/yum 全面停止工作，表现就是上面的<code>key .. BAD</code>。</p>
+<h2 id="解决"><a href="#解决" class="headerlink" title="解决"></a>解决</h2><p>解决起来也很方便，首先你可以通过<code>cat /var/log/messages|grep nss</code>看到<code>nss-softokn-freebl</code>的版本：<br><figure class="highlight less"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"># <span class="selector-tag">cat</span> /<span class="selector-tag">var</span>/<span class="selector-tag">log</span>/<span class="selector-tag">messages</span>|<span class="selector-tag">grep</span> <span class="selector-tag">nss-softokn</span></div><div class="line"><span class="selector-tag">Mar</span>  <span class="selector-tag">2</span> <span class="selector-tag">09</span><span class="selector-pseudo">:56</span><span class="selector-pseudo">:18</span> <span class="selector-tag">poprod</span> <span class="selector-tag">yum</span><span class="selector-attr">[14920]</span>: <span class="selector-tag">Updated</span>: <span class="selector-tag">nss-softokn-3</span><span class="selector-class">.14</span><span class="selector-class">.3-19</span><span class="selector-class">.el6_6</span><span class="selector-class">.x86_64</span></div><div class="line"><span class="selector-tag">Mar</span>  <span class="selector-tag">2</span> <span class="selector-tag">14</span><span class="selector-pseudo">:43</span><span class="selector-pseudo">:29</span> <span class="selector-tag">poprod</span> <span class="selector-tag">yum</span><span class="selector-attr">[33040]</span>: <span class="selector-tag">Installed</span>: <span class="selector-tag">nss-softokn-freebl-3</span><span class="selector-class">.14</span><span class="selector-class">.3-19</span><span class="selector-class">.el6_6</span><span class="selector-class">.x86_64</span></div><div class="line"><span class="selector-tag">Mar</span>  <span class="selector-tag">2</span> <span class="selector-tag">14</span><span class="selector-pseudo">:44</span><span class="selector-pseudo">:14</span> <span class="selector-tag">poprod</span> <span class="selector-tag">yum</span><span class="selector-attr">[33047]</span>: <span class="selector-tag">Installed</span>: <span class="selector-tag">nss-softokn-freebl-3</span><span class="selector-class">.14</span><span class="selector-class">.3-19</span><span class="selector-class">.el6_6</span><span class="selector-class">.x86_64</span></div><div class="line">...</div></pre></td></tr></table></figure></p>
+<a id="more"></a>
+<p>下载 <code>nss-softokn-freebl-3.14.3-19.el6_6.x86_64.rpm</code>：<br><figure class="highlight awk"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">wget ftp:<span class="regexp">//</span><span class="number">195.220</span>.<span class="number">108.108</span><span class="regexp">/linux/</span>centos<span class="regexp">/6.6/u</span>pdates<span class="regexp">/x86_64/</span>Packages<span class="regexp">/nss-softokn-freebl-3.14.3-19.el6_6.x86_64.rpm</span></div></pre></td></tr></table></figure></p>
+<p>解压rpm：<br><figure class="highlight lsl"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">rpm2cpio nss-softokn-freebl<span class="number">-3.14</span><span class="number">.3</span><span class="number">-19.</span>el6_6.x86_64.rpm | cpio -idmv</div></pre></td></tr></table></figure></p>
+<p>复制 libfreeblpriv3.* 覆盖旧的库文件：<br><figure class="highlight awk"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">cp .<span class="regexp">/lib64/</span>libfreeblpriv3.* <span class="regexp">/lib64/</span></div><div class="line">cp .<span class="regexp">/lib64/</span>libfreebl3* <span class="regexp">/lib64/</span></div></pre></td></tr></table></figure></p>
+<p>试一下 <code>yum install gcc</code> 看能否正常工作，如果不行，继续下一步：<br><figure class="highlight stylus"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">wget http:<span class="comment">//mirror.centos.org/centos/6/os/x86_64/Packages/yum-3.2.29-60.el6.centos.noarch.rpm</span></div><div class="line">rpm -ivh --nodeps yum-<span class="number">3.2</span>.<span class="number">29</span>-<span class="number">60</span><span class="selector-class">.el6</span><span class="selector-class">.centos</span><span class="selector-class">.noarch</span><span class="selector-class">.rpm</span></div></pre></td></tr></table></figure></p>
+<p>应该就好了：<br><figure class="highlight cmake"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">rpm -qa</div><div class="line">yum <span class="keyword">install</span> glibc-devel</div></pre></td></tr></table></figure></p>
+<p><strong>参考</strong></p>
+<ul>
+<li><a href="http://unix.stackexchange.com/questions/179344/big-trouble-rpm-empty-db-install-v3-rsa-sha1-signature-key-bad-yumrepo-erro" target="_blank" rel="external">http://unix.stackexchange.com/questions/179344/big-trouble-rpm-empty-db-install-v3-rsa-sha1-signature-key-bad-yumrepo-erro</a></li>
+<li><a href="https://www.centos.org/forums/viewtopic.php?p=214791&amp;f=13#p215140" target="_blank" rel="external">https://www.centos.org/forums/viewtopic.php?p=214791&amp;f=13#p215140</a></li>
+<li><a href="http://blog.chinaunix.net/uid-26085226-id-4545167.html" target="_blank" rel="external">http://blog.chinaunix.net/uid-26085226-id-4545167.html</a></li>
+</ul>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/linux/" rel="tag">#linux</a>
+          
+            <a href="/tags/troubleshooting/" rel="tag">#troubleshooting</a>
+          
+            <a href="/tags/软件包/" rel="tag">#软件包</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2015/02/28/baidu-complain/" rel="next" title="我为何厌恶百度的产品">
+                <i class="fa fa-chevron-left"></i> 我为何厌恶百度的产品
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2015/03/10/install-pdo-oci-oci8-phpext/" rel="prev" title="php5.3连接oracle的客户端及pdo_oci模块安装">
+                php5.3连接oracle的客户端及pdo_oci模块安装 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2015/03/02/rpm-yum-recover/"
+           data-title="rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD" data-url="http://seanlook.com/2015/03/02/rpm-yum-recover/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#问题"><span class="nav-text">问题</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#分析"><span class="nav-text">分析</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#解决"><span class="nav-text">解决</span></a></li></ol></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

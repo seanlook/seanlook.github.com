@@ -1,0 +1,1009 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="安全,ssh," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="Linux是一个开放式系统，可以在网络上找到许多现成的程序和工具，这既方便了用户，也方便了黑客，因为他们也能很容易地找到程序和工具来潜入Linux系统，或者盗取Linux系统上的重要信息。不过，只要我们仔细地设定Linux的各种系统功能，并且加上必要的安全措施，就能让黑客们无机可乘。一般来说，对Linux系统的安全设定包括取消不必要的服务、限制远程存取、隐藏重要资料、修补安全漏洞、采用安全工具以及">
+<meta property="og:type" content="article">
+<meta property="og:title" content="CentOS 6 服务器安全配置指南（通用）">
+<meta property="og:url" content="http://seanlook.com/2014/09/07/linux-security-general-settings/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="Linux是一个开放式系统，可以在网络上找到许多现成的程序和工具，这既方便了用户，也方便了黑客，因为他们也能很容易地找到程序和工具来潜入Linux系统，或者盗取Linux系统上的重要信息。不过，只要我们仔细地设定Linux的各种系统功能，并且加上必要的安全措施，就能让黑客们无机可乘。一般来说，对Linux系统的安全设定包括取消不必要的服务、限制远程存取、隐藏重要资料、修补安全漏洞、采用安全工具以及">
+<meta property="og:updated_time" content="2016-08-02T09:50:59.872Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="CentOS 6 服务器安全配置指南（通用）">
+<meta name="twitter:description" content="Linux是一个开放式系统，可以在网络上找到许多现成的程序和工具，这既方便了用户，也方便了黑客，因为他们也能很容易地找到程序和工具来潜入Linux系统，或者盗取Linux系统上的重要信息。不过，只要我们仔细地设定Linux的各种系统功能，并且加上必要的安全措施，就能让黑客们无机可乘。一般来说，对Linux系统的安全设定包括取消不必要的服务、限制远程存取、隐藏重要资料、修补安全漏洞、采用安全工具以及">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title> CentOS 6 服务器安全配置指南（通用） | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                CentOS 6 服务器安全配置指南（通用）
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2014-09-07T01:21:25+08:00" content="2014-09-07">
+              2014-09-07
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2014/09/07/linux-security-general-settings/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2014/09/07/linux-security-general-settings/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>Linux是一个开放式系统，可以在网络上找到许多现成的程序和工具，这既方便了用户，也方便了黑客，因为他们也能很容易地找到程序和工具来潜入Linux系统，或者盗取Linux系统上的重要信息。不过，只要我们仔细地设定Linux的各种系统功能，并且加上必要的安全措施，就能让黑客们无机可乘。一般来说，对Linux系统的安全设定包括取消不必要的服务、限制远程存取、隐藏重要资料、修补安全漏洞、采用安全工具以及经常性的安全检查等。</p>
+<p>本文是可参考的实际操作，不涉及如IP欺骗这样的原理，而且安全问题也不算几行命令就能预防的，这里只是linux系统上基本的安全加固方法，后续有新的内容再添加进来。</p>
+<p>注：所有文件在修改之前都要进行备份如 <code>cp /etc/passwd{,.dist}</code></p>
+<h2 id="1-禁用不使用的用户"><a href="#1-禁用不使用的用户" class="headerlink" title="1. 禁用不使用的用户"></a>1. 禁用不使用的用户</h2><p>注意：不建议直接删除，当你需要某个用户时，自己重新添加会很麻烦。也可以<code>usermod -L</code>或<code>passwd -l user</code>锁定。</p>
+<p><code>cp /etc/passwd{,.bak}</code>  修改之前先备份<br><code>vi /etc/passwd</code> 编辑用户，在前面加上#注释掉此行</p>
+<a id="more"></a>
+<p>注释的用户名：</p>
+<pre><code># cat /etc/passwd|grep ^#
+#adm:x:3:4:adm:/var/adm:/sbin/nologin
+#lp:x:4:7:lp:/var/spool/lpd:/sbin/nologin
+#shutdown:x:6:0:shutdown:/sbin:/sbin/shutdown
+#halt:x:7:0:halt:/sbin:/sbin/halt
+#uucp:x:10:14:uucp:/var/spool/uucp:/sbin/nologin
+#operator:x:11:0:operator:/root:/sbin/nologin
+#games:x:12:100:games:/usr/games:/sbin/nologin
+#gopher:x:13:30:gopher:/var/gopher:/sbin/nologin
+#ftp:x:14:50:FTP User:/var/ftp:/sbin/nologin
+#nfsnobody:x:65534:65534:Anonymous NFS User:/var/lib/nfs:/sbin/nologin
+#postfix:x:89:89::/var/spool/postfix:/sbin/nologin
+</code></pre><p>注释的组：</p>
+<pre><code># cat /etc/group|grep ^#
+#adm:x:4:adm,daemon
+#lp:x:7:daemon
+#uucp:x:14:
+#games:x:20:
+#gopher:x:30:
+#video:x:39:
+#dip:x:40:
+#ftp:x:50:
+#audio:x:63:
+#floppy:x:19:
+#postfix:x:89:
+</code></pre><h2 id="2-关闭不使用的服务"><a href="#2-关闭不使用的服务" class="headerlink" title="2. 关闭不使用的服务"></a>2. 关闭不使用的服务</h2><pre><code># chkconfig --list |grep &apos;3:on&apos;
+</code></pre><p>邮件服务，使用公司邮件服务器：</p>
+<pre><code>service postfix stop
+chkconfig postfix --level 2345 off
+</code></pre><p>通用unix打印服务，对服务器无用：</p>
+<pre><code>service cups stop
+chkconfig cups --level 2345 off
+</code></pre><p>调节cpu速度用来省电，常用在Laptop上：</p>
+<pre><code>service cpuspeed stop
+chkconfig cpuspeed --level 2345 off
+</code></pre><p>蓝牙无线通讯，对服务器无用：</p>
+<pre><code>service bluetooth stop
+chkconfig bluetooth --level 2345 off
+</code></pre><p>系统安装后初始设定，第一次启动系统后就没用了：</p>
+<pre><code>service firstboot stop
+chkconfig firstboot --level 2345 off
+</code></pre><p>关闭nfs服务及客户端：</p>
+<pre><code>service netfs stop
+chkconfig netfs --level 2345 off
+service nfslock stop
+chkconfig nfslock --level 2345 off
+</code></pre><p>如果要恢复某一个服务，可以执行下面操作：<br><code>service acpid start &amp;&amp; chkconfig acpid on</code><br>也可以使用<code>setup</code>工具来设置</p>
+<h2 id="3-禁用IPV6"><a href="#3-禁用IPV6" class="headerlink" title="3. 禁用IPV6"></a>3. 禁用IPV6</h2><p>IPv6是为了解决IPv4地址耗尽的问题，但我们的服务器一般用不到它，反而禁用IPv6不仅仅会加快网络，还会有助于减少管理开销和提高安全级别。以下几步在CentOS上完全禁用ipv6。</p>
+<p>禁止加载IPv6模块：<br>让系统不加载ipv6相关模块，这需要修改modprobe相关设定文件，为了管理方便，我们新建设定文件<code>/etc/modprobe.d/ipv6off.conf</code>，内容如下</p>
+<pre><code>alias net-pf-10 off
+options ipv6 disable=1
+</code></pre><p>禁用基于IPv6网络，使之不会被触发启动：</p>
+<pre><code># vi /etc/sysconfig/network
+NETWORKING_IPV6=no
+</code></pre><p>禁用网卡IPv6设置，使之仅在IPv4模式下运行：</p>
+<pre><code># vi /etc/sysconfig/network-scripts/ifcfg-eth0
+IPV6INIT=no
+IPV6_AUTOCONF=no
+</code></pre><p>关闭ip6tables：</p>
+<pre><code># chkconfig ip6tables off
+</code></pre><p>重启系统，验证是否生效：</p>
+<pre><code># lsmod | grep ipv6
+# ifconfig | grep -i inet6
+</code></pre><p>如果没有任何输出就说明IPv6模块已被禁用，否则被启用。</p>
+<h2 id="4-iptables规则"><a href="#4-iptables规则" class="headerlink" title="4. iptables规则"></a>4. iptables规则</h2><p>启用linux防火墙来禁止非法程序访问。使用iptable的规则来过滤入站、出站和转发的包。我们可以针对来源和目的地址进行特定udp/tcp端口的准许和拒绝访问。</p>
+<p>关于防火墙的设置规则请参考博客文章 <a href="http://seanlook.com/2014/02/26/iptables-example/">iptables设置实例</a>。</p>
+<h2 id="5-SSH安全"><a href="#5-SSH安全" class="headerlink" title="5. SSH安全"></a>5. SSH安全</h2><p>如果有可能，第一件事就是修改ssh的默认端口22，改成如20002这样的较大端口会大幅提高安全系数，降低ssh破解登录的可能性。</p>
+<p>创建具备辨识度的应用用户如crm以及系统管理用户sysmgr</p>
+<pre><code># useradd crm -d /apps/crm
+# passwd crm
+
+# useradd sysmgr
+# passwd sysmgr
+</code></pre><h3 id="5-1-只允许wheel用户组的用户su切换"><a href="#5-1-只允许wheel用户组的用户su切换" class="headerlink" title="5.1 只允许wheel用户组的用户su切换"></a>5.1 只允许wheel用户组的用户su切换</h3><pre><code># usermod -G wheel sysmgr
+
+# vi /etc/pam.d/su
+# Uncomment the following line to require a user to be in the &quot;wheel&quot; group.
+auth            required        pam_wheel.so use_uid
+</code></pre><p>其他用户切换root，即使输对密码也会提示 su: incorrect password</p>
+<h3 id="5-2-登录超时"><a href="#5-2-登录超时" class="headerlink" title="5.2 登录超时"></a>5.2 登录超时</h3><p>用户在线5分钟无操作则超时断开连接，在<code>/etc/profile</code>中添加：</p>
+<pre><code>export TMOUT=300
+readonly TMOUT
+</code></pre><h3 id="5-3-禁止root直接远程登录"><a href="#5-3-禁止root直接远程登录" class="headerlink" title="5.3 禁止root直接远程登录"></a>5.3 禁止root直接远程登录</h3><pre><code># vi /etc/ssh/sshd_config
+PermitRootLogin no
+</code></pre><h3 id="5-4-限制登录失败次数并锁定"><a href="#5-4-限制登录失败次数并锁定" class="headerlink" title="5.4 限制登录失败次数并锁定"></a>5.4 限制登录失败次数并锁定</h3><p>在<code>/etc/pam.d/login</code>后添加</p>
+<pre><code>auth required pam_tally2.so deny=6 unlock_time=180 even_deny_root root_unlock_time=180
+</code></pre><p>登录失败5次锁定180秒，根据需要设置是否包括root。</p>
+<h3 id="5-5-登录IP限制"><a href="#5-5-登录IP限制" class="headerlink" title="5.5 登录IP限制"></a>5.5 登录IP限制</h3><p>（由于要与某一固定IP或IP段绑定，暂未设置）<br>更严格的限制是在sshd_config中定死允许ssh的用户和来源ip：</p>
+<pre><code>## allowed ssh users sysmgr
+AllowUsers sysmgr@172.29.73.*
+</code></pre><p>或者使用tcpwrapper:</p>
+<pre><code>vi /etc/hosts.deny
+sshd:all
+vi /etc/hosts.allow
+sshd:172.29.73.23
+sshd:172.29.73.
+</code></pre><h2 id="6-配置只能使用密钥文件登录"><a href="#6-配置只能使用密钥文件登录" class="headerlink" title="6. 配置只能使用密钥文件登录"></a>6. 配置只能使用密钥文件登录</h2><p>使用密钥文件代替普通的简单密码认证也会极大的提高安全性：</p>
+<pre><code>[dir@username ~]$ ssh-keygen -t rsa -b 2048
+Generating public/private rsa key pair.
+Enter file in which to save the key (/root/.ssh/id_rsa):   //默认路径，回车
+Enter passphrase (empty for no passphrase):     //输入你的密钥短语，登录时使用
+Enter same passphrase again: 
+Your identification has been saved in /root/.ssh/id_rsa.
+Your public key has been saved in /root/.ssh/id_rsa.pub.
+The key fingerprint is:
+3e:fd:fc:e5:d3:22:86:8e:2c:4b:a7:3d:92:18:9f:64 root@ibpak.tp-link.net
+The key&apos;s randomart image is:
++--[ RSA 2048]----+
+|                 |
+…
+|      o++o..oo..o|
++-----------------+
+</code></pre><p>将公钥重命名为<code>authorized_key</code>：</p>
+<pre><code>$ mv ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys
+$ chmod 600 ~/.ssh/authorized_keys
+</code></pre><p>下载私钥文件 id_rsa 到本地（为了更加容易识别，可重命名为<code>hostname_username_id_rsa</code>），保存到安全的地方。以后 username 用户登录这台主机就必须使用这个私钥，配合密码短语来登录（不再使用 username 用户自身的密码）</p>
+<p>另外还要修改<code>/etc/ssh/sshd_config</code>文件<br>打开注释</p>
+<pre><code>RSAAuthentication yes
+PubkeyAuthentication yes
+AuthorizedKeysFile      .ssh/authorized_keys
+</code></pre><p>我们要求 username 用户（可以切换到其他用户，特别是root）必须使用ssh密钥文件登录，而其他普通用户可以直接密码登录。因此还需在sshd_config文件最后加入：</p>
+<pre><code>Match User itsection
+        PasswordAuthentication no
+</code></pre><p>重启sshd服务</p>
+<pre><code># service sshd restart
+</code></pre><p>另外提醒一句，这对公钥和私钥一定要单独保存在另外的机器上，服务器上丢失公钥或连接端丢失私钥（或密钥短语），可能导致再也无法登陆服务器获得root权限！</p>
+<h2 id="7-减少history命令记录"><a href="#7-减少history命令记录" class="headerlink" title="7. 减少history命令记录"></a>7. 减少history命令记录</h2><p>执行过的历史命令记录越多，从一定程度上讲会给维护带来简便，但同样会伴随安全问题</p>
+<pre><code>vi /etc/profile
+</code></pre><p>找到 <code>HISTSIZE=1000</code> 改为 <code>HISTSIZE=50</code>。</p>
+<p>或每次退出时清理history，<code>history -c</code>  </p>
+<h2 id="8-增强特殊文件权限"><a href="#8-增强特殊文件权限" class="headerlink" title="8. 增强特殊文件权限"></a>8. 增强特殊文件权限</h2><p>给下面的文件加上不可更改属性，从而防止非授权用户获得权限</p>
+<pre><code>chattr +i /etc/passwd
+chattr +i /etc/shadow
+chattr +i /etc/group
+chattr +i /etc/gshadow
+chattr +i /etc/services #给系统服务端口列表文件加锁，防止未经许可的删除或添加服务
+chattr +i /etc/pam.d/su
+chattr +i /etc/ssh/sshd_config
+</code></pre><p>显示文件的属性</p>
+<pre><code>lsattr /etc/passwd /etc/shadow /etc/services /etc/ssh/sshd_config
+</code></pre><p>注意：执行以上 chattr 权限修改之后，就无法添加删除用户了。</p>
+<p>如果再要添加删除用户，需要先取消上面的设置，等用户添加删除完成之后，再执行上面的操作，例如取消只读权限<code>chattr -i /etc/passwd</code>。（记得重新设置只读）</p>
+<h2 id="9-防止一般网络攻击"><a href="#9-防止一般网络攻击" class="headerlink" title="9. 防止一般网络攻击"></a>9. 防止一般网络攻击</h2><p>网络攻击不是几行设置就能避免的，以下都只是些简单的将可能性降到最低，增大攻击的难度但并不能完全阻止。</p>
+<h3 id="9-1-禁ping"><a href="#9-1-禁ping" class="headerlink" title="9.1 禁ping"></a>9.1 禁ping</h3><p>阻止ping如果没人能ping通您的系统，安全性自然增加了，可以有效的防止ping洪水。为此，可以在<code>/etc/rc.d/rc.local</code>文件中增加如下一行：</p>
+<pre><code># echo 1 &gt; /proc/sys/net/ipv4/icmp_echo_ignore_all
+</code></pre><p>或使用iptable禁ping：</p>
+<pre><code>iptables -A INPUT -p icmp --icmp-type 0 -s 0/0 -j DROP
+
+不允许ping其他主机：
+iptables -A OUTPUT -p icmp --icmp-type 8 -j DROP
+</code></pre><h3 id="9-2-防止IP欺骗"><a href="#9-2-防止IP欺骗" class="headerlink" title="9.2. 防止IP欺骗"></a>9.2. 防止IP欺骗</h3><p>编辑/etc/host.conf文件并增加如下几行来防止IP欺骗攻击。</p>
+<pre><code>order hosts,bind    #名称解释顺序
+multi on           #允许主机拥有多个IP地址
+nospoof on         #禁止IP地址欺骗
+</code></pre><h3 id="9-3-防止DoS攻击"><a href="#9-3-防止DoS攻击" class="headerlink" title="9.3 防止DoS攻击"></a>9.3 防止DoS攻击</h3><p>对系统所有的用户设置资源限制可以防止DoS类型攻击，如最大进程数和内存使用数量等。<br>可以在<code>/etc/security/limits.conf</code>中添加如下几行：</p>
+<pre><code>*    soft    core    0
+*    soft    nproc   2048
+*    hard    nproc   16384
+*    soft    nofile 1024
+*    hard    nofile  65536
+</code></pre><p>core 0 表示禁止创建core文件；nproc 128 把最多的进程数限制到20；nofile 64 表示把一个用户同时打开的最大文件数限制为64；* 表示登录到系统的所有用户，不包括root</p>
+<p>然后必须编辑<code>/etc/pam.d/login</code>文件检查下面一行是否存在。</p>
+<pre><code>session    required     pam_limits.so
+</code></pre><p><code>limits.conf</code>参数的值需要根据具体情况调整。</p>
+<h2 id="10-修复已知安全漏洞"><a href="#10-修复已知安全漏洞" class="headerlink" title="10. 修复已知安全漏洞"></a>10. 修复已知安全漏洞</h2><p>在linux上偶尔会爆出毁灭级的漏洞，如<a href="http://www.ha97.com/1002.html" target="_blank" rel="external">udev</a>、<a href="https://access.redhat.com/solutions/781793" target="_blank" rel="external">heartbleed</a>、<a href="http://linux.cn/article-3902-1.html" target="_blank" rel="external">shellshock</a>、<a href="http://www.36kr.com/p/219344.html" target="_blank" rel="external">ghost</a>等，如果服务器暴露在外网，一定及时修复。</p>
+<h2 id="11-定期做日志安全检查"><a href="#11-定期做日志安全检查" class="headerlink" title="11. 定期做日志安全检查"></a>11. 定期做日志安全检查</h2><p>将日志移动到专用的日志服务器里，这可避免入侵者轻易的改动本地日志。下面是常见linux的默认日志文件及其用处：</p>
+<ul>
+<li><code>/var/log/message</code> – 记录系统日志或当前活动日志。</li>
+<li><code>/var/log/auth.log</code> – 身份认证日志。</li>
+<li><code>/var/log/cron</code>   – Crond 日志 (cron 任务).</li>
+<li><code>/var/log/maillog</code> – 邮件服务器日志。</li>
+<li><code>/var/log/secure</code> – 认证日志。</li>
+<li><code>/var/log/wtmp</code>    历史登录、注销、启动、停机日志和，lastb命令可以查看登录失败的用户</li>
+<li><code>/var/run/utmp</code>    当前登录的用户信息日志，w、who命令的信息便来源与此</li>
+<li><code>/var/log/yum.log</code> Yum 日志。</li>
+</ul>
+<p>参考 <a href="http://linux.it.net.cn/CentOS/safe/2014/0429/985.html" target="_blank" rel="external">深度解析CentOS通过日志反查入侵</a>。</p>
+<h3 id="11-1-安装logwatch"><a href="#11-1-安装logwatch" class="headerlink" title="11.1 安装logwatch"></a>11.1 安装logwatch</h3><p>Logwatch是使用 Perl 开发的一个日志分析工具。能够对Linux 的日志文件进行分析，并自动发送mail给相关处理人员，可定制需求。</p>
+<p>Logwatch的mail功能是借助宿主系统自带的 mail server 发邮件的，所以系统需安装mail server , 如sendmail,postfix,Qmail等</p>
+<p>安装和配置方法见博文 <a href="http://seanlook.com/2014/08/23/linux-logwatch-usage/">linux日志监控logwatch</a>。</p>
+<h2 id="12-web服务器安全"><a href="#12-web服务器安全" class="headerlink" title="12. web服务器安全"></a>12. web服务器安全</h2><p>像apache或tomcat这样的服务端程序在配置时，如果有安全问题存在可以查阅文档进行安全加固。日后有时间再补充到新的文章。</p>
+<p><strong>参考</strong></p>
+<ul>
+<li><a href="http://www.cyberciti.biz/tips/linux-unix-bsd-openssh-server-best-practices.html" target="_blank" rel="external">Top 20 OpenSSH Server Best Security Practices</a></li>
+</ul>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/安全/" rel="tag">#安全</a>
+          
+            <a href="/tags/ssh/" rel="tag">#ssh</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2014/08/23/linux-logwatch-usage/" rel="next" title="在Linux上使用logwatch分析监控日志文件">
+                <i class="fa fa-chevron-left"></i> 在Linux上使用logwatch分析监控日志文件
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2014/10/06/linux-level2/" rel="prev" title="Linux进阶培训-tplink">
+                Linux进阶培训-tplink <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2014/09/07/linux-security-general-settings/"
+           data-title="CentOS 6 服务器安全配置指南（通用）" data-url="http://seanlook.com/2014/09/07/linux-security-general-settings/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-禁用不使用的用户"><span class="nav-text">1. 禁用不使用的用户</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-关闭不使用的服务"><span class="nav-text">2. 关闭不使用的服务</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-禁用IPV6"><span class="nav-text">3. 禁用IPV6</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-iptables规则"><span class="nav-text">4. iptables规则</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-SSH安全"><span class="nav-text">5. SSH安全</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-只允许wheel用户组的用户su切换"><span class="nav-text">5.1 只允许wheel用户组的用户su切换</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-登录超时"><span class="nav-text">5.2 登录超时</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-3-禁止root直接远程登录"><span class="nav-text">5.3 禁止root直接远程登录</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-4-限制登录失败次数并锁定"><span class="nav-text">5.4 限制登录失败次数并锁定</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-5-登录IP限制"><span class="nav-text">5.5 登录IP限制</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-配置只能使用密钥文件登录"><span class="nav-text">6. 配置只能使用密钥文件登录</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-减少history命令记录"><span class="nav-text">7. 减少history命令记录</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-增强特殊文件权限"><span class="nav-text">8. 增强特殊文件权限</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#9-防止一般网络攻击"><span class="nav-text">9. 防止一般网络攻击</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#9-1-禁ping"><span class="nav-text">9.1 禁ping</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#9-2-防止IP欺骗"><span class="nav-text">9.2. 防止IP欺骗</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#9-3-防止DoS攻击"><span class="nav-text">9.3 防止DoS攻击</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#10-修复已知安全漏洞"><span class="nav-text">10. 修复已知安全漏洞</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#11-定期做日志安全检查"><span class="nav-text">11. 定期做日志安全检查</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#11-1-安装logwatch"><span class="nav-text">11.1 安装logwatch</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#12-web服务器安全"><span class="nav-text">12. web服务器安全</span></a></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

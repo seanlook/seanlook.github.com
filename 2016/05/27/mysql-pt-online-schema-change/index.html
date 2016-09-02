@@ -1,0 +1,919 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="mysql,Percona-toolkit," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="如果正在看这篇文章，相信你已经知道自己的需求了。
+在 mysql 5.5 版本以前，修改表结构如添加索引、修改列，需要锁表，期间不能写入，对于大表这简直是灾难。从5.5特别是5.6里，情况有了好转，支持Online DDL，相关介绍见 这篇文章，而我在实际alter table过程中还是会引起 data meta lock 问题。pt-online-schema-change是Percona-to">
+<meta property="og:type" content="article">
+<meta property="og:title" content="pt-online-schema-change使用说明、限制与比较">
+<meta property="og:url" content="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="如果正在看这篇文章，相信你已经知道自己的需求了。
+在 mysql 5.5 版本以前，修改表结构如添加索引、修改列，需要锁表，期间不能写入，对于大表这简直是灾难。从5.5特别是5.6里，情况有了好转，支持Online DDL，相关介绍见 这篇文章，而我在实际alter table过程中还是会引起 data meta lock 问题。pt-online-schema-change是Percona-to">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/DDLFlow1.png">
+<meta property="og:updated_time" content="2016-05-27T08:32:49.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="pt-online-schema-change使用说明、限制与比较">
+<meta name="twitter:description" content="如果正在看这篇文章，相信你已经知道自己的需求了。
+在 mysql 5.5 版本以前，修改表结构如添加索引、修改列，需要锁表，期间不能写入，对于大表这简直是灾难。从5.5特别是5.6里，情况有了好转，支持Online DDL，相关介绍见 这篇文章，而我在实际alter table过程中还是会引起 data meta lock 问题。pt-online-schema-change是Percona-to">
+<meta name="twitter:image" content="http://7q5fot.com1.z0.glb.clouddn.com/DDLFlow1.png">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title> pt-online-schema-change使用说明、限制与比较 | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                pt-online-schema-change使用说明、限制与比较
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2016-05-27T16:32:49+08:00" content="2016-05-27">
+              2016-05-27
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/05/27/mysql-pt-online-schema-change/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/05/27/mysql-pt-online-schema-change/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>如果正在看这篇文章，相信你已经知道自己的需求了。</p>
+<p>在 mysql 5.5 版本以前，修改表结构如添加索引、修改列，需要锁表，期间不能写入，对于大表这简直是灾难。从5.5特别是5.6里，情况有了好转，支持Online DDL，相关介绍见 <a href="http://seanlook.com/2016/05/24/mysql-online-ddl-concept">这篇文章</a>，而我在实际alter table过程中还是会引起 data meta lock 问题。pt-online-schema-change是Percona-toolkit一员，通过改进原生ddl的方式，达到不锁表在线修改表结构。</p>
+<h2 id="1-pt-osc工作过程"><a href="#1-pt-osc工作过程" class="headerlink" title="1. pt-osc工作过程"></a>1. pt-osc工作过程</h2><ol>
+<li>创建一个和要执行 alter 操作的表一样的新的空表结构(是alter之前的结构)</li>
+<li>在新表执行alter table 语句（速度应该很快）</li>
+<li>在原表中创建触发器3个触发器分别对应insert,update,delete操作</li>
+<li>以一定块大小从原表拷贝数据到临时表，拷贝过程中通过原表上的触发器在原表进行的写操作都会更新到新建的临时表</li>
+<li>Rename 原表到old表中，在把临时表Rename为原表</li>
+<li>如果有参考该表的外键，根据alter-foreign-keys-method参数的值，检测外键相关的表，做相应设置的处理</li>
+<li>默认最后将旧原表删除</li>
+</ol>
+<h2 id="2-常用选项说明"><a href="#2-常用选项说明" class="headerlink" title="2. 常用选项说明"></a>2. 常用选项说明</h2><p>只介绍部分常用的选项</p>
+<ul>
+<li><code>--host=xxx --user=xxx --password=xxx</code><br>连接实例信息，缩写<code>-h xxx -u xxx -p xxx</code>，密码可以使用参数<code>--ask-pass</code> 手动输入。</li>
+<li><code>--alter</code><br>结构变更语句，不需要 <code>ALTER TABLE</code>关键字。与原始ddl一样可以指定多个更改，用逗号分隔。<ul>
+<li>绝大部分情况下表上需要有主键或唯一索引，因为工具在运行当中为了保证新表也是最新的，需要旧表上创建 DELETE和UPDATE 触发器，同步到新表的时候有主键会更快。个别情况是，当alter操作就是在c1列上建立主键时，DELETE触发器将基于c1列。</li>
+<li>子句不支持 rename 去给表重命名。 </li>
+<li>alter命令原表就不支持给索引重命名，需要先drop再add，在pt-osc也一样。(mysql 5.7 支持 RENAME INDEX old_index_name TO new_index_name)<br>但给字段重命名，千万不要drop-add，整列数据会丢失，使用<code>change col1 col1_new type constraint</code>（保持类型和约束一致，否则相当于修改 column type，不能online）</li>
+<li>子句如果是add column并且定义了not null，那么必须指定default值，否则会失败。</li>
+<li>如果要删除外键（名 fk_foo），使用工具的时候外键名要加下划线，比如<code>--alter &quot;DROP FOREIGN KEY _fk_foo&quot;</code></li>
+</ul>
+</li>
+</ul>
+<ul>
+<li><p><code>D=db_name,t=table_name</code><br>指定要ddl的数据库名和表名</p>
+</li>
+<li><p><code>--max-load</code><br>默认为<code>Threads_running=25</code>。每个chunk拷贝完后，会检查 <em>SHOW GLOBAL STATUS</em> 的内容，检查指标是否超过了指定的阈值。如果超过，则先暂停。这里可以用逗号分隔，指定多个条件，每个条件格式： <code>status指标=MAX_VALUE</code>或者<code>status指标:MAX_VALUE</code>。如果不指定MAX_VALUE，那么工具会这只其为当前值的120%。<br>因为拷贝行有可能会给部分行上锁，Threads_running 是判断当前数据库负载的绝佳指标。</p>
+</li>
+<li><p><code>--max-lag</code><br>默认1s。每个chunk拷贝完成后，会查看所有复制Slave的延迟情况（<code>Seconds_Behind_Master</code>）。要是延迟大于该值，则暂停复制数据，直到所有从的滞后小于这个值。<code>--check-interval</code>配合使用，指定出现从库滞后超过 max-lag，则该工具将睡眠多长时间，默认1s，再检查。如<code>--max-lag=5 --check-interval=2</code>。<br>熟悉percona-toolkit的人都知道<code>--recursion-method</code>可以用来指定从库dsn记录。另外，如果从库被停止，将会永远等待，直到从开始同步，并且延迟小于该值。</p>
+</li>
+<li><p><code>--chunk-time</code><br>默认0.5s，即拷贝数据行的时候，为了尽量保证0.5s内拷完一个chunk，动态调整chunk-size的大小，以适应服务器性能的变化。<br>也可以通过另外一个选项<code>--chunk-size</code>禁止动态调整，即每次固定拷贝 1k 行，如果指定则默认1000行，且比 chunk-time 优先生效</p>
+<a id="more"></a></li>
+<li><p><code>--set-vars</code><br>使用pt-osc进行ddl要开一个session去操作，<code>set-vars</code>可以在执行alter之前设定这些变量，比如默认会设置<code>--set-vars &quot;wait_timeout=10000,innodb_lock_wait_timeout=1,lock_wait_timeout=60&quot;</code>。<br>因为使用pt-osc之后ddl的速度会变慢，所以预计2.5h只能还不能改完，记得加大<code>wait_timeout</code>。</p>
+</li>
+<li><p><code>--dry-run</code><br>创建和修改新表，但不会创建触发器、复制数据、和替换原表。并不真正执行，可以看到生成的执行语句，了解其执行步骤与细节，和<code>--print</code>配合最佳。。</p>
+</li>
+<li><p><code>--execute</code><br>确定修改表，则指定该参数。真正执行alter。–dry-run与–execute必须指定一个，二者相互排斥</p>
+</li>
+</ul>
+<h2 id="3-使用疑惑（限制）"><a href="#3-使用疑惑（限制）" class="headerlink" title="3. 使用疑惑（限制）"></a>3. 使用疑惑（限制）</h2><h3 id="3-1-原表上不能有触发器存在"><a href="#3-1-原表上不能有触发器存在" class="headerlink" title="3.1 原表上不能有触发器存在"></a>3.1 原表上不能有触发器存在</h3><p>这个很容易理解，pt-osc会在原表上创建3个触发器，而一个表上不能同时有2个相同类型的触发器，为简单通用起见，只能一棍子打死。<br>所以如果要让它支持有触发器存在的表也是可以实现的，思路就是：先找到原表触发器定义；重写原表触发器；最后阶段将原表触发器定义应用到新表。</p>
+<h3 id="3-2-通过触发器写数据到临时新表，会不会出现数据不一致或异常"><a href="#3-2-通过触发器写数据到临时新表，会不会出现数据不一致或异常" class="headerlink" title="3.2 通过触发器写数据到临时新表，会不会出现数据不一致或异常"></a>3.2 通过触发器写数据到临时新表，会不会出现数据不一致或异常</h3><p>这其实是我的一个顾虑，因为如果update t1，触发update t2，但这条数据还没copy到t2，不就有异常了吗？后台通过打开general_log，看到它创建的触发器：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line">    6165 Query     <span class="keyword">CREATE</span> <span class="keyword">TRIGGER</span> <span class="string">`pt_osc_confluence_sbtest3_del`</span> <span class="keyword">AFTER</span> <span class="keyword">DELETE</span> <span class="keyword">ON</span> <span class="string">`confluence`</span>.<span class="string">`sbtest3`</span> </div><div class="line">        <span class="keyword">FOR</span> <span class="keyword">EACH</span> <span class="keyword">ROW</span> <span class="keyword">DELETE</span> <span class="keyword">IGNORE</span> <span class="keyword">FROM</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> <span class="keyword">WHERE</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span>.<span class="string">`id`</span> &lt;=&gt; OLD.<span class="string">`id`</span></div><div class="line">    <span class="number">6165</span> <span class="keyword">Query</span>     <span class="keyword">CREATE</span> <span class="keyword">TRIGGER</span> <span class="string">`pt_osc_confluence_sbtest3_upd`</span> <span class="keyword">AFTER</span> <span class="keyword">UPDATE</span> <span class="keyword">ON</span> <span class="string">`confluence`</span>.<span class="string">`sbtest3`</span> </div><div class="line">        <span class="keyword">FOR</span> <span class="keyword">EACH</span> <span class="keyword">ROW</span> <span class="keyword">REPLACE</span> <span class="keyword">INTO</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> (<span class="string">`id`</span>, <span class="string">`k`</span>, <span class="string">`c`</span>, <span class="string">`pad`</span>) <span class="keyword">VALUES</span> (NEW.<span class="string">`id`</span>, NEW.<span class="string">`k`</span>, NEW.<span class="string">`c`</span>, NEW.<span class="string">`pad`</span>)</div><div class="line">    <span class="number">6165</span> <span class="keyword">Query</span>     <span class="keyword">CREATE</span> <span class="keyword">TRIGGER</span> <span class="string">`pt_osc_confluence_sbtest3_ins`</span> <span class="keyword">AFTER</span> <span class="keyword">INSERT</span> <span class="keyword">ON</span> <span class="string">`confluence`</span>.<span class="string">`sbtest3`</span> </div><div class="line">        <span class="keyword">FOR</span> <span class="keyword">EACH</span> <span class="keyword">ROW</span> <span class="keyword">REPLACE</span> <span class="keyword">INTO</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> (<span class="string">`id`</span>, <span class="string">`k`</span>, <span class="string">`c`</span>, <span class="string">`pad`</span>) <span class="keyword">VALUES</span> (NEW.<span class="string">`id`</span>, NEW.<span class="string">`k`</span>, NEW.<span class="string">`c`</span>, NEW.<span class="string">`pad`</span>)</div><div class="line"></div><div class="line">并且copy操作是：</div><div class="line"></div><div class="line">    <span class="number">6165</span> <span class="keyword">Query</span>     <span class="keyword">INSERT</span> <span class="keyword">LOW_PRIORITY</span> <span class="keyword">IGNORE</span> <span class="keyword">INTO</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> (<span class="string">`id`</span>, <span class="string">`k`</span>, <span class="string">`c`</span>, <span class="string">`pad`</span>) </div><div class="line">         <span class="keyword">SELECT</span> <span class="string">`id`</span>, <span class="string">`k`</span>, <span class="string">`c`</span>, <span class="string">`pad`</span> <span class="keyword">FROM</span> <span class="string">`confluence`</span>.<span class="string">`sbtest3`</span> <span class="keyword">FORCE</span> <span class="keyword">INDEX</span>(<span class="string">`PRIMARY`</span>) <span class="keyword">WHERE</span> ((<span class="string">`id`</span> &gt;= <span class="string">'4692805'</span>)) <span class="keyword">AND</span> ((<span class="string">`id`</span> &lt;= <span class="string">'4718680'</span>)) </div><div class="line">        <span class="keyword">LOCK</span> <span class="keyword">IN</span> <span class="keyword">SHARE</span> <span class="keyword">MODE</span> <span class="comment">/*pt-online-schema-change 46459 copy nibble*/</span></div></pre></td></tr></table></figure></p>
+<p>在原表上update，新临时表上是replace into整行数据，所以达到有则更新，无则插入。同时配合后面的 insert ignore，保证这条数据不会因为重复而失败。</p>
+<h3 id="3-3-为什么外键那么特殊"><a href="#3-3-为什么外键那么特殊" class="headerlink" title="3.3 为什么外键那么特殊"></a>3.3 为什么外键那么特殊</h3><p>假设 <em>t1</em> 是要修改的表，<em>t2</em> 有外键依赖于 <em>t1</em>，<em>_t1_new</em> 是 alter <em>t1</em> 产生的新临时表。<br>这里的外键不是看t1上是否存在外键，而是作为子表的 t2。主要问题在 rename t1 时，t1“不存在”导致t2的外键认为参考失败，不允许rename。<br>pt-osc提供<code>--alter-foreign-keys-method</code>选项来决定怎么处理这种情况：</p>
+<ul>
+<li><code>rebuild_constraints</code>，优先采用这种方式<ul>
+<li>它先通过 <em>alter table t2 drop fk1,add _fk1</em> 重建外键参考，指向新表 </li>
+<li>再 <em>rename t1 t1_old, _t1_new t1</em> ，交换表名，不影响客户端</li>
+<li>删除旧表 t1_old<br>但如果字表t2太大，以致alter操作可能耗时过长，有可能会强制选择 drop_swap。<br>涉及的主要方法在 <code>pt-online-schema-change</code> 文件的 <em>determine_alter_fk_method</em>, <em>rebuild_constraints</em>, <em>swap_tables</em>三个函数中。</li>
+</ul>
+</li>
+<li><code>drop_swap</code>，<ul>
+<li>禁用t2表外键约束检查 <code>FOREIGN_KEY_CHECKS=0</code></li>
+<li>然后 drop t1 原表</li>
+<li>再 <em>rename _t1_new t1</em><br>这种方式速度更快，也不会阻塞请求。但有风险，第一，drop表的瞬间到rename过程，原表t1是不存在的，遇到请求会报错；第二，如果因为bug或某种原因，旧表已删，新表rename失败，那就太晚了，但这种情况很少见。<br>我们的开发规范决定，即使表间存在外键参考关系，也不通过表定义强制约束。</li>
+</ul>
+</li>
+</ul>
+<h3 id="3-4-在使用之前需要对磁盘容量进行评估"><a href="#3-4-在使用之前需要对磁盘容量进行评估" class="headerlink" title="3.4 在使用之前需要对磁盘容量进行评估"></a>3.4 在使用之前需要对磁盘容量进行评估</h3><p>使用OSC会使增加一倍的空间，包括索引<br>而且在 Row Based Replication 下，还会写一份binlog。不要想当然使用<code>--set-vars</code>去设置 sql_log_bin=0，因为在这个session级别，alter语句也要在从库上执行，除非你对从库另有打算。</p>
+<h2 id="4-使用-pt-osc原生-5-6-online-ddl相比，如何选择"><a href="#4-使用-pt-osc原生-5-6-online-ddl相比，如何选择" class="headerlink" title="4. 使用 pt-osc原生 5.6 online ddl相比，如何选择"></a>4. 使用 pt-osc原生 5.6 online ddl相比，如何选择</h2><ul>
+<li>online ddl在必须copy table时成本较高，不宜采用</li>
+<li>pt-osc工具在存在触发器时，不适用</li>
+<li>修改索引、外键、列名时，优先采用online ddl，并指定 ALGORITHM=INPLACE</li>
+<li>其它情况使用pt-osc，虽然存在copy data</li>
+<li>pt-osc比online ddl要慢一倍左右，因为它是根据负载调整的</li>
+<li>无论哪种方式都选择的业务低峰期执行</li>
+<li>特殊情况需要利用主从特性，先alter从库，主备切换，再改原主库</li>
+</ul>
+<p>借助percona博客一张图说明一下：</p>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/DDLFlow1.png" alt="DDL flow"></p>
+<h2 id="5-示例"><a href="#5-示例" class="headerlink" title="5. 示例"></a>5. 示例</h2><ul>
+<li><p><strong>添加新列</strong><br>完整输出过程</p>
+<figure class="highlight autohotkey"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div></pre></td><td class="code"><pre><div class="line">[root@ssd-<span class="number">34</span> sysbench]# pt-online-schema-change --user=user --password=password --host=<span class="number">10.0</span>.<span class="number">201.34</span>  --alter <span class="string">"ADD COLUMN f_id int default 0"</span> D=confluence,t=sbtest3 --print --execute</div><div class="line">No slaves found.  See --recursion-method <span class="keyword">if</span> host ssd-<span class="number">34</span> has slaves.</div><div class="line"><span class="literal">Not</span> checking slave lag because no slaves were found <span class="literal">and</span> --check-slave-lag was <span class="literal">not</span> specified.</div><div class="line"><span class="symbol">Operation, tries, wait:</span></div><div class="line">  analyze_table, <span class="number">10</span>, <span class="number">1</span></div><div class="line">  copy_rows, <span class="number">10</span>, <span class="number">0.25</span></div><div class="line">  create_triggers, <span class="number">10</span>, <span class="number">1</span></div><div class="line">  drop_triggers, <span class="number">10</span>, <span class="number">1</span></div><div class="line">  swap_tables, <span class="number">10</span>, <span class="number">1</span></div><div class="line">  update_foreign_keys, <span class="number">10</span>, <span class="number">1</span></div><div class="line">Altering `confluence`.`sbtest3`...</div><div class="line">Creating new table...         ==&gt; 创建新表</div><div class="line">CREATE TABLE `confluence`.`_sbtest3_new` (</div><div class="line">  `id` int(<span class="number">10</span>) unsigned <span class="literal">NOT</span> NULL AUTO_INCREMENT,</div><div class="line">  `k` int(<span class="number">10</span>) unsigned <span class="literal">NOT</span> NULL DEFAULT '<span class="number">0</span>',</div><div class="line">  `c` char(<span class="number">120</span>) COLLATE utf8_bin <span class="literal">NOT</span> NULL DEFAULT '',</div><div class="line">  `pad` char(<span class="number">60</span>) COLLATE utf8_bin <span class="literal">NOT</span> NULL DEFAULT '',</div><div class="line">  PRIMARY KEY (`id`),</div><div class="line">  KEY `k_3` (`k`)</div><div class="line">) ENGINE=InnoDB AUTO_INCREMENT=<span class="number">5000001</span> DEFAULT CHARSET=utf8 COLLATE=utf8_bin MAX_ROWS=<span class="number">1000000</span></div><div class="line">Created new table confluence._sbtest3_new OK.</div><div class="line">Altering new table...         ==&gt; 使用ddl修改新表结构</div><div class="line">ALTER TABLE `confluence`.`_sbtest3_new` ADD COLUMN f_id int default <span class="number">0</span></div><div class="line">Altered `confluence`.`_sbtest3_new` OK.</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">54</span>:<span class="number">23</span> Creating triggers...   ==&gt; 在旧表上创建<span class="number">3</span>个触发器</div><div class="line">CREATE TRIGGER `pt_osc_confluence_sbtest3_del` AFTER DELETE ON `confluence`.`sbtest3` FOR EACH ROW </div><div class="line">    DELETE IGNORE FROM `confluence`.`_sbtest3_new` WHERE `confluence`.`_sbtest3_new`.`id` &lt;=&gt; OLD.`id`</div><div class="line">CREATE TRIGGER `pt_osc_confluence_sbtest3_upd` AFTER UPDATE ON `confluence`.`sbtest3` FOR EACH ROW </div><div class="line">    REPLACE INTO `confluence`.`_sbtest3_new` (`id`, `k`, `c`, `pad`) VALUES (NEW.`id`, NEW.`k`, NEW.`c`, NEW.`pad`)</div><div class="line">CREATE TRIGGER `pt_osc_confluence_sbtest3_ins` AFTER INSERT ON `confluence`.`sbtest3` FOR EACH ROW </div><div class="line">    REPLACE INTO `confluence`.`_sbtest3_new` (`id`, `k`, `c`, `pad`) VALUES (NEW.`id`, NEW.`k`, NEW.`c`, NEW.`pad`)</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">54</span>:<span class="number">23</span> Created triggers OK.</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">54</span>:<span class="number">23</span> Copying approximately <span class="number">4485573</span> rows...  ==&gt; 分块拷贝数据到新表</div><div class="line">INSERT LOW_PRIORITY IGNORE INTO `confluence`.`_sbtest3_new` (`id`, `k`, `c`, `pad`) </div><div class="line">  SELECT `id`, `k`, `c`, `pad` FROM `confluence`.`sbtest3` FORCE INDEX(`PRIMARY`) WHERE ((`id` &gt;= ?)) <span class="literal">AND</span> ((`id` &lt;= ?)) </div><div class="line">  LOCK IN SHARE MODE /*pt-online-schema-change <span class="number">44155</span> copy nibble*/</div><div class="line">SELECT /*!<span class="number">40001</span> SQL_NO_CACHE */ `id` FROM `confluence`.`sbtest3` FORCE INDEX(`PRIMARY`) WHERE ((`id` &gt;= ?)) ORDER BY `id` LIMIT ?, <span class="number">2</span> /*next chunk boundary*/</div><div class="line"><span class="symbol">Copying `confluence`.`sbtest3`:  36% 00:</span><span class="number">52</span> remain</div><div class="line"><span class="symbol">Copying `confluence`.`sbtest3`:  69% 00:</span><span class="number">26</span> remain</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">56</span>:<span class="number">01</span> Copied rows OK.</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">56</span>:<span class="number">01</span> Analyzing new table...</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">56</span>:<span class="number">01</span> Swapping tables...  ==&gt; 交换新旧表</div><div class="line">RENAME TABLE `confluence`.`sbtest3` TO `confluence`.`_sbtest3_old`, `confluence`.`_sbtest3_new` TO `confluence`.`sbtest3`</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">56</span>:<span class="number">01</span> Swapped original <span class="literal">and</span> new tables OK.</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">56</span>:<span class="number">01</span> Dropping old table...  ==&gt; 删除旧表</div><div class="line">DROP TABLE <span class="keyword">IF</span> EXISTS `confluence`.`_sbtest3_old`</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">56</span>:<span class="number">02</span> Dropped old table `confluence`.`_sbtest3_old` OK.</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">56</span>:<span class="number">02</span> Dropping triggers...</div><div class="line">DROP TRIGGER <span class="keyword">IF</span> EXISTS `confluence`.`pt_osc_confluence_sbtest3_del`;</div><div class="line">DROP TRIGGER <span class="keyword">IF</span> EXISTS `confluence`.`pt_osc_confluence_sbtest3_upd`;</div><div class="line">DROP TRIGGER <span class="keyword">IF</span> EXISTS `confluence`.`pt_osc_confluence_sbtest3_ins`;</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">56</span>:<span class="number">02</span> Dropped triggers OK.</div><div class="line">Successfully altered `confluence`.`sbtest3`.</div></pre></td></tr></table></figure>
+</li>
+<li><p><strong>修改列类型</strong></p>
+<figure class="highlight haml"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">pt-online-schema-change h=10.0.201.34,P=3306,u=jacky,p=xxx,D=confluence,t=sbtest3 \</div><div class="line">-<span class="ruby">-alter <span class="string">"CHANGE pad f_pad varchar(60) NOT NULL DEFAULT '' "</span> \</span></div><div class="line">-<span class="ruby">-print --dry-run</span></div><div class="line"></div><div class="line">pt-online-schema-change -ujacky -p xxx -h "10.0.201.34" D=confluence,t=sbtest3 \</div><div class="line">-<span class="ruby">-alter <span class="string">"CHANGE pad f_pad varchar(60) NOT NULL DEFAULT '' "</span> \</span></div><div class="line">-<span class="ruby">-execute</span></div></pre></td></tr></table></figure>
+</li>
+<li><p><strong>添加删除索引</strong><br>放后台执行</p>
+<figure class="highlight brainfuck"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="comment">pt</span><span class="literal">-</span><span class="comment">online</span><span class="literal">-</span><span class="comment">schema</span><span class="literal">-</span><span class="comment">change</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">user=user</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">ask</span><span class="literal">-</span><span class="comment">pass</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">host=10</span><span class="string">.</span><span class="comment">0</span><span class="string">.</span><span class="comment">201</span><span class="string">.</span><span class="comment">34</span>  <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">alter</span> <span class="comment">"DROP</span> <span class="comment">KEY</span> <span class="comment">cid</span><span class="string">,</span> <span class="comment">ADD</span> <span class="comment">KEY</span> <span class="comment">idx_corpid_userid(f_corp_id</span><span class="string">,</span><span class="comment">f_user_id)</span> <span class="comment">"</span> <span class="comment">\</span></div><div class="line"><span class="comment">D=confluence</span><span class="string">,</span><span class="comment">t=sbtest3</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">print</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">execute</span></div></pre></td></tr></table></figure>
+</li>
+<li><p><strong>修改主键</strong></p>
+</li>
+</ul>
+<p>在我的环境里有不少表设计之初没有自增id，而是采用复合主键，pt-osc 对删除、添加主键会特殊处理，详见 <a href="http://seanlook/2016/05/27/mysql-pt-osc-add-primarykey" target="_blank" rel="external">这里</a>。</p>
+<h2 id="6-错误处理"><a href="#6-错误处理" class="headerlink" title="6. 错误处理"></a>6. 错误处理</h2><p><strong>1. 存在trigger </strong><br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">[zx@mysql-5 ~]$ pt-online-schema-<span class="keyword">change</span>  -u <span class="keyword">user</span> -p <span class="keyword">password</span> -h <span class="number">10.0</span><span class="number">.200</span><span class="number">.195</span> \</div><div class="line"><span class="comment">--alter="MODIFY COLUMN f_receiver  varchar(128)                                                      NOT NULL DEFAULT '' AFTER f_user_id" --dry-run D=db_name,t=table_name</span></div><div class="line">The <span class="keyword">table</span> <span class="string">`db_name`</span>.<span class="string">`table_name`</span> has triggers.  This tool needs <span class="keyword">to</span> <span class="keyword">create</span> its own <span class="keyword">triggers</span>, so the <span class="keyword">table</span> cannot already have triggers.</div></pre></td></tr></table></figure></p>
+<p>表上存在触发器，不适用。</p>
+<p><strong>2. no-version-check  </strong><br><figure class="highlight stata"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">$ pt-online-schema-change -uuser -ppassword --alter <span class="string">"add key id_provice(f_provice)"</span> \</div><div class="line"><span class="keyword">D</span>=db_name,t=tb_name -<span class="keyword">h</span> rdsxxxxxx.mysql.rds.aliyuncs.com</div><div class="line">Can't <span class="keyword">use</span> <span class="keyword">an</span> undefined value <span class="keyword">as</span> <span class="keyword">an</span> ARRAY reference at /usr/bin/pt-online-schema-change <span class="keyword">line</span> 7335.</div></pre></td></tr></table></figure></p>
+<p>这个错误在阿里云RDS上执行时出现的，我以为是我哪里语法写错了，但拿到原生5.6的版本上就没问题了，加上<code>--no-version-check</code>选项就好了，见 <a href="https://help.aliyun.com/knowledge_detail/13098164.html" target="_blank" rel="external">https://help.aliyun.com/knowledge_detail/13098164.html</a> ，没深究，应该是pt去验证mysql server版本的时候从rds拿到的信息不对，导致格式出错。</p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><ul>
+<li><a href="https://www.percona.com/doc/percona-toolkit/2.2/pt-online-schema-change.html" target="_blank" rel="external">refman pt-online-schema-change</a></li>
+<li><a href="https://help.aliyun.com/knowledge_detail/13098164.html" target="_blank" rel="external">RDS MySQL 如何使用 Percona Toolkit</a></li>
+<li><a href="http://www.cnblogs.com/zhoujinyi/p/3491059.html" target="_blank" rel="external">percona-toolkit 之 【pt-online-schema-change】说明</a></li>
+<li><a href="https://www.percona.com/blog/2014/11/18/avoiding-mysql-alter-table-downtime/" target="_blank" rel="external">Avoiding MySQL ALTER table downtime</a></li>
+<li><a href="http://www.imcjd.com/?p=1081" target="_blank" rel="external">MySQL Online DDL和NoSQL Schemaless Design</a></li>
+</ul>
+<hr>
+<p>原文链接地址：<a href="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/">http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/</a></p>
+<hr>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/mysql/" rel="tag">#mysql</a>
+          
+            <a href="/tags/Percona-toolkit/" rel="tag">#Percona-toolkit</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2016/05/27/mysql-pt-osc-add-primarykey/" rel="next" title="使用pt-osc修改主键时注意">
+                <i class="fa fa-chevron-left"></i> 使用pt-osc修改主键时注意
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2016/06/11/mysql-advanced-query-tuning-percona/" rel="prev" title="Advanced MySQL Query Tuning .pdf">
+                Advanced MySQL Query Tuning .pdf <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2016/05/27/mysql-pt-online-schema-change/"
+           data-title="pt-online-schema-change使用说明、限制与比较" data-url="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-pt-osc工作过程"><span class="nav-text">1. pt-osc工作过程</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-常用选项说明"><span class="nav-text">2. 常用选项说明</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-使用疑惑（限制）"><span class="nav-text">3. 使用疑惑（限制）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-原表上不能有触发器存在"><span class="nav-text">3.1 原表上不能有触发器存在</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-通过触发器写数据到临时新表，会不会出现数据不一致或异常"><span class="nav-text">3.2 通过触发器写数据到临时新表，会不会出现数据不一致或异常</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-为什么外键那么特殊"><span class="nav-text">3.3 为什么外键那么特殊</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-4-在使用之前需要对磁盘容量进行评估"><span class="nav-text">3.4 在使用之前需要对磁盘容量进行评估</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-使用-pt-osc原生-5-6-online-ddl相比，如何选择"><span class="nav-text">4. 使用 pt-osc原生 5.6 online ddl相比，如何选择</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-示例"><span class="nav-text">5. 示例</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-错误处理"><span class="nav-text">6. 错误处理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#参考"><span class="nav-text">参考</span></a></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

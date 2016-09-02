@@ -1,0 +1,901 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="docker,linux,dockerfile," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="Docker可以从Dockerfile中一步一步的读取指令来自动的创建镜像，常使用Dockerfile来创建用户自定义的镜像。格式如下：12# CommentINSTRUCTION arguments
+虽然前面的指令大小写不敏感，但习惯性的还是建议大写。docker是严格按照顺序（#注释起来的忽略）运行指令的。下面逐个来介绍几个必要的指令。
+FROM123FROM  &amp;lt;image&amp;gt;或F">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Dockerfile指令详解">
+<meta property="og:url" content="http://seanlook.com/2014/11/17/dockerfile-introduction/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="Docker可以从Dockerfile中一步一步的读取指令来自动的创建镜像，常使用Dockerfile来创建用户自定义的镜像。格式如下：12# CommentINSTRUCTION arguments
+虽然前面的指令大小写不敏感，但习惯性的还是建议大写。docker是严格按照顺序（#注释起来的忽略）运行指令的。下面逐个来介绍几个必要的指令。
+FROM123FROM  &amp;lt;image&amp;gt;或F">
+<meta property="og:updated_time" content="2014-11-17T07:46:23.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Dockerfile指令详解">
+<meta name="twitter:description" content="Docker可以从Dockerfile中一步一步的读取指令来自动的创建镜像，常使用Dockerfile来创建用户自定义的镜像。格式如下：12# CommentINSTRUCTION arguments
+虽然前面的指令大小写不敏感，但习惯性的还是建议大写。docker是严格按照顺序（#注释起来的忽略）运行指令的。下面逐个来介绍几个必要的指令。
+FROM123FROM  &amp;lt;image&amp;gt;或F">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title> Dockerfile指令详解 | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                Dockerfile指令详解
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2014-11-17T15:21:25+08:00" content="2014-11-17">
+              2014-11-17
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Virtualization/" itemprop="url" rel="index">
+                    <span itemprop="name">Virtualization</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Virtualization/Docker/" itemprop="url" rel="index">
+                    <span itemprop="name">Docker</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2014/11/17/dockerfile-introduction/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2014/11/17/dockerfile-introduction/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>Docker可以从<code>Dockerfile</code>中一步一步的读取指令来自动的创建镜像，常使用Dockerfile来创建用户自定义的镜像。格式如下：<br><figure class="highlight mipsasm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># Comment</span></div><div class="line"><span class="keyword">INSTRUCTION </span>arguments</div></pre></td></tr></table></figure></p>
+<p>虽然前面的指令大小写不敏感，但习惯性的还是建议大写。docker是严格按照顺序（<code>#</code>注释起来的忽略）运行指令的。<br>下面逐个来介绍几个必要的指令。</p>
+<h3 id="FROM"><a href="#FROM" class="headerlink" title="FROM"></a>FROM</h3><figure class="highlight sqf"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">FROM</span>  &lt;<span class="built_in">image</span>&gt;</div><div class="line">或</div><div class="line"><span class="keyword">FROM</span> &lt;<span class="built_in">image</span>&gt;:&lt;tag&gt;</div></pre></td></tr></table></figure>
+<p>在Dockerfile中第一条非注释INSTRUCTION一定是<code>FROM</code>，它决定了以哪一个镜像作为基准，<code>&lt;image&gt;</code>首选本地是否存在，如果不存在则会从公共仓库下载（当然也可以使用私有仓库的格式）。</p>
+<h3 id="RUN"><a href="#RUN" class="headerlink" title="RUN"></a>RUN</h3><figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">RUN</span> <span class="bash">&lt;commnad&gt;</span></div><div class="line">或</div><div class="line"><span class="keyword">RUN</span> <span class="bash">[<span class="string">"executable"</span>, <span class="string">"param1"</span>, <span class="string">"param2"</span>]</span></div></pre></td></tr></table></figure>
+<p><code>RUN</code>指令会在当前镜像的顶层执行任何命令，并commit成新的（中间）镜像，提交的镜像会在后面继续用到。<br>上面看到<code>RUN</code>后的格式有两种写法。</p>
+<a id="more"></a>
+<p>shell格式，相当于执行<code>/bin/sh -c &quot;&lt;command&gt;&quot;</code>：<br><figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">RUN</span> <span class="bash">apt-get install vim -y</span></div></pre></td></tr></table></figure></p>
+<p>exec格式，不会触发shell，所以<code>$HOME</code>这样的环境变量无法使用，但它可以在没有<code>bash</code>的镜像中执行，而且可以避免错误的解析命令字符串：<br><figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">RUN</span> <span class="bash">[<span class="string">"apt-get"</span>, <span class="string">"install"</span>, <span class="string">"vim"</span>, <span class="string">"-y"</span>]</span></div><div class="line">或</div><div class="line"><span class="keyword">RUN</span> <span class="bash">[<span class="string">"/bin/bash"</span>, <span class="string">"-c"</span>, <span class="string">"apt-get install vim -y"</span>]  与shell风格相同</span></div></pre></td></tr></table></figure></p>
+<h3 id="ENTRYPORINT"><a href="#ENTRYPORINT" class="headerlink" title="ENTRYPORINT"></a>ENTRYPORINT</h3><p><code>ENTRYPOINT</code>命令设置在容器启动时执行命令，如果有多个<code>ENTRYPOINT</code>指令，那只有最后一个生效。有以下两种命令格式：<br><figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">ENTRYPOINT</span> <span class="bash">[<span class="string">"executable"</span>, <span class="string">"param1"</span>, <span class="string">"param2"</span>]  数组/<span class="built_in">exec</span>格式，推荐</span></div><div class="line">或</div><div class="line"><span class="keyword">ENTRYPOINT</span> <span class="bash"><span class="built_in">command</span> param1 param2    shell格式</span></div></pre></td></tr></table></figure></p>
+<p>比如：<br><figure class="highlight stylus"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">docker run -<span class="selector-tag">i</span> -t --rm -<span class="selector-tag">p</span> <span class="number">80</span>:<span class="number">80</span> nginx</div></pre></td></tr></table></figure></p>
+<p>使用exec格式，在<code>docker run &lt;image&gt;</code>的所有参数，都会追加到<code>ENTRYPOINT</code>之后，并且会覆盖<code>CMD</code>所指定的参数（如果有的话）。当然可以在<code>run</code>时使用<code>--entrypoint</code>来覆盖<code>ENTRYPOINT</code>指令。<br>使用shell格式，<code>ENTRYPOINT</code>相当于执行<code>/bin/sh -c &lt;command..&gt;</code>，这种格式会忽略<code>docker run</code>和<code>CMD</code>的所有参数。</p>
+<p>以推荐使用的exec格式为例：<br>我们可以使用<code>ENTRYPOINT</code>来设置基本不会变化的命令，用<code>CMD</code>来设置其它的可能改变的默认启动命令或选项（<code>docker run</code>会覆盖的）。<br><figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">FROM</span> ubuntu</div><div class="line"><span class="keyword">ENTRYPOINT</span> <span class="bash">[<span class="string">"top"</span>, <span class="string">"-b"</span>]</span></div><div class="line"><span class="keyword">CMD</span> <span class="bash">[<span class="string">"-c"</span>]</span></div></pre></td></tr></table></figure></p>
+<p><code>docker build -t registry.tp-link.net:8000/ubuntu:dockerfile_test .</code><br>运行<br><figure class="highlight tap"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">$ docker run -it --rm --name test 44f178c416b0 -H</div><div class="line">这里的top后的选项会追加到上面的ENTRYPOINT，同时会覆盖CMD的，所以实际相当于执行top -b -H，没有-c：</div><div class="line">top - 04:32:07 up<span class="number"> 10 </span>days, 11:27, <span class="number"> 0 </span>users,  load average: 0.01, 0.03, 0.00</div><div class="line">Threads:  <span class="number"> 1 </span>total,  <span class="number"> 1 </span>running,  <span class="number"> 0 </span>sleeping,  <span class="number"> 0 </span>stopped,  <span class="number"> 0 </span>zombie</div><div class="line">%Cpu(s):  0.1 us,  0.1 sy,  0.0 ni, 99.7 id,  0.2 wa,  0.0 hi,  0.0 si,  0.0 st</div><div class="line">KiB Mem:  <span class="number"> 4056784 </span>total, <span class="number"> 3749188 </span>used,  <span class="number"> 307596 </span>free,  <span class="number"> 209372 </span>buffers</div><div class="line">KiB Swap:       <span class="number"> 0 </span>total,       <span class="number"> 0 </span>used,       <span class="number"> 0 </span>free.  <span class="number"> 571388 </span>cached Mem</div><div class="line"></div><div class="line">  PID USER      PR  NI    VIRT    RES    SHR S %CPU %MEM     TIME+ COMMAND</div><div class="line">   <span class="number"> 1 </span>root     <span class="number"> 20 </span> <span class="number"> 0 </span> <span class="number"> 19688 </span> <span class="number"> 1208 </span>  <span class="number"> 940 </span>R  0.0  0.0   0:00.01 top</div></pre></td></tr></table></figure></p>
+<p>如果在使用的docker版本在v1.3及以上，则可以使用<code>docker exec</code>继续在容器中验证，看到完整的top命令<code>docker exec -it test ps aux</code></p>
+<h3 id="CMD"><a href="#CMD" class="headerlink" title="CMD"></a>CMD</h3><figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">CMD</span> <span class="bash">[<span class="string">"executable"</span>,<span class="string">"param1"</span>,<span class="string">"param2"</span>]  （数组/<span class="built_in">exec</span>格式）</span></div><div class="line"><span class="keyword">CMD</span> <span class="bash">[<span class="string">"param1"</span>,<span class="string">"param2"</span>]  (as default parameters to ENTRYPOINT)</span></div><div class="line"><span class="keyword">CMD</span> <span class="bash"><span class="built_in">command</span> param1 param2  (shell格式)</span></div></pre></td></tr></table></figure>
+<p>一个Dockerfile里只能有一个CMD，如果有多个，只有最后一个生效。<code>CMD</code>指令的主要功能是在build完成后，为了给<code>docker run</code>启动到容器时提供默认命令或参数，这些默认值可以包含可执行的命令，也可以只是参数（此时可执行命令就必须提前在<code>ENTRYPORINT</code>中指定）。</p>
+<p>它与<code>ENTRYPOINT</code>的功能极为相似，区别在于如果<code>docker run</code>后面出现与<code>CMD</code>指定的相同命令，那么CMD会被覆盖；而<code>ENTRYPOINT</code>会把容器名后面的所有内容都当成参数传递给其指定的命令（不会对命令覆盖）。另外<code>CMD</code>还可以单独作为<code>ENTRYPOINT</code>的所接命令的可选参数。<br><code>CMD</code>与<code>RUN</code>的区别在于，<code>RUN</code>是在<code>build</code>成镜像时就运行的，先于<code>CMD</code>和<code>ENTRYPOINT</code>的，<code>CMD</code>会在每次启动容器的时候运行，而<code>RUN</code>只在创建镜像时执行一次，固化在image中。</p>
+<p>举例1：<br><figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">Dockerfile:</div><div class="line">    <span class="keyword">CMD</span> <span class="bash">[<span class="string">"echo CMD_args"</span>]</span></div><div class="line">运行</div><div class="line">    docker <span class="keyword">run</span> &lt;image&gt; echo run_arg</div><div class="line">结果</div><div class="line">    输出 run_arg</div></pre></td></tr></table></figure></p>
+<p>因为<code>echo run_arg</code>覆盖了<code>CMD</code>。如果<code>run</code>后没有<code>echo run_arg</code>，则输出<code>CMD_args</code>。</p>
+<p>举例2：<br><figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">Dockerfile:</div><div class="line">    <span class="keyword">ENTRYPOINT</span> <span class="bash">[<span class="string">"echo"</span>, <span class="string">"ENTRYPOINT_args"</span>]</span></div><div class="line">运行</div><div class="line">    docker <span class="keyword">run</span> &lt;image&gt; run_arg</div><div class="line">结果</div><div class="line">    输出 ENTRYPOINT_args run_arg</div></pre></td></tr></table></figure></p>
+<p>因为<code>echo run_arg</code>追加到<code>ENTRYPOIINT</code>的<code>echo</code>后面了。如果在<code>ENTRYPOINT</code>后再加入一行<code>CMD [&quot;CMD_args&quot;]</code>，则结果依旧，除非去掉run后的所有参数。<br>当出现<code>ENTRYPOINT</code>指令时<code>CMD</code>指令只可能(当<code>ENTRYPOINT</code>指令使用exec方式执行时)被当做<code>ENTRYPOINT</code>指令的参数使用，其他情况则会被忽略。</p>
+<h3 id="EXPOSE"><a href="#EXPOSE" class="headerlink" title="EXPOSE"></a>EXPOSE</h3><p><code>EXPOSE</code>指令告诉容器在运行时要监听的端口，但是这个端口是用于多个容器之间通信用的（links），外面的host是访问不到的。要把端口暴露给外面的主机，在启动容器时使用<code>-p</code>选项。<br>示例：<br><figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># expose memcached(s) port</span></div><div class="line"><span class="keyword">EXPOSE</span> <span class="number">11211</span> <span class="number">11212</span></div></pre></td></tr></table></figure></p>
+<h3 id="ADD"><a href="#ADD" class="headerlink" title="ADD"></a>ADD</h3><figure class="highlight xml"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">ADD <span class="tag">&lt;<span class="name">src</span>&gt;</span>... <span class="tag">&lt;<span class="name">dest</span>&gt;</span></div></pre></td></tr></table></figure>
+<p>将文件<code>&lt;src&gt;</code>拷贝到container的文件系统对应的路径<code>&lt;dest&gt;</code>下。<br><code>&lt;src&gt;</code>可以是文件、文件夹、URL，对于文件和文件夹<code>&lt;src&gt;</code>必须是在Dockerfile的相对路径下（build context path），即只能是相对路径且不能包含<code>../path/</code>。<br><code>&lt;dest&gt;</code>只能是容器中的绝对路径。如果路径不存在则会自动级联创建，根据你的需要是<code>&lt;dest&gt;</code>里是否需要反斜杠<code>/</code>，习惯使用<code>/</code>结尾从而避免被当成文件。<br>示例：<br><figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">支持模糊匹配</div><div class="line"><span class="keyword">ADD</span> <span class="bash">hom* /mydir/        <span class="comment"># adds all files starting with "hom"</span></span></div><div class="line"><span class="keyword">ADD</span> <span class="bash">hom?.txt /mydir/    <span class="comment"># ? is replaced with any single character</span></span></div><div class="line"></div><div class="line"><span class="keyword">ADD</span> <span class="bash">requirements.txt /tmp/</span></div><div class="line"><span class="keyword">RUN</span> <span class="bash">pip install /tmp/requirements.txt</span></div><div class="line"><span class="keyword">ADD</span> <span class="bash">. /tmp/</span></div></pre></td></tr></table></figure></p>
+<p>另外<code>ADD</code>支持远程URL获取文件，但官方认为是<code>strongly discouraged</code>，建议使用<code>wget</code>或<code>curl</code>代替。<br><code>ADD</code>还支持自动解压tar文件，比如<code>ADD trusty-core-amd64.tar.gz /</code>会线自动解压内容再COPY到在容器的<code>/</code>目录下。</p>
+<p>ADD只有在build镜像的时候运行一次，后面运行container的时候不会再重新加载，也就是你不能在运行时通过这种方式向容器中传送文件，<code>-v</code>选项映射本地到容器的目录。</p>
+<h3 id="COPY"><a href="#COPY" class="headerlink" title="COPY"></a>COPY</h3><p>Same as ‘ADD’ but without the tar and remote url handling.</p>
+<p><code>COPY</code>的语法与功能与<code>ADD</code>相同，只是不支持上面讲到的<code>&lt;src&gt;</code>是远程URL、自动解压这两个特性，但是<a href="https://docs.docker.com/articles/dockerfile_best-practices/" target="_blank" rel="external">Best Practices for Writing Dockerfiles</a>建议<strong>尽量使用<code>COPY</code></strong>，并使用<code>RUN</code>与<code>COPY</code>的组合来代替<code>ADD</code>，这是因为虽然<code>COPY</code>只支持本地文件拷贝到container，但它的处理比<code>ADD</code>更加透明，建议只在复制tar文件时使用<code>ADD</code>，如<code>ADD trusty-core-amd64.tar.gz /</code>。</p>
+<h3 id="ENV"><a href="#ENV" class="headerlink" title="ENV"></a>ENV</h3><p>用于设置环境变量：<br><figure class="highlight xml"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">ENV <span class="tag">&lt;<span class="name">key</span>&gt;</span> <span class="tag">&lt;<span class="name">value</span>&gt;</span></div></pre></td></tr></table></figure></p>
+<p>设置了后，后续的RUN命令都可以使用，当运行生成的镜像时这些环境变量依然有效，如果需要在运行时更改这些环境变量可以在运行<code>docker run</code>时添加<code>-env &lt;key&gt;=&lt;value&gt;</code>参数来修改。 </p>
+<h3 id="VOLUME"><a href="#VOLUME" class="headerlink" title="VOLUME"></a>VOLUME</h3><p>VOLUME指令用来在容器中设置一个挂载点，可以用来让其他容器挂载以实现数据共享或对容器数据的备份、恢复或迁移。请参考文章<a href="http://seanlook/2014/12/17/docker_comun" target="_blank" rel="external">docker容器间通信</a></p>
+<h3 id="WORKDIR"><a href="#WORKDIR" class="headerlink" title="WORKDIR"></a>WORKDIR</h3><p><code>WORKDIR指</code>令用于设置<code>Dockerfile</code>中的<code>RUN</code>、<code>CMD</code>和<code>ENTRYPOINT</code>指令执行命令的工作目录(默认为<code>/</code>目录)，该指令在<code>Dockerfile</code>文件中可以出现多次，如果使用相对路径则为相对于<code>WORKDIR</code>上一次的值，例如<code>WORKDIR /a</code>，<code>WORKDIR b</code>，<code>RUN pwd</code>最终输出的当前目录是<code>/a/b</code>。（<code>RUN cd /a/b</code>，<code>RUN pwd</code>是得不到<code>/a/b</code>的）</p>
+<h3 id="ONBUILD"><a href="#ONBUILD" class="headerlink" title="ONBUILD"></a>ONBUILD</h3><p><code>ONBUILD</code>指令用来设置一些触发的指令，用于在当该镜像被作为基础镜像来创建其他镜像时(也就是<code>Dockerfile</code>中的<code>FROM</code>为当前镜像时)执行一些操作，<code>ONBUILD中</code>定义的指令会在用于生成其他镜像的<code>Dockerfile</code>文件的<code>FROM</code>指令之后被执行，上述介绍的任何一个指令都可以用于<code>ONBUILD</code>指令，可以用来执行一些因为环境而变化的操作，使镜像更加通用。</p>
+<p>注意：</p>
+<ol>
+<li>ONBUILD中定义的指令在当前镜像的build中不会被执行。</li>
+<li>可以通过查看<code>docker inspect &lt;image&gt;</code>命令执行结果的OnBuild键来查看某个镜像ONBUILD指令定义的内容。</li>
+<li>ONBUILD中定义的指令会当做引用该镜像的Dockerfile文件的FROM指令的一部分来执行，执行顺序会按ONBUILD定义的先后顺序执行，如果ONBUILD中定义的任何一个指令运行失败，则会使FROM指令中断并导致整个build失败，当所有的ONBUILD中定义的指令成功完成后，会按正常顺序继续执行build。</li>
+<li>ONBUILD中定义的指令不会继承到当前引用的镜像中，也就是当引用ONBUILD的镜像创建完成后将会清除所有引用的ONBUILD指令。</li>
+<li>ONBUILD指令不允许嵌套，例如<code>ONBUILD ONBUILD ADD . /data</code>是不允许的。</li>
+<li>ONBUILD指令不会执行其定义的FROM或MAINTAINER指令。</li>
+</ol>
+<p>例如，<code>Dockerfile</code>使用如下的内容创建了镜像 image-A ：<br><figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">[...]</div><div class="line"><span class="keyword">ONBUILD</span> <span class="keyword">ADD</span> <span class="bash">. /app/src</span></div><div class="line"><span class="keyword">ONBUILD</span> <span class="keyword">RUN</span> <span class="bash">/usr/<span class="built_in">local</span>/bin/python-build --dir /app/src</span></div><div class="line">[...]</div></pre></td></tr></table></figure></p>
+<p>如果基于 image-A 创建新的镜像时，新的<code>Dockerfile</code>中使用<code>FROM image-A</code>指定基础镜像时，会自动执行<code>ONBUILD</code>指令内容，等价于在后面添加了两条指令。<br><figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">FROM</span> image-A</div><div class="line"></div><div class="line"><span class="comment">#Automatically run the following</span></div><div class="line"><span class="keyword">ADD</span> <span class="bash">. /app/src</span></div><div class="line"><span class="keyword">RUN</span> <span class="bash">/usr/<span class="built_in">local</span>/bin/python-build --dir /app/src</span></div></pre></td></tr></table></figure></p>
+<h3 id="USER"><a href="#USER" class="headerlink" title="USER"></a>USER</h3><p>为运行镜像时或者任何接下来的<code>RUN</code>指令指定运行用户名或UID：</p>
+<pre><code>USER daemon
+</code></pre><h3 id="MAINTAINER"><a href="#MAINTAINER" class="headerlink" title="MAINTAINER"></a>MAINTAINER</h3><p>使用MAINTAINER指令来为生成的镜像署名作者</p>
+<pre><code>MAINTAINER author&apos;s name mailaddress
+</code></pre><h3 id="The-dockerignore-file"><a href="#The-dockerignore-file" class="headerlink" title="The .dockerignore file"></a>The <code>.dockerignore</code> file</h3><p><code>.dockerignore</code>用来忽略上下文目录中包含的一些image用不到的文件，它们不会传送到docker daemon。规则使用go语言的匹配语法。如：<br><figure class="highlight stylus"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">$ cat <span class="selector-class">.dockerignore</span></div><div class="line"><span class="selector-class">.git</span></div><div class="line">tmp*</div></pre></td></tr></table></figure></p>
+<p>更多内容参考<a href="http://seanlook.com/2014/12/20/dockerfile_best_practice1">Dockerfile最佳实践</a>系列。官方有个<a href="格式">Dockerfile tutorial</a>练习Dockerfile的写法，非常简单但对于养成良好的格式、注释有一些帮助。</p>
+<h3 id="Dockerfile示例"><a href="#Dockerfile示例" class="headerlink" title="Dockerfile示例"></a>Dockerfile示例</h3><p>下面的<code>Dockerfile</code>是MySQL官方镜像的构建过程。从ubuntu基础镜像开始构建，安装mysql-server、配置权限、映射目录和端口，<code>CMD</code>在从这个镜像运行到容器时启动mysql。其中<code>VOLUME</code>定义的两个可挂载点，用于在host中挂载，因为数据库保存在主机上而非容器中才是比较安全的。</p>
+<figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div></pre></td><td class="code"><pre><div class="line"><span class="comment">#</span></div><div class="line"><span class="comment"># MySQL Dockerfile</span></div><div class="line"><span class="comment">#</span></div><div class="line"><span class="comment"># https://github.com/dockerfile/mysql</span></div><div class="line"><span class="comment">#</span></div><div class="line"></div><div class="line"><span class="comment"># Pull base image.</span></div><div class="line"><span class="keyword">FROM</span> dockerfile/ubuntu</div><div class="line"></div><div class="line"><span class="comment"># Install MySQL.</span></div><div class="line"><span class="keyword">RUN</span> <span class="bash">\</span></div><div class="line">  apt-get update &amp;&amp; \</div><div class="line">  DEBIAN_FRONTEND=noninteractive apt-get install -y mysql-server &amp;&amp; \</div><div class="line">  rm -rf /var/lib/apt/lists/* &amp;&amp; \</div><div class="line">  sed -i <span class="string">'s/^\(bind-address\s.*\)/# \1/'</span> /etc/mysql/my.cnf &amp;&amp; \</div><div class="line">  sed -i <span class="string">'s/^\(log_error\s.*\)/# \1/'</span> /etc/mysql/my.cnf &amp;&amp; \</div><div class="line">  <span class="built_in">echo</span> <span class="string">"mysqld_safe &amp;"</span> &gt; /tmp/config &amp;&amp; \</div><div class="line">  <span class="built_in">echo</span> <span class="string">"mysqladmin --silent --wait=30 ping || exit 1"</span> &gt;&gt; /tmp/config &amp;&amp; \</div><div class="line">  <span class="built_in">echo</span> <span class="string">"mysql -e 'GRANT ALL PRIVILEGES ON *.* TO \"root\"@\"%\" WITH GRANT OPTION;'"</span> &gt;&gt; /tmp/config &amp;&amp; \</div><div class="line">  bash /tmp/config &amp;&amp; \</div><div class="line">  rm <span class="_">-f</span> /tmp/config</div><div class="line"></div><div class="line"><span class="comment"># Define mountable directories.</span></div><div class="line"><span class="keyword">VOLUME</span> <span class="bash">[<span class="string">"/etc/mysql"</span>, <span class="string">"/var/lib/mysql"</span>]</span></div><div class="line"></div><div class="line"><span class="comment"># Define working directory.</span></div><div class="line"><span class="keyword">WORKDIR</span> <span class="bash">/data</span></div><div class="line"></div><div class="line"><span class="comment"># Define default command.</span></div><div class="line"><span class="keyword">CMD</span> <span class="bash">[<span class="string">"mysqld_safe"</span>]</span></div><div class="line"></div><div class="line"><span class="comment"># Expose ports.</span></div><div class="line"><span class="keyword">EXPOSE</span> <span class="number">3306</span></div></pre></td></tr></table></figure>
+<p>使用：<br><figure class="highlight armasm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">$ docker <span class="keyword">build </span>-t=<span class="string">"dockerfile/mysql"</span> github.com/dockerfile/mysql</div><div class="line"></div><div class="line">或下载Dockerfile内容再当前目录：</div><div class="line">$ docker <span class="keyword">build </span>-t=<span class="string">"dockerfile/mysql"</span> .</div></pre></td></tr></table></figure></p>
+<p>（提示，上述第一条命令，如果你的host不可以连接Docker Hub，那么需要在启动docker服务时使用<code>HTTP_PROXY=</code>——用于build的时更新下载软件，同时执行<code>docker build</code>的终端设置<code>http_proxy</code>和<code>https_proxy</code>用于下载Dockerfile）</p>
+<p>运行：<br><figure class="highlight applescript"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">$ docker <span class="built_in">run</span> -d <span class="comment">--name mysql -p 3306:3306 dockerfile/mysql</span></div><div class="line">或</div><div class="line">$ docker <span class="built_in">run</span> -<span class="keyword">it</span> <span class="comment">--rm --link mysql:mysql dockerfile/mysql bash -c 'mysql -h $MYSQL_PORT_3306_TCP_ADDR'</span></div></pre></td></tr></table></figure></p>
+<h3 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h3><ul>
+<li><a href="https://github.com/HoO-Group/docker-heat/wiki/Dockerfile-Reference" target="_blank" rel="external">Dockerfile Reference 中文</a></li>
+<li><a href="http://www.leiem.com/post-222.html" target="_blank" rel="external">Dockerfile详解</a></li>
+<li><a href="http://www.dockerpool.com/static/books/docker_practice/dockerfile/instructions.html" target="_blank" rel="external">dockerpool-build-instructions</a></li>
+<li><a href="https://docs.docker.com/reference/builder/" target="_blank" rel="external">https://docs.docker.com/reference/builder/</a></li>
+<li><a href="https://docs.docker.com/articles/dockerfile_best-practices/" target="_blank" rel="external">https://docs.docker.com/articles/dockerfile_best-practices/</a></li>
+<li><a href="http://syntaxsugar.cn/2014/07/09/dockerfile/" target="_blank" rel="external">http://syntaxsugar.cn/2014/07/09/dockerfile/</a></li>
+</ul>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/docker/" rel="tag">#docker</a>
+          
+            <a href="/tags/linux/" rel="tag">#linux</a>
+          
+            <a href="/tags/dockerfile/" rel="tag">#dockerfile</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2014/11/13/deploy-private-docker-registry-with-nginx-ssl/" rel="next" title="搭建docker内网私服（docker-registry with nginx&ssl on centos）">
+                <i class="fa fa-chevron-left"></i> 搭建docker内网私服（docker-registry with nginx&ssl on centos）
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2014/11/30/thoughts_about_graduate_from_course/" rel="prev" title="关于研究生的一点担忧">
+                关于研究生的一点担忧 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2014/11/17/dockerfile-introduction/"
+           data-title="Dockerfile指令详解" data-url="http://seanlook.com/2014/11/17/dockerfile-introduction/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#FROM"><span class="nav-text">FROM</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#RUN"><span class="nav-text">RUN</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ENTRYPORINT"><span class="nav-text">ENTRYPORINT</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#CMD"><span class="nav-text">CMD</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#EXPOSE"><span class="nav-text">EXPOSE</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ADD"><span class="nav-text">ADD</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#COPY"><span class="nav-text">COPY</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ENV"><span class="nav-text">ENV</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#VOLUME"><span class="nav-text">VOLUME</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#WORKDIR"><span class="nav-text">WORKDIR</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ONBUILD"><span class="nav-text">ONBUILD</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#USER"><span class="nav-text">USER</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#MAINTAINER"><span class="nav-text">MAINTAINER</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#The-dockerignore-file"><span class="nav-text">The .dockerignore file</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Dockerfile示例"><span class="nav-text">Dockerfile示例</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#参考"><span class="nav-text">参考</span></a></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

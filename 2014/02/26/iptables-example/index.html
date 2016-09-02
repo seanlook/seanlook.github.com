@@ -1,0 +1,895 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="iptables,安全," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="1. 普通规则1.1 操作规则
+iptables -nL查看本机关于iptables的设置情况，默认查看的是-t filter，可以指定-t nat
+iptables-save &amp;gt; iptables.rule会保存当前的防火墙规则设置，命令行下通过iptables配置的规则在下次重启后会失效，当然这也是为了防止错误的配置防火墙。默认读取和保存的配置文件地址为/etc/sysconfig/ip">
+<meta property="og:type" content="article">
+<meta property="og:title" content="iptables常用实例备查（更新中）">
+<meta property="og:url" content="http://seanlook.com/2014/02/26/iptables-example/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="1. 普通规则1.1 操作规则
+iptables -nL查看本机关于iptables的设置情况，默认查看的是-t filter，可以指定-t nat
+iptables-save &amp;gt; iptables.rule会保存当前的防火墙规则设置，命令行下通过iptables配置的规则在下次重启后会失效，当然这也是为了防止错误的配置防火墙。默认读取和保存的配置文件地址为/etc/sysconfig/ip">
+<meta property="og:updated_time" content="2016-08-02T09:50:59.869Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="iptables常用实例备查（更新中）">
+<meta name="twitter:description" content="1. 普通规则1.1 操作规则
+iptables -nL查看本机关于iptables的设置情况，默认查看的是-t filter，可以指定-t nat
+iptables-save &amp;gt; iptables.rule会保存当前的防火墙规则设置，命令行下通过iptables配置的规则在下次重启后会失效，当然这也是为了防止错误的配置防火墙。默认读取和保存的配置文件地址为/etc/sysconfig/ip">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title> iptables常用实例备查（更新中） | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                iptables常用实例备查（更新中）
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2014-02-26T01:21:25+08:00" content="2014-02-26">
+              2014-02-26
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2014/02/26/iptables-example/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2014/02/26/iptables-example/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h2 id="1-普通规则"><a href="#1-普通规则" class="headerlink" title="1. 普通规则"></a>1. 普通规则</h2><h3 id="1-1-操作规则"><a href="#1-1-操作规则" class="headerlink" title="1.1 操作规则"></a>1.1 操作规则</h3><ul>
+<li><code>iptables -nL</code><br>查看本机关于iptables的设置情况，默认查看的是<code>-t filter</code>，可以指定<code>-t nat</code></li>
+<li><p><code>iptables-save &gt; iptables.rule</code><br>会保存当前的防火墙规则设置，命令行下通过iptables配置的规则在下次重启后会失效，当然这也是为了防止错误的配置防火墙。默认读取和保存的配置文件地址为<code>/etc/sysconfig/iptables</code>。</p>
+</li>
+<li><p>设置chain默认策略</p>
+<figure class="highlight tp"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">iptables -<span class="keyword">P</span> INPUT DROP</div><div class="line">iptables -<span class="keyword">P</span> FORWARD <span class="keyword">ACC</span>EPT</div><div class="line">iptables -<span class="keyword">P</span> OUTPUT <span class="keyword">ACC</span>EPT</div></pre></td></tr></table></figure>
+</li>
+</ul>
+<p>将 INPUT 链默认处理策略设置为DROP，前提是已经存在一条可以访问22端口的规则。这里要说明的是，在添加这类拒绝访问的规则之前，一定要想好执行完，会不会把自己关在防火墙外面，不然就傻眼了。像下面这句。</p>
+<h3 id="1-2-限制访问规则"><a href="#1-2-限制访问规则" class="headerlink" title="1.2 限制访问规则"></a>1.2 限制访问规则</h3><ul>
+<li><p><code>iptables -I INPUT 1 -m state --state RELATED,ESTABLISHED -j ACCEPT</code><br>把这条语句插在input链的最前面（第一条），对状态为ESTABLISHED,RELATED的连接放行。<br>这条规则在某种情况下甚至比下面开放ssh服务都重要：① 如果INPUT连默认为DROP，② INPUT链默认为INPUT，但存在这条规则<code>-A INPUT -j REJECT --reject-with icmp-host-prohibited</code>，上面两种情况下都必须添加<code>--state RELATED,ESTABLISHED</code>为第一条，否则22端口无法通行，把自己锁在防火墙外面了。<br>有了这条规则，可保证只要当前ssh没有关闭，哪怕防火墙忘记开启22端口，也可以继续连接。</p>
+</li>
+<li><p><code>iptables -A INPUT -m state --state NEW -m tcp -p tcp --dport 22 -j ACCEPT</code><br>允许所有，不安全，默认。</p>
+</li>
+<li><p><code>iptables -A INPUT -s 172.29.73.0/24 -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT</code><br>限制指定IP范围能SSH，可取</p>
+</li>
+<li><p><code>iptables -A INPUT -s 10.30.0.0/16 -p tcp -m tcp -m multiport --dports 80,443 -j ACCEPT</code><br>允许一个IP段访问多个端口</p>
+</li>
+<li><p><code>iptables -A INPUT -s 10.30.26.0/24 -p tcp -m tcp --dport 80 -j DROP</code><br>禁止某IP段访问80端口，将<code>-j DROP</code>改成 <code>-j REJECT --reject-with icmp-host-prohibited</code>作用相同。</p>
+</li>
+</ul>
+<p><code>iptables -A INPUT -s 172.29.73.23 -j ACCEPT</code><br>完全信任某一主机，尽量不使用</p>
+<p><code>iptables -I INPUT 2 -i lo -j ACCEPT</code><br>允许loopback。回环接口是一个主机内部发送和接收数据的虚拟设备接口，应该放行所有数据包。指定插入位置为 2 则之前该编号为 2 规则依次后移。</p>
+<ul>
+<li><code>-A INPUT -p icmp -j ACCEPT</code><br>接受icmp数据包，可以ping。也可以设置只允许某个特定的IP，见后文。</li>
+</ul>
+<p><code>iptables -A INPUT -j REJECT --reject-with icmp-host-prohibited</code><br>这条规则用在INPUT链默没有DROP的情况，作用与<code>-P DROP</code>相同，当前面所有的规则都没匹配时，自然落到这个 REJECT 上。<br>类似的FORWARD链也可以这么用：<code>iptables -A FORWARD -j REJECT --reject-with icmp-host-prohibited</code>。</p>
+<p>当然，更强的规则是将<code>OUPUT</code>链也设置成DROP，这样一来情况就会复杂很多，如就是发送名解析请求，也要添加规则<code>iptables -A OUTPUT -p udp --dport 53 -j ACCEPT</code>。<br>正是因为这样的太过麻烦，所以一般OUTPUT策略默认为ACCEPT。（安全性比较高的系统除外）</p>
+<h3 id="1-3-删除规则"><a href="#1-3-删除规则" class="headerlink" title="1.3 删除规则"></a>1.3 删除规则</h3><ul>
+<li><p><code>iptables -nL --line-number</code><br>显示每条规则链的编号</p>
+</li>
+<li><p><code>iptables -D FORWARD 2</code><br>删除FORWARD链的第2条规则，编号由上一条得知。如果删除的是nat表中的链，记得带上<code>-t nat</code></p>
+</li>
+<li><p><code>iptables -D INPUT -j REJECT --reject-with icmp-host-prohibited</code><br>删除规则的第二种方法，所有选项要与要删除的规则都相同才能删除，否则提示<code>iptables: No chain/target/match by that name.</code></p>
+</li>
+<li><p>丢弃非法连接</p>
+<p>  iptables -A INPUT   -m state –state INVALID -j DROP<br>  iptables -A OUTPUT -m state –state INVALID -j DROP<br>  iptables-A FORWARD -m state –state INVALID -j DROP</p>
+</li>
+</ul>
+<h2 id="2-几种情形"><a href="#2-几种情形" class="headerlink" title="2. 几种情形"></a>2. 几种情形</h2><h3 id="2-1-端口转发"><a href="#2-1-端口转发" class="headerlink" title="2.1 端口转发"></a>2.1 端口转发</h3><p>首先要开启端口转发器必须先修改内核运行参数ip_forward,打开转发:<br><figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># echo 1 &gt; /proc/sys/net/ipv4/ip_forward   //此方法临时生效</span></div><div class="line">或</div><div class="line"><span class="meta"># vi /ect/sysctl.conf                      //此方法永久生效</span></div><div class="line"><span class="meta"># sysctl -p</span></div></pre></td></tr></table></figure></p>
+<p><strong>本机端口转发</strong></p>
+<pre><code># iptables -t nat -A PREROUTING -p tcp -m tcp --dport 80 -j REDIRECT --to-ports 8080
+</code></pre><p>根据 <a href="http://seanlook.com/2014/02/23/iptables-understand/">iptables防火墙原理详解</a> 可知，实际上在数据包进入INPUT链之前，修改了目标地址（端口），于是不难理解在开放端口时需要设置的是放行8080端口，无需考虑80：</p>
+<pre><code># iptables -A INPUT -s 172.29.88.0/24 -p tcp -m state --state NEW -m tcp --dport 8080 -j ACCEPT
+</code></pre><p>此时外部访问http的80端口便可自动转到8080（浏览器地址栏不会变），而且又具有很高的性能，但如果你通过服务器<strong>本地</strong>主机的curl或firfox浏览器访问<code>http://localhost:80</code>或<code>http://doman.com:80</code>都是不行（假如你有这样的奇葩需求），这是因为本地数据包产生的目标地址不对，你需要额外添加这条 OUTPUT 规则：</p>
+<pre><code>iptables -t nat -A OUTPUT -p tcp --dport 80 -j REDIRECT --to-ports 8080
+</code></pre><p>下面的规则可以达到同样的效果：</p>
+<pre><code>iptables -t nat -A PREROUTING -p tcp -i eth0 -d $YOUR_HOST_IP --dport 80 -j DNAT --to $YOUR_HOST_IP:8080
+iptables -t nat -A OUTPUT -p tcp -d $YOUR_HOST_IP --dport 80 -j DNAT --to 127.0.0.1:8080
+iptables -t nat -A OUTPUT -p tcp -d 127.0.0.1      --dport 80 -j DNAT --to 127.0.0.1:8080
+</code></pre><p><strong>异机端口转发</strong><br>有些情况下企业内部网络隔离比较严格，但有一个跨网段访问的情况，此时只要转发用的中转服务器能够与另外的两个IP(服务器或PC)通讯就可以使用iptables实现转发。（端口转发的还有其他方法，<a href="http://" target="_blank" rel="external">请参考 linux服务器下各种端口转发技巧</a> ）</p>
+<p>要实现的是所有访问 192.168.10.100:8000 的请求，转发到 172.29.88.56:80 上，在 192.168.10.100 是哪个添加规则:</p>
+<pre><code>iptables -t nat -A PREROUTING -i eth0 -p tcp -d 192.168.10.100 --dport 8000 -j DNAT --to-destination 172.29.88.56:80
+iptables -t nat -A POSTROUTING -o eth0 -j SNAT --to-source 192.168.10.100
+或者
+iptables -t nat -A PREROUTING -d 192.168.10.100 -p tcp --dport 8000 -j DNAT --to 172.29.88.56:80
+iptables -t nat -A POSTROUTING -d 172.29.88.56 -p tcp --dport 80 -j SNAT --to-source 192.168.10.100
+</code></pre><p>需要注意的是，如果你的FORWARD链默认为DROP，上面所有端口转发都必须建立在FORWARD链允许通行的情况下：</p>
+<pre><code>iptables -A FORWARD -d 172.29.88.56 -p tcp --dport 80 -j ACCEPT
+iptables -A FORWARD -s 172.29.88.56 -p tcp -j ACCEPT
+</code></pre><h3 id="2-2-记录日志"><a href="#2-2-记录日志" class="headerlink" title="2.2 记录日志"></a>2.2 记录日志</h3><p>为22端口的INPUT包增加日志功能，插在input的第1个规则前面，为避免日志信息塞满<code>/var/log/message</code>，用<code>--limit</code>限制：</p>
+<pre><code>iptables -R INPUT 1 -p tcp --dport 22 -m limit --limit 3/minute --limit-burst 8 -j LOG
+</code></pre><p><code>vi /etc/rsyslog.conf</code> 编辑日志配置文件，添加<code>kern.=notice   /var/log/iptables.log</code>，可以将日志记录到自定义的文件中。</p>
+<p><code>service rsyslog restart</code> #重启日志服务</p>
+<h3 id="2-3-防止DoS攻击"><a href="#2-3-防止DoS攻击" class="headerlink" title="2.3 防止DoS攻击"></a>2.3 防止DoS攻击</h3><p>SYN洪水是攻击者发送海量的SYN请求到目标服务器上的一种DoS攻击方法，下面的脚本用于预防轻量级的DoS攻击：<br><code>ipt-tcp.sh</code>：<br><figure class="highlight hsp"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line">iptables -N syn-flood   (如果您的防火墙默认配置有“ :syn-flood - [<span class="number">0</span>:<span class="number">0</span>] ”则不许要该项，因为重复了)</div><div class="line">iptables -A <span class="keyword">INPUT</span> -p tcp --syn -j syn-flood   </div><div class="line">iptables -I syn-flood -p tcp -m <span class="keyword">limit</span> --<span class="keyword">limit</span> <span class="number">2</span>/s --<span class="keyword">limit</span>-burst <span class="number">5</span> -j <span class="keyword">RETURN</span>   </div><div class="line">iptables -A syn-flood -j REJECT   </div><div class="line"><span class="meta"># 防止DOS太多连接进来,可以允许外网网卡每个IP最多<span class="number">15</span>个初始连接,超过的丢弃</span></div><div class="line"><span class="meta"># 需要iptables v1<span class="number">.4</span><span class="number">.19</span>以上版本：iptables -V </span></div><div class="line">iptables -A <span class="keyword">INPUT</span> -p tcp --syn -i eth0 --dport <span class="number">80</span> -m connlimit --connlimit-above <span class="number">20</span> --connlimit-mask <span class="number">24</span> -j DROP   </div><div class="line"></div><div class="line"><span class="meta">#用Iptables抵御DDOS (参数与上相同)   </span></div><div class="line">iptables -A <span class="keyword">INPUT</span> -p tcp --syn -m <span class="keyword">limit</span> --<span class="keyword">limit</span> <span class="number">5</span>/s --<span class="keyword">limit</span>-burst <span class="number">10</span> -j ACCEPT  </div><div class="line">iptables -A FORWARD -p tcp --syn -m <span class="keyword">limit</span> --<span class="keyword">limit</span> <span class="number">1</span>/s -j ACCEPT </div><div class="line"></div><div class="line">iptables -A FORWARD -p icmp -m <span class="keyword">limit</span> --<span class="keyword">limit</span> <span class="number">2</span>/s --<span class="keyword">limit</span>-burst <span class="number">10</span> -j ACCEPT</div><div class="line">iptables -A <span class="keyword">INPUT</span> -p icmp --icmp-type <span class="number">0</span> -s ! <span class="number">172.29</span><span class="number">.73</span><span class="number">.0</span>/<span class="number">24</span> -j DROP</div></pre></td></tr></table></figure></p>
+<p>请参考：<a href="http://www.cyberciti.biz/tips/linux-iptables-examples.html" target="_blank" rel="external">Linux: 20 Iptables Examples For New SysAdmins</a>、<a href="http://www.cyberciti.biz/faq/iptables-connection-limits-howto/" target="_blank" rel="external">Iptables Limits Connections Per IP</a>、<a href="http://blog.csdn.net/zqtsx/article/details/9405515" target="_blank" rel="external">iptables预防DDOS和CC攻击配置</a></p>
+<p><strong>参考</strong></p>
+<ul>
+<li><a href="http://wiki.centos.org/zh/HowTos/Network/IPTables" target="_blank" rel="external">IPTables wiki</a></li>
+<li><a href="http://www.ha97.com/4095.html" target="_blank" rel="external">iptables/netfilter详解中文手册</a></li>
+<li><a href="http://www.ha97.com/3928.html" target="_blank" rel="external">Linux的iptables常用配置范例</a></li>
+</ul>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/iptables/" rel="tag">#iptables</a>
+          
+            <a href="/tags/安全/" rel="tag">#安全</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2014/02/23/iptables-understand/" rel="next" title="iptables防火墙原理详解">
+                <i class="fa fa-chevron-left"></i> iptables防火墙原理详解
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2014/03/09/linux-bash/" rel="prev" title="高效Linux bash快捷键及alias总结">
+                高效Linux bash快捷键及alias总结 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2014/02/26/iptables-example/"
+           data-title="iptables常用实例备查（更新中）" data-url="http://seanlook.com/2014/02/26/iptables-example/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-普通规则"><span class="nav-text">1. 普通规则</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-操作规则"><span class="nav-text">1.1 操作规则</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-限制访问规则"><span class="nav-text">1.2 限制访问规则</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-3-删除规则"><span class="nav-text">1.3 删除规则</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-几种情形"><span class="nav-text">2. 几种情形</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-端口转发"><span class="nav-text">2.1 端口转发</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-记录日志"><span class="nav-text">2.2 记录日志</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-防止DoS攻击"><span class="nav-text">2.3 防止DoS攻击</span></a></li></ol></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

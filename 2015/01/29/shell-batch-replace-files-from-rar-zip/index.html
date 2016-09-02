@@ -1,0 +1,866 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="shell,script," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="本需求是自己负责的一个生产系统上，有大量以zip和rar结尾的压缩文件散落在文件系统的各个文件夹，先在需要把压缩包里包含某一个特定文件（如tftpd32.exe或Tftpd32.exe，版本较旧），全都替换成比较新的tftpd32.exe版本。压缩文件总数约5000个，需要替换的数量约1500个。
+因为是生产环境，不敢轻易乱动，所以脚本考虑的因素就非常多，不允许中间执行过程出现异常，所以找到文件后">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Linux下rar及zip压缩包中批量替换某文件脚本">
+<meta property="og:url" content="http://seanlook.com/2015/01/29/shell-batch-replace-files-from-rar-zip/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="本需求是自己负责的一个生产系统上，有大量以zip和rar结尾的压缩文件散落在文件系统的各个文件夹，先在需要把压缩包里包含某一个特定文件（如tftpd32.exe或Tftpd32.exe，版本较旧），全都替换成比较新的tftpd32.exe版本。压缩文件总数约5000个，需要替换的数量约1500个。
+因为是生产环境，不敢轻易乱动，所以脚本考虑的因素就非常多，不允许中间执行过程出现异常，所以找到文件后">
+<meta property="og:updated_time" content="2015-01-30T03:46:23.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Linux下rar及zip压缩包中批量替换某文件脚本">
+<meta name="twitter:description" content="本需求是自己负责的一个生产系统上，有大量以zip和rar结尾的压缩文件散落在文件系统的各个文件夹，先在需要把压缩包里包含某一个特定文件（如tftpd32.exe或Tftpd32.exe，版本较旧），全都替换成比较新的tftpd32.exe版本。压缩文件总数约5000个，需要替换的数量约1500个。
+因为是生产环境，不敢轻易乱动，所以脚本考虑的因素就非常多，不允许中间执行过程出现异常，所以找到文件后">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title> Linux下rar及zip压缩包中批量替换某文件脚本 | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                Linux下rar及zip压缩包中批量替换某文件脚本
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2015-01-29T18:21:25+08:00" content="2015-01-29">
+              2015-01-29
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/01/29/shell-batch-replace-files-from-rar-zip/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/01/29/shell-batch-replace-files-from-rar-zip/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>本需求是自己负责的一个生产系统上，有大量以zip和rar结尾的压缩文件散落在文件系统的各个文件夹，先在需要把压缩包里包含某一个特定文件（如tftpd32.exe或Tftpd32.exe，版本较旧），全都替换成比较新的tftpd32.exe版本。压缩文件总数约5000个，需要替换的数量约1500个。</p>
+<p>因为是生产环境，不敢轻易乱动，所以脚本考虑的因素就非常多，不允许中间执行过程出现异常，所以找到文件后实际执行替换操作之前做好备份，并且将操作过程记录日志。</p>
+<p>以下几点需要考虑：</p>
+<ul>
+<li>分别处理zip和rar文件，为减低脚本的复杂程度，分作两个shell脚本。</li>
+<li>rar在Linux下默认是没有安装解压缩工具，下载rarlinux-x64-5.2.0.tar.gz</li>
+<li>zip包中文件含有中文文件名，unzip测试解压缩或列出内容时出现文件名乱码，原因是zip在压缩时不记录当时的编码格式。这个问题非常棘手，乱码打进压缩包是绝对不允许的，网上<a href="http://www.zhihu.com/question/20523036" target="_blank" rel="external">有几种解压办法</a>有几种办法都不能很好的应对我的场景：并不需要实际解压zip文件，而只需使用 <code>l</code> ——列出文件列表、获取目录及文件名，<code>d</code> ——从压缩包中直接删除某个文件，<code>a</code> ——向压缩包添加一个文件。实际解压到文件系统上是不是乱码我们并不关心。<br>最后的解决办法是使用<code>p7zip</code>工具，配合<code>LANG</code>变量解决。</li>
+<li>向压缩包里添加新文件时，要保持里面的目录结构，则必须在文件系统上存在同样的 相对目录/文件 。所以每次都要在脚本执行目录下创建临时目录tmp_dir，还要及时删除。但如果文件在压缩包的根目录下，这个临时目录就是当前脚本执行目录。</li>
+<li>有可能会存在一个压缩包中多个文件夹中包含不止一个tftpd32.exe文件。</li>
+<li>每个文件都有一个CRC值，处理文件名大小写不同但实质是同一个文件时有效。</li>
+</ul>
+<a id="more"></a>
+<p>以下脚本使用说明：</p>
+<ul>
+<li>变量说明<ul>
+<li><code>filelist</code> 变量设定你所需要检查的压缩文件列表（绝对路径），可以通过<code>find /your/dir/ -name *.rar | sort | uniq  &gt; testfile</code>。与脚本在相同目录下，并且为unix格式</li>
+<li><code>existlist</code> 变量是从<code>filelist</code>文件中得到的包含特定文件的列表，脚本执行完后可以查看</li>
+<li><code>errorlist</code> 变量是从<code>filelist</code>文件列表中得到的不包含特定文件的列表，当然也有可能这个压缩文件本身不完整</li>
+<li><code>filebak</code> 变量指定要替换的那个压缩文件备份的目录</li>
+<li><code>oldfile</code> 指定要替换的那个文件名</li>
+<li><code>newfile</code> 指定新文件的文件名，注意这个文件一定要在脚本当前目录下</li>
+<li><code>binrar</code>,<code>bin7z</code> 指定解压缩命令目录，因为<code>7z</code>和<code>rar</code>都不是CentOS自带的</li>
+<li><code>fl</code> 是<code>filelist</code>文件列表里的每一条记录</li>
+<li><code>exist</code> 压缩文件<code>fl</code>的内容列表里包含tftpd32.exe的记录，可能有多行</li>
+<li><code>dirfiles</code> 处理<code>exist</code>的结果，形如压缩包里的目录结构 <code>your/dir/tftpd32.exe</code>，可能有多行</li>
+<li><code>df</code> 是<code>dirfiles</code>中的单行记录，它的前面目录部分便是<code>tmp_dir</code></li>
+</ul>
+</li>
+<li>是否有必要root用户执行看个人情况，执行后部分文件的属主可能会变，可用<code>chown user1.user1 -R /your/dir/</code>恢复</li>
+<li>有部分zip文件无法使用7z，但文件本身正常，从日志可以看到error信息</li>
+<li>tftpd32.exe区分大小写，如果要查找替换Tftpd32.exe请修改后在执行（确保grep没有<code>-i</code>选项）</li>
+<li>可以处理的情况<ul>
+<li>压缩文件中无tftpd32.exe</li>
+<li>要替换的tftpd32.exe文件在压缩文件根目录下</li>
+<li>要替换的tftpd32.exe在嵌套子目录中</li>
+<li>压缩文件中存在多个tftpd32.exe</li>
+<li>压缩文件本身存在问题</li>
+</ul>
+</li>
+<li>该脚本有一定的危险性（虽然已备份），在正式环境中运行之前一定要多做测试。并且运行一次之后，谨慎运行第二次，因为可能会导致备份被覆盖（可换备份目录）</li>
+<li>假如出现异常，要从备份文件恢复所有修改的文件，可以根据<code>$existlist</code>和<code>filebak</code>下的目录列表拼凑<code>cp</code>语句</li>
+<li>建议执行方法<code>./rar_new.sh | tee your.log</code>，事后可从<code>your.log</code>中查看日志</li>
+</ul>
+<p>处理rar的脚本<code>rar_new.sh</code>:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#!/bin/bash</span></div><div class="line"></div><div class="line">filelist=<span class="string">"testfile"</span></div><div class="line"><span class="comment"># filelist="crm_rar.txt"</span></div><div class="line">existlist=<span class="string">"<span class="variable">$&#123;filelist&#125;</span>.exist"</span></div><div class="line">errorlist=<span class="string">"<span class="variable">$&#123;filelist&#125;</span>.not"</span></div><div class="line">filebak=<span class="string">"/crmbak/rarbak"</span></div><div class="line">oldfile=tftpd32.exe                                                                                                                                          </div><div class="line">newfile=tftpd32.exe</div><div class="line">binrar=<span class="string">"/usr/bin/rar"</span></div><div class="line"></div><div class="line">IFS=$<span class="string">'\n'</span></div><div class="line"></div><div class="line"><span class="built_in">echo</span> <span class="string">"files list bellow have <span class="variable">$&#123;oldfile&#125;</span>:"</span> &gt; <span class="variable">$existlist</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"files list bellow do not have <span class="variable">$&#123;oldfile&#125;</span> or may have error:"</span> &gt; <span class="variable">$errorlist</span></div><div class="line"></div><div class="line"><span class="keyword">for</span> fl <span class="keyword">in</span> `cat <span class="variable">$filelist</span>`</div><div class="line">  <span class="keyword">do</span> </div><div class="line">    <span class="comment"># $&#123;oldfile&#125; exist or not, file error or not</span></div><div class="line">    exist=`<span class="variable">$binrar</span> l <span class="variable">$fl</span> |grep <span class="variable">$&#123;oldfile&#125;</span>`</div><div class="line">    <span class="keyword">if</span> [ $? <span class="_">-ne</span> 0 ];<span class="keyword">then</span></div><div class="line">       <span class="built_in">echo</span> <span class="string">"<span class="variable">$fl</span>"</span> &gt;&gt; <span class="variable">$errorlist</span></div><div class="line">       <span class="built_in">continue</span></div><div class="line">    <span class="keyword">else</span></div><div class="line">        <span class="comment"># get extracting dir and filename, could be more than one file</span></div><div class="line">       dirfiles=`<span class="built_in">echo</span> <span class="string">"<span class="variable">$exist</span>"</span> | awk <span class="string">'&#123;for (i=5;i&lt;=NF;i++) printf $i" " ; print ""&#125;'</span>`</div><div class="line">    <span class="keyword">fi</span></div><div class="line"></div><div class="line"><span class="comment">#    echo "$exist"</span></div><div class="line"></div><div class="line">    <span class="keyword">if</span> [ <span class="string">"<span class="variable">$dirfiles</span>"</span> != <span class="string">""</span> ];<span class="keyword">then</span></div><div class="line">      <span class="built_in">echo</span> <span class="string">"<span class="variable">$fl</span>"</span> | tee <span class="_">-a</span> <span class="variable">$existlist</span></div><div class="line">      <span class="comment"># backup original file</span></div><div class="line">      /bin/cp -af <span class="string">"<span class="variable">$fl</span>"</span> <span class="string">"<span class="variable">$filebak</span>/"</span></div><div class="line">      <span class="built_in">echo</span> <span class="string">"--- <span class="variable">$fl</span> is backed up in <span class="variable">$filebak</span>"</span></div><div class="line">      <span class="built_in">echo</span> <span class="string">"    <span class="variable">$dirfiles</span>"</span></div><div class="line"></div><div class="line">      <span class="keyword">for</span> df <span class="keyword">in</span> `<span class="built_in">echo</span> <span class="string">"<span class="variable">$dirfiles</span>"</span>`</div><div class="line">        <span class="keyword">do</span></div><div class="line">          <span class="comment"># create temp directory to put new $&#123;newfile&#125; for compress</span></div><div class="line">          tmp_dir=$( <span class="built_in">echo</span> <span class="string">"<span class="variable">$df</span>"</span> | awk -F <span class="string">'/'</span> <span class="string">'&#123;for(i=1;i&lt;NF;i++) printf"%s/",$i&#125; &#123;print ""&#125;'</span> )</div><div class="line">          <span class="keyword">if</span> [ <span class="variable">$&#123;#tmp_dir&#125;</span> <span class="_">-ne</span> 0 ];<span class="keyword">then</span></div><div class="line">            mkdir -p <span class="string">"<span class="variable">$tmp_dir</span>"</span> &amp;&amp; cp -af <span class="variable">$&#123;newfile&#125;</span> <span class="string">"<span class="variable">$tmp_dir</span>"</span></div><div class="line">          <span class="keyword">fi</span> </div><div class="line">          <span class="comment"># start delete old file and add new one</span></div><div class="line">          <span class="variable">$binrar</span> d <span class="string">"<span class="variable">$fl</span>"</span> <span class="string">"<span class="variable">$tmp_dir</span>"</span><span class="variable">$&#123;oldfile&#125;</span> &amp;&amp; <span class="variable">$binrar</span> a <span class="string">"<span class="variable">$fl</span>"</span> <span class="string">"<span class="variable">$tmp_dir</span>"</span><span class="variable">$&#123;newfile&#125;</span></div><div class="line">          <span class="keyword">if</span> [ $? <span class="_">-ne</span> 0 ];<span class="keyword">then</span>                                                                                                                             </div><div class="line">            <span class="built_in">echo</span> <span class="string">"--- rar file <span class="variable">$fl</span> may have error, you SHOULD check it"</span></div><div class="line">          <span class="keyword">fi</span></div><div class="line"></div><div class="line">          <span class="keyword">if</span> [ <span class="variable">$&#123;#tmp_dir&#125;</span> <span class="_">-ne</span> 0 ];<span class="keyword">then</span></div><div class="line">            rm <span class="_">-f</span> <span class="string">"<span class="variable">$tmp_dir</span>"</span><span class="variable">$&#123;newfile&#125;</span> &amp;&amp; rmdir -p <span class="string">"<span class="variable">$tmp_dir</span>"</span></div><div class="line">            <span class="keyword">if</span> [ $? <span class="_">-ne</span> 0 ];<span class="keyword">then</span></div><div class="line">              <span class="built_in">echo</span> <span class="string">"--- tmp_dir <span class="variable">$tmp_dir</span> delete fail"</span></div><div class="line">            <span class="keyword">fi</span></div><div class="line">          <span class="keyword">fi</span></div><div class="line">        <span class="keyword">done</span></div><div class="line"></div><div class="line">      <span class="built_in">echo</span> <span class="string">"--- old deleted, new added"</span></div><div class="line">    <span class="keyword">fi</span></div><div class="line"></div><div class="line">  <span class="keyword">done</span></div></pre></td></tr></table></figure>
+<p>处理zip的脚本<code>zip_new.sh</code>:(两脚本相差很小，主要是为了谨慎起见减低脚本的复杂度)</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#!/bin/bash</span></div><div class="line"></div><div class="line"><span class="comment"># filelist="test_filelist"</span></div><div class="line">filelist=<span class="string">"crm_zip.txt"</span></div><div class="line">existlist=<span class="string">"<span class="variable">$&#123;filelist&#125;</span>.exist"</span></div><div class="line">errorlist=<span class="string">"<span class="variable">$&#123;filelist&#125;</span>.not"</span></div><div class="line">filebak=<span class="string">"/crmbak/zipbak"</span></div><div class="line">oldfile=tftpd32.exe</div><div class="line">newfile=tftpd32.exe</div><div class="line">bin7z=<span class="string">"/usr/bin/7z"</span></div><div class="line"></div><div class="line"><span class="built_in">export</span> LANG=<span class="string">"zh_CN.GB18030"</span></div><div class="line">IFS=$<span class="string">'\n'</span></div><div class="line"></div><div class="line"><span class="built_in">echo</span> <span class="string">"files list bellow have <span class="variable">$&#123;oldfile&#125;</span>:"</span> &gt; <span class="variable">$existlist</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"files list bellow do not have <span class="variable">$&#123;oldfile&#125;</span> or may have error:"</span> &gt; <span class="variable">$errorlist</span></div><div class="line"></div><div class="line"><span class="keyword">for</span> fl <span class="keyword">in</span> `cat <span class="variable">$filelist</span>`</div><div class="line">  <span class="keyword">do</span> </div><div class="line">    <span class="comment"># $&#123;oldfile&#125; exist or not, file error or not</span></div><div class="line">    exist=`<span class="variable">$bin7z</span> l <span class="variable">$fl</span> |grep <span class="variable">$&#123;oldfile&#125;</span>`</div><div class="line">    <span class="keyword">if</span> [ $? <span class="_">-ne</span> 0 ];<span class="keyword">then</span></div><div class="line">       <span class="built_in">echo</span> <span class="string">"<span class="variable">$fl</span>"</span> &gt;&gt; <span class="variable">$errorlist</span></div><div class="line">       <span class="built_in">continue</span></div><div class="line">    <span class="keyword">else</span></div><div class="line">        <span class="comment"># get extracting dir and filename, could be more than one file</span></div><div class="line">       dirfiles=`<span class="built_in">echo</span> <span class="string">"<span class="variable">$exist</span>"</span> | awk <span class="string">'&#123;for (i=6;i&lt;=NF;i++) printf $i" " ; print ""&#125;'</span>`</div><div class="line">    <span class="keyword">fi</span></div><div class="line"></div><div class="line"><span class="comment"># echo ===== "$dirfiles"</span></div><div class="line"></div><div class="line">    <span class="keyword">if</span> [ <span class="string">"<span class="variable">$dirfiles</span>"</span> != <span class="string">""</span> ];<span class="keyword">then</span></div><div class="line">      <span class="built_in">echo</span> <span class="string">"<span class="variable">$fl</span>"</span> | tee <span class="_">-a</span> <span class="variable">$existlist</span></div><div class="line">      <span class="comment"># backup original file</span></div><div class="line">      /bin/cp -af <span class="string">"<span class="variable">$fl</span>"</span> <span class="string">"<span class="variable">$filebak</span>/"</span></div><div class="line">      <span class="built_in">echo</span> <span class="string">"--- <span class="variable">$fl</span> is backed up in <span class="variable">$filebak</span>"</span></div><div class="line">      <span class="built_in">echo</span> <span class="string">"    <span class="variable">$dirfiles</span>"</span></div><div class="line"></div><div class="line">      <span class="keyword">for</span> df <span class="keyword">in</span> `<span class="built_in">echo</span> <span class="string">"<span class="variable">$dirfiles</span>"</span>`</div><div class="line">        <span class="keyword">do</span></div><div class="line">          <span class="comment"># create temp directory to put new $&#123;newfile&#125; for compress</span></div><div class="line">          tmp_dir=$( <span class="built_in">echo</span> <span class="string">"<span class="variable">$df</span>"</span> | awk -F <span class="string">'/'</span> <span class="string">'&#123;for(i=1;i&lt;NF;i++) printf"%s/",$i&#125; &#123;print ""&#125;'</span> )</div><div class="line">          <span class="keyword">if</span> [ <span class="variable">$&#123;#tmp_dir&#125;</span> <span class="_">-ne</span> 0 ];<span class="keyword">then</span></div><div class="line">            mkdir -p <span class="string">"<span class="variable">$tmp_dir</span>"</span> &amp;&amp; cp -af <span class="variable">$&#123;newfile&#125;</span> <span class="string">"<span class="variable">$tmp_dir</span>"</span></div><div class="line">          <span class="keyword">fi</span> </div><div class="line">          <span class="comment"># start delete old file and add new one</span></div><div class="line">          <span class="variable">$bin7z</span> d <span class="string">"<span class="variable">$fl</span>"</span> <span class="string">"<span class="variable">$tmp_dir</span>"</span><span class="variable">$&#123;oldfile&#125;</span> &amp;&amp; <span class="variable">$bin7z</span> a <span class="string">"<span class="variable">$fl</span>"</span> <span class="string">"<span class="variable">$tmp_dir</span>"</span><span class="variable">$&#123;newfile&#125;</span></div><div class="line">          <span class="keyword">if</span> [ $? <span class="_">-ne</span> 0 ];<span class="keyword">then</span>                                                                                                                             </div><div class="line">            <span class="built_in">echo</span> <span class="string">"--- zip file <span class="variable">$fl</span> may have error, you SHOULD check it"</span></div><div class="line">          <span class="keyword">fi</span></div><div class="line"> </div><div class="line">          <span class="keyword">if</span> [ <span class="variable">$&#123;#tmp_dir&#125;</span> <span class="_">-ne</span> 0 ];<span class="keyword">then</span></div><div class="line">            rm <span class="_">-f</span> <span class="string">"<span class="variable">$tmp_dir</span>"</span><span class="variable">$&#123;newfile&#125;</span> &amp;&amp; rmdir -p <span class="string">"<span class="variable">$tmp_dir</span>"</span></div><div class="line">            <span class="keyword">if</span> [ $? <span class="_">-ne</span> 0 ];<span class="keyword">then</span></div><div class="line">              <span class="built_in">echo</span> <span class="string">"--- tmp_dir <span class="variable">$tmp_dir</span> delete fail"</span></div><div class="line">            <span class="keyword">fi</span></div><div class="line">          <span class="keyword">fi</span></div><div class="line">        <span class="keyword">done</span></div><div class="line"></div><div class="line">      <span class="built_in">echo</span> <span class="string">"--- old deleted, new added"</span></div><div class="line">    <span class="keyword">fi</span></div><div class="line"></div><div class="line">  <span class="keyword">done</span></div></pre></td></tr></table></figure>
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/shell/" rel="tag">#shell</a>
+          
+            <a href="/tags/script/" rel="tag">#script</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2015/01/22/openldap_ldif_example/" rel="next" title="LDIF修改ldap记录或配置示例">
+                <i class="fa fa-chevron-left"></i> LDIF修改ldap记录或配置示例
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2015/02/03/docker-kubernetes-arch-introduction/" rel="prev" title="开源容器集群管理系统Kubernetes架构及组件介绍">
+                开源容器集群管理系统Kubernetes架构及组件介绍 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2015/01/29/shell-batch-replace-files-from-rar-zip/"
+           data-title="Linux下rar及zip压缩包中批量替换某文件脚本" data-url="http://seanlook.com/2015/01/29/shell-batch-replace-files-from-rar-zip/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <p class="post-toc-empty">This post does not have a Table of Contents</p>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

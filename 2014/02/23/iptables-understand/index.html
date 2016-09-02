@@ -1,0 +1,924 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="iptables,安全," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="1. netfilter与iptablesNetfilter是由Rusty Russell提出的Linux 2.4内核防火墙框架，该框架既简洁又灵活，可实现安全策略应用中的许多功能，如数据包过滤、数据包处理、地址伪装、透明代理、动态网络地址转换(Network Address Translation，NAT)，以及基于用户及媒体访问控制(Media Access Control，MAC)地址的过滤">
+<meta property="og:type" content="article">
+<meta property="og:title" content="iptables防火墙原理详解">
+<meta property="og:url" content="http://seanlook.com/2014/02/23/iptables-understand/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="1. netfilter与iptablesNetfilter是由Rusty Russell提出的Linux 2.4内核防火墙框架，该框架既简洁又灵活，可实现安全策略应用中的许多功能，如数据包过滤、数据包处理、地址伪装、透明代理、动态网络地址转换(Network Address Translation，NAT)，以及基于用户及媒体访问控制(Media Access Control，MAC)地址的过滤">
+<meta property="og:image" content="http://sean-images.qiniudn.com/iptables-netfilter.png">
+<meta property="og:image" content="http://sean-images.qiniudn.com/iptables-routing.jpg">
+<meta property="og:image" content="http://sean-images.qiniudn.com/iptables-cli.png">
+<meta property="og:updated_time" content="2016-08-02T09:50:59.870Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="iptables防火墙原理详解">
+<meta name="twitter:description" content="1. netfilter与iptablesNetfilter是由Rusty Russell提出的Linux 2.4内核防火墙框架，该框架既简洁又灵活，可实现安全策略应用中的许多功能，如数据包过滤、数据包处理、地址伪装、透明代理、动态网络地址转换(Network Address Translation，NAT)，以及基于用户及媒体访问控制(Media Access Control，MAC)地址的过滤">
+<meta name="twitter:image" content="http://sean-images.qiniudn.com/iptables-netfilter.png">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title> iptables防火墙原理详解 | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                iptables防火墙原理详解
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2014-02-23T01:21:25+08:00" content="2014-02-23">
+              2014-02-23
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2014/02/23/iptables-understand/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2014/02/23/iptables-understand/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h1 id="1-netfilter与iptables"><a href="#1-netfilter与iptables" class="headerlink" title="1. netfilter与iptables"></a>1. netfilter与iptables</h1><p>Netfilter是由Rusty Russell提出的Linux 2.4内核防火墙框架，该框架既简洁又灵活，可实现安全策略应用中的许多功能，如数据包过滤、数据包处理、地址伪装、透明代理、动态网络地址转换(Network Address Translation，NAT)，以及基于用户及媒体访问控制(Media Access Control，MAC)地址的过滤和基于状态的过滤、包速率限制等。Iptables/Netfilter的这些规则可以通过灵活组合，形成非常多的功能、涵盖各个方面，这一切都得益于它的优秀设计思想。</p>
+<p>Netfilter是Linux操作系统核心层内部的一个数据包处理模块，它具有如下功能：</p>
+<ul>
+<li>网络地址转换(Network Address Translate)</li>
+<li>数据包内容修改</li>
+<li>以及数据包过滤的防火墙功能</li>
+</ul>
+<p>Netfilter 平台中制定了数据包的五个挂载点（Hook Point，我们可以理解为回调函数点，数据包到达这些位置的时候会主动调用我们的函数，使我们有机会能在数据包路由的时候改变它们的方向、内容），这5个挂载点分别是<code>PRE_ROUTING</code>、<code>INPUT</code>、<code>OUTPUT</code>、<code>FORWARD</code>、<code>POST_ROUTING</code>。</p>
+<p>Netfilter 所设置的规则是存放在内核内存中的，而 iptables 是一个应用层的应用程序，它通过 Netfilter 放出的接口来对存放在内核内存中的 XXtables（Netfilter的配置表）进行修改。这个XXtables由表<code>tables</code>、链<code>chains</code>、规则<code>rules</code>组成，iptables在应用层负责修改这个规则文件。类似的应用程序还有 firewalld 。</p>
+<p><img src="http://sean-images.qiniudn.com/iptables-netfilter.png" alt="iptables-netfilter"></p>
+<a id="more"></a>
+<h2 id="1-1-filter、nat、mangle等规则表"><a href="#1-1-filter、nat、mangle等规则表" class="headerlink" title="1.1 filter、nat、mangle等规则表"></a>1.1 filter、nat、mangle等规则表</h2><p><strong>filter表</strong></p>
+<p>主要用于对数据包进行过滤，根据具体的规则决定是否放行该数据包（如DROP、ACCEPT、REJECT、LOG）。filter 表对应的内核模块为iptable_filter，包含三个规则链：</p>
+<ul>
+<li><code>INPUT</code>链：INPUT针对那些目的地是本地的包</li>
+<li><code>FORWARD</code>链：FORWARD过滤所有不是本地产生的并且目的地不是本地(即本机只是负责转发)的包</li>
+<li><code>OUTPUT</code>链：OUTPUT是用来过滤所有本地生成的包</li>
+</ul>
+<p><strong>nat表</strong></p>
+<p>主要用于修改数据包的IP地址、端口号等信息（网络地址转换，如SNAT、DNAT、MASQUERADE、REDIRECT）。属于一个流的包(因为包<br>的大小限制导致数据可能会被分成多个数据包)只会经过这个表一次。如果第一个包被允许做NAT或Masqueraded，那么余下的包都会自动地被做相同的操作，也就是说，余下的包不会再通过这个表。表对应的内核模块为 iptable_nat，包含三个链：</p>
+<ul>
+<li><code>PREROUTING</code>链：作用是在包刚刚到达防火墙时改变它的目的地址</li>
+<li><code>OUTPUT</code>链：改变本地产生的包的目的地址</li>
+<li><code>POSTROUTING</code>链：在包就要离开防火墙之前改变其源地址</li>
+</ul>
+<p><strong>mangle表</strong></p>
+<p>主要用于修改数据包的TOS（Type Of Service，服务类型）、TTL（Time To Live，生存周期）指以及为数据包设置Mark标记，以实现Qos(Quality Of Service，服务质量)调整以及策略路由等应用，由于需要相应的路由设备支持，因此应用并不广泛。包含五个规则链——PREROUTING，POSTROUTING，INPUT，OUTPUT，FORWARD。</p>
+<p><strong>raw表</strong></p>
+<p>是自1.2.9以后版本的iptables新增的表，主要用于决定数据包是否被状态跟踪机制处理。在匹配数据包时，raw表的规则要优先于其他表。包含两条规则链——OUTPUT、PREROUTING</p>
+<p>iptables中数据包和4种被跟踪连接的4种不同状态：</p>
+<ul>
+<li><code>NEW</code>：该包想要开始一个连接（重新连接或将连接重定向）</li>
+<li><code>RELATED</code>：该包是属于某个已经建立的连接所建立的新连接。例如：FTP的数据传输连接就是控制连接所 RELATED出来的连接。<code>--icmp-type  0</code> ( ping 应答) 就是<code>--icmp-type 8</code> (ping 请求)所RELATED出来的。</li>
+<li><code>ESTABLISHED</code> ：只要发送并接到应答，一个数据连接从NEW变为ESTABLISHED,而且该状态会继续匹配这个连接的后续数据包。</li>
+<li><code>INVALID</code>：数据包不能被识别属于哪个连接或没有任何状态比如内存溢出，收到不知属于哪个连接的ICMP错误信息，一般应该DROP这个状态的任何数据。</li>
+</ul>
+<h2 id="1-2-INPUT、FORWARD等规则链和规则"><a href="#1-2-INPUT、FORWARD等规则链和规则" class="headerlink" title="1.2 INPUT、FORWARD等规则链和规则"></a>1.2 INPUT、FORWARD等规则链和规则</h2><p>在处理各种数据包时，根据防火墙规则的不同介入时机，iptables供涉及5种默认规则链，从应用时间点的角度理解这些链：</p>
+<ul>
+<li><code>INPUT</code>链：当接收到防火墙本机地址的数据包（入站）时，应用此链中的规则。</li>
+<li><code>OUTPUT</code>链：当防火墙本机向外发送数据包（出站）时，应用此链中的规则。</li>
+<li><code>FORWARD</code>链：当接收到需要通过防火墙发送给其他地址的数据包（转发）时，应用此链中的规则。</li>
+<li><code>PREROUTING</code>链：在对数据包作路由选择之前，应用此链中的规则，如DNAT。</li>
+<li><code>POSTROUTING</code>链：在对数据包作路由选择之后，应用此链中的规则，如SNAT。</li>
+</ul>
+<figure class="highlight coq"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">--&gt;PREROUTING--&gt;[ROUTE]--&gt;FORWARD--&gt;POSTROUTING--&gt;</div><div class="line">     mangle        |       <span class="type">mangle</span>        ^ mangle</div><div class="line">      nat          |       <span class="type">filter</span>        |  <span class="type">nat</span></div><div class="line">                   |                     <span class="type">|</span></div><div class="line">                   |                     |</div><div class="line">                   v                     |</div><div class="line">                 <span class="type">INPUT</span>                 OUTPUT</div><div class="line">                   | <span class="type">mangle</span>              ^ mangle</div><div class="line">                   | <span class="type">filter</span>              |  <span class="type">nat</span></div><div class="line">                   v ------&gt;local-------&gt;| <span class="type">filter</span></div></pre></td></tr></table></figure>
+<p>其中中INPUT、OUTPUT链更多的应用在“主机防火墙”中，即主要针对服务器本机进出数据的安全控制；而FORWARD、PREROUTING、POSTROUTING链更多的应用在“网络防火墙”中，特别是防火墙服务器作为网关使用时的情况。</p>
+<p><strong>防火墙处理数据包的方式（规则）：</strong></p>
+<ul>
+<li><code>ACCEPT</code>：允许数据包通过</li>
+<li><code>DROP</code>：直接丢弃数据包，不给任何回应信息</li>
+<li><p><code>REJECT</code>：拒绝数据包通过，必要时会给数据发送端一个响应的信息。</p>
+</li>
+<li><p><code>SNAT</code>：源地址转换。在进入路由层面的route之前，重新改写源地址，目标地址不变，并在本机建立NAT表项，当数据返回时，根据NAT表将目的地址数据改写为数据发送出去时候的源地址，并发送给主机。解决内网用户用同一个公网地址上网的问题。<br><code>MASQUERADE</code>，是SNAT的一种特殊形式，适用于像adsl这种临时会变的ip上</p>
+</li>
+<li><p><code>DNAT</code>:目标地址转换。和SNAT相反，IP包经过route之后、出本地的网络栈之前，重新修改目标地址，源地址不变，在本机建立NAT表项，当数据返回时，根据NAT表将源地址修改为数据发送过来时的目标地址，并发给远程主机。可以隐藏后端服务器的真实地址。<br><code>REDIRECT</code>：是DNAT的一种特殊形式，将网络包转发到本地host上（不管IP头部指定的目标地址是啥），方便在本机做端口转发。</p>
+</li>
+<li><p><code>LOG</code>：在/var/log/messages文件中记录日志信息，然后将数据包传递给下一条规则</p>
+</li>
+</ul>
+<p>除去最后一个<code>LOG</code>，前3条规则匹配数据包后，该数据包不会再往下继续匹配了，所以编写的规则顺序极其关键。</p>
+<h1 id="2-Linux数据包路由原理"><a href="#2-Linux数据包路由原理" class="headerlink" title="2.  Linux数据包路由原理"></a>2.  Linux数据包路由原理</h1><p>我们已经知道了Netfilter和Iptables的架构和作用，并且学习了控制Netfilter行为的Xtables表的结构，那么这个Xtables表是怎么在内核协议栈的数据包路由中起作用的呢？</p>
+<p>网口数据包由底层的网卡NIC接收，通过数据链路层的解包之后(去除数据链路帧头)，就进入了TCP/IP协议栈(本质就是一个处理网络数据包的内核驱动)和Netfilter混合的数据包处理流程中了。数据包的接收、处理、转发流程构成一个有限状态向量机，经过一些列的内核处理函数、以及Netfilter Hook点，最后被转发、或者本次上层的应用程序消化掉。是时候看这张图了：<br><img src="http://sean-images.qiniudn.com/iptables-routing.jpg" alt="iptables-routing"></p>
+<p>从上图中，我们可以总结出以下规律：</p>
+<ul>
+<li>当一个数据包进入网卡时，数据包首先进入PREROUTING链，在PREROUTING链中我们有机会修改数据包的DestIP(目的IP)，然后内核的”路由模块”根据”数据包目的IP”以及”内核中的路由表”判断是否需要转送出去(注意，这个时候数据包的DestIP有可能已经被我们修改过了)</li>
+<li>如果数据包就是进入本机的(即数据包的目的IP是本机的网口IP)，数据包就会沿着图向下移动，到达INPUT链。数据包到达INPUT链后，任何进程都会-收到它</li>
+<li>本机上运行的程序也可以发送数据包，这些数据包经过OUTPUT链，然后到达POSTROTING链输出(注意，这个时候数据包的SrcIP有可能已经被我们修改过了)</li>
+<li>如果数据包是要转发出去的(即目的IP地址不再当前子网中)，且内核允许转发，数据包就会向右移动，经过FORWARD链，然后到达POSTROUTING链输出(选择对应子网的网口发送出去)</li>
+</ul>
+<p>我们在写Iptables规则的时候，要时刻牢记这张路由次序图，根据所在Hook点的不同，灵活配置规则。</p>
+<h1 id="3-iptables编写规则"><a href="#3-iptables编写规则" class="headerlink" title="3. iptables编写规则"></a>3. iptables编写规则</h1><p>命令格式：<br><img src="http://sean-images.qiniudn.com/iptables-cli.png" alt="iptables-cli"></p>
+<ul>
+<li><code>[-t 表名]</code>：该规则所操作的哪个表，可以使用filter、nat等，如果没有指定则默认为filter</li>
+<li><code>-A</code>：新增一条规则，到该规则链列表的最后一行</li>
+<li><code>-I</code>：插入一条规则，原本该位置上的规则会往后顺序移动，没有指定编号则为1</li>
+<li><code>-D</code>：从规则链中删除一条规则，要么输入完整的规则，或者指定规则编号加以删除</li>
+<li><code>-R</code>：替换某条规则，规则替换不会改变顺序，而且必须指定编号。</li>
+<li><code>-P</code>：设置某条规则链的默认动作</li>
+<li><code>-nL</code>：<code>-L</code>、<code>-n</code>，查看当前运行的防火墙规则列表</li>
+<li><code>chain名</code>：指定规则表的哪个链，如INPUT、OUPUT、FORWARD、PREROUTING等</li>
+<li><code>[规则编号]</code>：插入、删除、替换规则时用，<code>--line-numbers</code>显示号码</li>
+<li><code>[-i|o 网卡名称]</code>：i是指定数据包从哪块网卡进入，o是指定数据包从哪块网卡输出</li>
+<li><code>[-p 协议类型]</code>：可以指定规则应用的协议，包含tcp、udp和icmp等</li>
+<li><code>[-s 源IP地址]</code>：源主机的IP地址或子网地址</li>
+<li><code>[--sport 源端口号]</code>：数据包的IP的源端口号</li>
+<li><code>[-d目标IP地址]</code>：目标主机的IP地址或子网地址</li>
+<li><code>[--dport目标端口号]</code>：数据包的IP的目标端口号</li>
+<li><code>-m</code>：extend matches，这个选项用于提供更多的匹配参数，如：<ul>
+<li>-m state –state ESTABLISHED,RELATED</li>
+<li>-m tcp –dport 22    </li>
+<li>-m multiport –dports 80,8080</li>
+<li>-m icmp –icmp-type 8 </li>
+</ul>
+</li>
+<li><code>&lt;-j 动作&gt;</code>：处理数据包的动作，包括ACCEPT、DROP、REJECT等</li>
+</ul>
+<p>具体实例请参考 <a href="http://seanlook.com/2014/02/26/iptables-example/">iptables常用实例备查</a>。</p>
+<p><strong>参考</strong></p>
+<ul>
+<li><a href="http://zh.wikipedia.org/wiki/Iptables" target="_blank" rel="external">wikipedia iptables</a> (里面有张原理图片值得收藏)</li>
+<li>2小时玩转iptables企业版.ppt  (网上可下)</li>
+<li><a href="http://www.netfilter.org/documentation/index.html" target="_blank" rel="external">netfilter/iptables documentation</a></li>
+</ul>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/iptables/" rel="tag">#iptables</a>
+          
+            <a href="/tags/安全/" rel="tag">#安全</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2014/02/20/linux-process-running-background-screen/" rel="next" title="linux进程后台运行的几种方式">
+                <i class="fa fa-chevron-left"></i> linux进程后台运行的几种方式
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2014/02/26/iptables-example/" rel="prev" title="iptables常用实例备查（更新中）">
+                iptables常用实例备查（更新中） <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2014/02/23/iptables-understand/"
+           data-title="iptables防火墙原理详解" data-url="http://seanlook.com/2014/02/23/iptables-understand/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-netfilter与iptables"><span class="nav-text">1. netfilter与iptables</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-filter、nat、mangle等规则表"><span class="nav-text">1.1 filter、nat、mangle等规则表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-INPUT、FORWARD等规则链和规则"><span class="nav-text">1.2 INPUT、FORWARD等规则链和规则</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-Linux数据包路由原理"><span class="nav-text">2.  Linux数据包路由原理</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-iptables编写规则"><span class="nav-text">3. iptables编写规则</span></a></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
