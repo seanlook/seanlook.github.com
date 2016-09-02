@@ -487,10 +487,42 @@ Maximum Value
 <li>length()在numeric类型中作用于char_length()一样，因为字节数已经固定了。</li>
 </ul>
 <p>zerofill的使用可能会在复杂join时因为了解不够深入而带来问题，所以最终的结论也很简单：除非极端的特殊需要，尽量不用zerofill，建表时这类int无需指定 (11) 这样的显示宽度。</p>
-<h2 id="float与decimal"><a href="#float与decimal" class="headerlink" title="float与decimal"></a>float与decimal</h2><p>MySQL使用<code>DECIMAL</code>类型去存储对精度要求比较高的数值，比如金额，也叫定点数，decimal在mysql内存是以字符串存储的。声明语法是<code>DECIMAL(M,D)</code>，占用字节 M+2 bytes。M是数字最大位数（精度precision），范围1-65；D是小数点右侧数字个数（标度scale），范围0-30，但不得超过M。</p>
+<h2 id="float与decimal"><a href="#float与decimal" class="headerlink" title="float与decimal"></a>float与decimal</h2><p>MySQL使用<code>DECIMAL</code>类型去存储对精度要求比较高的数值，比如金额，也叫定点数，decimal在mysql内存是以<del>字符串</del>二进制存储的。声明语法是<code>DECIMAL(M,D)</code>，<del>占用字节 M+2 bytes</del>。M是数字最大位数（精度precision），范围1-65；D是小数点右侧数字个数（标度scale），范围0-30，但不得超过M。</p>
+<p>占用字节数计算方法 —— 小数和整数分别计算，每9位数占4字节，剩余部分如下表换算：</p>
+<table>
+<thead>
+<tr>
+<th>Leftover Digits</th>
+<th>Number of Bytes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>1–2</td>
+<td>1</td>
+</tr>
+<tr>
+<td>3–4</td>
+<td>2</td>
+</tr>
+<tr>
+<td>5–6</td>
+<td>3</td>
+</tr>
+<tr>
+<td>7–9</td>
+<td>4</td>
+</tr>
+</tbody>
+</table>
+<p>比如<code>DECIMAL(18,9)</code>，整数部分和小数部分各9位，所以各占4字节，共8bytes<br>再比如<code>DECIMAL(20,6)</code>，整数14位，需要4字节存9位，还需3字节存5位；小数6位，需3字节。共10bytes<br>（感谢 consatan 在评论区提出文中错误）</p>
 <p>比如定义<code>DECIMAL(7,3)</code>：</p>
 <ul>
-<li>能存的数值范围是 -9999.999 ~ 9999.999，占用9个字节</li>
+<li>能存的数值范围是 -9999.999 ~ 9999.999，占用4个字节</li>
 <li>123.12 -&gt; 123.120，因为小数点后未满3位，补0</li>
 <li>123.1245 -&gt; 123.125，小数点只留3位，多余的自动四舍五入截断</li>
 <li>12345.12 -&gt; 保存失败，因为小数点未满3位，补0变成12345.120，超过了7位。严格模式下报错，非严格模式存成9999.999</li>
@@ -507,7 +539,7 @@ Maximum Value
 <ul>
 <li>float(9,2)与decimal(9,2)是很像的，并没有前面提到24位一下6位有效数字的限制</li>
 <li>他们俩之间的差别就在精度上，f_float9_2本应该是 1234567.10，结果小数点变成 .12 。f_decimal9_2因为标度为2，所以 .125 四舍五入成 .13</li>
-<li>将 12345.1 插入f_float7_3列，因为转成标度3时 12345.100，整个位数大于7，所以 out of range 了 </li>
+<li>将 12345.1 插入f_float7_3列，因为转成标度3时 12345.100，整个位数大于7，所以 out of range 了</li>
 </ul>
 <p>另外在编程中应尽量避免做浮点数的比较，否则可能会导致一些潜在的问题。</p>
 <p>坚决不允许使用float去存money，使用decimal更加稳妥，但使用decimal做除法依旧会产生浮点型，所以特殊情况请考虑使用整型，货币单位使用 分 ，或者除法在最后进行。</p>

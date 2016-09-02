@@ -99,7 +99,7 @@
 <meta property="og:image" content="http://sean-images.qiniudn.com/iptables-netfilter.png">
 <meta property="og:image" content="http://sean-images.qiniudn.com/iptables-routing.jpg">
 <meta property="og:image" content="http://sean-images.qiniudn.com/iptables-cli.png">
-<meta property="og:updated_time" content="2016-08-02T09:50:59.870Z">
+<meta property="og:updated_time" content="2016-09-02T07:10:37.372Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="iptables防火墙原理详解">
 <meta name="twitter:description" content="1. netfilter与iptablesNetfilter是由Rusty Russell提出的Linux 2.4内核防火墙框架，该框架既简洁又灵活，可实现安全策略应用中的许多功能，如数据包过滤、数据包处理、地址伪装、透明代理、动态网络地址转换(Network Address Translation，NAT)，以及基于用户及媒体访问控制(Media Access Control，MAC)地址的过滤">
@@ -401,9 +401,9 @@
 <li><code>DROP</code>：直接丢弃数据包，不给任何回应信息</li>
 <li><p><code>REJECT</code>：拒绝数据包通过，必要时会给数据发送端一个响应的信息。</p>
 </li>
-<li><p><code>SNAT</code>：源地址转换。在进入路由层面的route之前，重新改写源地址，目标地址不变，并在本机建立NAT表项，当数据返回时，根据NAT表将目的地址数据改写为数据发送出去时候的源地址，并发送给主机。解决内网用户用同一个公网地址上网的问题。<br><code>MASQUERADE</code>，是SNAT的一种特殊形式，适用于像adsl这种临时会变的ip上</p>
+<li><p><code>SNAT</code>：源地址转换。在进入路由层面的route之后，出本地的网络栈之前，改写源地址，目标地址不变，并在本机建立NAT表项，当数据返回时，根据NAT表将目的地址数据改写为数据发送出去时候的源地址，并发送给主机。解决内网用户用同一个公网地址上网的问题。<br><code>MASQUERADE</code>，是SNAT的一种特殊形式，适用于像adsl这种临时会变的ip上</p>
 </li>
-<li><p><code>DNAT</code>:目标地址转换。和SNAT相反，IP包经过route之后、出本地的网络栈之前，重新修改目标地址，源地址不变，在本机建立NAT表项，当数据返回时，根据NAT表将源地址修改为数据发送过来时的目标地址，并发给远程主机。可以隐藏后端服务器的真实地址。<br><code>REDIRECT</code>：是DNAT的一种特殊形式，将网络包转发到本地host上（不管IP头部指定的目标地址是啥），方便在本机做端口转发。</p>
+<li><p><code>DNAT</code>:目标地址转换。和SNAT相反，IP包经过route之前，重新修改目标地址，源地址不变，在本机建立NAT表项，当数据返回时，根据NAT表将源地址修改为数据发送过来时的目标地址，并发给远程主机。可以隐藏后端服务器的真实地址。（感谢网友提出之前这个地方与SNAT写反了）<br><code>REDIRECT</code>：是DNAT的一种特殊形式，将网络包转发到本地host上（不管IP头部指定的目标地址是啥），方便在本机做端口转发。</p>
 </li>
 <li><p><code>LOG</code>：在/var/log/messages文件中记录日志信息，然后将数据包传递给下一条规则</p>
 </li>
@@ -438,9 +438,9 @@
 <li><code>[--dport目标端口号]</code>：数据包的IP的目标端口号</li>
 <li><code>-m</code>：extend matches，这个选项用于提供更多的匹配参数，如：<ul>
 <li>-m state –state ESTABLISHED,RELATED</li>
-<li>-m tcp –dport 22    </li>
+<li>-m tcp –dport 22</li>
 <li>-m multiport –dports 80,8080</li>
-<li>-m icmp –icmp-type 8 </li>
+<li>-m icmp –icmp-type 8</li>
 </ul>
 </li>
 <li><code>&lt;-j 动作&gt;</code>：处理数据包的动作，包括ACCEPT、DROP、REJECT等</li>
