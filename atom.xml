@@ -5,7 +5,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://seanlook.com/"/>
-  <updated>2016-06-11T08:32:49.000Z</updated>
+  <updated>2016-09-27T08:32:49.000Z</updated>
   <id>http://seanlook.com/</id>
   
   <author>
@@ -14,6 +14,168 @@
   </author>
   
   <generator uri="http://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>自动记录MySQL慢查询快照脚本</title>
+    <link href="http://seanlook.com/2016/09/27/python-mysql-querykill/"/>
+    <id>http://seanlook.com/2016/09/27/python-mysql-querykill/</id>
+    <published>2016-09-27T08:32:49.000Z</published>
+    <updated>2016-09-27T08:32:49.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>Python完成的一个小程序，用于杀掉 MySQL 上的异常线程，如慢查询、处于Sleep状态的。<br><strong>项目地址</strong>：<a href="https://github.com/seanlook/myquerykill" target="_blank" rel="external">https://github.com/seanlook/myquerykill</a>  </p>
+<p>写这个脚本的初衷是在使用阿里云RDS的过程中，数据库出现异常，需要快速恢复。网上有许多类似的kill脚本，都是通过 mysqladmin 实现的。然而 Ali-RDS 环境有以下限制：</p>
+<ul>
+<li>不提供 SUPER 权限的用户，也就是用户只能 kill 自己的线程</li>
+<li>当连接数暴增时，外部用户无法登陆，包括控制台</li>
+</ul>
+<p>为了解决上午2大问题，该 python 脚本通过在db实例上，使用多线程的方式，为每个用户保留一个连接，并<strong>实时</strong>读取指令配置文件 <code>mysqk.ini</code>，发现有 kill 需求时，利用对应用户已有连接找到 <code>information_schema.processlist</code> 中符合条件的线程，并 kill 。</p>
+<p>说明：该脚本在9月份做过一次重写，7月份的版本（分支 old_0.5.0）是每实例每用户，对应一个线程，db实例一多线程数也太多，看得始终不太优雅，于是改成了一个db实例一个线程，维护同时维护多个用户的会话。同时新版也加入了更多的功能，如按时间窗口检查，包含或排除特定连接，邮件通知，配置项覆盖。</p>
+<h1 id="特性"><a href="#特性" class="headerlink" title="特性"></a>特性</h1><ol>
+<li>始终通过 mysql ping 维持一个长连接，并有断开自动重来机制，解决没有连接可用的尴尬局面</li>
+<li>每个db实例有自己的线程，避免需要单独登陆个别用户去kill的繁复操作。<br>如果你具有 SUPER 权限，也可以简化配置做到兼容</li>
+<li>能够分开应对需要杀死线程的场景：<ul>
+<li>长时间运行超过 N 秒的</li>
+<li>Sleep 状态的事务 （一般不建议，但有时候kill它，可以快速释放连接给管理员使用）</li>
+<li>排除一些线程不能kill，如 Binlog dump</li>
+<li>包含特定关键字的线程要kill</li>
+</ul>
+</li>
+<li>出现符合条件的线程时，会对当时的processlist, engine status，lock_wait 做一个快照，并邮件发出</li>
+<li>有试运行dry_run模式，即执行所有的检查过程但不真正kill</li>
+<li>支持只在时间窗口内运行，考虑到晚上一些长任务不检查</li>
+<li>密码加密</li>
+</ol>
+<a id="more"></a>
+<h1 id="快速使用"><a href="#快速使用" class="headerlink" title="快速使用"></a>快速使用</h1><p>需要pip安装<code>MySQL-python</code>和<code>pycrypto</code>两个库，只在python 2.7上有测试。</p>
+<p>在 <em>settings.py</em> 里面设置连接的用户名和密码信息。这里假设同一批db的要check的认证信息是一样的，指定的用户既用于登录认证，也用于告知脚本哪些用户需要被检查。<br>密码要通过 <code>prpcryptec.py</code> 加密，加密的密钥需写入脚本本身的 <code>KEY_DB_AUTH</code>变量。（担心泄露的话，把mysqk.py编译成 pyc 来跑）</p>
+<p>在 <em>mysqk.ini</em> 主配置文件里面  </p>
+<ul>
+<li><code>db_info</code> 节设置需要被检查的数据库地址，如 <code>db01=10.0.200.100:3306</code></li>
+<li>可分别 <code>db01</code>等指定需要kill thread的选项。<code>[id_db01]</code> 则默认复用 <code>[db_commkill]</code> 的选项</li>
+<li><code>db_comconfig</code> 节设置 <code>db_puser</code> 为能查看到所有processlist的权限用户，且在 <em>settings.py</em> 的DB_AUTH中已指定</li>
+<li><p>只想执行检查，并不想真正kill异常线程，确认 dry_run不等于0</p>
+<p>Here we go!</p>
+</li>
+</ul>
+<h1 id="配置项说明"><a href="#配置项说明" class="headerlink" title="配置项说明"></a>配置项说明</h1><p><strong><code>mysqk.ini</code></strong>：</p>
+<h2 id="mail-config"><a href="#mail-config" class="headerlink" title="mail_config"></a>mail_config</h2><p>邮件通知相关设置，smtp服务地址和认证信息。<br><code>mail_receiver=</code> 设置空，表示不发邮件</p>
+<h2 id="db-info"><a href="#db-info" class="headerlink" title="db_info"></a>db_info</h2><p>设置要检查kill哪些数据库实例.<br>格式：<code>&lt;dbid&gt;=&lt;host&gt;:&lt;port&gt;</code>，dbid是唯一表示db实例的，后面设置各db需要被kill的选项，小节配置名就是 <code>id_&lt;dbid&gt;</code>；端口必需指定。</p>
+<p>在这里出现的db实例都会被执行检查，可用 ; 注释，但需要重启脚本。</p>
+<h2 id="db-comconfig"><a href="#db-comconfig" class="headerlink" title="db_comconfig"></a>db_comconfig</h2><p>检查用公共配置，实时生效。</p>
+<ul>
+<li><code>db_puser</code>：指定一个用户名用于 show processlist，需要的权限：PROCESS、information_schema库查看。可以认为是一个代表用户，检查异常thread，把结果提供给有该thread杀掉权限用户。</li>
+<li><code>run_max_count</code>：执行检查的次数，是一个全局控制开关。每次修改这个值都会重新开始检查，即一个 clean start，让刚修改的配置生效。<ul>
+<li>为 0 表示脚本不进行任何检查，只简单维护与数据库的连接存活。存活检查频率在 <em>settings.py</em> 由 <code>CHECK_CONFIG_INTERVAL × CHECK_PING_MULTI</code>决定</li>
+<li>为 999 表示会在后台一致检查连接线程（但不一定有符合kill条件的），检查的频率在 <em>settings.py</em> 里面 <code>CHECK_CONFIG_INTERVAL</code> 指定</li>
+<li>为其它值时，表示检查次数满后停止检查</li>
+</ul>
+</li>
+<li><code>dry_run</code>：是否开启试运行模式，为0表示真实kill，为1或其它值表示试运行。试运行模式可用于监控慢查询并告警。注意同一会话线程ID只告警一次</li>
+<li><code>run_time_window</code>：运行的检查的时间窗口，格式如 <code>08:00-22:00</code>，在这个时间以外不执行检查，留空表示不限制。主要考虑晚上一些统计任务可能出现“异常”线程。</li>
+</ul>
+<h2 id="db-commkill"><a href="#db-commkill" class="headerlink" title="db_commkill"></a>db_commkill</h2><p>kill用公共配置，实时生效，会被 <code>id_&lt;dbid&gt;</code> 节的选项覆盖。</p>
+<ul>
+<li><p><code>k_user</code>：很关键的一个选项，表示你要检查并kill哪些数据库用户，多个用逗号分隔（不要带引号）。<br>为 <code>all</code> 时，表示要检查 <em>settings.py</em> 里 DB_AUTH 指定的所有用户<br>为 <code>none</code> 时，表示不kill任何异常线程，效果与设置了 dry_run 模式相当  </p>
+</li>
+<li><p><code>k_longtime</code>：执行超过设定值的sql则认为异常。一般大于 CHECK_CONFIG_INTERVAL</p>
+</li>
+<li><code>k_sleep</code>：Sleep超过设定秒的sql则认为异常，为 0 表示不杀掉sleep状态的线程</li>
+<li><code>k_exclude</code>：排除掉那些特定关键字的线程，比如复制线程、管理员的连接等</li>
+<li><code>k_include</code>：包含这些特定关键字的线程，需要被kill。注意，它作用在满足 k_user 和 k_exclude 的前提之下。<br>k_exclude与k_include 的值是支持python re模块正则的格式，不要带引号</li>
+</ul>
+<h2 id="id-dbid"><a href="#id-dbid" class="headerlink" title="id_dbid"></a>id_dbid</h2><p>这部分区域的配置项与 db_commconfig 相同，用于针对个别db的kill选项。</p>
+<h1 id="使用建议"><a href="#使用建议" class="headerlink" title="使用建议"></a>使用建议</h1><p>两种组合模式：</p>
+<ol>
+<li>设置 <code>dry_run=0</code>，默认 <code>k_user=none</code>，当数据库出现异常时，主动修改对应db的k_user值，动态kill</li>
+<li>设置 <code>dry_run=1</code>，默认 <code>k_user=all</code>，相当于运行在daemon模式，有慢查询则邮件通知，并且记录下当时的信息</li>
+</ol>
+<p>当然你也可以<code>dry_run=0</code>，<code>k_user=all</code>，让程序一直在后台跑并kill，但生产环境极不推荐。</p>
+<p>有日志和快照文件可以查看。</p>
+<h1 id="配置文件示例"><a href="#配置文件示例" class="headerlink" title="配置文件示例"></a>配置文件示例</h1><p>mysqlk.ini :</p>
+<figure class="highlight ini"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div></pre></td><td class="code"><pre><div class="line"><span class="section">[mail_config]</span></div><div class="line"><span class="attr">mail_host</span>=smtp.exmail.qq.com</div><div class="line"><span class="attr">mail_user</span>=xxx@ecqun.com</div><div class="line"><span class="attr">mail_pass</span>=xxxxxx</div><div class="line"></div><div class="line"><span class="attr">mail_receiver</span>=</div><div class="line"><span class="section"></span></div><div class="line">[db_info]</div><div class="line"><span class="attr">crm0</span>=<span class="number">192.168</span>.<span class="number">1.125</span>:<span class="number">3306</span></div><div class="line"><span class="attr">crm1</span>=<span class="number">192.168</span>.<span class="number">1.126</span>:<span class="number">3306</span></div><div class="line"><span class="attr">crm2</span>=<span class="number">192.168</span>.<span class="number">1.127</span>:<span class="number">3306</span></div><div class="line"><span class="attr">crm3</span>=<span class="number">192.168</span>.<span class="number">1.128</span>:<span class="number">3306</span></div><div class="line"><span class="attr">base</span>=<span class="number">10.0</span>.<span class="number">200.142</span>:<span class="number">3306</span></div><div class="line"><span class="section"></span></div><div class="line">[db_commconfig]</div><div class="line"><span class="attr">db_puser</span>=ecuser</div><div class="line"></div><div class="line"><span class="comment">; how many kill times once this config file changed</span></div><div class="line"><span class="comment">; 0: DISABLE all kill</span></div><div class="line"><span class="comment">; 999: always kill threads that meet kill conditions</span></div><div class="line"><span class="comment">; default: 1</span></div><div class="line"><span class="comment">; can not be inherit</span></div><div class="line"><span class="attr">run_max_count</span>=<span class="number">999</span></div><div class="line"><span class="attr">dry_run</span>=<span class="number">1</span></div><div class="line"><span class="attr">run_time_window</span>=<span class="number">08</span>:<span class="number">00</span>-<span class="number">22</span>:<span class="number">00</span></div><div class="line"><span class="section"></span></div><div class="line"></div><div class="line">[db_commkill]</div><div class="line"><span class="attr">k_user</span>=all</div><div class="line"><span class="attr">k_longtime</span>=<span class="number">10</span></div><div class="line"><span class="attr">k_lock</span>=<span class="number">1</span></div><div class="line"><span class="attr">k_sleep</span>=<span class="number">0</span></div><div class="line"></div><div class="line"><span class="attr">k_exclude</span>=Binlog|ecdba|Daemon</div><div class="line"><span class="attr">k_include</span>=select sleep\(<span class="number">17</span>\)</div><div class="line"><span class="section"></span></div><div class="line"></div><div class="line">[id_crm0]</div><div class="line"><span class="comment">; k_user: who's threads to be killed. use comma to separate</span></div><div class="line"><span class="comment">;         none: do not kill anyone's threads</span></div><div class="line"><span class="comment">;         all: kill all user's threads (with other where conditions)</span></div><div class="line"><span class="comment">; default: none</span></div><div class="line"><span class="attr">k_user</span>=all</div><div class="line"></div><div class="line"><span class="comment">; k_longtime: filter the threads who's running time is longer than this</span></div><div class="line"><span class="comment">;             0: ignore the time &gt; x  condition</span></div><div class="line"><span class="comment">; default: 10</span></div><div class="line"><span class="attr">k_longtime</span>=<span class="number">10</span></div><div class="line"></div><div class="line"><span class="comment">; k_sleep: whether kill sleepd threads or not</span></div><div class="line"><span class="comment">;          0: do not kill command='Sleep' threads from processlist</span></div><div class="line"><span class="comment">;          when it set to 1, usually it's subset of k_longtime condition</span></div><div class="line"><span class="comment">; default: 0</span></div><div class="line"><span class="attr">k_sleep</span>=<span class="number">0</span></div><div class="line"><span class="section"></span></div><div class="line">[id_crm1]</div><div class="line"><span class="attr">k_user</span>=ecuser</div><div class="line"><span class="attr">k_longtime</span>=<span class="number">10</span></div><div class="line"><span class="attr">k_sleep</span>=<span class="number">0</span></div><div class="line"><span class="section"></span></div><div class="line">[id_crm2]</div><div class="line"><span class="attr">k_user</span>=all</div><div class="line"><span class="attr">k_longtime</span>=<span class="number">10</span></div><div class="line"><span class="attr">k_sleep</span>=<span class="number">0</span></div><div class="line"><span class="section"></span></div><div class="line">[id_crm3]</div></pre></td></tr></table></figure>
+<hr>
+<p>原文链接地址：<a href="http://seanlook.com/2016/09/27/python-mysql-querykill/">http://seanlook.com/2016/09/27/python-mysql-querykill/</a></p>
+<hr>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;Python完成的一个小程序，用于杀掉 MySQL 上的异常线程，如慢查询、处于Sleep状态的。&lt;br&gt;&lt;strong&gt;项目地址&lt;/strong&gt;：&lt;a href=&quot;https://github.com/seanlook/myquerykill&quot;&gt;https://github.com/seanlook/myquerykill&lt;/a&gt;  &lt;/p&gt;
+&lt;p&gt;写这个脚本的初衷是在使用阿里云RDS的过程中，数据库出现异常，需要快速恢复。网上有许多类似的kill脚本，都是通过 mysqladmin 实现的。然而 Ali-RDS 环境有以下限制：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;不提供 SUPER 权限的用户，也就是用户只能 kill 自己的线程&lt;/li&gt;
+&lt;li&gt;当连接数暴增时，外部用户无法登陆，包括控制台&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;为了解决上午2大问题，该 python 脚本通过在db实例上，使用多线程的方式，为每个用户保留一个连接，并&lt;strong&gt;实时&lt;/strong&gt;读取指令配置文件 &lt;code&gt;mysqk.ini&lt;/code&gt;，发现有 kill 需求时，利用对应用户已有连接找到 &lt;code&gt;information_schema.processlist&lt;/code&gt; 中符合条件的线程，并 kill 。&lt;/p&gt;
+&lt;p&gt;说明：该脚本在9月份做过一次重写，7月份的版本（分支 old_0.5.0）是每实例每用户，对应一个线程，db实例一多线程数也太多，看得始终不太优雅，于是改成了一个db实例一个线程，维护同时维护多个用户的会话。同时新版也加入了更多的功能，如按时间窗口检查，包含或排除特定连接，邮件通知，配置项覆盖。&lt;/p&gt;
+&lt;h1 id=&quot;特性&quot;&gt;&lt;a href=&quot;#特性&quot; class=&quot;headerlink&quot; title=&quot;特性&quot;&gt;&lt;/a&gt;特性&lt;/h1&gt;&lt;ol&gt;
+&lt;li&gt;始终通过 mysql ping 维持一个长连接，并有断开自动重来机制，解决没有连接可用的尴尬局面&lt;/li&gt;
+&lt;li&gt;每个db实例有自己的线程，避免需要单独登陆个别用户去kill的繁复操作。&lt;br&gt;如果你具有 SUPER 权限，也可以简化配置做到兼容&lt;/li&gt;
+&lt;li&gt;能够分开应对需要杀死线程的场景：&lt;ul&gt;
+&lt;li&gt;长时间运行超过 N 秒的&lt;/li&gt;
+&lt;li&gt;Sleep 状态的事务 （一般不建议，但有时候kill它，可以快速释放连接给管理员使用）&lt;/li&gt;
+&lt;li&gt;排除一些线程不能kill，如 Binlog dump&lt;/li&gt;
+&lt;li&gt;包含特定关键字的线程要kill&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;出现符合条件的线程时，会对当时的processlist, engine status，lock_wait 做一个快照，并邮件发出&lt;/li&gt;
+&lt;li&gt;有试运行dry_run模式，即执行所有的检查过程但不真正kill&lt;/li&gt;
+&lt;li&gt;支持只在时间窗口内运行，考虑到晚上一些长任务不检查&lt;/li&gt;
+&lt;li&gt;密码加密&lt;/li&gt;
+&lt;/ol&gt;
+    
+    </summary>
+    
+      <category term="Python" scheme="http://seanlook.com/categories/Python/"/>
+    
+    
+      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
+    
+      <category term="python" scheme="http://seanlook.com/tags/python/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>浅析MySQL事务隔离级别与锁 分享</title>
+    <link href="http://seanlook.com/2016/08/30/mysql-ppt-trx_isolation-lock/"/>
+    <id>http://seanlook.com/2016/08/30/mysql-ppt-trx_isolation-lock/</id>
+    <published>2016-08-30T13:32:49.000Z</published>
+    <updated>2016-08-30T13:32:49.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>这段时间在公司内部准备了一个分享，主题是关于 MySQL事务与锁，准备过程内容很多，也深入弄清楚了一些以前比较迷糊的地方，加上后面的讨论也就一个半小时。</p>
+<p>主要涉及的是乐观锁与悲观锁，InnoDB多版本并发控制的实现，以及隔离级别与各种情况加锁分析，因为涉及的主要还是开发人员，所以不是很深奥。也算花了不少心血，分享一下。</p>
+<p>slideshare: <a href="http://www.slideshare.net/ssuser5a0bc0/my-sql-seanlook" target="_blank" rel="external">http://www.slideshare.net/ssuser5a0bc0/my-sql-seanlook</a></p>
+
+
+	<div class="row">
+	  <iframe src="http://nagland.github.io/viewer/web/viewer.html?val=http://7q5fot.com1.z0.glb.clouddn.com/mysql-ppt-trx_isolation-lock-seanlook.pdf" style="width:100%; height:550px"></iframe>
+	</div>
+
+
+
+<hr>
+<p>原文连接地址：<a href="http://seanlook.com/2016/08/30/mysql-ppt-trx_isolation-lock/">http://seanlook.com/2016/08/30/mysql-ppt-trx_isolation-lock/</a></p>
+<hr>
+<!--
+<iframe src="https://www.slideshare.net/slideshow/embed_code/key/3HLJJcJmM9KLGT" width="900" height="512" frameborder="0" allowfullscreen></iframe>
+<p>–&gt;</p>
+-->]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;这段时间在公司内部准备了一个分享，主题是关于 MySQL事务与锁，准备过程内容很多，也深入弄清楚了一些以前比较迷糊的地方，加上后面的讨论也就一个半小时。&lt;/p&gt;
+&lt;p&gt;主要涉及的是乐观锁与悲观锁，InnoDB多版本并发控制的实现，以及隔离级别与各种情况加锁分析，因为涉及的主
+    
+    </summary>
+    
+      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
+    
+    
+      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
+    
+      <category term="事务" scheme="http://seanlook.com/tags/%E4%BA%8B%E5%8A%A1/"/>
+    
+  </entry>
   
   <entry>
     <title>Advanced MySQL Query Tuning .pdf</title>
@@ -52,6 +214,54 @@
       <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
     
       <category term="SQL优化" scheme="http://seanlook.com/tags/SQL%E4%BC%98%E5%8C%96/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>使用pt-osc修改主键时注意</title>
+    <link href="http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/"/>
+    <id>http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/</id>
+    <published>2016-05-27T08:32:49.000Z</published>
+    <updated>2016-05-27T08:32:49.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：<br><figure class="highlight applescript"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">原表上有个复合主键，现在要添加一个自增<span class="built_in">id</span>作为主键，如何进行</div></pre></td></tr></table></figure></p>
+<a id="more"></a>
+<p>会涉及到以下修改动作：</p>
+<ol>
+<li>删除复合主键定义</li>
+<li>添加新的自增主键</li>
+<li>原复合主键字段，修改成唯一索引</li>
+</ol>
+<p>如果你够聪明，应该会把这三个操作放在同一个 alter table 命令执行。percona手册里有两个地方对修改主键进行了特殊注解：</p>
+<blockquote>
+<p>–alter<br>A notable exception is when a PRIMARY KEY or UNIQUE INDEX is being created from existing columns as part of the ALTER clause; in that case it will use these column(s) for the DELETE trigger.</p>
+<p>–[no]check-alter</p>
+<ul>
+<li>DROP PRIMARY KEY<br>If –alter contain DROP PRIMARY KEY (case- and space-insensitive), a warning is printed and the tool exits unless –dry-run is specified. Altering the primary key can be dangerous, but the tool can handle it. The tool’s triggers, particularly the DELETE trigger, are most affected by altering the primary key because the tool prefers to use the primary key for its triggers. You should first run the tool with –dry-run and –print and verify that the triggers are correct.</li>
+</ul>
+</blockquote>
+<p>由上一篇文章 <a href="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/">pt-online-schema-change使用说明、限制与比较</a> 可知，pt-osc会在原表t1上创建 AFTER DELETE/UPDATE/INSERT 三个触发器，修改主键影响最大的就是 DELETE 触发器：新表t2上的主键字段在旧表t1上不存在，无法根据主键条件触发删除新表t2数据。<code>but the tool can handle it</code>，原因是pt-osc把触发器改成了下面的形式：<br><figure class="highlight autohotkey"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">CREATE TRIGGER `pt_osc_confluence_sbtest3_del` AFTER DELETE ON `confluence`.`sbtest3` FOR EACH ROW DELETE IGNORE FROM `confluence`.`_sbtest3_new` </div><div class="line">WHERE `confluence`.`_sbtest3_new`.`id` &lt;=&gt; OLD.`id` <span class="literal">AND</span> `confluence`.`_sbtest3_new`.`k` &lt;=&gt; OLD.`k`</div><div class="line"></div><div class="line">注：sbtest3表上以(id,k)作为复合主键</div></pre></td></tr></table></figure></p>
+<p>但是如果id或k列上没有索引，这个删除的代价非常高，所以一定要同时添加复合（唯一）索引 <code>(id,k)</code> .</p>
+<p>而对于INSERT,UPDATE的触发器，依然是 <code>REPLACE INTO</code>语法，因为它采用的是先插入，如果违反主键或唯一约束，则根据主键或意义约束删除这条数据，再执行插入。（但是注意你不能依赖于新表的主键递增，因为如果原表有update，新表就会先插入这一条，导致id与原表记录所在顺序不一样）</p>
+<p>所以如果使用pt-osc去修改删除主键，务必同时添加原主键为 UNIQUE KEY，否则很有可能导致性能问题：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line">$ pt-online-schema-<span class="keyword">change</span> <span class="comment">--user=ecuser --password=ecuser --host=10.0.201.34  \</span></div><div class="line"><span class="comment">--alter "DROP PRIMARY KEY,add column pk int auto_increment primary key,add unique key uk_id_k(id,k)" \</span></div><div class="line">D=confluence,t=sbtest3 <span class="comment">--print --dry-run</span></div><div class="line"></div><div class="line"><span class="comment">--alter contains 'DROP PRIMARY KEY'.  Dropping and altering the primary key can be dangerous, </span></div><div class="line">especially <span class="keyword">if</span> the original <span class="keyword">table</span> does <span class="keyword">not</span> have other <span class="keyword">unique</span> indexes.  ==&gt;注意 dry-run的输出</div><div class="line"></div><div class="line"><span class="keyword">ALTER</span> <span class="keyword">TABLE</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> <span class="keyword">DROP</span> PRIMARY <span class="keyword">KEY</span>,<span class="keyword">add</span> <span class="keyword">column</span> pk <span class="built_in">int</span> auto_increment primary <span class="keyword">key</span>,<span class="keyword">add</span> <span class="keyword">unique</span> <span class="keyword">key</span> uk_id_k(<span class="keyword">id</span>,k)</div><div class="line">Altered <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> OK.</div><div class="line"><span class="keyword">Using</span> original <span class="keyword">table</span> <span class="keyword">index</span> PRIMARY <span class="keyword">for</span> the <span class="keyword">DELETE</span> <span class="keyword">trigger</span> instead <span class="keyword">of</span> <span class="keyword">new</span> <span class="keyword">table</span> <span class="keyword">index</span> PRIMARY because ==&gt; 使用原表主键值判断</div><div class="line">the <span class="keyword">new</span> <span class="keyword">table</span> <span class="keyword">index</span> uses <span class="keyword">column</span> pk which does <span class="keyword">not</span> exist <span class="keyword">in</span> the original table.</div><div class="line"></div><div class="line"><span class="keyword">CREATE</span> <span class="keyword">TRIGGER</span> <span class="string">`pt_osc_confluence_sbtest3_del`</span> <span class="keyword">AFTER</span> <span class="keyword">DELETE</span> <span class="keyword">ON</span> <span class="string">`confluence`</span>.<span class="string">`sbtest3`</span> <span class="keyword">FOR</span> <span class="keyword">EACH</span> <span class="keyword">ROW</span> <span class="keyword">DELETE</span> <span class="keyword">IGNORE</span> <span class="keyword">FROM</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> </div><div class="line"><span class="keyword">WHERE</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span>.<span class="string">`id`</span> &lt;=&gt; OLD.<span class="string">`id`</span> <span class="keyword">AND</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span>.<span class="string">`k`</span> &lt;=&gt; OLD.<span class="string">`k`</span></div></pre></td></tr></table></figure>
+<hr>
+<p>原文链接地址：<a href="http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/">http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/</a></p>
+<hr>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：&lt;br&gt;&lt;figure class=&quot;highlight applescript&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;原表上有个复合主键，现在要添加一个自增&lt;span class=&quot;built_in&quot;&gt;id&lt;/span&gt;作为主键，如何进行&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;&lt;/p&gt;
+    
+    </summary>
+    
+      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
+    
+    
+      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
+    
+      <category term="Percona-toolkit" scheme="http://seanlook.com/tags/Percona-toolkit/"/>
     
   </entry>
   
@@ -194,54 +404,6 @@
 &lt;li&gt;&lt;p&gt;&lt;code&gt;--max-lag&lt;/code&gt;&lt;br&gt;默认1s。每个chunk拷贝完成后，会查看所有复制Slave的延迟情况（&lt;code&gt;Seconds_Behind_Master&lt;/code&gt;）。要是延迟大于该值，则暂停复制数据，直到所有从的滞后小于这个值。&lt;code&gt;--check-interval&lt;/code&gt;配合使用，指定出现从库滞后超过 max-lag，则该工具将睡眠多长时间，默认1s，再检查。如&lt;code&gt;--max-lag=5 --check-interval=2&lt;/code&gt;。&lt;br&gt;熟悉percona-toolkit的人都知道&lt;code&gt;--recursion-method&lt;/code&gt;可以用来指定从库dsn记录。另外，如果从库被停止，将会永远等待，直到从开始同步，并且延迟小于该值。&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;&lt;p&gt;&lt;code&gt;--chunk-time&lt;/code&gt;&lt;br&gt;默认0.5s，即拷贝数据行的时候，为了尽量保证0.5s内拷完一个chunk，动态调整chunk-size的大小，以适应服务器性能的变化。&lt;br&gt;也可以通过另外一个选项&lt;code&gt;--chunk-size&lt;/code&gt;禁止动态调整，即每次固定拷贝 1k 行，如果指定则默认1000行，且比 chunk-time 优先生效&lt;/p&gt;
-    
-    </summary>
-    
-      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
-    
-    
-      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
-    
-      <category term="Percona-toolkit" scheme="http://seanlook.com/tags/Percona-toolkit/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>使用pt-osc修改主键时注意</title>
-    <link href="http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/"/>
-    <id>http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/</id>
-    <published>2016-05-27T08:32:49.000Z</published>
-    <updated>2016-05-27T08:32:49.000Z</updated>
-    
-    <content type="html"><![CDATA[<p>使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：<br><figure class="highlight applescript"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">原表上有个复合主键，现在要添加一个自增<span class="built_in">id</span>作为主键，如何进行</div></pre></td></tr></table></figure></p>
-<a id="more"></a>
-<p>会涉及到以下修改动作：</p>
-<ol>
-<li>删除复合主键定义</li>
-<li>添加新的自增主键</li>
-<li>原复合主键字段，修改成唯一索引</li>
-</ol>
-<p>如果你够聪明，应该会把这三个操作放在同一个 alter table 命令执行。percona手册里有两个地方对修改主键进行了特殊注解：</p>
-<blockquote>
-<p>–alter<br>A notable exception is when a PRIMARY KEY or UNIQUE INDEX is being created from existing columns as part of the ALTER clause; in that case it will use these column(s) for the DELETE trigger.</p>
-<p>–[no]check-alter</p>
-<ul>
-<li>DROP PRIMARY KEY<br>If –alter contain DROP PRIMARY KEY (case- and space-insensitive), a warning is printed and the tool exits unless –dry-run is specified. Altering the primary key can be dangerous, but the tool can handle it. The tool’s triggers, particularly the DELETE trigger, are most affected by altering the primary key because the tool prefers to use the primary key for its triggers. You should first run the tool with –dry-run and –print and verify that the triggers are correct.</li>
-</ul>
-</blockquote>
-<p>由上一篇文章 <a href="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/">pt-online-schema-change使用说明、限制与比较</a> 可知，pt-osc会在原表t1上创建 AFTER DELETE/UPDATE/INSERT 三个触发器，修改主键影响最大的就是 DELETE 触发器：新表t2上的主键字段在旧表t1上不存在，无法根据主键条件触发删除新表t2数据。<code>but the tool can handle it</code>，原因是pt-osc把触发器改成了下面的形式：<br><figure class="highlight autohotkey"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">CREATE TRIGGER `pt_osc_confluence_sbtest3_del` AFTER DELETE ON `confluence`.`sbtest3` FOR EACH ROW DELETE IGNORE FROM `confluence`.`_sbtest3_new` </div><div class="line">WHERE `confluence`.`_sbtest3_new`.`id` &lt;=&gt; OLD.`id` <span class="literal">AND</span> `confluence`.`_sbtest3_new`.`k` &lt;=&gt; OLD.`k`</div><div class="line"></div><div class="line">注：sbtest3表上以(id,k)作为复合主键</div></pre></td></tr></table></figure></p>
-<p>但是如果id或k列上没有索引，这个删除的代价非常高，所以一定要同时添加复合（唯一）索引 <code>(id,k)</code> .</p>
-<p>而对于INSERT,UPDATE的触发器，依然是 <code>REPLACE INTO</code>语法，因为它采用的是先插入，如果违反主键或唯一约束，则根据主键或意义约束删除这条数据，再执行插入。（但是注意你不能依赖于新表的主键递增，因为如果原表有update，新表就会先插入这一条，导致id与原表记录所在顺序不一样）</p>
-<p>所以如果使用pt-osc去修改删除主键，务必同时添加原主键为 UNIQUE KEY，否则很有可能导致性能问题：</p>
-<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line">$ pt-online-schema-<span class="keyword">change</span> <span class="comment">--user=ecuser --password=ecuser --host=10.0.201.34  \</span></div><div class="line"><span class="comment">--alter "DROP PRIMARY KEY,add column pk int auto_increment primary key,add unique key uk_id_k(id,k)" \</span></div><div class="line">D=confluence,t=sbtest3 <span class="comment">--print --dry-run</span></div><div class="line"></div><div class="line"><span class="comment">--alter contains 'DROP PRIMARY KEY'.  Dropping and altering the primary key can be dangerous, </span></div><div class="line">especially <span class="keyword">if</span> the original <span class="keyword">table</span> does <span class="keyword">not</span> have other <span class="keyword">unique</span> indexes.  ==&gt;注意 dry-run的输出</div><div class="line"></div><div class="line"><span class="keyword">ALTER</span> <span class="keyword">TABLE</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> <span class="keyword">DROP</span> PRIMARY <span class="keyword">KEY</span>,<span class="keyword">add</span> <span class="keyword">column</span> pk <span class="built_in">int</span> auto_increment primary <span class="keyword">key</span>,<span class="keyword">add</span> <span class="keyword">unique</span> <span class="keyword">key</span> uk_id_k(<span class="keyword">id</span>,k)</div><div class="line">Altered <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> OK.</div><div class="line"><span class="keyword">Using</span> original <span class="keyword">table</span> <span class="keyword">index</span> PRIMARY <span class="keyword">for</span> the <span class="keyword">DELETE</span> <span class="keyword">trigger</span> instead <span class="keyword">of</span> <span class="keyword">new</span> <span class="keyword">table</span> <span class="keyword">index</span> PRIMARY because ==&gt; 使用原表主键值判断</div><div class="line">the <span class="keyword">new</span> <span class="keyword">table</span> <span class="keyword">index</span> uses <span class="keyword">column</span> pk which does <span class="keyword">not</span> exist <span class="keyword">in</span> the original table.</div><div class="line"></div><div class="line"><span class="keyword">CREATE</span> <span class="keyword">TRIGGER</span> <span class="string">`pt_osc_confluence_sbtest3_del`</span> <span class="keyword">AFTER</span> <span class="keyword">DELETE</span> <span class="keyword">ON</span> <span class="string">`confluence`</span>.<span class="string">`sbtest3`</span> <span class="keyword">FOR</span> <span class="keyword">EACH</span> <span class="keyword">ROW</span> <span class="keyword">DELETE</span> <span class="keyword">IGNORE</span> <span class="keyword">FROM</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> </div><div class="line"><span class="keyword">WHERE</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span>.<span class="string">`id`</span> &lt;=&gt; OLD.<span class="string">`id`</span> <span class="keyword">AND</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span>.<span class="string">`k`</span> &lt;=&gt; OLD.<span class="string">`k`</span></div></pre></td></tr></table></figure>
-<hr>
-<p>原文链接地址：<a href="http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/">http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/</a></p>
-<hr>
-]]></content>
-    
-    <summary type="html">
-    
-      &lt;p&gt;使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：&lt;br&gt;&lt;figure class=&quot;highlight applescript&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;原表上有个复合主键，现在要添加一个自增&lt;span class=&quot;built_in&quot;&gt;id&lt;/span&gt;作为主键，如何进行&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;&lt;/p&gt;
     
     </summary>
     
@@ -2356,87 +2518,6 @@ mysql&gt; show slave status\G
       <category term="翻译" scheme="http://seanlook.com/tags/%E7%BF%BB%E8%AF%91/"/>
     
       <category term="做饭" scheme="http://seanlook.com/tags/%E5%81%9A%E9%A5%AD/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>回家看看（国庆）</title>
-    <link href="http://seanlook.com/2015/09/30/the-way-home-20151001/"/>
-    <id>http://seanlook.com/2015/09/30/the-way-home-20151001/</id>
-    <published>2015-09-30T03:59:31.000Z</published>
-    <updated>2015-09-30T03:59:31.000Z</updated>
-    
-    <content type="html"><![CDATA[<p>汽车在公路上一路奔驰，车厢内很安静，大部分人闭目休息，能确定的是司机是清醒的，而我在后面靠窗的位置，取掉眼镜，不太清晰的望着窗外。一片片无人问津小树林，一片片因下雨而污浊的池塘水，一片片村庄、农田……﻿</p>
-<p>是的，老毛病又犯了，又要发感慨了。﻿﻿</p>
-<p>昨天这个时候还在深圳地铁上，忙忙碌碌，人挤人。每天朝七晚九，周末睡不醒，完全没有7月份换工作那会儿打了鸡血一样，与自己的约定也始终没坚持。早在一个月前，实在想不到国庆去哪，也是因为种种压力，澳门的计划，四川的计划，没法任性的说走就走，于是就选择了回家，去见见老同学们，去参加婚礼，去看看父母，去看看自己。﻿﻿</p>
-<p>昨天在列车上，看完了『侣行1』，作者带我们去探寻索马里的恐怖之都摩加迪沙，体验被枪抵住胸膛的心跳；带我们去北极的奥伊米亚康，在地冻天寒的雪地上露营；还深入乌克兰切尔诺贝利核电站，挑战核辐射恐惧；最后去感受毁灭与美学兼具的马鲁姆火山，看岩浆翻滚，体验生死，把命交给爱人。当然，不必羡慕，不必自悔，但哪怕我们生活做出他们百分之一的改变，至少深藏一颗不羁的内心，不要再一成不变，不要再泥潭深陷，就会变得不再慵懒，变得有趣。﻿﻿</p>
-<p>能折腾，有信仰，这是我对他们四人团队的极简总结。而这正是我还没走出的迷途，Yes和No用错地方。﻿﻿</p>
-<a id="more"></a>
-<p>人一生会遇到形形色色的人，相信每个人背后都有故事。这些人会对你产生重大影响的人，一双手都可以数的过来，而时常能陪在身边的更是屈指可数。与他们去经历欢笑与泪水，去经历生死与难忘，这样才懂得珍惜，不会恶语相向。很喜欢道士下山范伟讲的那段话，“人生七十古来稀，十年少小，十年老弱，还有五十年，五十年再分成日夜，只有二十五年的光景了，再加上 刮风下雨，三灾六病，人这一辈子 还能剩下多少好日子。”。工作，努力尽心就好，对自己做的事情负责；生活，本应多样。(写完这段，良辰都想吐了)﻿﻿</p>
-<p>火车上还看电影『遗弃』，差一点陷入平常悬疑片的路子，特别是女主开始怀疑自己的时候，好了，不剧透了，小电影里值得一看。﻿﻿</p>
-<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/child-school.jpg" alt="child-school.jpg"></p>
-<p>凌晨1点到的九江，以亲友马上过来接我为由，逃离出站口过分“热烈”的拉客仪式，不下十个说有小妹儿的，“我们这都这么叫”，终于在一公里开外的地方找到一个宾馆，尼玛，还是双标。抓紧时间睡了四个小时就滚了。</p>
-<hr>
-<p>本文链接地址： <a href="http://seanlook.com/2015/09/30/the-way-home-20151001/">http://seanlook.com/2015/09/30/the-way-home-20151001/</a></p>
-<hr>
-]]></content>
-    
-    <summary type="html">
-    
-      &lt;p&gt;汽车在公路上一路奔驰，车厢内很安静，大部分人闭目休息，能确定的是司机是清醒的，而我在后面靠窗的位置，取掉眼镜，不太清晰的望着窗外。一片片无人问津小树林，一片片因下雨而污浊的池塘水，一片片村庄、农田……﻿&lt;/p&gt;
-&lt;p&gt;是的，老毛病又犯了，又要发感慨了。﻿﻿&lt;/p&gt;
-&lt;p&gt;昨天这个时候还在深圳地铁上，忙忙碌碌，人挤人。每天朝七晚九，周末睡不醒，完全没有7月份换工作那会儿打了鸡血一样，与自己的约定也始终没坚持。早在一个月前，实在想不到国庆去哪，也是因为种种压力，澳门的计划，四川的计划，没法任性的说走就走，于是就选择了回家，去见见老同学们，去参加婚礼，去看看父母，去看看自己。﻿﻿&lt;/p&gt;
-&lt;p&gt;昨天在列车上，看完了『侣行1』，作者带我们去探寻索马里的恐怖之都摩加迪沙，体验被枪抵住胸膛的心跳；带我们去北极的奥伊米亚康，在地冻天寒的雪地上露营；还深入乌克兰切尔诺贝利核电站，挑战核辐射恐惧；最后去感受毁灭与美学兼具的马鲁姆火山，看岩浆翻滚，体验生死，把命交给爱人。当然，不必羡慕，不必自悔，但哪怕我们生活做出他们百分之一的改变，至少深藏一颗不羁的内心，不要再一成不变，不要再泥潭深陷，就会变得不再慵懒，变得有趣。﻿﻿&lt;/p&gt;
-&lt;p&gt;能折腾，有信仰，这是我对他们四人团队的极简总结。而这正是我还没走出的迷途，Yes和No用错地方。﻿﻿&lt;/p&gt;
-    
-    </summary>
-    
-      <category term="生活" scheme="http://seanlook.com/categories/%E7%94%9F%E6%B4%BB/"/>
-    
-      <category term="随记" scheme="http://seanlook.com/categories/%E7%94%9F%E6%B4%BB/%E9%9A%8F%E8%AE%B0/"/>
-    
-    
-      <category term="生活" scheme="http://seanlook.com/tags/%E7%94%9F%E6%B4%BB/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>nice is not nice</title>
-    <link href="http://seanlook.com/2015/07/14/nice-is-not-nice/"/>
-    <id>http://seanlook.com/2015/07/14/nice-is-not-nice/</id>
-    <published>2015-07-13T16:49:31.000Z</published>
-    <updated>2015-07-13T16:49:31.000Z</updated>
-    
-    <content type="html"><![CDATA[<p>看到身边朋友在玩一个叫 nice 的应用，也试用了一把。</p>
-<p>从下载量来说它是LOFTER的2倍，它们都可以划分为图片社交。这样说对于网易乐乎来说是不公平的，lofter定位是轻博客，类似于国外的tumblr，生产高质量的内容，尤其是图片。（jianshu倾向于文字，类似国外的medium）</p>
-<p>而nice呢，注重图片几乎到放弃文字的地步，简单的通过打标签来注解图片，炫耀的意思不言而喻，而恰好它打的是陌生人社交的牌，大家都互相不认识，不会引起熟人间拉仇恨的嫌疑。陌生人之间也丝毫不吝啬自己的赞，这种低成本却又能给对方带来好感的点赞行为，实际都是虚伪在作怪。我因为应用要求上传了一个阿狸的头像，几分钟内也能收到十多个赞，我当时都蒙了。但是确实喜欢听到被点赞的通知，这大概能解释为什么女生偏爱这个app——全nice内容无非就是自拍照、吃的什么、逛街——无特效，不发图。</p>
-<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/nice-app.jpg" alt="nice-app.jpg"></p>
-<a id="more"></a>
-<p>在nice里，你会发现所有人都过着小资生活。它不是一个发泄的场地，也不适合记录生活，因为它是短暂的，一个人可能接触nice一到两个月基本就淡出了。有时候想想用nice的人其实是自私的，因为你的图（背后）往往不止你一人，但因为几乎全来自陌生人点赞，满足的是个人的虚荣心，而图中那一刻的其他人无非是个陪衬。不然为何不发惹朋友圈呢……</p>
-<p>可能有人出来批判我了，女生爱美怎么啦，注孤生。也许我喜欢的只是对生活一种简简单单的表达。你为何不愿在朋友圈发同样的，难道是因为缺少标签的功能吗，no！ 难道是文艺青年号称要逃离朋友圈，也不对！一万个哈姆雷特！</p>
-<p>在nice久了，刷够了别人的美图，忍不住自己也要上图。要有上图的资本，就要打破原来的计划去寻找“素材”，会不会对身边平凡的生活感到厌倦——我YY的。</p>
-<p>人人都有爱美之心，无可厚非，但吸取更有营养的内容，增加自己的涵养，戒除浮躁，懂心交流，才是高情商的选择。</p>
-<p>–<br>玛德，在dropbox上下个插图搞了一个小时</p>
-<hr>
-<p>本文链接地址： <a href="http://seanlook.com/2015/07/14/nice-is-not-nice/">http://seanlook.com/2015/07/14/nice-is-not-nice/</a></p>
-<hr>
-]]></content>
-    
-    <summary type="html">
-    
-      &lt;p&gt;看到身边朋友在玩一个叫 nice 的应用，也试用了一把。&lt;/p&gt;
-&lt;p&gt;从下载量来说它是LOFTER的2倍，它们都可以划分为图片社交。这样说对于网易乐乎来说是不公平的，lofter定位是轻博客，类似于国外的tumblr，生产高质量的内容，尤其是图片。（jianshu倾向于文字，类似国外的medium）&lt;/p&gt;
-&lt;p&gt;而nice呢，注重图片几乎到放弃文字的地步，简单的通过打标签来注解图片，炫耀的意思不言而喻，而恰好它打的是陌生人社交的牌，大家都互相不认识，不会引起熟人间拉仇恨的嫌疑。陌生人之间也丝毫不吝啬自己的赞，这种低成本却又能给对方带来好感的点赞行为，实际都是虚伪在作怪。我因为应用要求上传了一个阿狸的头像，几分钟内也能收到十多个赞，我当时都蒙了。但是确实喜欢听到被点赞的通知，这大概能解释为什么女生偏爱这个app——全nice内容无非就是自拍照、吃的什么、逛街——无特效，不发图。&lt;/p&gt;
-&lt;p&gt;&lt;img src=&quot;http://7q5fot.com1.z0.glb.clouddn.com/nice-app.jpg&quot; alt=&quot;nice-app.jpg&quot;&gt;&lt;/p&gt;
-    
-    </summary>
-    
-      <category term="生活" scheme="http://seanlook.com/categories/%E7%94%9F%E6%B4%BB/"/>
-    
-      <category term="随记" scheme="http://seanlook.com/categories/%E7%94%9F%E6%B4%BB/%E9%9A%8F%E8%AE%B0/"/>
-    
-    
-      <category term="生活" scheme="http://seanlook.com/tags/%E7%94%9F%E6%B4%BB/"/>
     
   </entry>
   

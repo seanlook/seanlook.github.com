@@ -281,6 +281,270 @@
             
               
                 
+                <a class="post-title-link" href="/2015/04/23/pfsense-usage/" itemprop="url">
+                  图解pfSense软路由系统的使用（NAT功能）
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2015-04-23T15:21:25+08:00" content="2015-04-23">
+              2015-04-23
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/04/23/pfsense-usage/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/04/23/pfsense-usage/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>pfsense是一款开源的路由和防火墙产品，它基于freebsd系统定制和开发。pfsene拥有友好的web的配置界面，且具有伸缩性强又不失强大性能，在众多开源网络防火墙中属于佼佼者。</p>
+<p>2004年，pfsense作为m0n0wall项目（基于freebsd内核的嵌入式软防火墙）的分支项目启动，增加了许多m0n0wall没有的功能(pfSense的官方网站称它为the better m0n0wall).pfSense除了包含宽带路由器的基本功能外,还有以下的特点:</p>
+<ul>
+<li>基于稳定可靠的FreeBSD操作系统,能适应全天候运行的要求</li>
+<li>具有用户认证功能,使用Web网页的认证方式,配合RADIUS可以实现记费功能</li>
+<li>完善的防火墙、流量控制和数据包功能,保证了网络的安全,稳定和高速运行</li>
+<li>支持多条WAN线路和负载均衡功能,可大幅度提高网络出口带宽,在带宽拥塞时自动分配负载</li>
+<li>内置了IPsec 和PPTP VPN功能,实现不同分支机构的远程互联或远程用户安全地访问内部网</li>
+<li>支持802.1Q VLAN标准,可以通过软件模拟的方式使得普通网卡能识别802.1Q的标记,同时为多个VLAN的用户提供服务</li>
+<li>支持使用额外的软件包来扩展pfSense功能,为用户提供更多的功能(如FTP和透明代理).</li>
+<li>详细的日志功能,方便用户对网络出现的事件分析,统计和处理</li>
+<li>使用Web管理界面进行配置(支持SSL),支持远程管理和软件版本自动在线升级</li>
+</ul>
+<p>本文简单介绍pfSense的安装及配置过程，完成一个基本的路由器该有的功能，如访问局外网、设置防火墙规则、配置端口映射。这里演示在ESXi虚拟服务器上，解决IP不足的问题。</p>
+<h2 id="创建虚拟机"><a href="#创建虚拟机" class="headerlink" title="创建虚拟机"></a>创建虚拟机</h2><p>首先去 <a href="https://www.pfsense.org/download/">https://www.pfsense.org/download/</a> 下载稳定版本的pfSense，如pfSense-LiveCD-2.2.2-RELEASE-amd64.iso.gz（网上看到有人提到这个版本不稳定，我在使用中偶尔也发现突然很慢，建议2.1.5）。在vSphere上创建虚拟机的过程省略，取名01_pfSense，创建虚拟机操作系统时选择“其他 -&gt; FreeBSD 64位”，单CPU,512Mb内存，4G硬盘。将下载的系统解压成iso后挂载到CD/DVD，并“打开电源时连接”。<br>下图是网卡情况：<br>为pfSense分配两个网卡，分别是可以连接公司内网的172.29.88.1/24网段的vSphere_Admin端口组，和IP范围是172.30.31.1/24的内部局域网端口组VM Local。<br><img src="http://sean-images.qiniudn.com/pfsense-vsphere0.png" alt="pfsense-vsphere0.png"></p>
+<p>记录下Mac地址<br>外网接口：00:0c:29:36:b6:c2<br>内网接口：00:0c:29:36:b6:cc</p>
+<h2 id="安装pfsense"><a href="#安装pfsense" class="headerlink" title="安装pfsense"></a>安装pfsense</h2><p>启动电源后出现欢迎界面，选择<code>1.Boot pfSense [default]</code>，或等待几秒钟自动选择，进入如下界面：<br><img src="http://sean-images.qiniudn.com/pfsense-vsphere1.png" alt="pfsense-vsphere1.png"></p>
+<p>输入I，回车，然后是一个蓝屏，开始安装。</p>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2015/04/23/pfsense-usage/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2015/04/11/oracle_db_autostart_with_linux/" itemprop="url">
+                  配置 Oracle 11gR2 在 CentOS6 上开机自启动
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2015-04-11T15:21:25+08:00" content="2015-04-11">
+              2015-04-11
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Oracle/" itemprop="url" rel="index">
+                    <span itemprop="name">Oracle</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/04/11/oracle_db_autostart_with_linux/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/04/11/oracle_db_autostart_with_linux/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h2 id="修改配置"><a href="#修改配置" class="headerlink" title="修改配置"></a>修改配置</h2><p>要达到oracle随开机自启动，一般使用11g自带的dbstart脚本：<code>$ORACLE_HOME/bin/dbstart</code>，但要先修改<code>/etc/oratab</code>的内容，将N改成Y，表示允许实例自启动，假如有2个实例要启动，再写一行：<br><figure class="highlight groovy"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ vi <span class="regexp">/etc/</span>oratab</div><div class="line"><span class="string">EXCRMPROD:</span><span class="regexp">/db/</span>oracle<span class="regexp">/product/</span><span class="number">11.2</span><span class="number">.0</span>/<span class="string">db_1:</span>Y</div></pre></td></tr></table></figure></p>
+<p>然后在oracle用户下执行<code>$ORACLE_HOME/bin/dbstart</code>即可启动，日志被记录在<code>$ORACLE_HOME/startup.log</code>。但是，默认情况<code>dbstart</code>和<code>dbshut</code>脚本不能自动启动或关闭监听，所以也要加以修改：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">$ vi /db/oracle/product/11.2.0/db_1/bin/dbstart</div><div class="line"><span class="comment">## 找到下面的代码(约第80行)，在实际脚本代码的前面</span></div><div class="line"><span class="comment"># First argument is used to bring up Oracle Net Listener</span></div><div class="line">ORACLE_HOME_LISTNER=<span class="variable">$1</span></div><div class="line"><span class="comment">## 将此处的 ORACLE_HOME_LISTNER=$1 修改为 ORACLE_HOME_LISTNER=$ORACLE_HOME</span></div><div class="line"><span class="keyword">if</span> [ ! <span class="variable">$ORACLE_HOME_LISTNER</span> ] ; <span class="keyword">then</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"ORACLE_HOME_LISTNER is not SET, unable to auto-start Oracle Net Listener"</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"Usage: <span class="variable">$0</span> ORACLE_HOME"</span></div><div class="line"><span class="keyword">else</span></div><div class="line">LOG=<span class="variable">$ORACLE_HOME_LISTNER</span>/listener.log</div></pre></td></tr></table></figure></p>
+<p>同样也修改dbshut脚本（约第50行）：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line">$ vi /db/oracle/product/11.2.0/db_1/bin/dbshut</div><div class="line"></div><div class="line"><span class="comment"># The this to bring down Oracle Net Listener</span></div><div class="line">ORACLE_HOME_LISTNER=<span class="variable">$ORACLE_HOME</span></div><div class="line"><span class="keyword">if</span> [ ! <span class="variable">$ORACLE_HOME_LISTNER</span> ] ; <span class="keyword">then</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"ORACLE_HOME_LISTNER is not SET, unable to auto-stop Oracle Net Listener"</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"Usage: <span class="variable">$0</span> ORACLE_HOME"</span></div><div class="line"><span class="keyword">else</span></div><div class="line">LOG=<span class="variable">$ORACLE_HOME_LISTNER</span>/listener.log</div></pre></td></tr></table></figure></p>
+<h2 id="开机启动"><a href="#开机启动" class="headerlink" title="开机启动"></a>开机启动</h2><p>这两个脚本在执行时会自动去搜索<code>/etc/oratab</code>文件的内容，将这两个命令分别加入开机启动和关闭脚本里。</p>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2015/04/11/oracle_db_autostart_with_linux/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
                 <a class="post-title-link" href="/2015/04/05/vmware-vcenter-vconverter/" itemprop="url">
                   使用vmware vconverter从物理机迁移系统到虚拟机P2V（多图）
                 </a>
@@ -650,260 +914,6 @@
 
 
     
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/03/10/install-pdo-oci-oci8-phpext/" itemprop="url">
-                  php5.3连接oracle的客户端及pdo_oci模块安装
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2015-03-10T01:21:25+08:00" content="2015-03-10">
-              2015-03-10
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/Linux/" itemprop="url" rel="index">
-                    <span itemprop="name">Linux</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2015/03/10/install-pdo-oci-oci8-phpext/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/03/10/install-pdo-oci-oci8-phpext/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>php连接oracle数据库虽然不是最佳拍档，但组内开发确实有这样需求。如果没有参考合适的文档，这个过程还是挺折磨人的，下面是一个记录，原型是国外的一篇博客 <a href="http://shiki.me/blog/installing-pdo_oci-and-oci8-php-extensions-on-centos-6-4-64bit/">Installing PDO_OCI and OCI8 PHP extensions on CentOS 6.4 64bit</a>。</p>
-<p>假设你已经安装好php的环境，php版本为5.3，要连接的oracle服务器是 11g R2，操作系统版本CentOS 6.4 x86_64。如果没有安装php，可以通过以下命令安装：<br><figure class="highlight crmsh"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># yum install php php-pdo</span></div><div class="line"><span class="comment"># yum install php-devel php-pear php-fpm php-gd php-ldap \</span></div><div class="line">php-mbstring php-<span class="keyword">xml</span> <span class="title">php-xmlrpc</span>  php- zlib zlib-devel bc libaio glibc</div></pre></td></tr></table></figure></p>
-<p>假如web服务器使用apache。</p>
-<h2 id="1-安装InstantClient"><a href="#1-安装InstantClient" class="headerlink" title="1. 安装InstantClient"></a>1. 安装InstantClient</h2><p>instantclient是oracle的连接数据库的简单客户端，不用安装一个500Moracle客户端就可以连接oracle数据库，有windows和linux版本。从 <a href="http://www.oracle.com/technetwork/topics/linuxx86-64soft-092277.html">这里</a> 选择需要的版本下载，只需Basic和Devel两个rpm包。<br><figure class="highlight lsl"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">安装</div><div class="line"># rpm -ivh oracle-instantclient11<span class="number">.2</span>-basic<span class="number">-11.2</span><span class="number">.0</span><span class="number">.4</span><span class="number">.0</span><span class="number">-1.</span>x86_64.rpm</div><div class="line"># rpm -ivh oracle-instantclient11<span class="number">.2</span>-devel<span class="number">-11.2</span><span class="number">.0</span><span class="number">.4</span><span class="number">.0</span><span class="number">-1.</span>x86_64.rpm</div><div class="line"></div><div class="line">软链接</div><div class="line"># ln -s /usr/include/oracle/<span class="number">11.2</span>/client64 /usr/include/oracle/<span class="number">11.2</span>/client</div><div class="line"># ln -s /usr/lib/oracle/<span class="number">11.2</span>/client64 /usr/lib/oracle/<span class="number">11.2</span>/client</div></pre></td></tr></table></figure></p>
-<p>64位系统需要创建32位的软链接，这里可能是一个遗留bug，不然后面编译会出问题。</p>
-<p>接下来还要让系统能够找到oracle客户端的库文件，修改LD_LIBRARY_PATH：<br><figure class="highlight crystal"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># vi /etc/profile.d/oracle.sh</span></div><div class="line">export ORACLE_HOME=<span class="regexp">/usr/lib</span><span class="regexp">/oracle/</span><span class="number">11.2</span>/client64</div><div class="line">export LD_LIBRARY_PATH=$ORACLE_HOME/<span class="class"><span class="keyword">lib</span></span></div></pre></td></tr></table></figure></p>
-<p>执行<code>source /etc/profile.d/oracle.sh</code>使环境变量生效。</p>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2015/03/10/install-pdo-oci-oci8-phpext/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/03/02/rpm-yum-recover/" itemprop="url">
-                  rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2015-03-02T01:21:25+08:00" content="2015-03-02">
-              2015-03-02
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/Linux/" itemprop="url" rel="index">
-                    <span itemprop="name">Linux</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2015/03/02/rpm-yum-recover/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/03/02/rpm-yum-recover/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <h1 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h1><p>在 CentOS 6.4 x86_64 上无论通过yum或rpm安装软件时，出现以下错误：<br><figure class="highlight subunit"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">yum install glibc-devel</div><div class="line">...</div><div class="line"><span class="keyword">error: </span>rpmts_HdrFromFdno: Header V3 RSA/SHA1 Signature, key ID c105b9de: BAD</div><div class="line">...</div><div class="line">Problem opening package *.el6.x86_64.rpm</div></pre></td></tr></table></figure></p>
-<h2 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h2><p><code>rpm -ivh</code>单独去安装软件也提示上面的错误。<code>rpm -qa</code> 无法列出系统中安装过的软件包，但许多库文件和软件命令是存在的。也尝试过<code>rpm --rebuilddb</code>来重建数据库，但情况依然没有得到改善（centos官网说千万不要在系统broken的情况下rebuilddb，不然有可能变成destroy）</p>
-<p>由上面的推断可知问题出现在rpm这个软件包管理工具本身，但此时又无法通过rpm来重新安装自己，所以只能找到具体是什么因素导致的。好在官网的这篇较新的文章正好就是解决该BUG：<a href="https://www.centos.org/forums/viewtopic.php?p=214791&amp;f=13#p214791">WARNING: nss-softokn-3.14.3-19.el6_6 updates may be broken</a> ：</p>
-<p>大致是说当你使用<code>yum update</code>去更新你的系统时，<code>nss-softokn</code>、<code>nss-softokn-freebl</code>和其它软件一起都得到更新，所以不会有问题。但如果单独去更新某一个软件，如<code>yum update nss-softokn</code>或<code>yum install &lt;software&gt;</code>引起它的依赖包也升级，使得<code>nss-softokn</code>和<code>nss-softokn-freebl</code>版本不匹配，就会导致 rpm/yum 全面停止工作，表现就是上面的<code>key .. BAD</code>。</p>
-<h2 id="解决"><a href="#解决" class="headerlink" title="解决"></a>解决</h2><p>解决起来也很方便，首先你可以通过<code>cat /var/log/messages|grep nss</code>看到<code>nss-softokn-freebl</code>的版本：<br><figure class="highlight less"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"># <span class="selector-tag">cat</span> /<span class="selector-tag">var</span>/<span class="selector-tag">log</span>/<span class="selector-tag">messages</span>|<span class="selector-tag">grep</span> <span class="selector-tag">nss-softokn</span></div><div class="line"><span class="selector-tag">Mar</span>  <span class="selector-tag">2</span> <span class="selector-tag">09</span><span class="selector-pseudo">:56</span><span class="selector-pseudo">:18</span> <span class="selector-tag">poprod</span> <span class="selector-tag">yum</span><span class="selector-attr">[14920]</span>: <span class="selector-tag">Updated</span>: <span class="selector-tag">nss-softokn-3</span><span class="selector-class">.14</span><span class="selector-class">.3-19</span><span class="selector-class">.el6_6</span><span class="selector-class">.x86_64</span></div><div class="line"><span class="selector-tag">Mar</span>  <span class="selector-tag">2</span> <span class="selector-tag">14</span><span class="selector-pseudo">:43</span><span class="selector-pseudo">:29</span> <span class="selector-tag">poprod</span> <span class="selector-tag">yum</span><span class="selector-attr">[33040]</span>: <span class="selector-tag">Installed</span>: <span class="selector-tag">nss-softokn-freebl-3</span><span class="selector-class">.14</span><span class="selector-class">.3-19</span><span class="selector-class">.el6_6</span><span class="selector-class">.x86_64</span></div><div class="line"><span class="selector-tag">Mar</span>  <span class="selector-tag">2</span> <span class="selector-tag">14</span><span class="selector-pseudo">:44</span><span class="selector-pseudo">:14</span> <span class="selector-tag">poprod</span> <span class="selector-tag">yum</span><span class="selector-attr">[33047]</span>: <span class="selector-tag">Installed</span>: <span class="selector-tag">nss-softokn-freebl-3</span><span class="selector-class">.14</span><span class="selector-class">.3-19</span><span class="selector-class">.el6_6</span><span class="selector-class">.x86_64</span></div><div class="line">...</div></pre></td></tr></table></figure></p>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2015/03/02/rpm-yum-recover/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -949,7 +959,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-count">83</span>
               <span class="site-state-item-name">posts</span>
             </a>
           </div>
@@ -957,7 +967,7 @@
           
             <div class="site-state-item site-state-categories">
               
-                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-count">23</span>
                 <span class="site-state-item-name">categories</span>
               
             </div>
@@ -966,7 +976,7 @@
           
             <div class="site-state-item site-state-tags">
               <a href="/tags">
-                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-count">107</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>

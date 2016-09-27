@@ -1,0 +1,896 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="mysql,python," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="Python完成的一个小程序，用于杀掉 MySQL 上的异常线程，如慢查询、处于Sleep状态的。项目地址：https://github.com/seanlook/myquerykill  
+写这个脚本的初衷是在使用阿里云RDS的过程中，数据库出现异常，需要快速恢复。网上有许多类似的kill脚本，都是通过 mysqladmin 实现的。然而 Ali-RDS 环境有以下限制：
+
+不提供 SUPER">
+<meta property="og:type" content="article">
+<meta property="og:title" content="自动记录MySQL慢查询快照脚本">
+<meta property="og:url" content="http://seanlook.com/2016/09/27/python-mysql-querykill/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="Python完成的一个小程序，用于杀掉 MySQL 上的异常线程，如慢查询、处于Sleep状态的。项目地址：https://github.com/seanlook/myquerykill  
+写这个脚本的初衷是在使用阿里云RDS的过程中，数据库出现异常，需要快速恢复。网上有许多类似的kill脚本，都是通过 mysqladmin 实现的。然而 Ali-RDS 环境有以下限制：
+
+不提供 SUPER">
+<meta property="og:updated_time" content="2016-09-27T08:32:49.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="自动记录MySQL慢查询快照脚本">
+<meta name="twitter:description" content="Python完成的一个小程序，用于杀掉 MySQL 上的异常线程，如慢查询、处于Sleep状态的。项目地址：https://github.com/seanlook/myquerykill  
+写这个脚本的初衷是在使用阿里云RDS的过程中，数据库出现异常，需要快速恢复。网上有许多类似的kill脚本，都是通过 mysqladmin 实现的。然而 Ali-RDS 环境有以下限制：
+
+不提供 SUPER">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title> 自动记录MySQL慢查询快照脚本 | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                自动记录MySQL慢查询快照脚本
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2016-09-27T16:32:49+08:00" content="2016-09-27">
+              2016-09-27
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Python/" itemprop="url" rel="index">
+                    <span itemprop="name">Python</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/09/27/python-mysql-querykill/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/09/27/python-mysql-querykill/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>Python完成的一个小程序，用于杀掉 MySQL 上的异常线程，如慢查询、处于Sleep状态的。<br><strong>项目地址</strong>：<a href="https://github.com/seanlook/myquerykill" target="_blank" rel="external">https://github.com/seanlook/myquerykill</a>  </p>
+<p>写这个脚本的初衷是在使用阿里云RDS的过程中，数据库出现异常，需要快速恢复。网上有许多类似的kill脚本，都是通过 mysqladmin 实现的。然而 Ali-RDS 环境有以下限制：</p>
+<ul>
+<li>不提供 SUPER 权限的用户，也就是用户只能 kill 自己的线程</li>
+<li>当连接数暴增时，外部用户无法登陆，包括控制台</li>
+</ul>
+<p>为了解决上午2大问题，该 python 脚本通过在db实例上，使用多线程的方式，为每个用户保留一个连接，并<strong>实时</strong>读取指令配置文件 <code>mysqk.ini</code>，发现有 kill 需求时，利用对应用户已有连接找到 <code>information_schema.processlist</code> 中符合条件的线程，并 kill 。</p>
+<p>说明：该脚本在9月份做过一次重写，7月份的版本（分支 old_0.5.0）是每实例每用户，对应一个线程，db实例一多线程数也太多，看得始终不太优雅，于是改成了一个db实例一个线程，维护同时维护多个用户的会话。同时新版也加入了更多的功能，如按时间窗口检查，包含或排除特定连接，邮件通知，配置项覆盖。</p>
+<h1 id="特性"><a href="#特性" class="headerlink" title="特性"></a>特性</h1><ol>
+<li>始终通过 mysql ping 维持一个长连接，并有断开自动重来机制，解决没有连接可用的尴尬局面</li>
+<li>每个db实例有自己的线程，避免需要单独登陆个别用户去kill的繁复操作。<br>如果你具有 SUPER 权限，也可以简化配置做到兼容</li>
+<li>能够分开应对需要杀死线程的场景：<ul>
+<li>长时间运行超过 N 秒的</li>
+<li>Sleep 状态的事务 （一般不建议，但有时候kill它，可以快速释放连接给管理员使用）</li>
+<li>排除一些线程不能kill，如 Binlog dump</li>
+<li>包含特定关键字的线程要kill</li>
+</ul>
+</li>
+<li>出现符合条件的线程时，会对当时的processlist, engine status，lock_wait 做一个快照，并邮件发出</li>
+<li>有试运行dry_run模式，即执行所有的检查过程但不真正kill</li>
+<li>支持只在时间窗口内运行，考虑到晚上一些长任务不检查</li>
+<li>密码加密</li>
+</ol>
+<a id="more"></a>
+<h1 id="快速使用"><a href="#快速使用" class="headerlink" title="快速使用"></a>快速使用</h1><p>需要pip安装<code>MySQL-python</code>和<code>pycrypto</code>两个库，只在python 2.7上有测试。</p>
+<p>在 <em>settings.py</em> 里面设置连接的用户名和密码信息。这里假设同一批db的要check的认证信息是一样的，指定的用户既用于登录认证，也用于告知脚本哪些用户需要被检查。<br>密码要通过 <code>prpcryptec.py</code> 加密，加密的密钥需写入脚本本身的 <code>KEY_DB_AUTH</code>变量。（担心泄露的话，把mysqk.py编译成 pyc 来跑）</p>
+<p>在 <em>mysqk.ini</em> 主配置文件里面  </p>
+<ul>
+<li><code>db_info</code> 节设置需要被检查的数据库地址，如 <code>db01=10.0.200.100:3306</code></li>
+<li>可分别 <code>db01</code>等指定需要kill thread的选项。<code>[id_db01]</code> 则默认复用 <code>[db_commkill]</code> 的选项</li>
+<li><code>db_comconfig</code> 节设置 <code>db_puser</code> 为能查看到所有processlist的权限用户，且在 <em>settings.py</em> 的DB_AUTH中已指定</li>
+<li><p>只想执行检查，并不想真正kill异常线程，确认 dry_run不等于0</p>
+<p>Here we go!</p>
+</li>
+</ul>
+<h1 id="配置项说明"><a href="#配置项说明" class="headerlink" title="配置项说明"></a>配置项说明</h1><p><strong><code>mysqk.ini</code></strong>：</p>
+<h2 id="mail-config"><a href="#mail-config" class="headerlink" title="mail_config"></a>mail_config</h2><p>邮件通知相关设置，smtp服务地址和认证信息。<br><code>mail_receiver=</code> 设置空，表示不发邮件</p>
+<h2 id="db-info"><a href="#db-info" class="headerlink" title="db_info"></a>db_info</h2><p>设置要检查kill哪些数据库实例.<br>格式：<code>&lt;dbid&gt;=&lt;host&gt;:&lt;port&gt;</code>，dbid是唯一表示db实例的，后面设置各db需要被kill的选项，小节配置名就是 <code>id_&lt;dbid&gt;</code>；端口必需指定。</p>
+<p>在这里出现的db实例都会被执行检查，可用 ; 注释，但需要重启脚本。</p>
+<h2 id="db-comconfig"><a href="#db-comconfig" class="headerlink" title="db_comconfig"></a>db_comconfig</h2><p>检查用公共配置，实时生效。</p>
+<ul>
+<li><code>db_puser</code>：指定一个用户名用于 show processlist，需要的权限：PROCESS、information_schema库查看。可以认为是一个代表用户，检查异常thread，把结果提供给有该thread杀掉权限用户。</li>
+<li><code>run_max_count</code>：执行检查的次数，是一个全局控制开关。每次修改这个值都会重新开始检查，即一个 clean start，让刚修改的配置生效。<ul>
+<li>为 0 表示脚本不进行任何检查，只简单维护与数据库的连接存活。存活检查频率在 <em>settings.py</em> 由 <code>CHECK_CONFIG_INTERVAL × CHECK_PING_MULTI</code>决定</li>
+<li>为 999 表示会在后台一致检查连接线程（但不一定有符合kill条件的），检查的频率在 <em>settings.py</em> 里面 <code>CHECK_CONFIG_INTERVAL</code> 指定</li>
+<li>为其它值时，表示检查次数满后停止检查</li>
+</ul>
+</li>
+<li><code>dry_run</code>：是否开启试运行模式，为0表示真实kill，为1或其它值表示试运行。试运行模式可用于监控慢查询并告警。注意同一会话线程ID只告警一次</li>
+<li><code>run_time_window</code>：运行的检查的时间窗口，格式如 <code>08:00-22:00</code>，在这个时间以外不执行检查，留空表示不限制。主要考虑晚上一些统计任务可能出现“异常”线程。</li>
+</ul>
+<h2 id="db-commkill"><a href="#db-commkill" class="headerlink" title="db_commkill"></a>db_commkill</h2><p>kill用公共配置，实时生效，会被 <code>id_&lt;dbid&gt;</code> 节的选项覆盖。</p>
+<ul>
+<li><p><code>k_user</code>：很关键的一个选项，表示你要检查并kill哪些数据库用户，多个用逗号分隔（不要带引号）。<br>为 <code>all</code> 时，表示要检查 <em>settings.py</em> 里 DB_AUTH 指定的所有用户<br>为 <code>none</code> 时，表示不kill任何异常线程，效果与设置了 dry_run 模式相当  </p>
+</li>
+<li><p><code>k_longtime</code>：执行超过设定值的sql则认为异常。一般大于 CHECK_CONFIG_INTERVAL</p>
+</li>
+<li><code>k_sleep</code>：Sleep超过设定秒的sql则认为异常，为 0 表示不杀掉sleep状态的线程</li>
+<li><code>k_exclude</code>：排除掉那些特定关键字的线程，比如复制线程、管理员的连接等</li>
+<li><code>k_include</code>：包含这些特定关键字的线程，需要被kill。注意，它作用在满足 k_user 和 k_exclude 的前提之下。<br>k_exclude与k_include 的值是支持python re模块正则的格式，不要带引号</li>
+</ul>
+<h2 id="id-dbid"><a href="#id-dbid" class="headerlink" title="id_dbid"></a>id_dbid</h2><p>这部分区域的配置项与 db_commconfig 相同，用于针对个别db的kill选项。</p>
+<h1 id="使用建议"><a href="#使用建议" class="headerlink" title="使用建议"></a>使用建议</h1><p>两种组合模式：</p>
+<ol>
+<li>设置 <code>dry_run=0</code>，默认 <code>k_user=none</code>，当数据库出现异常时，主动修改对应db的k_user值，动态kill</li>
+<li>设置 <code>dry_run=1</code>，默认 <code>k_user=all</code>，相当于运行在daemon模式，有慢查询则邮件通知，并且记录下当时的信息</li>
+</ol>
+<p>当然你也可以<code>dry_run=0</code>，<code>k_user=all</code>，让程序一直在后台跑并kill，但生产环境极不推荐。</p>
+<p>有日志和快照文件可以查看。</p>
+<h1 id="配置文件示例"><a href="#配置文件示例" class="headerlink" title="配置文件示例"></a>配置文件示例</h1><p>mysqlk.ini :</p>
+<figure class="highlight ini"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div></pre></td><td class="code"><pre><div class="line"><span class="section">[mail_config]</span></div><div class="line"><span class="attr">mail_host</span>=smtp.exmail.qq.com</div><div class="line"><span class="attr">mail_user</span>=xxx@ecqun.com</div><div class="line"><span class="attr">mail_pass</span>=xxxxxx</div><div class="line"></div><div class="line"><span class="attr">mail_receiver</span>=</div><div class="line"><span class="section"></span></div><div class="line">[db_info]</div><div class="line"><span class="attr">crm0</span>=<span class="number">192.168</span>.<span class="number">1.125</span>:<span class="number">3306</span></div><div class="line"><span class="attr">crm1</span>=<span class="number">192.168</span>.<span class="number">1.126</span>:<span class="number">3306</span></div><div class="line"><span class="attr">crm2</span>=<span class="number">192.168</span>.<span class="number">1.127</span>:<span class="number">3306</span></div><div class="line"><span class="attr">crm3</span>=<span class="number">192.168</span>.<span class="number">1.128</span>:<span class="number">3306</span></div><div class="line"><span class="attr">base</span>=<span class="number">10.0</span>.<span class="number">200.142</span>:<span class="number">3306</span></div><div class="line"><span class="section"></span></div><div class="line">[db_commconfig]</div><div class="line"><span class="attr">db_puser</span>=ecuser</div><div class="line"></div><div class="line"><span class="comment">; how many kill times once this config file changed</span></div><div class="line"><span class="comment">; 0: DISABLE all kill</span></div><div class="line"><span class="comment">; 999: always kill threads that meet kill conditions</span></div><div class="line"><span class="comment">; default: 1</span></div><div class="line"><span class="comment">; can not be inherit</span></div><div class="line"><span class="attr">run_max_count</span>=<span class="number">999</span></div><div class="line"><span class="attr">dry_run</span>=<span class="number">1</span></div><div class="line"><span class="attr">run_time_window</span>=<span class="number">08</span>:<span class="number">00</span>-<span class="number">22</span>:<span class="number">00</span></div><div class="line"><span class="section"></span></div><div class="line"></div><div class="line">[db_commkill]</div><div class="line"><span class="attr">k_user</span>=all</div><div class="line"><span class="attr">k_longtime</span>=<span class="number">10</span></div><div class="line"><span class="attr">k_lock</span>=<span class="number">1</span></div><div class="line"><span class="attr">k_sleep</span>=<span class="number">0</span></div><div class="line"></div><div class="line"><span class="attr">k_exclude</span>=Binlog|ecdba|Daemon</div><div class="line"><span class="attr">k_include</span>=select sleep\(<span class="number">17</span>\)</div><div class="line"><span class="section"></span></div><div class="line"></div><div class="line">[id_crm0]</div><div class="line"><span class="comment">; k_user: who's threads to be killed. use comma to separate</span></div><div class="line"><span class="comment">;         none: do not kill anyone's threads</span></div><div class="line"><span class="comment">;         all: kill all user's threads (with other where conditions)</span></div><div class="line"><span class="comment">; default: none</span></div><div class="line"><span class="attr">k_user</span>=all</div><div class="line"></div><div class="line"><span class="comment">; k_longtime: filter the threads who's running time is longer than this</span></div><div class="line"><span class="comment">;             0: ignore the time &gt; x  condition</span></div><div class="line"><span class="comment">; default: 10</span></div><div class="line"><span class="attr">k_longtime</span>=<span class="number">10</span></div><div class="line"></div><div class="line"><span class="comment">; k_sleep: whether kill sleepd threads or not</span></div><div class="line"><span class="comment">;          0: do not kill command='Sleep' threads from processlist</span></div><div class="line"><span class="comment">;          when it set to 1, usually it's subset of k_longtime condition</span></div><div class="line"><span class="comment">; default: 0</span></div><div class="line"><span class="attr">k_sleep</span>=<span class="number">0</span></div><div class="line"><span class="section"></span></div><div class="line">[id_crm1]</div><div class="line"><span class="attr">k_user</span>=ecuser</div><div class="line"><span class="attr">k_longtime</span>=<span class="number">10</span></div><div class="line"><span class="attr">k_sleep</span>=<span class="number">0</span></div><div class="line"><span class="section"></span></div><div class="line">[id_crm2]</div><div class="line"><span class="attr">k_user</span>=all</div><div class="line"><span class="attr">k_longtime</span>=<span class="number">10</span></div><div class="line"><span class="attr">k_sleep</span>=<span class="number">0</span></div><div class="line"><span class="section"></span></div><div class="line">[id_crm3]</div></pre></td></tr></table></figure>
+<hr>
+<p>原文链接地址：<a href="http://seanlook.com/2016/09/27/python-mysql-querykill/">http://seanlook.com/2016/09/27/python-mysql-querykill/</a></p>
+<hr>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/mysql/" rel="tag">#mysql</a>
+          
+            <a href="/tags/python/" rel="tag">#python</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2016/08/30/mysql-ppt-trx_isolation-lock/" rel="next" title="浅析MySQL事务隔离级别与锁 分享">
+                <i class="fa fa-chevron-left"></i> 浅析MySQL事务隔离级别与锁 分享
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2016/09/27/python-mysql-querykill/"
+           data-title="自动记录MySQL慢查询快照脚本" data-url="http://seanlook.com/2016/09/27/python-mysql-querykill/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">83</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">23</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">107</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#特性"><span class="nav-text">特性</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#快速使用"><span class="nav-text">快速使用</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#配置项说明"><span class="nav-text">配置项说明</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#mail-config"><span class="nav-text">mail_config</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#db-info"><span class="nav-text">db_info</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#db-comconfig"><span class="nav-text">db_comconfig</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#db-commkill"><span class="nav-text">db_commkill</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#id-dbid"><span class="nav-text">id_dbid</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#使用建议"><span class="nav-text">使用建议</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#配置文件示例"><span class="nav-text">配置文件示例</span></a></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

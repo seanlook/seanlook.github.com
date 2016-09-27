@@ -281,6 +281,286 @@
             
               
                 
+                <a class="post-title-link" href="/2016/09/27/python-mysql-querykill/" itemprop="url">
+                  自动记录MySQL慢查询快照脚本
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2016-09-27T16:32:49+08:00" content="2016-09-27">
+              2016-09-27
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Python/" itemprop="url" rel="index">
+                    <span itemprop="name">Python</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/09/27/python-mysql-querykill/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/09/27/python-mysql-querykill/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>Python完成的一个小程序，用于杀掉 MySQL 上的异常线程，如慢查询、处于Sleep状态的。<br><strong>项目地址</strong>：<a href="https://github.com/seanlook/myquerykill">https://github.com/seanlook/myquerykill</a>  </p>
+<p>写这个脚本的初衷是在使用阿里云RDS的过程中，数据库出现异常，需要快速恢复。网上有许多类似的kill脚本，都是通过 mysqladmin 实现的。然而 Ali-RDS 环境有以下限制：</p>
+<ul>
+<li>不提供 SUPER 权限的用户，也就是用户只能 kill 自己的线程</li>
+<li>当连接数暴增时，外部用户无法登陆，包括控制台</li>
+</ul>
+<p>为了解决上午2大问题，该 python 脚本通过在db实例上，使用多线程的方式，为每个用户保留一个连接，并<strong>实时</strong>读取指令配置文件 <code>mysqk.ini</code>，发现有 kill 需求时，利用对应用户已有连接找到 <code>information_schema.processlist</code> 中符合条件的线程，并 kill 。</p>
+<p>说明：该脚本在9月份做过一次重写，7月份的版本（分支 old_0.5.0）是每实例每用户，对应一个线程，db实例一多线程数也太多，看得始终不太优雅，于是改成了一个db实例一个线程，维护同时维护多个用户的会话。同时新版也加入了更多的功能，如按时间窗口检查，包含或排除特定连接，邮件通知，配置项覆盖。</p>
+<h1 id="特性"><a href="#特性" class="headerlink" title="特性"></a>特性</h1><ol>
+<li>始终通过 mysql ping 维持一个长连接，并有断开自动重来机制，解决没有连接可用的尴尬局面</li>
+<li>每个db实例有自己的线程，避免需要单独登陆个别用户去kill的繁复操作。<br>如果你具有 SUPER 权限，也可以简化配置做到兼容</li>
+<li>能够分开应对需要杀死线程的场景：<ul>
+<li>长时间运行超过 N 秒的</li>
+<li>Sleep 状态的事务 （一般不建议，但有时候kill它，可以快速释放连接给管理员使用）</li>
+<li>排除一些线程不能kill，如 Binlog dump</li>
+<li>包含特定关键字的线程要kill</li>
+</ul>
+</li>
+<li>出现符合条件的线程时，会对当时的processlist, engine status，lock_wait 做一个快照，并邮件发出</li>
+<li>有试运行dry_run模式，即执行所有的检查过程但不真正kill</li>
+<li>支持只在时间窗口内运行，考虑到晚上一些长任务不检查</li>
+<li>密码加密</li>
+</ol>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2016/09/27/python-mysql-querykill/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2016/08/30/mysql-ppt-trx_isolation-lock/" itemprop="url">
+                  浅析MySQL事务隔离级别与锁 分享
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2016-08-30T21:32:49+08:00" content="2016-08-30">
+              2016-08-30
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/08/30/mysql-ppt-trx_isolation-lock/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/08/30/mysql-ppt-trx_isolation-lock/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          
+            <p>这段时间在公司内部准备了一个分享，主题是关于 MySQL事务与锁，准备过程内容很多，也深入弄清楚了一些以前比较迷糊的地方，加上后面的讨论也就一个半小时。</p>
+<p>主要涉及的是乐观锁与悲观锁，InnoDB多版本并发控制的实现，以及隔离级别与各种情况加锁分析，因为涉及的主要还是开发人员，所以不是很深奥。也算花了不少心血，分享一下。</p>
+<p>slideshare: <a href="http://www.slideshare.net/ssuser5a0bc0/my-sql-seanlook" target="_blank" rel="external">http://www.slideshare.net/ssuser5a0bc0/my-sql-seanlook</a></p>
+
+
+	<div class="row">
+	  <iframe src="http://nagland.github.io/viewer/web/viewer.html?val=http://7q5fot.com1.z0.glb.clouddn.com/mysql-ppt-trx_isolation-lock-seanlook.pdf" style="width:100%; height:550px"></iframe>
+	</div>
+
+
+
+<hr>
+<p>原文连接地址：<a href="http://seanlook.com/2016/08/30/mysql-ppt-trx_isolation-lock/">http://seanlook.com/2016/08/30/mysql-ppt-trx_isolation-lock/</a></p>
+<hr>
+<!--
+<iframe src="https://www.slideshare.net/slideshow/embed_code/key/3HLJJcJmM9KLGT" width="900" height="512" frameborder="0" allowfullscreen></iframe>
+<p>–&gt;</p>
+-->
+          
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
                 <a class="post-title-link" href="/2016/06/11/mysql-advanced-query-tuning-percona/" itemprop="url">
                   Advanced MySQL Query Tuning .pdf
                 </a>
@@ -368,6 +648,128 @@
 <p>–&gt;</p>
 --></div>
           
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2016/05/27/mysql-pt-osc-add-primarykey/" itemprop="url">
+                  使用pt-osc修改主键时注意
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2016-05-27T16:32:49+08:00" content="2016-05-27">
+              2016-05-27
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/05/27/mysql-pt-osc-add-primarykey/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/05/27/mysql-pt-osc-add-primarykey/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：<br><figure class="highlight applescript"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">原表上有个复合主键，现在要添加一个自增<span class="built_in">id</span>作为主键，如何进行</div></pre></td></tr></table></figure></p>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2016/05/27/mysql-pt-osc-add-primarykey/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
         
       
     </div>
@@ -546,402 +948,6 @@
 
 
     
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2016/05/27/mysql-pt-osc-add-primarykey/" itemprop="url">
-                  使用pt-osc修改主键时注意
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2016-05-27T16:32:49+08:00" content="2016-05-27">
-              2016-05-27
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2016/05/27/mysql-pt-osc-add-primarykey/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/05/27/mysql-pt-osc-add-primarykey/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：<br><figure class="highlight applescript"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">原表上有个复合主键，现在要添加一个自增<span class="built_in">id</span>作为主键，如何进行</div></pre></td></tr></table></figure></p>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2016/05/27/mysql-pt-osc-add-primarykey/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2016/05/24/mysql-online-ddl-concept/" itemprop="url">
-                  mysql 5.6 原生Online DDL解析
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2016-05-24T16:32:49+08:00" content="2016-05-24">
-              2016-05-24
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2016/05/24/mysql-online-ddl-concept/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/05/24/mysql-online-ddl-concept/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>做MySQL的都知道，数据库操作里面，DDL操作（比如CREATE,DROP,ALTER等）代价是非常高的，特别是在单表上千万的情况下，加个索引或改个列类型，就有可能堵塞整个表的读写。</p>
-<p>然后 mysql 5.6 开始，大家期待的Online DDL出现了，可以实现修改表结构的同时，依然允许DML操作(select,insert,update,delete)。在这个特性出现以前，用的比较多的工具是<code>pt-online-schema-change</code>，比较请参考<a href="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change">pt-online-schema-change使用说明、限制与比较</a>或 <a href="http://www.fromdual.ch/online-ddl_vs_pt-online-schema-change">ONLINE DDL VS PT-ONLINE-SCHEMA-CHANGE</a> 。</p>
-<h2 id="1-Online-DDL"><a href="#1-Online-DDL" class="headerlink" title="1. Online DDL"></a>1. Online DDL</h2><p>在 MySQL 5.1 （带InnoDB Plugin）和5.5中，有个新特性叫 Fast Index Creation（下称 FIC），就是在添加或者删除二级<strong>索引</strong>的时候，可以不用复制原表。对于之前的版本对于索引的添加删除这类DDL操作，MySQL数据库的操作过程为如下：</p>
-<ol>
-<li>首先新建Temp table，表结构是 ALTAR TABLE 新定义的结构</li>
-<li>然后把原表中数据导入到这个Temp table</li>
-<li>删除原表</li>
-<li>最后把临时表rename为原来的表名</li>
-</ol>
-<p>为了保持数据的一致性，中间复制数据（Copy Table）全程锁表只读，如果有写请求进来将无法提供服务，连接数爆张。</p>
-<p>引入FIC之后，创建二级索引时会对原表加上一个S锁，创建过程不需要重建表（no-rebuild）；删除InnoDB二级索引只需要更新内部视图，并标记这个索引的空间可用，去掉数据库元数据上该索引的定义即可。这个过程也只允许读操作，不能写入，但大大加快了修改索引的速度（不含主键索引，InnoDB IOT的特性决定了修改主键依然需要 Copy Table ）。</p>
-<p>FIC只对索引的创建删除有效，MySQL 5.6 Online DDL把这种特性扩展到了添加列、删除列、修改列类型、列重命名、设置默认值等等，实际效果要看所使用的选项和操作类别来定。</p>
-<h3 id="1-1-Online-DDL选项"><a href="#1-1-Online-DDL选项" class="headerlink" title="1.1 Online DDL选项"></a>1.1 Online DDL选项</h3><p>MySQL 在线DDL分为 <code>INPLACE</code> 和 <code>COPY</code> 两种方式，通过在ALTER语句的ALGORITHM参数指定。</p>
-<ul>
-<li><code>ALGORITHM=INPLACE</code>，可以避免重建表带来的IO和CPU消耗，保证ddl期间依然有良好的性能和并发。</li>
-<li><code>ALGORITHM=COPY</code>，需要拷贝原始表，所以不允许并发DML写操作，可读。这种copy方式的效率还是不如 inplace ，因为前者需要记录undo和redo log，而且因为临时占用buffer pool引起短时间内性能受影响。</li>
-</ul>
-<p>上面只是 Online DDL 内部的实现方式，此外还有 LOCK 选项控制是否锁表，根据不同的DDL操作类型有不同的表现：默认mysql尽可能不去锁表，但是像修改主键这样的昂贵操作不得不选择锁表。</p>
-<ul>
-<li><code>LOCK=NONE</code>，即DDL期间允许并发读写涉及的表，比如为了保证 ALTER TABLE 时不影响用户注册或支付，可以明确指定，好处是如果不幸该 alter语句不支持对该表的继续写入，则会提示失败，而不会直接发到库上执行。<code>ALGORITHM=COPY</code>默认LOCK级别</li>
-<li><code>LOCK=SHARED</code>，即DDL期间表上的写操作会被阻塞，但不影响读取。</li>
-<li><code>LOCK=DEFAULT</code>，让mysql自己去判断lock的模式，原则是mysql尽可能不去锁表</li>
-<li><code>LOCK=EXCLUSIVE</code>，即DDL期间该表不可用，堵塞任何读写请求。如果你想alter操作在最短的时间内完成，或者表短时间内不可用能接受，可以手动指定。</li>
-</ul>
-<p>但是有一点需要说明，无论任何模式下，online ddl开始之前都需要一个短时间排它锁(exclusive)来准备环境，所以alter命令发出后，会首先等待该表上的其它操作完成，在alter命令之后的请求会出现等待<code>waiting meta data lock</code>。同样在ddl结束之前，也要等待alter期间所有的事务完成，也会堵塞一小段时间。所以尽量在ALTER TABLE之前确保没有大事务在执行，否则一样出现连环锁表。</p>
-<h3 id="1-2-考虑不同的DDL操作类别"><a href="#1-2-考虑不同的DDL操作类别" class="headerlink" title="1.2 考虑不同的DDL操作类别"></a>1.2 考虑不同的DDL操作类别</h3><p>从上面的介绍可以看出，不是5.6支持在线ddl就可以随心所欲的alter table，锁不锁表要看情况：</p>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2016/05/24/mysql-online-ddl-concept/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2016/05/18/mysql-blob-row_format/" itemprop="url">
-                  InnoDB行格式对text/blob大变长字段的影响
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2016-05-18T16:32:49+08:00" content="2016-05-18">
-              2016-05-18
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2016/05/18/mysql-blob-row_format/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/05/18/mysql-blob-row_format/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>最近在排查现网Text与Blob类型，发现有不少，在《高性能MySQL(第3版)》看到对这两种变长数据类型的处理会涉及到在磁盘上创建临时表，性能开销比较大。于是把影响blob型数据存储方式了解了一下：row_format。<!-- 关于临时表的内容，请参考 --></p>
-<h2 id="1-InnoDB的Antelop与Barracuda文件格式"><a href="#1-InnoDB的Antelop与Barracuda文件格式" class="headerlink" title="1. InnoDB的Antelop与Barracuda文件格式"></a>1. InnoDB的Antelop与Barracuda文件格式</h2><p>Innodb存储引擎保存记录，是以行的形式存放的（与之对应的是像Google BigTable这种列数据库）。在InnoDB 1.0.x版本之前，InnoDB 存储引擎提供了 <code>Compact</code> 和 <code>Redundant</code> 两种格式来存放行记录数据，这也是目前使用最多的一种格式。Redundant 格式是为兼容之前版本而保留的。</p>
-<p>MySQL 5.1 中的 innodb_plugin 引入了新的<em>文件格式</em>：<code>Barracuda</code>（将以前的<em>行格式</em> compact 和 redundant 合称为<code>Antelope</code>），该文件格式拥有新的两种行格式：<code>compressed</code>和<code>dynamic</code>。</p>
-<p>在 MySQL 5.6 版本中，默认还是 Compact 行格式，也是目前使用最多的一种 ROW FORMAT。用户可以通过命令 <code>SHOW TABLE STATUS LIKE&#39;table_name&#39;</code> 来查看当前表使用的行格式，其中 <em>row_format</em> 列表示当前所使用的行记录结构类型。</p>
-<figure class="highlight asciidoc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div></pre></td><td class="code"><pre><div class="line"><span class="section">mysql&gt; show variables like "innodb_file_format";</div><div class="line">+--------------------+-----------+</span></div><div class="line"><span class="section">| Variable_name      | Value     |</div><div class="line">+--------------------+-----------+</span></div><div class="line"><span class="section">| innodb_file_format | Barracuda |</div><div class="line">+--------------------+-----------+</span></div><div class="line">1 row in set</div><div class="line"></div><div class="line">mysql&gt; show table status like "tablename%"\G</div><div class="line"><span class="bullet">*************************** </span>1. row ***************************</div><div class="line"><span class="code">           Name: t_rf_compact</span></div><div class="line"><span class="code">         Engine: InnoDB</span></div><div class="line"><span class="code">        Version: 10</span></div><div class="line"><span class="code">     Row_format: Compact</span></div><div class="line"><span class="code">           Rows: 4</span></div><div class="line"><span class="code"> Avg_row_length: 36864</span></div><div class="line"><span class="code">    Data_length: 147456</span></div><div class="line">Max<span class="emphasis">_data_</span>length: 0</div><div class="line"><span class="code">   Index_length: 0</span></div><div class="line"><span class="code">      Data_free: 0</span></div><div class="line"><span class="code"> Auto_increment: 7</span></div><div class="line"><span class="code">    Create_time: 2016-05-14 20:52:58</span></div><div class="line"><span class="code">    Update_time: NULL</span></div><div class="line"><span class="code">     Check_time: NULL</span></div><div class="line"><span class="code">      Collation: utf8_general_ci</span></div><div class="line"><span class="code">       Checksum: NULL</span></div><div class="line"><span class="code"> Create_options: </span></div><div class="line"><span class="code">        Comment: </span></div><div class="line">1 row in set (0.00 sec)</div></pre></td></tr></table></figure>
-<p>在 msyql 5.7.9 及以后版本，默认行格式由<code>innodb_default_row_format</code>变量决定，它的默认值是<code>DYNAMIC</code>，也可以在 create table 的时候指定<code>ROW_FORMAT=DYNAMIC</code>。</p>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2016/05/18/mysql-blob-row_format/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -987,7 +993,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">81</span>
+              <span class="site-state-item-count">83</span>
               <span class="site-state-item-name">posts</span>
             </a>
           </div>
@@ -995,7 +1001,7 @@
           
             <div class="site-state-item site-state-categories">
               
-                <span class="site-state-item-count">22</span>
+                <span class="site-state-item-count">23</span>
                 <span class="site-state-item-name">categories</span>
               
             </div>
@@ -1004,7 +1010,7 @@
           
             <div class="site-state-item site-state-tags">
               <a href="/tags">
-                <span class="site-state-item-count">105</span>
+                <span class="site-state-item-count">107</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>
