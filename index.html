@@ -281,6 +281,137 @@
             
               
                 
+                <a class="post-title-link" href="/2016/11/17/python-mysqldump-out-in-concurrency-magic/" itemprop="url">
+                  让mysqldump变成并发导出导入的魔法
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2016-11-17T16:32:49+08:00" content="2016-11-17">
+              2016-11-17
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Python/" itemprop="url" rel="index">
+                    <span itemprop="name">Python</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/11/17/python-mysqldump-out-in-concurrency-magic/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/11/17/python-mysqldump-out-in-concurrency-magic/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h2 id="1-简介"><a href="#1-简介" class="headerlink" title="1. 简介"></a>1. 简介</h2><p>取名mypumpkin，是python封装的一个让mysqldump以多线程的方式导出库表，再以mysql命令多线程导入新库，用于成倍加快导出，特别是导入的速度。这一切只需要在 mysqldump 或 mysql 命令前面加上 <code>mypumpkin.py</code> 即可，所以称作魔法。</p>
+<p><strong>项目地址</strong>：<a href="https://github.com/seanlook/mypumpkin">https://github.com/seanlook/mypumpkin</a>  </p>
+<p>该程序源于需要对现网单库几百G的数据进行转移到新库，并对中间进行一些特殊操作（如字符集转换），无法容忍mysqldump导入速度。有人可能会提到为什么不用 mydumper，其实也尝试过它但还是放弃了，原因有：</p>
+<ol>
+<li>不能设置字符集<br>mydumper强制使用 binary 方式来连接库以达到不关心备份恢复时的字符集问题，然而我的场景下需要特意以不同的字符集导出、再导入。写这个程序的时候正好在公众号看到网易有推送的一篇文章 (<a href="http://mp.weixin.qq.com/s?__biz=MzI4NTA1MDEwNg==&amp;mid=2650756926&amp;idx=1&amp;sn=b8081a8ae9456a6051d1ba519febee54&amp;chksm=f3f9e2abc48e6bbd5912edb4e6207ff6ec5bf7123fedbf10b5c65a43146af22845dbf0787b39&amp;scene=0#wechat_redirect">解密网易MySQL实例迁移高效完成背后的黑科技</a>)，提到他们对mydumper的改进已支持字符集设置，可是在0.9.1版本的patch里还是没找到。</li>
+<li>没有像 mysqldump 那样灵活控制过滤选项（导哪些表、忽略哪些表）<br>因为数据量之巨大，而且将近70%是不变更的历史表数据，这些表是可以提前导出转换的；又有少量单表大于50G的，最好是分库导出转换。mydumper 不具备 mysqldump 这样的灵活性</li>
+<li>对忽略导出gtid信息、触发器等其它支持<br>阿里云rds 5.6 导出必须要设置 set-gtid-purged=OFF</li>
+</ol>
+<p>另外有人还可能提到 mysqlpump —— 它才是我认为mysqldump应该具有的模样，语法兼容，基于表的并发导出。但是只有 mysql服务端 5.7.9 以上才支持，这就是现实和理想的距离。。。</p>
+<h2 id="2-实现方法"><a href="#2-实现方法" class="headerlink" title="2. 实现方法"></a>2. 实现方法</h2><p>首先说明，mysqldump的导出速度并不慢，经测试能达到50M/s的速度，10G数据花费3分钟的样子，可以看到瓶颈在于网络和磁盘IO，再怎样的导出工具也快不了多少，但是导入却花了60分钟，磁盘和网络大概只用到了20%，瓶颈在目标库写入速度（而一般顺序写入达不到IOPS限制），所以mypumpkin就诞生了 —— 兼顾myloader的导入速度和mysqldump导出的灵活性。</p>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2016/11/17/python-mysqldump-out-in-concurrency-magic/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
                 <a class="post-title-link" href="/2016/09/27/python-mysql-querykill/" itemprop="url">
                   自动记录MySQL慢查询快照脚本
                 </a>
@@ -695,128 +826,6 @@
             
               
                 
-                <a class="post-title-link" href="/2016/05/27/mysql-pt-osc-add-primarykey/" itemprop="url">
-                  使用pt-osc修改主键时注意
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2016-05-27T16:32:49+08:00" content="2016-05-27">
-              2016-05-27
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2016/05/27/mysql-pt-osc-add-primarykey/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/05/27/mysql-pt-osc-add-primarykey/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：<br><figure class="highlight applescript"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">原表上有个复合主键，现在要添加一个自增<span class="built_in">id</span>作为主键，如何进行</div></pre></td></tr></table></figure></p>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2016/05/27/mysql-pt-osc-add-primarykey/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
                 <a class="post-title-link" href="/2016/05/27/mysql-pt-online-schema-change/" itemprop="url">
                   pt-online-schema-change使用说明、限制与比较
                 </a>
@@ -993,7 +1002,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">83</span>
+              <span class="site-state-item-count">84</span>
               <span class="site-state-item-name">posts</span>
             </a>
           </div>

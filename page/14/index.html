@@ -281,6 +281,143 @@
             
               
                 
+                <a class="post-title-link" href="/2014/11/08/github-mail-warning-dns/" itemprop="url">
+                  完全解决Github Pages邮件两次warning（DNS解析问题）
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2014-11-08T01:21:25+08:00" content="2014-11-08">
+              2014-11-08
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Github/" itemprop="url" rel="index">
+                    <span itemprop="name">Github</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2014/11/08/github-mail-warning-dns/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2014/11/08/github-mail-warning-dns/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>之所以有本文是由于Github前后两次发了2封不同的警告邮件，都是关于DNS配置的。因为<code>seanlook.com</code>刚申请下来时我也是参考其他博客，在<code>seanlook.github.com</code>仓库下面建立了一个<code>CNAME</code>文件，内容：<code>seanlook.com</code>，然后去DNSPod绑定域名和IP（207.97.227.245）访问也就没事了。然而几天之后每次deploy博客的时候都会受到一封<code>build warning</code>邮件（见本文最后），后来参考下面的文章：</p>
+<ul>
+<li><a href="http://mayecn.com/blog/2014/05/17/githubpages-accelerating/">解决GitHub Pages Warning邮件提醒</a></li>
+<li><a href="http://www.pchou.info/web-build/2014/07/04/build-github-blog-page-08.html">一步步在GitHub上创建博客主页-最新版 — 自定义域名的新玩法</a></li>
+<li><a href="https://github.com/blog/1715-faster-more-awesome-github-pages">Faster, More Awesome GitHub Pages</a> 和 <a href="https://github.com/blog/1917-github-pages-legacy-ip-deprecation">GitHub Pages Legacy IP Deprecation</a></li>
+</ul>
+<p>但显然第一篇有点拆东墙补西墙，只是换了个离自己最近的服务器，CDN根本就没用上，也是因为我<code>dig seanlook.github.io +nostats +nocomments +nocmd</code>之后把IP改成了103.245.222.133，才有了第二封邮件的warning（见本文最后）。第二篇倒是跟官方（第三条）是同一个意思，但是博主放弃了原本的顶级域名而是用www子域名。<br>首先根据邮件提示，明确一下最终目的：</p>
+<ul>
+<li>使用顶级域名<code>seanlook.com</code>来访问站点</li>
+<li>子域名<code>www.seanlook.com</code>跳转到<code>seanlook.com</code></li>
+<li>充分Github Pages提供的cdn加速功能</li>
+</ul>
+<p>两份邮件大概是同一个意思，说Github Pages正在进行重大的升级来提供更快的访问速度，所以我们指定的域名解析的IP在不就的将来将要废弃，需要指向一个合法的IP，第二封邮件说的更明确了，为了使用CDN加速功能，需要增加<code>CNAME</code>的子域名解析记录。</p>
+<blockquote>
+<p>如果你正在使用顶级域名（example.com）而不是子域名（如www.example.com），并且你的DNS解析服务提供商不支持<code>ALIAS</code>记录，那么唯一的选择就是使用<code>A</code>记录，但这种配置没有办法利用CDN加速了（依然可以应对DoS攻击）。如果切换成子域名或使用支持<code>ALIAS</code>的DNS解析上，都可以利用CDN和应对DoS。</p>
+</blockquote>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2014/11/08/github-mail-warning-dns/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
                 <a class="post-title-link" href="/2014/11/05/docker-command-best-use-2/" itemprop="url">
                   docker常用管理命令（下）
                 </a>
@@ -797,128 +934,6 @@
 
 
     
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/10/29/multiple-tomcats-service-script/" itemprop="url">
-                  管理多tomcat服务shell脚本（CentOS）
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2014-10-29T18:21:25+08:00" content="2014-10-29">
-              2014-10-29
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/Tomcat/" itemprop="url" rel="index">
-                    <span itemprop="name">Tomcat</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2014/10/29/multiple-tomcats-service-script/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2014/10/29/multiple-tomcats-service-script/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>该脚本改自csdn上的一个shell，忘记出处了，只记得它能够简单的通过<code>service tomcat [stop|start|restart]</code>来方便的管理Linux服务器上的tomcat，这可以满足大部分人的需求，然而并不适合我所管理的CentOS上的tomcat应用：通过端口区分的3台tomcat集群。如果每一次管理tomcat或查看日志，都<code>cd /apps/test/tomcat0/log/</code>然后切换到另外一个<code>cd ../../</code>或<code>cd /apps/test/tomcat1/log/</code>，麻烦至极。因此“懒人”创造了这个脚本<code>tomcat</code>：</p>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2014/10/29/multiple-tomcats-service-script/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -964,7 +979,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">83</span>
+              <span class="site-state-item-count">84</span>
               <span class="site-state-item-name">posts</span>
             </a>
           </div>

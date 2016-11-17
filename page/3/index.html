@@ -281,6 +281,214 @@
             
               
                 
+                <a class="post-title-link" href="/2016/04/29/mysql-numeric-int-float/" itemprop="url">
+                  MySQL数字类型int与tinyint、float与decimal如何选择
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2016-04-29T16:32:49+08:00" content="2016-04-29">
+              2016-04-29
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/04/29/mysql-numeric-int-float/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/04/29/mysql-numeric-int-float/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>最近在准备给开发做一个mysql数据库开发规范方面培训，一步一步来，结合在生产环境发现的数据库方面的问题，从几个常用的数据类型说起。</p>
+<h2 id="int、tinyint与bigint"><a href="#int、tinyint与bigint" class="headerlink" title="int、tinyint与bigint"></a>int、tinyint与bigint</h2><p>它们都是（精确）整型数据类型，但是占用字节数和表达的范围不同。首先没有这个表就说不过去了：</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Storage</th>
+<th>Minimum Value</th>
+<th>Maximum Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td>(Bytes)</td>
+<td>(Signed/Unsigned)</td>
+<td>(Signed/Unsigned)</td>
+</tr>
+<tr>
+<td>TINYINT</td>
+<td>1</td>
+<td>-128</td>
+<td>127</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>0</td>
+<td>255</td>
+</tr>
+<tr>
+<td>SMALLINT</td>
+<td>2</td>
+<td>-32768</td>
+<td>32767</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>0</td>
+<td>65535</td>
+</tr>
+<tr>
+<td>MEDIUMINT</td>
+<td>3</td>
+<td>-8388608</td>
+<td>8388607</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>0</td>
+<td>16777215</td>
+</tr>
+<tr>
+<td>INT</td>
+<td>4</td>
+<td>-2147483648</td>
+<td>2147483647</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>0</td>
+<td>4294967295</td>
+</tr>
+<tr>
+<td>BIGINT</td>
+<td>8</td>
+<td>-9223372036854775808</td>
+<td>9223372036854775807</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>0</td>
+<td>18446744073709551615</td>
+</tr>
+</tbody>
+</table>
+<p>只需要知道对应类型占多少字节就能推算出范围了，比如int占 4 bytes,即4*8=32bits，大约10位数字，也能理解为什么int默认显示位数是11。</p>
+<p>遇到比较多的是tinyint和bigint，tinyint一般用于存放status,type这种数值小的数据，不够用时可能会用smallint。bigint一般用于自增主键。</p>
+<p>为了避免数据库被过度设计，布尔、枚举类型也采用tinyint。</p>
+<p>还有一点也是经常被提到的关于 int(M) 中M的理解，int型数据无论是int(4)还是int(11)，都已经占用了 4 bytes 存储空间，M表示的只是显示宽度(display width, max value 255)，并不是定义int的长度。</p>
+<p>例如：</p>
+<figure class="highlight gherkin"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div></pre></td><td class="code"><pre><div class="line">mysql&gt; CREATE TABLE `tc_integer` (</div><div class="line">  `f_id` bigint(20) PRIMARY KEY AUTO_INCREMENT,</div><div class="line">  `f_type` tinyint,</div><div class="line">  `f_flag` tinyint(1),</div><div class="line">  `f_num` smallint(5) unsigned ZEROFILL</div><div class="line">) ENGINE=InnoDB DEFAULT CHARSET=utf8;</div><div class="line"></div><div class="line">mysql&gt; desc tc_integer;</div><div class="line">+----------------+-------------------------------+------+-----+---------+----------------+</div><div class="line">|<span class="string"> Field          </span>|<span class="string"> Type                          </span>|<span class="string"> Null </span>|<span class="string"> Key </span>|<span class="string"> Default </span>|<span class="string"> Extra          </span>|</div><div class="line">+----------------+-------------------------------+------+-----+---------+----------------+</div><div class="line">|<span class="string"> f_id           </span>|<span class="string"> bigint(20)                    </span>|<span class="string"> NO   </span>|<span class="string"> PRI </span>|<span class="string"> NULL    </span>|<span class="string"> auto_increment </span>|</div><div class="line">|<span class="string"> f_type         </span>|<span class="string"> tinyint(4)                    </span>|<span class="string"> YES  </span>|<span class="string">     </span>|<span class="string"> NULL    </span>|<span class="string">                </span>|</div><div class="line">|<span class="string"> f_flag         </span>|<span class="string"> tinyint(1)                    </span>|<span class="string"> YES  </span>|<span class="string">     </span>|<span class="string"> NULL    </span>|<span class="string">                </span>|</div><div class="line">|<span class="string"> f_num          </span>|<span class="string"> smallint(5) unsigned zerofill </span>|<span class="string"> YES  </span>|<span class="string">     </span>|<span class="string"> NULL    </span>|<span class="string">                </span>|</div><div class="line">+----------------+-------------------------------+------+-----+---------+----------------+</div><div class="line">4 rows in set (0.01 sec)</div></pre></td></tr></table></figure>
+<p>插入几条数据看一下：<br>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2016/04/29/mysql-numeric-int-float/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
                 <a class="post-title-link" href="/2016/04/28/mysql-char-varchar-set/" itemprop="url">
                   MySQL字符数据类型char与varchar的区别
                 </a>
@@ -834,135 +1042,6 @@
 
 
     
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2016/01/18/mac-mini-zturn/" itemprop="url">
-                  记一次Mac mini折腾过程（鼠键共享，更换SSD）
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2016-01-18T16:32:49+08:00" content="2016-01-18">
-              2016-01-18
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/Mac-OSX/" itemprop="url" rel="index">
-                    <span itemprop="name">Mac OSX</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2016/01/18/mac-mini-zturn/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/01/18/mac-mini-zturn/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>从公司网管那捣鼓来一个“遗弃” Mac mini，说其它人觉得用起来太卡，正好我的工作PC( CPU 4×i3，MEM 8G, HDD 500G)软件开多了也觉得有些卡，特别是我使用浏览器的习惯不太好，每次搜索统一结果都要打开好多标签页对比，文章性质的觉得有用想将来记录下来就没关闭页面，一两个星期下来只Chrome使用的内存就达到4G多。不用也浪费，于是就拿Mac mini分摊一下压力。</p>
-<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/macmini-a1347.jpg" alt="macmini-a1347.jpg"></p>
-<p>刚拿到手时心想得有多不堪配置才使得的Mac mini卡到嫌弃的地步，看了下底面的型号，A1347——这是2014年底出的新款，没有我想象的那么旧，还好。于是找来显示器、鼠键准备开用了（在某宝上买根八字电源线）。</p>
-<p>但是开机密码没有啊！虽然简单重装是个办法，但我还是想看看里面现在是什么样的，杀鸡焉用牛刀。直接Crack root…</p>
-<hr>
-<h1 id="1-破解Mac-root密码"><a href="#1-破解Mac-root密码" class="headerlink" title="1. 破解Mac root密码"></a>1. 破解Mac root密码</h1><p>找到这篇文章 <a href="http://wowking.blog.51cto.com/1638252/753774">http://wowking.blog.51cto.com/1638252/753774</a> 。我们平头百姓手头哪会有刻录的Mac OS光盘，而且也没移动光驱，所以方法一就不考虑了。方法二是单用户模式，毕竟 OS X 也是*nix血统，命令行几个命令倒难不到我。</p>
-<p>可是众所周知，Mac的键盘跟普通键盘是不一样的，开机启动的时候<code>command + S</code>在一般美式键盘下到底能不能进入单用户模式呢？嗯，行的，按下mini的开机按钮之后不断 <code>win + S</code>。进入Single user model之后提示符#root&gt;，逐步输入以下命令：</p>
-<figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># 执行硬盘检测（只读）, 这一步可以省略</span></div><div class="line">/sbin/fsck -y</div><div class="line"></div><div class="line"><span class="meta"># 加载文件系统（读/写）</span></div><div class="line">/sbin/mount -uaw</div><div class="line"></div><div class="line"><span class="meta"># 删除初始化设置时的OSX生成的隐藏文件”.applesetupdone”</span></div><div class="line">rm /<span class="keyword">var</span>/db/.AppleSetupDone</div><div class="line"></div><div class="line"><span class="meta"># 重启</span></div><div class="line">reboot</div></pre></td></tr></table></figure>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2016/01/18/mac-mini-zturn/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -1008,7 +1087,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">83</span>
+              <span class="site-state-item-count">84</span>
               <span class="site-state-item-name">posts</span>
             </a>
           </div>
