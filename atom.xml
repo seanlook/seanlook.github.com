@@ -5,7 +5,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://seanlook.com/"/>
-  <updated>2016-11-21T00:55:08.073Z</updated>
+  <updated>2016-11-20T08:32:49.000Z</updated>
   <id>http://seanlook.com/</id>
   
   <author>
@@ -16,18 +16,13 @@
   <generator uri="http://hexo.io/">Hexo</generator>
   
   <entry>
-    <title></title>
-    <link href="http://seanlook.com/2016/11/21/py-mysql-table-checksum-non-replicas/"/>
-    <id>http://seanlook.com/2016/11/21/py-mysql-table-checksum-non-replicas/</id>
-    <published>2016-11-21T00:52:15.950Z</published>
-    <updated>2016-11-21T00:55:08.073Z</updated>
+    <title>MySQL非主从环境下数据一致性校验及修复程序</title>
+    <link href="http://seanlook.com/2016/11/20/py-mysql-table-checksum-non-replicas/"/>
+    <id>http://seanlook.com/2016/11/20/py-mysql-table-checksum-non-replicas/</id>
+    <published>2016-11-20T08:32:49.000Z</published>
+    <updated>2016-11-20T08:32:49.000Z</updated>
     
-    <content type="html"><![CDATA[<h2 id=""><a href="#" class="headerlink" title="#"></a>#</h2><p>title: MySQL非主从环境下数据一致性校验及修复程序<br>date: 2016-11-20 16:32:49<br>tags: [mysql, python, pt-table-checksum]<br>categories:</p>
-<ul>
-<li>Python<br>updated: 2016-11-20 16:32:49</li>
-</ul>
-<hr>
-<h2 id="1-简介"><a href="#1-简介" class="headerlink" title="1. 简介"></a>1. 简介</h2><p>项目地址：<a href="https://github.com/seanlook/px-table-checksum" target="_blank" rel="external">https://github.com/seanlook/px-table-checksum</a></p>
+    <content type="html"><![CDATA[<h2 id="1-简介"><a href="#1-简介" class="headerlink" title="1. 简介"></a>1. 简介</h2><p>项目地址：<a href="https://github.com/seanlook/px-table-checksum" target="_blank" rel="external">https://github.com/seanlook/px-table-checksum</a></p>
 <p>主从环境下数据一致性校验经常会用 pt-table-checksum 工具，它的原理及实施过程之前写过一篇文章：<a href="http://seanlook.com/2015/12/29/mysql_replica_pt-table-checksum/">生产环境使用 pt-table-checksum 检查MySQL数据一致性</a>。但是DBA工作中还会有些针对两个表检查是否一致，而这两个表之间并没有主从关系，pt工具是基于binlog把在主库进行的检查动作，在从库重放一遍，此时就不适用了。</p>
 <p>总会有这样特殊的需求，比如从阿里云RDS实例迁移到自建mysql实例，它的数据传输服务实现方式是基于表的批量数据提取，加上binlog订阅，但强制row模式会导致pt-table-checksum没有权限把会话临时改成statement。另一种需求是，整库进行字符集转换：库表定义都是utf8，但应用连接使用了默认的 latin1，要将连接字符集和表字符集统一起来，只能以latin1导出数据，再以utf8导入，这种情况数据一致性校验，且不说binlog解析程序不支持statement（如canal），新旧库本身内容不同，pt-table-checksum 算出的校验值也会不一样，失效。</p>
 <p>所以才萌生了参考 pt-table-checksum 自己写了一个：px-table-checksum 。</p>
@@ -87,12 +82,7 @@
     
     <summary type="html">
     
-      &lt;h2 id=&quot;&quot;&gt;&lt;a href=&quot;#&quot; class=&quot;headerlink&quot; title=&quot;#&quot;&gt;&lt;/a&gt;#&lt;/h2&gt;&lt;p&gt;title: MySQL非主从环境下数据一致性校验及修复程序&lt;br&gt;date: 2016-11-20 16:32:49&lt;br&gt;tags: [mysql, python, pt-table-checksum]&lt;br&gt;categories:&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;Python&lt;br&gt;updated: 2016-11-20 16:32:49&lt;/li&gt;
-&lt;/ul&gt;
-&lt;hr&gt;
-&lt;h2 id=&quot;1-简介&quot;&gt;&lt;a href=&quot;#1-简介&quot; class=&quot;headerlink&quot; title=&quot;1. 简介&quot;&gt;&lt;/a&gt;1. 简介&lt;/h2&gt;&lt;p&gt;项目地址：&lt;a href=&quot;https://github.com/seanlook/px-table-checksum&quot;&gt;https://github.com/seanlook/px-table-checksum&lt;/a&gt;&lt;/p&gt;
+      &lt;h2 id=&quot;1-简介&quot;&gt;&lt;a href=&quot;#1-简介&quot; class=&quot;headerlink&quot; title=&quot;1. 简介&quot;&gt;&lt;/a&gt;1. 简介&lt;/h2&gt;&lt;p&gt;项目地址：&lt;a href=&quot;https://github.com/seanlook/px-table-checksum&quot;&gt;https://github.com/seanlook/px-table-checksum&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;主从环境下数据一致性校验经常会用 pt-table-checksum 工具，它的原理及实施过程之前写过一篇文章：&lt;a href=&quot;http://seanlook.com/2015/12/29/mysql_replica_pt-table-checksum/&quot;&gt;生产环境使用 pt-table-checksum 检查MySQL数据一致性&lt;/a&gt;。但是DBA工作中还会有些针对两个表检查是否一致，而这两个表之间并没有主从关系，pt工具是基于binlog把在主库进行的检查动作，在从库重放一遍，此时就不适用了。&lt;/p&gt;
 &lt;p&gt;总会有这样特殊的需求，比如从阿里云RDS实例迁移到自建mysql实例，它的数据传输服务实现方式是基于表的批量数据提取，加上binlog订阅，但强制row模式会导致pt-table-checksum没有权限把会话临时改成statement。另一种需求是，整库进行字符集转换：库表定义都是utf8，但应用连接使用了默认的 latin1，要将连接字符集和表字符集统一起来，只能以latin1导出数据，再以utf8导入，这种情况数据一致性校验，且不说binlog解析程序不支持statement（如canal），新旧库本身内容不同，pt-table-checksum 算出的校验值也会不一样，失效。&lt;/p&gt;
 &lt;p&gt;所以才萌生了参考 pt-table-checksum 自己写了一个：px-table-checksum 。&lt;/p&gt;
@@ -113,6 +103,14 @@
     
     </summary>
     
+      <category term="Python" scheme="http://seanlook.com/categories/Python/"/>
+    
+    
+      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
+    
+      <category term="python" scheme="http://seanlook.com/tags/python/"/>
+    
+      <category term="pt-table-checksum" scheme="http://seanlook.com/tags/pt-table-checksum/"/>
     
   </entry>
   

@@ -281,8 +281,8 @@
             
               
                 
-                <a class="post-title-link" href="/2016/11/21/py-mysql-table-checksum-non-replicas/" itemprop="url">
-                  Untitled
+                <a class="post-title-link" href="/2016/11/20/py-mysql-table-checksum-non-replicas/" itemprop="url">
+                  MySQL非主从环境下数据一致性校验及修复程序
                 </a>
               
             
@@ -295,19 +295,38 @@
               <i class="fa fa-calendar-o"></i>
             </span>
             <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2016-11-21T08:52:15+08:00" content="2016-11-21">
-              2016-11-21
+            <time itemprop="dateCreated" datetime="2016-11-20T16:32:49+08:00" content="2016-11-20">
+              2016-11-20
             </time>
           </span>
 
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Python/" itemprop="url" rel="index">
+                    <span itemprop="name">Python</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
           
 
           
             
               <span class="post-comments-count">
                 &nbsp; | &nbsp;
-                <a href="/2016/11/21/py-mysql-table-checksum-non-replicas/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/11/21/py-mysql-table-checksum-non-replicas/" itemprop="commentsCount"></span>
+                <a href="/2016/11/20/py-mysql-table-checksum-non-replicas/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/11/20/py-mysql-table-checksum-non-replicas/" itemprop="commentsCount"></span>
                 </a>
               </span>
             
@@ -331,12 +350,7 @@
 
       
         
-          <h2 id=""><a href="#" class="headerlink" title="#"></a>#</h2><p>title: MySQL非主从环境下数据一致性校验及修复程序<br>date: 2016-11-20 16:32:49<br>tags: [mysql, python, pt-table-checksum]<br>categories:</p>
-<ul>
-<li>Python<br>updated: 2016-11-20 16:32:49</li>
-</ul>
-<hr>
-<h2 id="1-简介"><a href="#1-简介" class="headerlink" title="1. 简介"></a>1. 简介</h2><p>项目地址：<a href="https://github.com/seanlook/px-table-checksum">https://github.com/seanlook/px-table-checksum</a></p>
+          <h2 id="1-简介"><a href="#1-简介" class="headerlink" title="1. 简介"></a>1. 简介</h2><p>项目地址：<a href="https://github.com/seanlook/px-table-checksum">https://github.com/seanlook/px-table-checksum</a></p>
 <p>主从环境下数据一致性校验经常会用 pt-table-checksum 工具，它的原理及实施过程之前写过一篇文章：<a href="http://seanlook.com/2015/12/29/mysql_replica_pt-table-checksum/">生产环境使用 pt-table-checksum 检查MySQL数据一致性</a>。但是DBA工作中还会有些针对两个表检查是否一致，而这两个表之间并没有主从关系，pt工具是基于binlog把在主库进行的检查动作，在从库重放一遍，此时就不适用了。</p>
 <p>总会有这样特殊的需求，比如从阿里云RDS实例迁移到自建mysql实例，它的数据传输服务实现方式是基于表的批量数据提取，加上binlog订阅，但强制row模式会导致pt-table-checksum没有权限把会话临时改成statement。另一种需求是，整库进行字符集转换：库表定义都是utf8，但应用连接使用了默认的 latin1，要将连接字符集和表字符集统一起来，只能以latin1导出数据，再以utf8导入，这种情况数据一致性校验，且不说binlog解析程序不支持statement（如canal），新旧库本身内容不同，pt-table-checksum 算出的校验值也会不一样，失效。</p>
 <p>所以才萌生了参考 pt-table-checksum 自己写了一个：px-table-checksum 。</p>
@@ -355,7 +369,7 @@
 <h2 id="3-限制"><a href="#3-限制" class="headerlink" title="3. 限制"></a>3. 限制</h2><ol>
 <li>如果检查期间源表数据，变化频繁，有可能检查的结果不准确<br>也就是上面第4点的问题。很明显，这个程序每个检查的事务是分开的，不像pt工具能严格保证每条检查sql的事务顺序。但有不一致的数据再排查一下就ok了。实际在我线上使用过程中，99.9%是准确的。
           <div class="post-more-link text-center">
-            <a class="btn" href="/2016/11/21/py-mysql-table-checksum-non-replicas/#more" rel="contents">
+            <a class="btn" href="/2016/11/20/py-mysql-table-checksum-non-replicas/#more" rel="contents">
               Read more &raquo;
             </a>
           </div>
@@ -992,7 +1006,7 @@
           
             <div class="site-state-item site-state-tags">
               <a href="/tags">
-                <span class="site-state-item-count">107</span>
+                <span class="site-state-item-count">108</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>
