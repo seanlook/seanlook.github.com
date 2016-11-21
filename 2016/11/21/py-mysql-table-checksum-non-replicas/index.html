@@ -1,0 +1,862 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="Hexo, seanlook" />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="#title: MySQL非主从环境下数据一致性校验及修复程序date: 2016-11-20 16:32:49tags: [mysql, python, pt-table-checksum]categories:
+
+Pythonupdated: 2016-11-20 16:32:49
+
+
+1. 简介项目地址：https://github.com/seanlook/px-table-checksu">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Sean's Notes">
+<meta property="og:url" content="http://seanlook.com/2016/11/21/py-mysql-table-checksum-non-replicas/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="#title: MySQL非主从环境下数据一致性校验及修复程序date: 2016-11-20 16:32:49tags: [mysql, python, pt-table-checksum]categories:
+
+Pythonupdated: 2016-11-20 16:32:49
+
+
+1. 简介项目地址：https://github.com/seanlook/px-table-checksu">
+<meta property="og:updated_time" content="2016-11-21T00:55:08.073Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Sean's Notes">
+<meta name="twitter:description" content="#title: MySQL非主从环境下数据一致性校验及修复程序date: 2016-11-20 16:32:49tags: [mysql, python, pt-table-checksum]categories:
+
+Pythonupdated: 2016-11-20 16:32:49
+
+
+1. 简介项目地址：https://github.com/seanlook/px-table-checksu">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: 'Author'
+    }
+  };
+</script>
+
+
+
+
+  <title>  | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s6.cnzz.com/stat.php?id=1253513173&web_id=1253513173" type="text/javascript"></script>
+  </div>
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Sean's Notes</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">Stay hungry, stay foolish.</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2016-11-21T08:52:15+08:00" content="2016-11-21">
+              2016-11-21
+            </time>
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/11/21/py-mysql-table-checksum-non-replicas/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/11/21/py-mysql-table-checksum-non-replicas/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h2 id=""><a href="#" class="headerlink" title="#"></a>#</h2><p>title: MySQL非主从环境下数据一致性校验及修复程序<br>date: 2016-11-20 16:32:49<br>tags: [mysql, python, pt-table-checksum]<br>categories:</p>
+<ul>
+<li>Python<br>updated: 2016-11-20 16:32:49</li>
+</ul>
+<hr>
+<h2 id="1-简介"><a href="#1-简介" class="headerlink" title="1. 简介"></a>1. 简介</h2><p>项目地址：<a href="https://github.com/seanlook/px-table-checksum" target="_blank" rel="external">https://github.com/seanlook/px-table-checksum</a></p>
+<p>主从环境下数据一致性校验经常会用 pt-table-checksum 工具，它的原理及实施过程之前写过一篇文章：<a href="http://seanlook.com/2015/12/29/mysql_replica_pt-table-checksum/">生产环境使用 pt-table-checksum 检查MySQL数据一致性</a>。但是DBA工作中还会有些针对两个表检查是否一致，而这两个表之间并没有主从关系，pt工具是基于binlog把在主库进行的检查动作，在从库重放一遍，此时就不适用了。</p>
+<p>总会有这样特殊的需求，比如从阿里云RDS实例迁移到自建mysql实例，它的数据传输服务实现方式是基于表的批量数据提取，加上binlog订阅，但强制row模式会导致pt-table-checksum没有权限把会话临时改成statement。另一种需求是，整库进行字符集转换：库表定义都是utf8，但应用连接使用了默认的 latin1，要将连接字符集和表字符集统一起来，只能以latin1导出数据，再以utf8导入，这种情况数据一致性校验，且不说binlog解析程序不支持statement（如canal），新旧库本身内容不同，pt-table-checksum 算出的校验值也会不一样，失效。</p>
+<p>所以才萌生了参考 pt-table-checksum 自己写了一个：px-table-checksum 。</p>
+<h2 id="2-实现方法"><a href="#2-实现方法" class="headerlink" title="2. 实现方法"></a>2. 实现方法</h2><p>整体思路是借鉴pt-table-checksum，从源库批量（即chunk）取出一块数据如1000行，计算CRC32值，同样的语句在目标库运行一遍，结果都存入另一个库，最后检查对应编号的chunk crc值是否一致。知道不一致还不行，得能否快速方便的修复差异，所以继续根据那些不一致的chunk，去目标库和源库找到不一致的行，是缺失，还是多余，还是被修改了，然后生成修复sql，根据指示是否自动修复。</p>
+<p>那么问题就在于：</p>
+<ol>
+<li><p>如何确定批次，也就是下一个chunk该怎么取？<br>我还没想做到pt-table-checksum那样，可以根据负载动态调整chunk大小，甚至活跃线程数超过阀值就暂停检查，上来工作量就太大了。目前每次计算的chunk的行数是固定的，可以配置1000或2000等。<br>所以就要用到分页查询，根据（自增或联合）主键、唯一索引，每次limit 1000后升序取最后一条，作为下一批的起始。所以要分析表上的键情况，组合查询条件。目前仅能检查有主键或唯一所以的表。</p>
+</li>
+<li><p>如何保证源库和目标库，运行的sql一样？<br>之前一版是目标库和源库，以多线程各自计算chunk，入库，后来才意识到严重的bug：比如同样是取1000行，如果目标库少数据，那么下一个chunk起始就不一样，比较的结果简直一塌糊涂。<br>所以必须保证相同编号的chunk，起点必须相同，所以想到用队列，存放在源库跑过的所有校验sql，模拟pt工具在目标库重放。考虑到要多线程同时比较多个表，队列可能吃内存过大，于是使用了redis队列。</p>
+</li>
+<li><p>直接在数据库中计算crc32，还是取出数据在内存里计算？<br>翻了pt-table-checksum的源码，它是在数据库里计算的。但是第一节里说过，如果目标库和源库要使用不同的字符集才能读出正确的数据，只能查询出来之后再比较。所以 px-table-checksum 两种都支持，只需指定一个配置项。</p>
+</li>
+<li><p>同时检查多个表，源库sql挤在队列，目标库拿出来执行时过了1s，此时源库那条数据又被修改了一次同步到了目标库，会导致计算结果不一致，实则一致，怎么处理<br>无法处理，是px-table-checksum相比pt-table-checksum最大的缺陷。<br>但为了尽可能减少此类问题（比如主从延迟也可能会），特意设计了多个redis队列，目标库多个检查线程，即比如同时指定检查8个表，源库检查会有8个线程对应，但可以根据表的写入情况，配置4个redis队列（目前是随机入列），10个目标库检查线程，来减少不准确因素。<br>但站在我的角度往往来说，不一致的数据会被记录下来，如果不多，人工核对一下；如果较多，就再跑一遍检查，如果两次都有同一条数据不一致，那就有情况了。</p>
+</li>
+</ol>
+<h2 id="3-限制"><a href="#3-限制" class="headerlink" title="3. 限制"></a>3. 限制</h2><ol>
+<li>如果检查期间源表数据，变化频繁，有可能检查的结果不准确<br>也就是上面第4点的问题。很明显，这个程序每个检查的事务是分开的，不像pt工具能严格保证每条检查sql的事务顺序。但有不一致的数据再排查一下就ok了。实际在我线上使用过程中，99.9%是准确的。<a id="more"></a></li>
+<li><p>表上必须有主键或唯一索引<br>程序会检查，如果没有会退出。</p>
+</li>
+<li><p>varbinay,blob等二进制字段不支持修复<br>其实也不是完全不支持，要看怎么用的。开发如果有把字符先转成字节，再存入mysql，这种就不支持修复。是有办法可以处理，那就是从源库查时用 <code>hex()</code>函数，修复sql里面<code>unhex()</code>写回去。</p>
+</li>
+</ol>
+<h2 id="4-使用说明"><a href="#4-使用说明" class="headerlink" title="4. 使用说明"></a>4. 使用说明</h2><p>该python程序基于2.7开发，2.6、3.x上没有测试。使用前需要安装 <code>MySQLdb</code>和<code>hotqueue</code>：<br><figure class="highlight cmake"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo pip <span class="keyword">install</span> MySQL-python hotqueue</div></pre></td></tr></table></figure></p>
+<p>要比较的表和选项，使用全配置化，即不通过命令行的方式指定（原谅命令行参数使用方式会额外增加代码量）。</p>
+<h3 id="4-1-px-table-checksum-py"><a href="#4-1-px-table-checksum-py" class="headerlink" title="4.1 px-table-checksum.py"></a>4.1 <code>px-table-checksum.py</code></h3><p>主程序，运行<code>python px-table-checksum.py</code> 执行一致性检查，但一定了解下面的配置文件选项。</p>
+<h3 id="4-2-settings-checksum-py"><a href="#4-2-settings-checksum-py" class="headerlink" title="4.2 settings_checksum.py"></a>4.2 <code>settings_checksum.py</code></h3><p>配置选项</p>
+<ul>
+<li><code>CHUNK_SIZE</code>: 每次提取的chunk行数</li>
+<li><code>REDIS_INFO</code>: 指定使用redis队列地址</li>
+<li><code>REDIS_QUEUE_CNT</code>: redis队列数量，消费者（目标库）有一一对应的线程守着队列</li>
+<li><code>REDIS_POOL_CNT</code>: 生产者（源库）redis客户端连接池。这个设计是为了缓解GIL带来的问题，把入列端与出列端分开，因为如果表多可能短时间有大量sql入队列，避免hotqueue争用</li>
+<li><p><code>CALC_CRC32_DB</code>: True 表示在db里面计算checksum值，False表示取出chunk数据在python里面计算。默认给的值是根据连接字符集定的。</p>
+</li>
+<li><p><code>DO_COMPARE</code>: 运行模式</p>
+<ul>
+<li>0: 只提取数据计算，不比较是否一致。可以在之后在模式2下只比较</li>
+<li>1: 计算，并比较。常用，每次计算之前会删除上一次这个待检查表的结果，比较的结果只告诉哪些chunk号不一致。</li>
+<li>2: 不计算，只从t_checkum结果比较。常用，计算是消耗数据库资源的，可以只对已有的checksum计算结果比较不一致的地方。类似pt工具的<code>--replicate-check-only</code>选项。</li>
+</ul>
+</li>
+<li><code>GEN_DATAFIX</code>:<br>与<code>DO_COMPARE</code>结合使用，为 True 表示对不一致的chunk找到具体不一致行，并生成修复sql；为 False 则什么都不做。</li>
+<li><p><code>RUN_DATAFIX</code>:<br>与<code>GEN_DATAFIX</code>结合使用，为 True 表示对生成的修复sql，在目标库执行。需要谨慎，如果哪一次设置了修复，记得完成后改回False，不然下次检查另一个表就出意外了，所以特意对这个选项再加了一个确认提示。</p>
+</li>
+<li><p><code>DB_CHECKSUM</code>: 一个字典，指定checksum的结果存到哪里<br>配置文件有示例，必须指定 <code>db_name</code>，表会自动创建。</p>
+</li>
+</ul>
+<h3 id="4-3-settings-cs-tables-py"><a href="#4-3-settings-cs-tables-py" class="headerlink" title="4.3 settings_cs_tables.py"></a>4.3 <code>settings_cs_tables.py</code></h3><p>上面的配置文件可以认为是用于控制程序的，这个配置文件是指定要校验的源库和目标库信息，以及要检验哪些表。</p>
+<ul>
+<li><code>TABLES_CHECK</code>: 字典，指定要检查哪些表的一致性，db名为key，多个table名组成列表为value。暂不支持对整个db做检查，同时比较的表数量不建议超过8个</li>
+<li><code>DB_SOURCE</code>: 字典，指定源库的连接信息</li>
+<li><code>DB_SOURCE</code>: 字典，指定目标库的连接信息</li>
+</ul>
+<hr>
+<p>原文链接地址：<a href="http://seanlook.com/2016/11/20/py-mysql-table-checksum-non-replicas/">http://seanlook.com/2016/11/20/py-mysql-table-checksum-non-replicas/</a></p>
+<hr>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2016/11/17/python-mysqldump-out-in-concurrency-magic/" rel="next" title="让mysqldump变成并发导出导入的魔法">
+                <i class="fa fa-chevron-left"></i> 让mysqldump变成并发导出导入的魔法
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2016/11/21/py-mysql-table-checksum-non-replicas/"
+           data-title="" data-url="http://seanlook.com/2016/11/21/py-mysql-table-checksum-non-replicas/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+          <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">85</span>
+              <span class="site-state-item-name">posts</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">23</span>
+                <span class="site-state-item-name">categories</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">107</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-weibo"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#"><span class="nav-text">#</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-简介"><span class="nav-text">1. 简介</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-实现方法"><span class="nav-text">2. 实现方法</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-限制"><span class="nav-text">3. 限制</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-使用说明"><span class="nav-text">4. 使用说明</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-px-table-checksum-py"><span class="nav-text">4.1 px-table-checksum.py</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-settings-checksum-py"><span class="nav-text">4.2 settings_checksum.py</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-settings-cs-tables-py"><span class="nav-text">4.3 settings_cs_tables.py</span></a></li></ol></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"seanlook"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="//cdn.jsdelivr.net/ua-parser.js/0.7.10/ua-parser.min.js"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

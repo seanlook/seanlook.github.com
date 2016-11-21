@@ -281,8 +281,8 @@
             
               
                 
-                <a class="post-title-link" href="/2015/01/15/openssl-certificate-encryption/" itemprop="url">
-                  OpenSSL 与 SSL 数字证书概念贴
+                <a class="post-title-link" href="/2015/01/18/openssl-self-sign-ca/" itemprop="url">
+                  基于OpenSSL自建CA和颁发SSL证书
                 </a>
               
             
@@ -295,8 +295,8 @@
               <i class="fa fa-calendar-o"></i>
             </span>
             <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2015-01-15T01:21:25+08:00" content="2015-01-15">
-              2015-01-15
+            <time itemprop="dateCreated" datetime="2015-01-18T01:21:25+08:00" content="2015-01-18">
+              2015-01-18
             </time>
           </span>
 
@@ -325,8 +325,8 @@
             
               <span class="post-comments-count">
                 &nbsp; | &nbsp;
-                <a href="/2015/01/15/openssl-certificate-encryption/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/01/15/openssl-certificate-encryption/" itemprop="commentsCount"></span>
+                <a href="/2015/01/18/openssl-self-sign-ca/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/01/18/openssl-self-sign-ca/" itemprop="commentsCount"></span>
                 </a>
               </span>
             
@@ -350,23 +350,12 @@
 
       
         
-          <p>SSL/TLS 介绍见文章 <a href="http://seanlook.com/2015/01/07/tls-ssl">SSL/TLS原理详解</a>。<br>如果你想快速自建CA然后签发数字证书，请移步 <a href="http://seanlook.com/2015/01/18/openssl-self-sign-ca">基于OpenSSL自建CA和颁发SSL证书 </a> 。</p>
-<p>首先简单区分一下HTTPS、SSL、OpenSSL三者的关系：</p>
-<p>SSL是在客户端和服务器之间建立一条SSL安全通道的安全协议，而OpenSSL是TLS/SSL协议的开源实现，提供开发库和命令行程序。常说的HTTPS是HTTP的加密版，底层使用的加密协议是SSL。</p>
-<h2 id="1-PKI、CA与证书"><a href="#1-PKI、CA与证书" class="headerlink" title="1. PKI、CA与证书"></a>1. PKI、CA与证书</h2><p>PKI 就是 Public Key Infrastructure 的缩写，翻译过来就是公开密钥基础设施。它是利用公开密钥技术所构建的，解决网络安全问题的，普遍适用的一种基础设施;是一种遵循既定标准的密钥管理平台,它能够为所有网络应用提供加密和数字签名等密码服务及所必需的密钥和证书管理体系。</p>
-<p>PKI既不是一个协议，也不是一个软件，它是一个标准，在这个标准之下发展出的为了实现安全基础服务目的的技术统称为PKI。可以说CA(认证中心)是PKI的核心，而数字证书是PKI的最基本元素，还有如apache等服务器、浏览器等客户端、银行等应用，都是pki的组件。这篇文章可以帮助理解：<a href="http://netsecurity.51cto.com/art/200602/21066.htm">PKI/CA 技术的介绍</a> 。</p>
-<h3 id="1-1-CA"><a href="#1-1-CA" class="headerlink" title="1.1 CA"></a>1.1 CA</h3><p>为保证用户之间在网上传递信息的安全性、真实性、可靠性、完整性和不可抵赖性</p>
-<p>CA 机构，又称为证书认证中心 (Certificate Authority) 中心，是一个负责发放和管理数字证书的第三方权威机构，它负责管理PKI结构下的所有用户(包括各种应用程序)的证书，把用户的公钥和用户的其他信息捆绑在一起，在网上验证用户的身份。CA机构的数字签名使得攻击者不能伪造和篡改证书。</p>
-<p>认证中心主要有以下5个功能：</p>
-<ol>
-<li>证书的颁发：接收、验证用户(包括下级认证中心和最终用户)的数字证书的申请。可以受理或拒绝</li>
-<li>证书的更新：认证中心可以定期更新所有用户的证书，或者根据用户的请求来更新用户的证书</li>
-<li>证书的查询：查询当前用户证书申请处理过程；查询用户证书的颁发信息，这类查询由目录服务器ldap来完成</li>
-<li>证书的作废：由于用户私钥泄密等原因，需要向认证中心提出证书作废的请求；证书已经过了有效期，认证中心自动将该证书作废。认证中心通过维护证书作废列表 (Certificate Revocation List,CRL) 来完成上述功能。 </li>
-<li>证书的归档：证书具有一定的有效期，证书过了有效期之后就将作废，但是我们不能将作废的证书简单地丢弃，因为有时我们可能需要验证以前的某个交易过程中产生的数字签名，这时我们就需要查询作废的证书。</li>
-</ol>
+          <p>关于SSL/TLS介绍见文章 <a href="http://seanlook.com/2015/01/07/tls-ssl">SSL/TLS原理详解</a>。<br>关于证书授权中心CA以及数字证书等概念，请移步 <a href="http://seanlook.com/2015/01/15/openssl-certificate-encryption">OpenSSL 与 SSL 数字证书概念贴</a> 。</p>
+<p>openssl是一个开源程序的套件、这个套件有三个部分组成：一是<code>libcryto</code>，这是一个具有通用功能的加密库，里面实现了众多的加密库；二是<code>libssl</code>，这个是实现ssl机制的，它是用于实现TLS/SSL的功能；三是openssl，是个多功能命令行工具，它可以实现加密解密，甚至还可以当CA来用，可以让你创建证书、吊销证书。</p>
+<p>默认情况ubuntu和CentOS上都已安装好openssl。CentOS 6.x 上有关ssl证书的目录结构：<br><figure class="highlight stylus"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">/etc/pki/CA/</div><div class="line">            newcerts    存放CA签署（颁发）过的数字证书（证书备份目录）</div><div class="line">            private     用于存放CA的私钥</div><div class="line">            crl         吊销的证书</div><div class="line"></div><div class="line">/etc/pki/tls/</div><div class="line">             cert<span class="selector-class">.pem</span>    软链接到certs/ca-bundle<span class="selector-class">.crt</span></div><div class="line">             certs/      该服务器上的证书存放目录，可以房子自己的证书和内置证书</div><div class="line">                   ca-bundle<span class="selector-class">.crt</span>    内置信任的证书</div><div class="line">             private    证书密钥存放目录</div><div class="line">             openssl<span class="selector-class">.cnf</span>    openssl的CA主配置文件</div></pre></td></tr></table></figure></p>
+<h1 id="1-颁发证书"><a href="#1-颁发证书" class="headerlink" title="1. 颁发证书"></a>1. 颁发证书</h1><h2 id="1-1-修改CA的一些配置文件"><a href="#1-1-修改CA的一些配置文件" class="headerlink" title="1.1 修改CA的一些配置文件"></a>1.1 修改CA的一些配置文件</h2><p>CA要给别人颁发证书，首先自己得有一个作为根证书，我们得在一切工作之前修改好CA的配置文件、序列号、索引等等。</p>
           <div class="post-more-link text-center">
-            <a class="btn" href="/2015/01/15/openssl-certificate-encryption/#more" rel="contents">
+            <a class="btn" href="/2015/01/18/openssl-self-sign-ca/#more" rel="contents">
               Read more &raquo;
             </a>
           </div>
@@ -517,6 +506,142 @@
 <h2 id="3-LDAP组织数据的方式"><a href="#3-LDAP组织数据的方式" class="headerlink" title="3. LDAP组织数据的方式"></a>3. LDAP组织数据的方式</h2><p><img src="http://sean-images.qiniudn.com/ldap_intro_dctree.png" alt="ldap_intro_dctree"></p>
           <div class="post-more-link text-center">
             <a class="btn" href="/2015/01/15/openldap_introduction/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2015/01/15/openssl-certificate-encryption/" itemprop="url">
+                  OpenSSL 与 SSL 数字证书概念贴
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2015-01-15T01:21:25+08:00" content="2015-01-15">
+              2015-01-15
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/安全/" itemprop="url" rel="index">
+                    <span itemprop="name">安全</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/01/15/openssl-certificate-encryption/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/01/15/openssl-certificate-encryption/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>SSL/TLS 介绍见文章 <a href="http://seanlook.com/2015/01/07/tls-ssl">SSL/TLS原理详解</a>。<br>如果你想快速自建CA然后签发数字证书，请移步 <a href="http://seanlook.com/2015/01/18/openssl-self-sign-ca">基于OpenSSL自建CA和颁发SSL证书 </a> 。</p>
+<p>首先简单区分一下HTTPS、SSL、OpenSSL三者的关系：</p>
+<p>SSL是在客户端和服务器之间建立一条SSL安全通道的安全协议，而OpenSSL是TLS/SSL协议的开源实现，提供开发库和命令行程序。常说的HTTPS是HTTP的加密版，底层使用的加密协议是SSL。</p>
+<h2 id="1-PKI、CA与证书"><a href="#1-PKI、CA与证书" class="headerlink" title="1. PKI、CA与证书"></a>1. PKI、CA与证书</h2><p>PKI 就是 Public Key Infrastructure 的缩写，翻译过来就是公开密钥基础设施。它是利用公开密钥技术所构建的，解决网络安全问题的，普遍适用的一种基础设施;是一种遵循既定标准的密钥管理平台,它能够为所有网络应用提供加密和数字签名等密码服务及所必需的密钥和证书管理体系。</p>
+<p>PKI既不是一个协议，也不是一个软件，它是一个标准，在这个标准之下发展出的为了实现安全基础服务目的的技术统称为PKI。可以说CA(认证中心)是PKI的核心，而数字证书是PKI的最基本元素，还有如apache等服务器、浏览器等客户端、银行等应用，都是pki的组件。这篇文章可以帮助理解：<a href="http://netsecurity.51cto.com/art/200602/21066.htm">PKI/CA 技术的介绍</a> 。</p>
+<h3 id="1-1-CA"><a href="#1-1-CA" class="headerlink" title="1.1 CA"></a>1.1 CA</h3><p>为保证用户之间在网上传递信息的安全性、真实性、可靠性、完整性和不可抵赖性</p>
+<p>CA 机构，又称为证书认证中心 (Certificate Authority) 中心，是一个负责发放和管理数字证书的第三方权威机构，它负责管理PKI结构下的所有用户(包括各种应用程序)的证书，把用户的公钥和用户的其他信息捆绑在一起，在网上验证用户的身份。CA机构的数字签名使得攻击者不能伪造和篡改证书。</p>
+<p>认证中心主要有以下5个功能：</p>
+<ol>
+<li>证书的颁发：接收、验证用户(包括下级认证中心和最终用户)的数字证书的申请。可以受理或拒绝</li>
+<li>证书的更新：认证中心可以定期更新所有用户的证书，或者根据用户的请求来更新用户的证书</li>
+<li>证书的查询：查询当前用户证书申请处理过程；查询用户证书的颁发信息，这类查询由目录服务器ldap来完成</li>
+<li>证书的作废：由于用户私钥泄密等原因，需要向认证中心提出证书作废的请求；证书已经过了有效期，认证中心自动将该证书作废。认证中心通过维护证书作废列表 (Certificate Revocation List,CRL) 来完成上述功能。 </li>
+<li>证书的归档：证书具有一定的有效期，证书过了有效期之后就将作废，但是我们不能将作废的证书简单地丢弃，因为有时我们可能需要验证以前的某个交易过程中产生的数字签名，这时我们就需要查询作废的证书。</li>
+</ol>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2015/01/15/openssl-certificate-encryption/#more" rel="contents">
               Read more &raquo;
             </a>
           </div>
@@ -817,147 +942,6 @@
 
 
     
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/12/29/docker-shipyard-centralized-management-webui/" itemprop="url">
-                  Docker集中化web界面管理平台shipyard
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2014-12-29T13:21:25+08:00" content="2014-12-29">
-              2014-12-29
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/Virtualization/" itemprop="url" rel="index">
-                    <span itemprop="name">Virtualization</span>
-                  </a>
-                </span>
-
-                
-                
-                  , 
-                
-
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/Virtualization/Docker/" itemprop="url" rel="index">
-                    <span itemprop="name">Docker</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2014/12/29/docker-shipyard-centralized-management-webui/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2014/12/29/docker-shipyard-centralized-management-webui/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p><a href="http://shipyard-project.com/">Shipyard</a>（<a href="https://github.com/shipyard/shipyard">github</a>）是建立在docker集群管理工具<a href="https://github.com/citadel/citadel">Citadel</a>之上的可以管理容器、主机等资源的web图形化工具。包括<a href="https://github.com/shipyard/shipyard">core</a>和<a href="https://github.com/shipyard/shipyard-extensions">extension</a>两个版本，core即shipyard主要是把多个 Docker host上的 containers 统一管理（支持跨越多个host），extension即shipyard-extensions添加了应用路由和负载均衡、集中化日志、部署等。</p>
-<h2 id="1-几个概念"><a href="#1-几个概念" class="headerlink" title="1. 几个概念"></a>1. 几个概念</h2><h3 id="engine"><a href="#engine" class="headerlink" title="engine"></a>engine</h3><p>一个shipyard管理的docker集群可以包含一个或多个<code>engine</code>（引擎），一个engine就是监听tcp端口的docker daemon。shipyard管理docker daemon、images、containers完全基于Docker API，不需要做其他的修改。另外，shipyard可以对每个engine做资源限制，包括CPU和内存；因为TCP监听相比Unix socket方式会有一定的安全隐患，所以shipyard还支持通过SSL证书与docker后台进程安全通信。</p>
-<h3 id="rethinkdb"><a href="#rethinkdb" class="headerlink" title="rethinkdb"></a>rethinkdb</h3><p><code>RethinkDB</code>是一个shipyard项目的一个docker镜像，用来存放账号（account）、引擎（engine）、服务密钥（service key）、扩展元数据（extension metadata）等信息，但不会存储任何有关容器或镜像的内容。一般会启动一个<code>shipyard/rethinkdb</code>容器shipyard-rethinkdb-data来使用它的<code>/data</code>作为数据卷供另外rethinkdb一个挂载，专门用于数据存储。</p>
-<h2 id="2-搭建过程"><a href="#2-搭建过程" class="headerlink" title="2. 搭建过程"></a>2. 搭建过程</h2><h3 id="修改tcp监听"><a href="#修改tcp监听" class="headerlink" title="修改tcp监听"></a>修改tcp监听</h3><p>Shipyard 要管理和控制 Docker host 的话需要先修改 Docker host 上的默认配置使其监听tcp端口(可以继续保持Unix socket）。有以下2种方式</p>
-<ol>
-<li><code>sudo docker -H tcp://0.0.0.0:4243 -H unix:///var/run/docker.sock -d</code> 启动docker daemon。如果为了避免每次启动都写这么长的命令，可以直接在<code>/etc/init/docker.conf</code>中修改。</li>
-<li>修改<code>/etc/default/docker</code>的<code>DOCKER_OPTS</code><br><code>DOCKER_OPTS=&quot;-H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock&quot;</code>。这种方式在我docker version 1.4.1 in ubuntu 14.04上并没有生效。</li>
-</ol>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2014/12/29/docker-shipyard-centralized-management-webui/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -1003,7 +987,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">84</span>
+              <span class="site-state-item-count">85</span>
               <span class="site-state-item-name">posts</span>
             </a>
           </div>

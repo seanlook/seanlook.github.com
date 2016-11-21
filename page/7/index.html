@@ -281,6 +281,158 @@
             
               
                 
+                <a class="post-title-link" href="/2015/05/17/nginx-install-and-config/" itemprop="url">
+                  nginx服务器安装及配置文件详解
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2015-05-17T01:21:25+08:00" content="2015-05-17">
+              2015-05-17
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/Nginx/" itemprop="url" rel="index">
+                    <span itemprop="name">Nginx</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/05/17/nginx-install-and-config/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/05/17/nginx-install-and-config/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>nginx在工作中已经有好几个环境在使用了，每次都是重新去网上扒博客，各种编译配置，今天自己也整理一份安装文档和nginx.conf配置选项的说明，留作以后参考。像负载均衡配置（包括健康检查）、缓存（包括清空缓存）配置实例，请参考 <a href="http://seanlook.com/2015/05/17/nginx-install-and-config">http://seanlook.com/2015/05/17/nginx-install-and-config</a> ，ssl加密请参考 <a href="http://seanlook.com/2015/05/28/nginx-ssl/">http://seanlook.com/2015/05/28/nginx-ssl/</a> 。</p>
+<h1 id="1-安装nginx"><a href="#1-安装nginx" class="headerlink" title="1. 安装nginx"></a>1. 安装nginx</h1><h2 id="1-1-选择稳定版本"><a href="#1-1-选择稳定版本" class="headerlink" title="1.1 选择稳定版本"></a>1.1 选择稳定版本</h2><p>我们编译安装nginx来定制自己的模块，机器CentOS 6.2 x86_64。首先安装缺少的依赖包：<br><figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># yum -y install gcc gcc-c++ make libtool zlib zlib-devel openssl openssl-devel pcre pcre-devel</span></div></pre></td></tr></table></figure></p>
+<p>这些软件包如果yum上没有的话可以下载源码来编译安装，只是要注意编译时默认安装的目录，确保下面在安装nginx时能够找到这些动态库文件（ldconfig）。</p>
+<p>从 <a href="http://nginx.org/en/download.html">http://nginx.org/en/download.html</a> 下载稳定版<code>nginx-1.6.3.tar.gz</code>到<code>/usr/local/src</code>下解压。</p>
+<p>为了后续准备我们另外下载2个插件模块：<a href="https://github.com/yaoweibin/nginx_upstream_check_module/releases">nginx_upstream_check_module-0.3.0.tar.gz</a> —— 检查后端服务器的状态，<a href="https://bitbucket.org/nginx-goodies/nginx-sticky-module-ng/downloads">nginx-goodies-nginx-sticky-module-ng-bd312d586752.tar.gz</a>（建议在/usr/local/src下解压后将目录重命名为<code>nginx-sticky-module-ng-1.2.5</code>） —— 后端做负载均衡解决session sticky问题（与upstream_check模块结合使用需要另外打补丁，请参考<a href="http://seanlook.com/2015/06/02/nginx-cache-check/">nginx负载均衡配置实战</a>）。</p>
+<p>请注意插件与nginx的版本兼容问题，一般插件越新越好，nginx不用追新，稳定第一。nginx-1.4.7，nginx-sticky-module-1.1，nginx_upstream_check_module-0.2.0，这个搭配也没问题。sticky-1.1与nginx-1.6版本由于更新没跟上编译出错。（可以直接使用Tengine，默认就包括了这些模块）</p>
+<figure class="highlight livescript"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">[root@cachets nginx-<span class="number">1.6</span>.<span class="number">3</span>]<span class="comment"># pwd</span></div><div class="line">/usr/local/src/nginx-<span class="number">1.6</span>.<span class="number">3</span></div><div class="line">[root@cachets nginx-<span class="number">1.6</span>.<span class="number">3</span>]<span class="comment"># ./configure --prefix=/usr/local/nginx-1.6 --with-pcre \</span></div><div class="line">&gt; --<span class="keyword">with</span>-http_stub_status_module --<span class="keyword">with</span>-http_ssl_module <span class="string">\</span></div><div class="line">&gt; --<span class="keyword">with</span>-http_gzip_static_module --<span class="keyword">with</span>-http_realip_module <span class="string">\</span></div><div class="line">&gt; --add-<span class="built_in">module</span>=../nginx_upstream_check_module-<span class="number">0.3</span>.<span class="number">0</span></div><div class="line"></div><div class="line">[root@cachets nginx-<span class="number">1.6</span>.<span class="number">3</span>]<span class="comment"># make &amp;&amp; make install</span></div></pre></td></tr></table></figure>
+<h2 id="1-2-常用编译选项说明"><a href="#1-2-常用编译选项说明" class="headerlink" title="1.2 常用编译选项说明"></a>1.2 常用编译选项说明</h2><p>nginx大部分常用模块，编译时<code>./configure --help</code>以<code>--without</code>开头的都默认安装。</p>
+<ul>
+<li><code>--prefix=PATH</code> ： 指定nginx的安装目录。默认 <code>/usr/local/nginx</code></li>
+<li><code>--conf-path=PATH</code> ： 设置nginx.conf配置文件的路径。nginx允许使用不同的配置文件启动，通过命令行中的-c选项。默认为<em>prefix/conf/nginx.conf</em></li>
+<li><code>--user=name</code>： 设置nginx工作进程的用户。安装完成后，可以随时在nginx.conf配置文件更改user指令。默认的用户名是nobody。<code>--group=name</code>类似</li>
+<li><code>--with-pcre</code> ： 设置PCRE库的源码路径，如果已通过yum方式安装，使用<code>--with-pcre</code>自动找到库文件。使用<code>--with-pcre=PATH</code>时，需要从PCRE网站下载pcre库的源码（版本4.4 - 8.30）并解压，剩下的就交给Nginx的<code>./configure</code>和<code>make</code>来完成。perl正则表达式使用在<code>location</code>指令和 <code>ngx_http_rewrite_module</code>模块中。</li>
+<li><code>--with-zlib=PATH</code> ： 指定 zlib（版本1.1.3 - 1.2.5）的源码解压目录。在默认就启用的网络传输压缩模块<code>ngx_http_gzip_module</code>时需要使用zlib 。</li>
+<li><code>--with-http_ssl_module</code> ： 使用https协议模块。默认情况下，该模块没有被构建。前提是openssl与openssl-devel已安装</li>
+<li><code>--with-http_stub_status_module</code> ： 用来监控 Nginx 的当前状态</li>
+<li><code>--with-http_realip_module</code> ： 通过这个模块允许我们改变客户端请求头中客户端IP地址值(例如X-Real-IP 或 X-Forwarded-For)，意义在于能够使得后台服务器记录原始客户端的IP地址</li>
+<li><code>--add-module=PATH</code> ： 添加第三方外部模块，如nginx-sticky-module-ng或缓存模块。每次添加新的模块都要重新编译（Tengine可以在新加入module时无需重新编译）</li>
+</ul>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2015/05/17/nginx-install-and-config/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
                 <a class="post-title-link" href="/2015/05/13/pdf2swf-preview/" itemprop="url">
                   仿豆丁网文件在线浏览解决方案搭建
                 </a>
@@ -778,134 +930,6 @@
 
 
     
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/04/28/iscsi-san-initiator/" itemprop="url">
-                  iscsi网络存储介绍及客户端配置操作
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2015-04-28T01:21:25+08:00" content="2015-04-28">
-              2015-04-28
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/Linux/" itemprop="url" rel="index">
-                    <span itemprop="name">Linux</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2015/04/28/iscsi-san-initiator/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/04/28/iscsi-san-initiator/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>本文不介绍iSCSI服务端的搭建过程，不然就会很累赘。主题就是怎么去完成iscsi网络存储的挂载过程，并顺带介绍一些必要的概念。</p>
-<h1 id="1-iscsi介绍与initiator安装"><a href="#1-iscsi介绍与initiator安装" class="headerlink" title="1. iscsi介绍与initiator安装"></a>1. iscsi介绍与initiator安装</h1><h2 id="1-1-iSCSI介绍"><a href="#1-1-iSCSI介绍" class="headerlink" title="1.1 iSCSI介绍"></a>1.1 iSCSI介绍</h2><p>iSCSI简单来说，就是把SCSI指令通过TCP/IP协议封装起来，在以太网中传输。iSCSI 可以实现在IP网络上传递和运行SCSI协议，使其能够在诸如高速千兆以太网上进行数据存取，实现了数据的网际传递和管理。基于iSCSI建立的存储区域网（SAN）与基于光纤的FC-SAN相比，具有很好的性价比。</p>
-<p>iSCSI属于端到端的会话层协议，它定义的是SCSI到TCP/IP的映射（如下图），即Initiator将SCSI指令和数据封装成iSCSI协议数据单元，向下提交给TCP层，最后封装成IP数据包在IP网络上传输，到达Target后通过解封装还原成SCSI指令和数据，再由存储控制器发送到指定的驱动器，从而实现SCSI命令和数据在IP网络上的透明传输。它整合了现有的存储协议SCSI和网络协议TCP/IP，实现了存储与TCP/IP网络的无缝融合。在本文中，将把发起器Initiator称为客户端，将目标器Target称为服务端以方便理解。</p>
-<p><img src="http://sean-images.qiniudn.com/iscsi-protocal-arch.gif" alt="iscsi-protocal-arch.gif"></p>
-<p>iSCSI 服务端和客户端的通讯就是一个在网络上封包和解包的过程，在网络的一端，数据包被封装成包括TCP/IP头、iSCSI 识别包和SCSI 数据三部分内容，传输到网络另一端时，这三部分内容分别被顺序地解开。为了保证安全，iSCSI 有约定操作顺序。在首次运行时，客户端（initiator）设备需要登录到服务端（target）中。任何一个接收到没有执行登录过程的客户端的iSCSI PDU （iSCSI rotocol Data Units，iSCSI 协议数据单元）服务端都将生成一个协议错误，并且关闭连接。在关闭会话之前，服务端可能发送回一个被驳回的iSCSI PDU。</p>
-<p>在工作时，iSCSI使SCSI数据块由原来的SCSI总线连接扩展到internet上，这一过程有些产品通过硬件来实现，这种硬件产品被简称为TOE（TCP Offload Engine），随着近年来服务器芯片技术的不断发展，服务器处理能力日益强劲，目前更为普遍的是通过软件来实现SCSI数据块的封装过程。这种软件通常被称为iSCSI Initiator软件/驱动。Initiator软件可以将以太网卡虚拟为iSCSI卡，接受和发送iSCSI数据报文，通过普通以太网卡来进行网络连接，但是需要占用CPU资源。另外的TOE和HBA连接转换方式都需要专门的硬件设备来完成，虽然相对昂贵但执行效率高，也可以减轻主机CPU的负载。本文客户端采用Initiator驱动的连接方式。</p>
-<h2 id="1-2-Initiator安装"><a href="#1-2-Initiator安装" class="headerlink" title="1.2 Initiator安装"></a>1.2 Initiator安装</h2><p>在Linux 2.6内核中提供了iscsi驱动，iSCSI 驱动（driver）使主机拥有了通过IP网络访问存储的能力，但还需要一个具体的客户端工具（Linux用户空间组件）初始化iSCSI驱动，即<code>iscsi-initiator-utils</code>，也是大家常说的open-iscsi。</p>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2015/04/28/iscsi-san-initiator/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -951,7 +975,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">84</span>
+              <span class="site-state-item-count">85</span>
               <span class="site-state-item-name">posts</span>
             </a>
           </div>
