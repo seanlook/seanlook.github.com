@@ -191,9 +191,66 @@
     
       <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
     
+      <category term="python" scheme="http://seanlook.com/tags/python/"/>
+    
       <category term="mysqldump" scheme="http://seanlook.com/tags/mysqldump/"/>
     
+  </entry>
+  
+  <entry>
+    <title>遇到腾讯云CDB连接字符集设置一个坑</title>
+    <link href="http://seanlook.com/2016/10/17/mysql-charset-handshake-cdb/"/>
+    <id>http://seanlook.com/2016/10/17/mysql-charset-handshake-cdb/</id>
+    <published>2016-10-17T08:32:49.000Z</published>
+    <updated>2016-10-17T08:32:49.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>最近一个与qq有关的服务迁到腾讯云上，相应的数据库也要从原阿里云RDS迁移到腾讯云CDB上，经过一番摸索，不带任何政治色彩的说，CDB跟RDS相比弱的不止一条街。比如看个错误日志还要提工单，数据库访问没有白名单，数据传输服务竞不支持源库的开启GTID，自带的后台管理是phpMyAdmin，要临时看查询日志也要提工单，当然这些都是可以容忍通过其它方法解决的，但是如果使用上带来了mysql数据库本身的影响，就用的不太爽了。</p>
+<p>最近2个月一直在弄与字符集相关的工作，却还是在cdb踩到一个大坑。情况是这样的，我们旧的RDS上的数据库表定义都是utf8，但由于历史原因，开发一直使用 latin1 去连接的。现在要把这样的一个db迁移到CDB，腾讯云的数据传输服务出了点问题，于是想了办法用阿里云的DTS反向迁。现象是：</p>
+<ol>
+<li>用Navicat客户端latin1连接，旧数据显示都ok</li>
+<li>但程序端看到历史数据全是乱码，新数据正常</li>
+<li>而且<strong>新数据通过navicat去看用 utf8 连接才正常</strong></li>
+<li>在mysql命令行下手动 <code>set names latin1</code> 读取旧数据ok，但新数据乱码</li>
+</ol>
+<p>这明显是新写入的时候就是以 utf8 连接的，读取的时候新旧数据也以 utf8 连接。但应用端已明确设置使用 latin1 连接来读写。为了验证是否CDB的问题，在相同环境下自建了个mysql实例，一切都ok。</p>
+<p>腾讯云工程师先是怀疑迁移有问题，后来说可能是character_set_server设置的问题，我站在2个月来处理字符集的经验看了虽然不太可能，还是配合截了几个图，在工单、电话了里撕了几个来回：</p>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-qcloud-charset1.png" alt=""></p>
+<p>因为跟腾讯有合作关系，上头就直接联系到了腾讯云的人，这才找到问题根源：都是<code>--skip-character-set-client-handshake</code>惹的祸。<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="comment">--character-set-client-handshake</span></div><div class="line"></div><div class="line"><span class="keyword">Do</span> <span class="keyword">not</span> <span class="keyword">ignore</span> <span class="built_in">character</span> <span class="keyword">set</span> information sent <span class="keyword">by</span> the client. <span class="keyword">To</span> <span class="keyword">ignore</span> <span class="keyword">client</span> information <span class="keyword">and</span> <span class="keyword">use</span> the <span class="keyword">default</span> <span class="keyword">server</span> <span class="built_in">character</span> <span class="keyword">set</span>, <span class="keyword">use</span> <span class="comment">--skip-character-set-client-handshake; this makes MySQL behave like MySQL 4.0</span></div></pre></td></tr></table></figure></p>
+<a id="more"></a>
+<p>一看到这个选项就恍然大悟了，官方文档FAQ里有专门介绍：<a href="https://dev.mysql.com/doc/refman/5.6/en/faqs-cjk.html" target="_blank" rel="external">A.11.11</a>（个人感觉最后一段贴的结果有问题），大意是说为了兼容 mysql 4.0 的习惯，mysqld启动时加上 <code>--skip-character-set-client-handshake</code> 来忽略客户端字符集的设置，强制使用服务端<code>character-set-server</code>的设置。</p>
+<p>但这个选项默认是没有开启的，当你在web控制台修改了实例字符集时，CDB自作自作主张修改了这个参数并重启 character_set_client_handshake = 0 。而这个参数在 <code>show variables</code> 看不到的，隐藏的比较深。正好我建实例的时候选择了utf8，然后修改为utf8mb4，但应用端要求latin1，便中枪了。</p>
+<p>主要是以前没听过这个参数，后来发现老叶也有篇文章讲到它 <a href="http://imysql.com/2013/10/29/misunderstand-about-charset-handshake.shtm" target="_blank" rel="external">MySQL字符集的一个坑</a>，其实是很小的东西，结果排查验证问题前后花了2天。。。</p>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-qcloud-charset.png" alt=""></p>
+<hr>
+<p>原文链接地址：<a href="http://seanlook.com/2016/11/20/py-mysql-table-checksum-non-replicas/">http://seanlook.com/2016/11/20/py-mysql-table-checksum-non-replicas/</a></p>
+<hr>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;最近一个与qq有关的服务迁到腾讯云上，相应的数据库也要从原阿里云RDS迁移到腾讯云CDB上，经过一番摸索，不带任何政治色彩的说，CDB跟RDS相比弱的不止一条街。比如看个错误日志还要提工单，数据库访问没有白名单，数据传输服务竞不支持源库的开启GTID，自带的后台管理是phpMyAdmin，要临时看查询日志也要提工单，当然这些都是可以容忍通过其它方法解决的，但是如果使用上带来了mysql数据库本身的影响，就用的不太爽了。&lt;/p&gt;
+&lt;p&gt;最近2个月一直在弄与字符集相关的工作，却还是在cdb踩到一个大坑。情况是这样的，我们旧的RDS上的数据库表定义都是utf8，但由于历史原因，开发一直使用 latin1 去连接的。现在要把这样的一个db迁移到CDB，腾讯云的数据传输服务出了点问题，于是想了办法用阿里云的DTS反向迁。现象是：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;用Navicat客户端latin1连接，旧数据显示都ok&lt;/li&gt;
+&lt;li&gt;但程序端看到历史数据全是乱码，新数据正常&lt;/li&gt;
+&lt;li&gt;而且&lt;strong&gt;新数据通过navicat去看用 utf8 连接才正常&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;在mysql命令行下手动 &lt;code&gt;set names latin1&lt;/code&gt; 读取旧数据ok，但新数据乱码&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;这明显是新写入的时候就是以 utf8 连接的，读取的时候新旧数据也以 utf8 连接。但应用端已明确设置使用 latin1 连接来读写。为了验证是否CDB的问题，在相同环境下自建了个mysql实例，一切都ok。&lt;/p&gt;
+&lt;p&gt;腾讯云工程师先是怀疑迁移有问题，后来说可能是character_set_server设置的问题，我站在2个月来处理字符集的经验看了虽然不太可能，还是配合截了几个图，在工单、电话了里撕了几个来回：&lt;/p&gt;
+&lt;p&gt;&lt;img src=&quot;http://7q5fot.com1.z0.glb.clouddn.com/mysql-qcloud-charset1.png&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+&lt;p&gt;因为跟腾讯有合作关系，上头就直接联系到了腾讯云的人，这才找到问题根源：都是&lt;code&gt;--skip-character-set-client-handshake&lt;/code&gt;惹的祸。&lt;br&gt;&lt;figure class=&quot;highlight sql&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;2&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;3&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;comment&quot;&gt;--character-set-client-handshake&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;Do&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;not&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;ignore&lt;/span&gt; &lt;span class=&quot;built_in&quot;&gt;character&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;set&lt;/span&gt; information sent &lt;span class=&quot;keyword&quot;&gt;by&lt;/span&gt; the client. &lt;span class=&quot;keyword&quot;&gt;To&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;ignore&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;client&lt;/span&gt; information &lt;span class=&quot;keyword&quot;&gt;and&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;use&lt;/span&gt; the &lt;span class=&quot;keyword&quot;&gt;default&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;server&lt;/span&gt; &lt;span class=&quot;built_in&quot;&gt;character&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;set&lt;/span&gt;, &lt;span class=&quot;keyword&quot;&gt;use&lt;/span&gt; &lt;span class=&quot;comment&quot;&gt;--skip-character-set-client-handshake; this makes MySQL behave like MySQL 4.0&lt;/span&gt;&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;&lt;/p&gt;
+    
+    </summary>
+    
+      <category term="Python" scheme="http://seanlook.com/categories/Python/"/>
+    
+    
+      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
+    
       <category term="python" scheme="http://seanlook.com/tags/python/"/>
+    
+      <category term="pt-table-checksum" scheme="http://seanlook.com/tags/pt-table-checksum/"/>
     
   </entry>
   
@@ -2547,56 +2604,6 @@ mysql&gt; show slave status\G
       <category term="主从复制" scheme="http://seanlook.com/tags/%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6/"/>
     
       <category term="备份" scheme="http://seanlook.com/tags/%E5%A4%87%E4%BB%BD/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>南山南</title>
-    <link href="http://seanlook.com/2015/11/01/nan-shan-hike/"/>
-    <id>http://seanlook.com/2015/11/01/nan-shan-hike/</id>
-    <published>2015-11-01T03:59:31.000Z</published>
-    <updated>2015-11-01T03:59:31.000Z</updated>
-    
-    <content type="html"><![CDATA[<p>今天11月1号，深圳的天气正好从这一天凉了起来，傍晚回住处的公交车上给家里打了个电话，是爸爸接的，说家里已经有点冷了。</p>
-<p>现在对冷没什么概念了，深圳是一个没有冬天的城市，一件外套就能过冬。也就是今天起风了出门才稍稍感觉到凉，昨天还热的不行呢——那是因为去爬山了。</p>
-<p>南山，2年前来这里的第一个月就听说过，但两次上过梧桐山，上半年爬过凤凰山，就偏偏离自己最近的南山未曾到访。山虽然不高，但一直放着不去还能再找到人陪我去不成，于是就响应党组织号召，登山去。</p>
-<p>周六下午，小明从公司过去，而我从家里坐公交过去，照计划的时间应该2点半可以集合，无奈在深大转车多等了20分钟，结果是小明跟其他人一起先从海关登山口上山，先到山顶者有奖，我晚十分钟到出发点，去追他们。出乎意料，迈进登山口就一直上台阶，上啊上啊上，T恤已经全湿了，我竟然还穿着紧身牛仔裤！（其实主要考虑到晚上吃饭方便）。由于平时也打打球，体力不算太差，20分钟上到了全程海拔一半的样子，还没追上，双腿力量也下降了，正好碰到没跟上大部队的两个人，就一起走了。后半程坡也小了很多，吹来一丝微风能感觉到背上一阵凉意。此时群里已经有人到观景台发图了，但奇怪的是那么一大波上去怎么才有2个人发图，原来拼的不仅仅是体力，还有手机信号……</p>
-<p>三点半时基本上都到顶了，风景还不错，能看到深圳湾大桥（据说晚上很美），和对面的香港。</p>
-<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/nan-hilltop.jpg" alt="nan-hilltop.jpg"></p>
-<p>团体里大部分我是认识的，有我以前的同事，和球场上认识的伙伴。虽然我已离职近4个月，但我党组织关系还在TP，也交了党费，这才有机会和他们一起出来。还有经费，号召大家买书，于是买了《摄影的艺术》《皮囊》等，小明也为他单反买了本，我看中的是他那本室内装饰和川菜食谱，嘿嘿。</p>
-<a id="more"></a>
-<p>爬完山当然还有活动，自助餐——不是平时想象的哪种自助餐。蛇口是富人区，自助的当然是海鲜之类的，与大饱口福和四海一家有点像，除了种类没有后面两家多，味道和环境都还不错，感受一下。</p>
-<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/nan-food.jpg" alt="nan-food.jpg"></p>
-<p>原本以为5点半开吃，顶多2小时回去了（因为人多而且还有些不熟的），结果听说海上世界就在附近，反正刚刚为了吃回本，肚子都撑了，就走着去了。哦，想起原来当天是万圣节，可不热闹了。</p>
-<p>常去的南山腐败地，一个海岸城，一个欢乐海岸，怎么能漏了海上世界，也是早有听说却没来过。一路望去，好多歪果仁，而且装扮忒吓人。海上世界最中心有一艘“船”叫明华号，当然甲板上开着各种餐厅。无意听到人说8点整有水秀表演，几个大男人在一顿狂拍后，终于等来了 water show 。短短的三分钟！</p>
-<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/nan-show.jpg" alt="nan-show.jpg"></p>
-<p>周六算是疯了一天，周日计划还是学点东西，上午9点起来看了看puppet视频，下午去公司简单加了个班。上周经理不在，杂事一大堆，也是身不由己，也是欠了很多技术债。</p>
-<p>最后，晚上做了顿饭，忙活2个小时——可是三个人的两顿饭菜啊，不过挺有成就感的，因为吃完了……</p>
-<hr>
-<p>11月，你好！</p>
-<hr>
-<p>本文链接地址： <a href="http://seanlook.com/2015/11/01/nan-shan-hike/">http://seanlook.com/2015/11/01/nan-shan-hike/</a></p>
-<hr>
-]]></content>
-    
-    <summary type="html">
-    
-      &lt;p&gt;今天11月1号，深圳的天气正好从这一天凉了起来，傍晚回住处的公交车上给家里打了个电话，是爸爸接的，说家里已经有点冷了。&lt;/p&gt;
-&lt;p&gt;现在对冷没什么概念了，深圳是一个没有冬天的城市，一件外套就能过冬。也就是今天起风了出门才稍稍感觉到凉，昨天还热的不行呢——那是因为去爬山了。&lt;/p&gt;
-&lt;p&gt;南山，2年前来这里的第一个月就听说过，但两次上过梧桐山，上半年爬过凤凰山，就偏偏离自己最近的南山未曾到访。山虽然不高，但一直放着不去还能再找到人陪我去不成，于是就响应党组织号召，登山去。&lt;/p&gt;
-&lt;p&gt;周六下午，小明从公司过去，而我从家里坐公交过去，照计划的时间应该2点半可以集合，无奈在深大转车多等了20分钟，结果是小明跟其他人一起先从海关登山口上山，先到山顶者有奖，我晚十分钟到出发点，去追他们。出乎意料，迈进登山口就一直上台阶，上啊上啊上，T恤已经全湿了，我竟然还穿着紧身牛仔裤！（其实主要考虑到晚上吃饭方便）。由于平时也打打球，体力不算太差，20分钟上到了全程海拔一半的样子，还没追上，双腿力量也下降了，正好碰到没跟上大部队的两个人，就一起走了。后半程坡也小了很多，吹来一丝微风能感觉到背上一阵凉意。此时群里已经有人到观景台发图了，但奇怪的是那么一大波上去怎么才有2个人发图，原来拼的不仅仅是体力，还有手机信号……&lt;/p&gt;
-&lt;p&gt;三点半时基本上都到顶了，风景还不错，能看到深圳湾大桥（据说晚上很美），和对面的香港。&lt;/p&gt;
-&lt;p&gt;&lt;img src=&quot;http://7q5fot.com1.z0.glb.clouddn.com/nan-hilltop.jpg&quot; alt=&quot;nan-hilltop.jpg&quot;&gt;&lt;/p&gt;
-&lt;p&gt;团体里大部分我是认识的，有我以前的同事，和球场上认识的伙伴。虽然我已离职近4个月，但我党组织关系还在TP，也交了党费，这才有机会和他们一起出来。还有经费，号召大家买书，于是买了《摄影的艺术》《皮囊》等，小明也为他单反买了本，我看中的是他那本室内装饰和川菜食谱，嘿嘿。&lt;/p&gt;
-    
-    </summary>
-    
-      <category term="生活" scheme="http://seanlook.com/categories/%E7%94%9F%E6%B4%BB/"/>
-    
-      <category term="随记" scheme="http://seanlook.com/categories/%E7%94%9F%E6%B4%BB/%E9%9A%8F%E8%AE%B0/"/>
-    
-    
-      <category term="生活" scheme="http://seanlook.com/tags/%E7%94%9F%E6%B4%BB/"/>
     
   </entry>
   

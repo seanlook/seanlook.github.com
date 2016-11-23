@@ -551,6 +551,139 @@
             
               
                 
+                <a class="post-title-link" href="/2016/10/17/mysql-charset-handshake-cdb/" itemprop="url">
+                  遇到腾讯云CDB连接字符集设置一个坑
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2016-10-17T16:32:49+08:00" content="2016-10-17">
+              2016-10-17
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Python/" itemprop="url" rel="index">
+                    <span itemprop="name">Python</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/10/17/mysql-charset-handshake-cdb/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/10/17/mysql-charset-handshake-cdb/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>最近一个与qq有关的服务迁到腾讯云上，相应的数据库也要从原阿里云RDS迁移到腾讯云CDB上，经过一番摸索，不带任何政治色彩的说，CDB跟RDS相比弱的不止一条街。比如看个错误日志还要提工单，数据库访问没有白名单，数据传输服务竞不支持源库的开启GTID，自带的后台管理是phpMyAdmin，要临时看查询日志也要提工单，当然这些都是可以容忍通过其它方法解决的，但是如果使用上带来了mysql数据库本身的影响，就用的不太爽了。</p>
+<p>最近2个月一直在弄与字符集相关的工作，却还是在cdb踩到一个大坑。情况是这样的，我们旧的RDS上的数据库表定义都是utf8，但由于历史原因，开发一直使用 latin1 去连接的。现在要把这样的一个db迁移到CDB，腾讯云的数据传输服务出了点问题，于是想了办法用阿里云的DTS反向迁。现象是：</p>
+<ol>
+<li>用Navicat客户端latin1连接，旧数据显示都ok</li>
+<li>但程序端看到历史数据全是乱码，新数据正常</li>
+<li>而且<strong>新数据通过navicat去看用 utf8 连接才正常</strong></li>
+<li>在mysql命令行下手动 <code>set names latin1</code> 读取旧数据ok，但新数据乱码</li>
+</ol>
+<p>这明显是新写入的时候就是以 utf8 连接的，读取的时候新旧数据也以 utf8 连接。但应用端已明确设置使用 latin1 连接来读写。为了验证是否CDB的问题，在相同环境下自建了个mysql实例，一切都ok。</p>
+<p>腾讯云工程师先是怀疑迁移有问题，后来说可能是character_set_server设置的问题，我站在2个月来处理字符集的经验看了虽然不太可能，还是配合截了几个图，在工单、电话了里撕了几个来回：</p>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-qcloud-charset1.png" alt=""></p>
+<p>因为跟腾讯有合作关系，上头就直接联系到了腾讯云的人，这才找到问题根源：都是<code>--skip-character-set-client-handshake</code>惹的祸。<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="comment">--character-set-client-handshake</span></div><div class="line"></div><div class="line"><span class="keyword">Do</span> <span class="keyword">not</span> <span class="keyword">ignore</span> <span class="built_in">character</span> <span class="keyword">set</span> information sent <span class="keyword">by</span> the client. <span class="keyword">To</span> <span class="keyword">ignore</span> <span class="keyword">client</span> information <span class="keyword">and</span> <span class="keyword">use</span> the <span class="keyword">default</span> <span class="keyword">server</span> <span class="built_in">character</span> <span class="keyword">set</span>, <span class="keyword">use</span> <span class="comment">--skip-character-set-client-handshake; this makes MySQL behave like MySQL 4.0</span></div></pre></td></tr></table></figure></p>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2016/10/17/mysql-charset-handshake-cdb/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
                 <a class="post-title-link" href="/2016/09/27/python-mysql-querykill/" itemprop="url">
                   自动记录MySQL慢查询快照脚本
                 </a>
@@ -810,145 +943,11 @@
 
 
     
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2016/06/11/mysql-advanced-query-tuning-percona/" itemprop="url">
-                  Advanced MySQL Query Tuning .pdf
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2016-06-11T16:32:49+08:00" content="2016-06-11">
-              2016-06-11
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2016/06/11/mysql-advanced-query-tuning-percona/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/06/11/mysql-advanced-query-tuning-percona/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-            <p>端午在家无聊，又不想学习。于是在Youtube随便逛，看到一个很不错的分享，来自 Percona Database Performance。下面是演示稿：</p>
-<p>slideshare: <a href="http://www.slideshare.net/ssuser5a0bc0/webinar-2013-advancedquerytuning" target="_blank" rel="external">http://www.slideshare.net/ssuser5a0bc0/webinar-2013-advancedquerytuning</a> </p>
-
-	<iframe src="https://www.slideshare.net/slideshow/embed_code/key/3HLJJcJmM9KLGT" style="width:100%;height:550px" frameborder="0" marginwidth="0" marginheight="0" scrolling="no" allowfullscreen> </iframe> <div style="margin-bottom:5px">
-
-
-<p>Youtube: <a href="https://www.youtube.com/watch?v=TPFibi2G_oo" target="_blank" rel="external">https://www.youtube.com/watch?v=TPFibi2G_oo</a></p>
-<p>能 <em>条件</em> 的可以看看。</p>
-<p>Percona webinars上有许多类似的分享，传送门： <a href="https://www.percona.com/resources/webinars" target="_blank" rel="external">https://www.percona.com/resources/webinars</a> ，不少是他们CEO Peter Zaitsev 亲自上马的。</p>
-<hr>
-<p>原文连接地址：<a href="http://seanlook.com/2016/06/11/mysql-advanced-query-tuning-percona/">http://seanlook.com/2016/06/11/mysql-advanced-query-tuning-percona/</a></p>
-<hr>
-<!--
-<iframe src="https://www.slideshare.net/slideshow/embed_code/key/3HLJJcJmM9KLGT" width="900" height="512" frameborder="0" allowfullscreen></iframe>
-<p>–&gt;</p>
---></div>
-          
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
   <nav class="pagination">
-    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><span class="space">&hellip;</span><a class="page-number" href="/page/17/">17</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right"></i></a>
+    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><span class="space">&hellip;</span><a class="page-number" href="/page/18/">18</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right"></i></a>
   </nav>
 
 
@@ -989,7 +988,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">85</span>
+              <span class="site-state-item-count">86</span>
               <span class="site-state-item-name">posts</span>
             </a>
           </div>

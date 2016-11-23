@@ -281,6 +281,141 @@
             
               
                 
+                <a class="post-title-link" href="/2015/05/17/nginx-location-rewrite/" itemprop="url">
+                  nginx配置location总结及rewrite规则写法
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2015-05-17T15:21:25+08:00" content="2015-05-17">
+              2015-05-17
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/Nginx/" itemprop="url" rel="index">
+                    <span itemprop="name">Nginx</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/05/17/nginx-location-rewrite/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/05/17/nginx-location-rewrite/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h1 id="1-location正则写法"><a href="#1-location正则写法" class="headerlink" title="1. location正则写法"></a>1. location正则写法</h1><p>一个示例：</p>
+<figure class="highlight crmsh"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">location</span>  <span class="title">= / &#123;</div><div class="line">  # 精确匹配 / ，主机名后面不能带任何字符串</div><div class="line">  [ configuration</span> A ]</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="keyword">location</span>  <span class="title">/ &#123;</div><div class="line">  # 因为所有的地址都以 / 开头，所以这条规则将匹配到所有请求</div><div class="line">  # 但是正则和最长字符串会优先匹配</div><div class="line">  [ configuration</span> B ]</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="keyword">location</span> <span class="title">/documents</span>/ &#123;</div><div class="line">  <span class="comment"># 匹配任何以 /documents/ 开头的地址，匹配符合以后，还要继续往下搜索</span></div><div class="line">  <span class="comment"># 只有后面的正则表达式没有匹配到时，这一条才会采用这一条</span></div><div class="line">  [ configuration C ]</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="keyword">location</span> <span class="title">~ /documents</span>/Abc &#123;</div><div class="line">  <span class="comment"># 匹配任何以 /documents/Abc 开头的地址，匹配符合以后，还要继续往下搜索</span></div><div class="line">  <span class="comment"># 只有后面的正则表达式没有匹配到时，这一条才会采用这一条</span></div><div class="line">  [ configuration CC ]</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="keyword">location</span> <span class="title">^~ /images</span>/ &#123;</div><div class="line">  <span class="comment"># 匹配任何以 /images/ 开头的地址，匹配符合以后，停止往下搜索正则，采用这一条。</span></div><div class="line">  [ configuration D ]</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="keyword">location</span> <span class="title">~* \.(gif</span>|jpg|jpeg)$ &#123;</div><div class="line">  <span class="comment"># 匹配所有以 gif,jpg或jpeg 结尾的请求</span></div><div class="line">  <span class="comment"># 然而，所有请求 /images/ 下的图片会被 config D 处理，因为 ^~ 到达不了这一条正则</span></div><div class="line">  [ configuration E ]</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="keyword">location</span> <span class="title">/images</span>/ &#123;</div><div class="line">  <span class="comment"># 字符匹配到 /images/，继续往下，会发现 ^~ 存在</span></div><div class="line">  [ configuration F ]</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="keyword">location</span> <span class="title">/images</span>/abc &#123;</div><div class="line">  <span class="comment"># 最长字符匹配到 /images/abc，继续往下，会发现 ^~ 存在</span></div><div class="line">  <span class="comment"># F与G的放置顺序是没有关系的</span></div><div class="line">  [ configuration G ]</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="keyword">location</span> <span class="title">~ /images</span>/abc/ &#123;</div><div class="line">  <span class="comment"># 只有去掉 config D 才有效：先最长匹配 config G 开头的地址，继续往下搜索，匹配到这一条正则，采用</span></div><div class="line">    [ configuration H ]</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="keyword">location</span> <span class="title">~* /js</span>/.*/\.js</div></pre></td></tr></table></figure>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2015/05/17/nginx-location-rewrite/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
                 <a class="post-title-link" href="/2015/05/17/nginx-install-and-config/" itemprop="url">
                   nginx服务器安装及配置文件详解
                 </a>
@@ -805,136 +940,11 @@
 
 
     
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/05/01/feel-wuyi-go/" itemprop="url">
-                  五一去哪儿
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2015-05-01T11:01:25+08:00" content="2015-05-01">
-              2015-05-01
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/Feel/" itemprop="url" rel="index">
-                    <span itemprop="name">Feel</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2015/05/01/feel-wuyi-go/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/05/01/feel-wuyi-go/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>五一去哪儿，我实在想不到更俗的标题了。去中山。说实在真不想去，我哥非要我带Mac回去让他拍照，给手表做陪衬。ps: 汽车就七个人，车厢也特么烂了，晃晃感觉要散了😳</p>
-<p>反正车上无聊，随便说说什么吧！昨晚，嗯，应该是失眠了。第二天睡到下午起来，窝在家里没事做（早知道就不那么快把《权利的游戏》看完了），五点的时候我竟然跑去公司加班了！</p>
-<p>加班也没做啥事，帮另一个同事调通了一个网络，然后在自己博客上更新了篇文章。赖到将近晚上八点半才走，本想在猫眼买张西乡天虹『左耳』的电影票，但没位置，想到一天没怎么吃饭（在公司吃了几包肉松饼和华夫饼干），在家门口沃尔玛楼下的爱尚堡点了份豪华午餐，坐了半个多小时起身才回去。晚上走在小区了，总有股淡淡的花香，却从来说不出名字，风吹的头发飘起，真的不是一般爽呢。但因为已经有十点多了，还是加快步伐推开了乌漆抹黑的家门，另外两个室友，一个回宜昌老家参加哥哥婚礼去了，一个去了阴盛阳衰的川大同学会。</p>
-<p>虽然今天还要赶车，但早睡这种事情很少发生在我身上。于是打开了电视，体育频道一个人没啥看的，央视一台播放什么劳动光荣的纪录片，五分钟换台了，想想还是去看宣传了很久的芒果台『真正男子汉』。额，杜海涛给我们的笑星形象永远不那么容易消失，这是节目，但也是在军队里，看着他总觉特意的去达到一种节目效果，他来部队参加训练是减肥。王宝强，真是个逗比，在教官检查违禁物品时宝宝那种呆萌老土的模样，笑抽了我，而且在后面打靶时的表现，蛮喜欢他的，他来部队是为了还原『士兵突击』里的许三多形象，想做一名真正的战士，这让我想到了不久前看过吴京的战狼，几次有一种每人都应该去参军的经历。我有个表弟（表哥？），就在去年过年时还跟我一起睡过，五年当兵回来，看他手持真枪的照片，威风凛凛。刘昊然，17岁，想在军队里完成他的成人礼，这名演员以后必火。袁弘，教官说他是一匹还没被驯服的野马，有血性，真男人。郭晓东，40岁的人，有过当兵的经历，可是带病参训，老婆不错😱。张丰毅，将近60岁的人，看过他不少电影，不是折腾，是表率。</p>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2015/05/01/feel-wuyi-go/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/6/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/6/">6</a><span class="page-number current">7</span><a class="page-number" href="/page/8/">8</a><span class="space">&hellip;</span><a class="page-number" href="/page/17/">17</a><a class="extend next" rel="next" href="/page/8/"><i class="fa fa-angle-right"></i></a>
+    <a class="extend prev" rel="prev" href="/page/6/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/6/">6</a><span class="page-number current">7</span><a class="page-number" href="/page/8/">8</a><span class="space">&hellip;</span><a class="page-number" href="/page/18/">18</a><a class="extend next" rel="next" href="/page/8/"><i class="fa fa-angle-right"></i></a>
   </nav>
 
 
@@ -975,7 +985,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">85</span>
+              <span class="site-state-item-count">86</span>
               <span class="site-state-item-name">posts</span>
             </a>
           </div>
