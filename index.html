@@ -365,7 +365,6 @@
 <li><code>Grafana</code>：数据展示面板</li>
 <li><code>Telegraf</code>：收集信息的agent<br>看了下 telegraf 的最新的 <a href="https://github.com/influxdata/telegraf/tree/master/plugins/inputs/mysql">mysql 插件</a>，一开始很欣慰：支持收集 Table schema statistics 和 Info schema auto increment columns。试用了一下，有数据，但是如前面所说，除了自增值外其他都是预估值，telegraf收集频率过高没啥意义，也许一天2次就足够了，它提供的 <code>IntervalSlow</code>选项固定写死在代码里，只能是放缓 global status 监控频率。不过倒是可以与其它监控指标分开成两份配置文件，各自定义收集间隔来实现。<br>最后打算自己用python撸一个，上报到influxdb里 :)</li>
 </ul>
-<p>github项目地址在文后。</p>
 <h2 id="2-Concept"><a href="#2-Concept" class="headerlink" title="2. Concept"></a>2. Concept</h2><p>完整代码见 GitHub项目地址：<a href="https://github.com/seanlook/DBschema_gather">DBschema_gather</a><br>实现也特别简单，就是查询 <code>information_schema</code> 库的 <code>COLUMNS</code>、<code>TABLES</code> 两个表：<br>
           <div class="post-more-link text-center">
             <a class="btn" href="/2016/12/04/mysql-schema-gather-statistics/#more" rel="contents">
