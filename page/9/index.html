@@ -281,6 +281,134 @@
             
               
                 
+                <a class="post-title-link" href="/2015/04/28/iscsi-san-initiator/" itemprop="url">
+                  iscsi网络存储介绍及客户端配置操作
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2015-04-28T01:21:25+08:00" content="2015-04-28">
+              2015-04-28
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/04/28/iscsi-san-initiator/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/04/28/iscsi-san-initiator/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>本文不介绍iSCSI服务端的搭建过程，不然就会很累赘。主题就是怎么去完成iscsi网络存储的挂载过程，并顺带介绍一些必要的概念。</p>
+<h1 id="1-iscsi介绍与initiator安装"><a href="#1-iscsi介绍与initiator安装" class="headerlink" title="1. iscsi介绍与initiator安装"></a>1. iscsi介绍与initiator安装</h1><h2 id="1-1-iSCSI介绍"><a href="#1-1-iSCSI介绍" class="headerlink" title="1.1 iSCSI介绍"></a>1.1 iSCSI介绍</h2><p>iSCSI简单来说，就是把SCSI指令通过TCP/IP协议封装起来，在以太网中传输。iSCSI 可以实现在IP网络上传递和运行SCSI协议，使其能够在诸如高速千兆以太网上进行数据存取，实现了数据的网际传递和管理。基于iSCSI建立的存储区域网（SAN）与基于光纤的FC-SAN相比，具有很好的性价比。</p>
+<p>iSCSI属于端到端的会话层协议，它定义的是SCSI到TCP/IP的映射（如下图），即Initiator将SCSI指令和数据封装成iSCSI协议数据单元，向下提交给TCP层，最后封装成IP数据包在IP网络上传输，到达Target后通过解封装还原成SCSI指令和数据，再由存储控制器发送到指定的驱动器，从而实现SCSI命令和数据在IP网络上的透明传输。它整合了现有的存储协议SCSI和网络协议TCP/IP，实现了存储与TCP/IP网络的无缝融合。在本文中，将把发起器Initiator称为客户端，将目标器Target称为服务端以方便理解。</p>
+<p><img src="http://sean-images.qiniudn.com/iscsi-protocal-arch.gif" alt="iscsi-protocal-arch.gif"></p>
+<p>iSCSI 服务端和客户端的通讯就是一个在网络上封包和解包的过程，在网络的一端，数据包被封装成包括TCP/IP头、iSCSI 识别包和SCSI 数据三部分内容，传输到网络另一端时，这三部分内容分别被顺序地解开。为了保证安全，iSCSI 有约定操作顺序。在首次运行时，客户端（initiator）设备需要登录到服务端（target）中。任何一个接收到没有执行登录过程的客户端的iSCSI PDU （iSCSI rotocol Data Units，iSCSI 协议数据单元）服务端都将生成一个协议错误，并且关闭连接。在关闭会话之前，服务端可能发送回一个被驳回的iSCSI PDU。</p>
+<p>在工作时，iSCSI使SCSI数据块由原来的SCSI总线连接扩展到internet上，这一过程有些产品通过硬件来实现，这种硬件产品被简称为TOE（TCP Offload Engine），随着近年来服务器芯片技术的不断发展，服务器处理能力日益强劲，目前更为普遍的是通过软件来实现SCSI数据块的封装过程。这种软件通常被称为iSCSI Initiator软件/驱动。Initiator软件可以将以太网卡虚拟为iSCSI卡，接受和发送iSCSI数据报文，通过普通以太网卡来进行网络连接，但是需要占用CPU资源。另外的TOE和HBA连接转换方式都需要专门的硬件设备来完成，虽然相对昂贵但执行效率高，也可以减轻主机CPU的负载。本文客户端采用Initiator驱动的连接方式。</p>
+<h2 id="1-2-Initiator安装"><a href="#1-2-Initiator安装" class="headerlink" title="1.2 Initiator安装"></a>1.2 Initiator安装</h2><p>在Linux 2.6内核中提供了iscsi驱动，iSCSI 驱动（driver）使主机拥有了通过IP网络访问存储的能力，但还需要一个具体的客户端工具（Linux用户空间组件）初始化iSCSI驱动，即<code>iscsi-initiator-utils</code>，也是大家常说的open-iscsi。</p>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2015/04/28/iscsi-san-initiator/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
                 <a class="post-title-link" href="/2015/04/24/pfsense-loadbalancer/" itemprop="url">
                   怎么用pfSense为你的web服务做负载均衡（翻译）
                 </a>
@@ -790,133 +918,6 @@
 
 
     
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/03/25/vagrant/" itemprop="url">
-                  在Mac在Mac/win7下上使用Vagrant打造本地开发环境
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2015-03-25T11:21:25+08:00" content="2015-03-25">
-              2015-03-25
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/Virtualization/" itemprop="url" rel="index">
-                    <span itemprop="name">Virtualization</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2015/03/25/vagrant/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/03/25/vagrant/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <h1 id="1-vagrant介绍"><a href="#1-vagrant介绍" class="headerlink" title="1. vagrant介绍"></a>1. vagrant介绍</h1><h2 id="1-1-vagrant能做什么"><a href="#1-1-vagrant能做什么" class="headerlink" title="1.1 vagrant能做什么"></a>1.1 vagrant能做什么</h2><p>做Web开发（java/php/python/ruby…）少不了要在本地搭建好开发环境，虽然说目前各种脚本/语言都有对应的Windows版，甚至是一键安装包，但很多时候和Windows环境的兼容性（如配置文件、编译的模块）并不是那么好，麻烦的问题是实际部署的环境通常是Linux，常常还要面临着开发和部署环境不一致，上线前还要大量的调试。而如果让每个开发人员都自己去搭建本地环境，安装虚拟机、下载ISO镜像、选择规格安装创建vm、安装OS、配置，会耗费非常多的时间，如果是团队开发应该要尽量保持每个人的运行环境一致。此时vagrant正式你所需要的。不适用正式环境部署。</p>
-<p>vagrant实际上一套虚拟机管理工具，基于Ruby开发，底层支持VirtualBox、VMware甚至AWS、docker等作为虚拟化系统。我们可以通过 Vagrant 封装一个 Linux 的开发环境，分发给团队成员。成员可以在自己喜欢的桌面系统（Mac/Windows/Linux）上开发程序，代码却能统一在封装好的环境里运行，“代码在我机子上运行没有问题”这种说辞将成为历史。</p>
-<p>通过上面的介绍如果你还在困惑有virtualbox或vmware为什么还要加入vagrant，纠结于要不要使用，可以参考这个问答 <a href="http://segmentfault.com/q/1010000002623455">使用vagrant的意义在哪</a>，另外docker作为后起之秀也可以做vagrant能完成的事情，stackoverflow有关于两位作者讨论各自应用场景的精彩”互掐”，<a href="http://stackoverflow.com/questions/16647069/should-i-use-vagrant-or-docker-io-for-creating-an-isolated-environment">传送门→</a> （<a href="http://www.cnblogs.com/vikings-blog/p/3973265.html">中文</a>）。</p>
-<h2 id="1-2-几个概念"><a href="#1-2-几个概念" class="headerlink" title="1.2 几个概念"></a>1.2 几个概念</h2><ul>
-<li><code>Provider</code>：供应商，在这里指Vagrant调用的虚拟化工具。Vagrant本身并没有能力创建虚拟机，它是调用一些虚拟化工具来创建，如VirtualBox、VMWare、Xen、Docker，甚至AWS，这些虚拟化工具只要安装好了，vagrant会自动封装在底层通过统一的命令调用。也就是说使用vagrant时你电脑上还需要安装对应的Provider，默认是免费开源的virtualbox。</li>
-</ul>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2015/03/25/vagrant/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -962,7 +963,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">89</span>
+              <span class="site-state-item-count">90</span>
               <span class="site-state-item-name">posts</span>
             </a>
           </div>
@@ -1043,7 +1044,7 @@
         <div class="copyright" >
   
   &copy;  2014 - 
-  <span itemprop="copyrightYear">2016</span>
+  <span itemprop="copyrightYear">2017</span>
   <span class="with-love">
     <i class="fa fa-heart"></i>
   </span>

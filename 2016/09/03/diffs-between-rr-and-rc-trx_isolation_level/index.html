@@ -72,7 +72,7 @@
 <link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
 
 
-  <meta name="keywords" content="Hexo, seanlook" />
+  <meta name="keywords" content="mysql,事务," />
 
 
 
@@ -90,15 +90,19 @@
 
 
 
-<meta name="description" content="Stay hungry, stay foolish.">
-<meta property="og:type" content="website">
-<meta property="og:title" content="Sean's Notes">
-<meta property="og:url" content="http://seanlook.com/archives/page/7/index.html">
+<meta name="description" content="经常会被问到 InnoDB隔离级别中 READ-COMMITED和REPEATABLE-READ 的区别，今天就整理了一下，不再从“脏读”、“幻读”这样的名词解释一样去回答了。
+1. 行锁InnoDB行锁实际锁的是索引记录，为了防止死锁的产生以及维护所需要的隔离级别，在执行sql语句的全过程中，innodb必须对所需要修改的行每条索引记录上锁。如此一来，如果你执行的 UPDATE 没有很好的索引，">
+<meta property="og:type" content="article">
+<meta property="og:title" content="READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同">
+<meta property="og:url" content="http://seanlook.com/2016/09/03/diffs-between-rr-and-rc-trx_isolation_level/index.html">
 <meta property="og:site_name" content="Sean's Notes">
-<meta property="og:description" content="Stay hungry, stay foolish.">
+<meta property="og:description" content="经常会被问到 InnoDB隔离级别中 READ-COMMITED和REPEATABLE-READ 的区别，今天就整理了一下，不再从“脏读”、“幻读”这样的名词解释一样去回答了。
+1. 行锁InnoDB行锁实际锁的是索引记录，为了防止死锁的产生以及维护所需要的隔离级别，在执行sql语句的全过程中，innodb必须对所需要修改的行每条索引记录上锁。如此一来，如果你执行的 UPDATE 没有很好的索引，">
+<meta property="og:updated_time" content="2016-09-03T08:32:49.000Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Sean's Notes">
-<meta name="twitter:description" content="Stay hungry, stay foolish.">
+<meta name="twitter:title" content="READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同">
+<meta name="twitter:description" content="经常会被问到 InnoDB隔离级别中 READ-COMMITED和REPEATABLE-READ 的区别，今天就整理了一下，不再从“脏读”、“幻读”这样的名词解释一样去回答了。
+1. 行锁InnoDB行锁实际锁的是索引记录，为了防止死锁的产生以及维护所需要的隔离级别，在执行sql语句的全过程中，innodb必须对所需要修改的行每条索引记录上锁。如此一来，如果你执行的 UPDATE 没有很好的索引，">
 
 
 
@@ -119,7 +123,7 @@
 
 
 
-  <title> Archive | Sean's Notes </title>
+  <title> READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同 | Sean's Notes </title>
 </head>
 
 <body itemscope itemtype="http://schema.org/WebPage" lang="en">
@@ -156,7 +160,7 @@
     
   
 
-  <div class="container one-collumn sidebar-position-left  page-archive  ">
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
     <div class="headband"></div>
 
     <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
@@ -257,476 +261,173 @@
           <div id="content" class="content">
             
 
-  <section id="posts" class="posts-collapse">
-    <span class="archive-move-on"></span>
-
-    <span class="archive-page-counter">
-      
-      
-       
-        
-      Good! 90 posts in total. Keep on posting.
-    </span>
-
+  <div id="posts" class="posts-expand">
     
-
-      
-      
-      
-
-      
-        
-        <div class="collection-title">
-          <h2 class="archive-year motion-element" id="archive-year-2014">2014</h2>
-        </div>
-      
-      
-
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2014/11/05/docker-command-best-use-2/" itemprop="url">
-              
-                <span itemprop="name">docker常用管理命令（下）</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2014-11-05T16:21:25+08:00"
-              content="2014-11-05" >
-          11-05
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-
-    
-
-      
-      
-      
-
-      
-      
-
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2014/11/03/docker-run-container-with-shell-daemon_process/" itemprop="url">
-              
-                <span itemprop="name">docker如何创建一个运行后台进程的容器并同时提供shell终端</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2014-11-03T20:21:25+08:00"
-              content="2014-11-03" >
-          11-03
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-
-    
-
-      
-      
-      
-
-      
-      
-
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2014/11/03/one-troubleshooting-for-centos-corrupt/" itemprop="url">
-              
-                <span itemprop="name">记一次错误卸载软件包导致Linux系统崩溃的修复解决过程</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2014-11-03T01:21:25+08:00"
-              content="2014-11-03" >
-          11-03
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-
-    
-
-      
-      
-      
-
-      
-      
-
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2014/10/31/docker-command-best-use-1/" itemprop="url">
-              
-                <span itemprop="name">docker常用管理命令（上）</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2014-10-31T20:21:25+08:00"
-              content="2014-10-31" >
-          10-31
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-
-    
-
-      
-      
-      
-
-      
-      
-
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2014/10/29/multiple-tomcats-service-script/" itemprop="url">
-              
-                <span itemprop="name">管理多tomcat服务shell脚本（CentOS）</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2014-10-29T18:21:25+08:00"
-              content="2014-10-29" >
-          10-29
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-
-    
-
-      
-      
-      
-
-      
-      
-
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2014/10/29/apache-3tomcat-cluster-jk-memcached/" itemprop="url">
-              
-                <span itemprop="name">apache+3tomcat+jk+memcached集群环境搭建</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2014-10-29T10:21:25+08:00"
-              content="2014-10-29" >
-          10-29
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-
-    
-
-      
-      
-      
-
-      
-      
-
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2014/10/28/vsphere-recover-from-missing-vmdk/" itemprop="url">
-              
-                <span itemprop="name">误删vSphere虚拟机.vmdk文件的恢复</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2014-10-28T15:21:25+08:00"
-              content="2014-10-28" >
-          10-28
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-
-    
-
-      
-      
-      
-
-      
-      
-
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2014/10/26/docker-installed-centos6-successfully/" itemprop="url">
-              
-                <span itemprop="name">在 CentOS 6.x上安装 docker.io成功</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2014-10-26T19:45:25+08:00"
-              content="2014-10-26" >
-          10-26
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-
-    
-
-      
-      
-      
-
-      
-      
-
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2014/10/25/markdown-tips/" itemprop="url">
-              
-                <span itemprop="name">markdown语法备忘笔记</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2014-10-25T01:21:25+08:00"
-              content="2014-10-25" >
-          10-25
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-
-    
-
-      
-      
-      
-
-      
-      
-
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2014/10/24/upgrade-centos6_kernel-to-3.10.x/" itemprop="url">
-              
-                <span itemprop="name">CentOS 6.x 内核升级（2.6.32 -> 3.10.58）过程记录</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2014-10-24T01:21:25+08:00"
-              content="2014-10-24" >
-          10-24
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-
-    
-
-      
-      
-      
-
-      
-      
-
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2014/10/06/linux-level2/" itemprop="url">
-              
-                <span itemprop="name">Linux进阶培训-tplink</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2014-10-06T16:32:49+08:00"
-              content="2014-10-06" >
-          10-06
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-
-    
-
-      
-      
-      
-
-      
-      
-
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2014/09/07/linux-security-general-settings/" itemprop="url">
-              
-                <span itemprop="name">CentOS 6 服务器安全配置指南（通用）</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2014-09-07T01:21:25+08:00"
-              content="2014-09-07" >
-          09-07
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-
-    
-
-  </section>
 
   
-  <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/archives/page/6/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/archives/">1</a><span class="space">&hellip;</span><a class="page-number" href="/archives/page/6/">6</a><span class="page-number current">7</span><a class="page-number" href="/archives/page/8/">8</a><a class="extend next" rel="next" href="/archives/page/8/"><i class="fa fa-angle-right"></i></a>
-  </nav>
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2016-09-03T16:32:49+08:00" content="2016-09-03">
+              2016-09-03
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/09/03/diffs-between-rr-and-rc-trx_isolation_level/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/09/03/diffs-between-rr-and-rc-trx_isolation_level/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
 
 
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>经常会被问到 InnoDB隔离级别中 READ-COMMITED和REPEATABLE-READ 的区别，今天就整理了一下，不再从“脏读”、“幻读”这样的名词解释一样去回答了。</p>
+<h2 id="1-行锁"><a href="#1-行锁" class="headerlink" title="1. 行锁"></a>1. 行锁</h2><p>InnoDB行锁实际锁的是索引记录，为了防止死锁的产生以及维护所需要的隔离级别，在执行sql语句的全过程中，innodb必须对所需要修改的行每条索引记录上锁。如此一来，如果你执行的 UPDATE 没有很好的索引，那么会导致锁定许多行：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">update</span> employees <span class="keyword">set</span> store_id = <span class="number">0</span> <span class="keyword">where</span> store_id = <span class="number">1</span>;</div><div class="line"><span class="comment">---TRANSACTION 1EAB04, ACTIVE 7 sec</span></div><div class="line">633 <span class="keyword">lock</span> <span class="keyword">struct</span>(s), &lt;strong&gt;<span class="keyword">heap</span> <span class="keyword">size</span> <span class="number">96696</span>&lt;/strong&gt;, <span class="number">218786</span> <span class="keyword">row</span> <span class="keyword">lock</span>(s), <span class="keyword">undo</span> <span class="keyword">log</span> entries <span class="number">1</span></div><div class="line">MySQL <span class="keyword">thread</span> <span class="keyword">id</span> <span class="number">4</span>, OS <span class="keyword">thread</span> handle <span class="number">0x7f8dfc35d700</span>, <span class="keyword">query</span> <span class="keyword">id</span> <span class="number">47</span> localhost root</div><div class="line"><span class="keyword">show</span> <span class="keyword">engine</span> <span class="keyword">innodb</span> <span class="keyword">status</span></div></pre></td></tr></table></figure></p>
+<p>上面的 <code>employees</code> 表 <code>store_id</code> 列没有索引。注意 UPDATE 已经执行完成（没有提交），但依然有 218786 个行锁没有释放，还有一个undo记录。这意味着只有一行被更改，但却持有了额外的锁。堆大小（heap size）代表了分配给锁使用的内存数量。</p>
+<p>在 REPEATABLE-READ 级别，事务持有的 <strong>每个锁</strong> 在整个事务期间一直被持有。</p>
+<p>在 READ-COMMITED 级别，事务里面特定语句结束之后，不匹配该sql语句扫描条件的锁，会被释放。</p>
+<p>下面是上述相同的 UPDATE 在 READ-COMMITED 级别下的结果：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"><span class="comment">---TRANSACTION 1EAB06, ACTIVE 11 sec</span></div><div class="line">631 <span class="keyword">lock</span> <span class="keyword">struct</span>(s), &lt;strong&gt;<span class="keyword">heap</span> <span class="keyword">size</span> <span class="number">96696</span>&lt;/strong&gt;, <span class="number">1</span> <span class="keyword">row</span> <span class="keyword">lock</span>(s), <span class="keyword">undo</span> <span class="keyword">log</span> entries <span class="number">1</span></div><div class="line">MySQL <span class="keyword">thread</span> <span class="keyword">id</span> <span class="number">4</span>, OS <span class="keyword">thread</span> handle <span class="number">0x7f8dfc35d700</span>, <span class="keyword">query</span> <span class="keyword">id</span> <span class="number">62</span> localhost root</div><div class="line"><span class="keyword">show</span> <span class="keyword">engine</span> <span class="keyword">innodb</span> <span class="keyword">status</span></div></pre></td></tr></table></figure></p>
+<p>可以看到 heap size 没有变化，但是现在我们只持有一个行锁。无论什么隔离级别下，InnoDB 会为扫描过的每条索引记录创建锁，不同的是在 RC 模式，一旦语句执行完毕（事务未必完成），不符合扫描条件的记录上的锁会被随即释放。释放这些锁后，堆内存并不会马上释放，所以heap size看到与 RR 模式是一样的，但是持有的锁数量明显小了很多。</p>
+<p>这也就意味着在 RC 级别下的事务A，只要A的UPDATE <strong>语句</strong> 完成了，其它事务可以修改A中也扫描过的行，但在 RR 级别下不允许。</p>
+<h2 id="2-Read-View"><a href="#2-Read-View" class="headerlink" title="2. Read View"></a>2. Read View</h2><h3 id="REPEATABLE-READ"><a href="#REPEATABLE-READ" class="headerlink" title="REPEATABLE-READ"></a>REPEATABLE-READ</h3><p>在 REPEATABLE-READ 级别，<em>read view</em> 对象在事务一开启就被创建，这个一致性快照在整个事务期间一直保持打开。在同一个事务里，前后间隔几个小时执行一遍相同的 SELECT，你会得到完全一样的结果，这就是所谓的 MVCC (multiple version concurrency control)，它是通过行版本号和UNDO段来实现的。</p>
+<p>在 REPEATABLE-READ 级别， InnoDB会为范围扫描创建间隙锁（gap locks）：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">select</span> * <span class="keyword">from</span> some_table <span class="keyword">where</span> <span class="keyword">id</span> &gt; <span class="number">100</span> <span class="keyword">FOR</span> <span class="keyword">UPDATE</span>;</div></pre></td></tr></table></figure></p>
+<a id="more"></a>
+<p>上面的update将会创建一个 gap lock，用来防止在 id&gt;100 范围内有新行被插入，锁会持续到事务回滚或提交。比如在同一个事务里，上午5点执行 SELECT … FOR UPDATE，下午5点执行 UPDATE some_table where id&gt;100，那么这个update只会修改上午5点 SELECT FOR UPDATE所锁定的行，因为大于100的记录的整个 <strong>间隙</strong> 被加了锁。</p>
+<h3 id="READ-COMMITED"><a href="#READ-COMMITED" class="headerlink" title="READ-COMMITED"></a>READ-COMMITED</h3><p>在 READ-COMMITED 级别，<em>read view</em> 结构在每个语句开始的时候被创建，这意味着即使在同一个事务中，上午5点执行的 SELECT与下午5点执行的SELECT可能会得到不同的结果。因为 read view 在 READ-COMMITED 级别下仅在 <strong>语句执行</strong> 期间存在。</p>
+<p>这就是所谓的 “幻读”（phantom read）。</p>
+<p>READ-COMMITED 隔离级别下是没有gap locks，所以执行上面的 SELECT FOR UPDATE where id&gt;100 并不会阻止其它事务插入新行，如果同一个事务里后面执行 UPDATE … where id&gt;100，就有可能导致实际更新的行数比前面锁定的行数要多。</p>
+<p>补充：<br>如果了解过 mysqldump 的实现原理，可知它就是充分利用InnoDB的MVCC特性，使用 REPEATABLE-READ 模式获取备份事务的一致性快照，避免锁表和幻读。</p>
+<p>本文主要参考自 percona博客上的一篇文章 <a href="https://www.percona.com/blog/2012/08/28/differences-between-read-committed-and-repeatable-read-transaction-isolation-levels/" target="_blank" rel="external">https://www.percona.com/blog/2012/08/28/differences-between-read-committed-and-repeatable-read-transaction-isolation-levels/</a> 。</p>
+<hr>
+<p>本文链接地址：<a href="http://seanlook.com/2016/09/03/diffs-between-rr-and-rc-trx_isolation_level/">http://seanlook.com/2016/09/03/diffs-between-rr-and-rc-trx_isolation_level/</a></p>
+<hr>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/mysql/" rel="tag">#mysql</a>
+          
+            <a href="/tags/事务/" rel="tag">#事务</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2016/08/30/mysql-ppt-trx_isolation-lock/" rel="next" title="浅析MySQL事务隔离级别与锁 分享">
+                <i class="fa fa-chevron-left"></i> 浅析MySQL事务隔离级别与锁 分享
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2016/09/27/python-mysql-querykill/" rel="prev" title="你可能需要一个实时抓取MySQL慢查询现场的程序">
+                你可能需要一个实时抓取MySQL慢查询现场的程序 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
 
 
           </div>
@@ -734,6 +435,14 @@
 
 
           
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2016/09/03/diffs-between-rr-and-rc-trx_isolation_level/"
+           data-title="READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同" data-url="http://seanlook.com/2016/09/03/diffs-between-rr-and-rc-trx_isolation_level/">
+      </div>
+    
+  </div>
+
 
         </div>
         
@@ -753,8 +462,17 @@
       
 
       
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
 
-      <section class="site-overview sidebar-panel  sidebar-panel-active ">
+      <section class="site-overview sidebar-panel ">
         <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
           <img class="site-author-image" itemprop="image"
                src="/images/avatar_sean.jpg"
@@ -831,6 +549,17 @@
 
       </section>
 
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-行锁"><span class="nav-text">1. 行锁</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-Read-View"><span class="nav-text">2. Read View</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#REPEATABLE-READ"><span class="nav-text">REPEATABLE-READ</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#READ-COMMITED"><span class="nav-text">READ-COMMITED</span></a></li></ol></li></ol></div>
+            
+          </div>
+        </section>
       
 
     </div>
@@ -927,11 +656,9 @@
   
 
   
-  
-    <script type="text/javascript" id="motion.page.archive">
-      $('.archive-year').velocity('transition.slideLeftIn');
-    </script>
-  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
 
 
   

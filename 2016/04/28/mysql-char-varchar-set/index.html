@@ -353,9 +353,9 @@ char类型是使用固定长度空间进行存储，范围0-255。比如CHA">
       
         <p>数据类型差不多是接触mysql一开始就了解的内容，最近遇到几个现象如varchar自动转mediumtext，blob存储性能的问题，不得不回头明确一下关于MySQL常用数据类型的选择。</p>
 <p><a href="http://dev.mysql.com/doc/refman/5.6/en/char.html" target="_blank" rel="external">mysql手册这里</a> 已经讲的很清楚了。它们都是定义字符串型字段时常用的类型，但它们存储和检索的方式有不同，最大长度和尾部的空格是否保留也有差别。</p>
-<p><code>char</code>类型是使用固定长度空间进行存储，范围0-255。比如<code>CHAR(30)</code>能放30个字节，存放abcd时，尾部会以空格补齐，实际占用空间 30bytes 。检索它的时候尾部空格会被去除。</p>
+<p><code>char</code>类型是使用固定长度空间进行存储，范围0-255。比如<code>CHAR(30)</code>能放30个字符，存放abcd时，尾部会以空格补齐，实际占用空间 30 * 3bytes (utf8)。检索它的时候尾部空格会被去除。</p>
 <p>char善于存储经常改变的值，或者长度相对固定的值，比如type、ip地址或md5之类的数据，不容易产生碎片。关于它的效率可以参考<a href="http://bbs.chinaunix.net/thread-1696053-1-1.html" target="_blank" rel="external">这里</a>。</p>
-<p><code>varchar</code>类型保存可变长度字符串，范围0-65535（但受到单行最大64kb的限制）。比如用<code>varchar(30)</code>去存放abcd，实际使用5个字节，因为还需要使用额外1个字节来标识字串长度（0-255使用1个字节，超过255需要2个字节）。</p>
+<p><code>varchar</code>类型保存可变长度字符串，范围0-65535（但受到单行最大64kb的限制）。比如用 <code>varchar(30)</code> 去存放abcd，实际使用5个字节，因为还需要使用额外1个字节来标识字串长度（0-255使用1个字节，超过255需要2个字节）。</p>
 <p>varchar善于存储值的长短不一的列，也是用的最多的一种类型，节省磁盘空间。update时varchar列时，如果新数据比原数据大，数据库需要重新开辟空间，这一点会有性能略有损耗，但innodb引擎下查询效率比char高一点。这也是innodb官方推荐的类型。</p>
 <p>如果存储时真实长度超过了char或者varchar定义的最大长度呢？</p>
 <ul>
@@ -410,8 +410,8 @@ char类型是使用固定长度空间进行存储，范围0-255。比如CHA">
 <p>需要注意的是，使用varchar不能因为长度可变就随意分大空间，比如90个字节能放够的列定义成varchar(200)，因为开辟内存时是以200字节进行的，遇到需要filesort或tmp table作业可能会带来不利影响。</p>
 <a id="more"></a>
 <p>最后研究一下字符集对存储长度影响，以 <code>create table tc_utf8(c1 int primary key auto_increment, c2 char(30), c3 varchar(N)) charset=utf8;</code> 为例：</p>
-<p>字符集为utf8，于是中文每个字符占3个字节，英文还是1个字节，所以N最大为 (65535-1-2-4-30<em>3)/3 = 21812，即最多能存放21812个英文、数字、汉字。其中65535是单行最大限制，减1是NULL标识位，减2的是头部的2个字节标识长度，减30</em>3的原因是char(30)占用90个字节，最后除以3还是因为utf8最长用3个字节表示一个字符。</p>
-<p>但有人会说，utf8的英文字符只需要1个字节表示，并不占用3个字节，在存ASCII字符的情况下N是不是可以更大呢。答案是否定的，因为定义表的时候mysql事先并不知道c3要存的是英文还在中文，只能以最大来计。mysql也是以这种方式来确保行最大65535bytes限制：数据行只要出现一个ascii字符（如英文字母、数字），就永远达不到65535，数据行全中文则刚好满。</p>
+<p>字符集为utf8，于是中文每个字符占3个字节，英文还是1个字节，所以N最大为 (65535-1-2-4-30*3)/3 = 21812，即最多能存放21812个英文、数字、汉字。其中65535是单行最大限制，减1是NULL标识位，减2的是头部的2个字节标识长度，减30*3的原因是char(30)占用90个字节，最后除以3还是因为utf8最长用3个字节表示一个字符。</p>
+<p>但有人会说，utf8的英文字符只需要1个字节表示，并不占用3个字节，在存ASCII字符的情况下N是不是可以更大呢。答案是否定的，因为定义表的时候mysql事先并不知道c3要存的是英文还在中文，只能以最大来计。mysql也是以这种方式来确保行最大 65535 bytes 限制：数据行只要出现一个ascii字符（如英文字母、数字），就永远达不到65535，数据行全中文则刚好满。</p>
 <p>还有一种特殊情况：</p>
 <figure class="highlight asciidoc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div></pre></td><td class="code"><pre><div class="line"><span class="section">mysql&gt; show variables like "char%";</span></div><div class="line">+--------------------------+----------------------------+</div><div class="line"><span class="section">| Variable_name            | Value                      |</span></div><div class="line">+--------------------------+----------------------------+</div><div class="line">| character<span class="emphasis">_set_</span>client     | utf8                       |</div><div class="line">| character<span class="emphasis">_set_</span>connection | utf8                       |</div><div class="line">| character<span class="emphasis">_set_</span>database   | utf8                       |</div><div class="line">| character<span class="emphasis">_set_</span>filesystem | binary                     |</div><div class="line">| character<span class="emphasis">_set_</span>results    | utf8                       |</div><div class="line">| character<span class="emphasis">_set_</span>server     | latin1                     |</div><div class="line">| character<span class="emphasis">_set_</span>system     | utf8                       |</div><div class="line"><span class="section">| character_sets_dir       | /usr/share/mysql/charsets/ |</span></div><div class="line">+--------------------------+----------------------------+</div><div class="line">8 rows in set (0.12 sec)</div><div class="line"></div><div class="line"><span class="section">mysql&gt; select @@sql_mode;</span></div><div class="line">+------------------------+</div><div class="line"><span class="section">| @@sql_mode             |</span></div><div class="line">+------------------------+</div><div class="line"><span class="section">| NO_ENGINE_SUBSTITUTION |</span></div><div class="line">+------------------------+</div><div class="line">1 rows in set (0.13 sec)</div><div class="line"></div><div class="line">mysql&gt; create table tc<span class="emphasis">_utf8_</span>21812(c1 int primary key auto<span class="emphasis">_increment, c2 char(30), c3 varchar(21812)) charset=utf8;</span></div><div class="line">Query OK, 0 rows affected (0.10 sec)</div><div class="line"></div><div class="line">mysql&gt; create table tc<span class="emphasis">_utf8_</span>21813(c1 int primary key auto<span class="emphasis">_increment, c2 char(30), c3 varchar(21845)) charset=utf8;</span></div><div class="line">Row size too large. The maximum row size for the used table type, not counting BLOBs, is 65535. This includes storage overhead, check the manual. You have to change some columns to TEXT or BLOBs</div><div class="line"></div><div class="line">mysql&gt; create table tc<span class="emphasis">_utf8_</span>21846(c1 int primary key auto<span class="emphasis">_increment, c2 char(30), c3 varchar(21846)) charset=utf8;</span></div><div class="line">Query OK, 0 rows affected, 1 warnings (0.10 sec)</div><div class="line"></div><div class="line"><span class="section">mysql&gt; show warnings;</span></div><div class="line">+-------+------+---------------------------------------------+</div><div class="line"><span class="section">| Level | Code | Message                                     |</span></div><div class="line">+-------+------+---------------------------------------------+</div><div class="line"><span class="section">| Note  | 1246 | Converting column 'c3' from VARCHAR to TEXT |</span></div><div class="line">+-------+------+---------------------------------------------+</div><div class="line">1 rows in set (0.14 sec)</div></pre></td></tr></table></figure>
 <p>即在非严格模式下，因为N=21813 &gt; 21812，所以报 Row size too large 错误。但N=21846 &gt; (65535/3)时，只是出现warnings，varchar自动变成了mediumtext 类型。</p>
@@ -552,7 +552,7 @@ char类型是使用固定长度空间进行存储，范围0-255。比如CHA">
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">89</span>
+              <span class="site-state-item-count">90</span>
               <span class="site-state-item-name">posts</span>
             </a>
           </div>
@@ -644,7 +644,7 @@ char类型是使用固定长度空间进行存储，范围0-255。比如CHA">
         <div class="copyright" >
   
   &copy;  2014 - 
-  <span itemprop="copyrightYear">2016</span>
+  <span itemprop="copyrightYear">2017</span>
   <span class="with-love">
     <i class="fa fa-heart"></i>
   </span>
