@@ -281,6 +281,267 @@
             
               
                 
+                <a class="post-title-link" href="/2015/04/11/oracle_db_autostart_with_linux/" itemprop="url">
+                  配置 Oracle 11gR2 在 CentOS6 上开机自启动
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2015-04-11T15:21:25+08:00" content="2015-04-11">
+              2015-04-11
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Oracle/" itemprop="url" rel="index">
+                    <span itemprop="name">Oracle</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/04/11/oracle_db_autostart_with_linux/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/04/11/oracle_db_autostart_with_linux/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h2 id="修改配置"><a href="#修改配置" class="headerlink" title="修改配置"></a>修改配置</h2><p>要达到oracle随开机自启动，一般使用11g自带的dbstart脚本：<code>$ORACLE_HOME/bin/dbstart</code>，但要先修改<code>/etc/oratab</code>的内容，将N改成Y，表示允许实例自启动，假如有2个实例要启动，再写一行：<br><figure class="highlight groovy"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ vi <span class="regexp">/etc/</span>oratab</div><div class="line"><span class="string">EXCRMPROD:</span><span class="regexp">/db/</span>oracle<span class="regexp">/product/</span><span class="number">11.2</span><span class="number">.0</span>/<span class="string">db_1:</span>Y</div></pre></td></tr></table></figure></p>
+<p>然后在oracle用户下执行<code>$ORACLE_HOME/bin/dbstart</code>即可启动，日志被记录在<code>$ORACLE_HOME/startup.log</code>。但是，默认情况<code>dbstart</code>和<code>dbshut</code>脚本不能自动启动或关闭监听，所以也要加以修改：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">$ vi /db/oracle/product/11.2.0/db_1/bin/dbstart</div><div class="line"><span class="comment">## 找到下面的代码(约第80行)，在实际脚本代码的前面</span></div><div class="line"><span class="comment"># First argument is used to bring up Oracle Net Listener</span></div><div class="line">ORACLE_HOME_LISTNER=<span class="variable">$1</span></div><div class="line"><span class="comment">## 将此处的 ORACLE_HOME_LISTNER=$1 修改为 ORACLE_HOME_LISTNER=$ORACLE_HOME</span></div><div class="line"><span class="keyword">if</span> [ ! <span class="variable">$ORACLE_HOME_LISTNER</span> ] ; <span class="keyword">then</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"ORACLE_HOME_LISTNER is not SET, unable to auto-start Oracle Net Listener"</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"Usage: <span class="variable">$0</span> ORACLE_HOME"</span></div><div class="line"><span class="keyword">else</span></div><div class="line">LOG=<span class="variable">$ORACLE_HOME_LISTNER</span>/listener.log</div></pre></td></tr></table></figure></p>
+<p>同样也修改dbshut脚本（约第50行）：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line">$ vi /db/oracle/product/11.2.0/db_1/bin/dbshut</div><div class="line"></div><div class="line"><span class="comment"># The this to bring down Oracle Net Listener</span></div><div class="line">ORACLE_HOME_LISTNER=<span class="variable">$ORACLE_HOME</span></div><div class="line"><span class="keyword">if</span> [ ! <span class="variable">$ORACLE_HOME_LISTNER</span> ] ; <span class="keyword">then</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"ORACLE_HOME_LISTNER is not SET, unable to auto-stop Oracle Net Listener"</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"Usage: <span class="variable">$0</span> ORACLE_HOME"</span></div><div class="line"><span class="keyword">else</span></div><div class="line">LOG=<span class="variable">$ORACLE_HOME_LISTNER</span>/listener.log</div></pre></td></tr></table></figure></p>
+<h2 id="开机启动"><a href="#开机启动" class="headerlink" title="开机启动"></a>开机启动</h2><p>这两个脚本在执行时会自动去搜索<code>/etc/oratab</code>文件的内容，将这两个命令分别加入开机启动和关闭脚本里。</p>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2015/04/11/oracle_db_autostart_with_linux/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2015/04/05/vmware-vcenter-vconverter/" itemprop="url">
+                  使用vmware vconverter从物理机迁移系统到虚拟机P2V（多图）
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2015-04-05T15:21:25+08:00" content="2015-04-05">
+              2015-04-05
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Virtualization/" itemprop="url" rel="index">
+                    <span itemprop="name">Virtualization</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/04/05/vmware-vcenter-vconverter/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/04/05/vmware-vcenter-vconverter/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>本文完整记录了如何从物理服务器，保持所有环境配置信息，纹丝不动的迁移到虚拟机上，俗称 P2V 。采用的工具是VMware公司的 <code>VMware vcenter vconverter standalone</code>，它支持将windows和linux操作系统用作源，可以执行若干转换任务：</p>
+<ul>
+<li>将正在运行的远程物理机和虚拟机作为虚拟机导入到vCenter Server管理的独立ESX/ESXi或ESX/ESXi主机</li>
+<li>将由VMware Workstation或Microsoft Hyper-V Server托管的虚拟机导入到vCenter Server管理的ESX/ESXi主机</li>
+<li>将第三方备份或磁盘映像导入到vCenterServer管理的ESX/ESXi主机中</li>
+<li>将旧版服务器迁移到新硬件，而不重新安装操作系统或应用程序软件等</li>
+<li>完整功能见《Converter Standalone 用户指南》</li>
+</ul>
+<p>Converter Standalone的组件，只能安装在Windows操作系统上：</p>
+<ul>
+<li>Converter Standalone Server —— 启用并执行虚拟机的导入和导出</li>
+<li>Converter Standalone agent —— Converter Standalone Server会在Windows物理机上安装代理，从而将这些物理机作为虚拟机导入，完成后可以选择自动删除</li>
+<li>Converter Standalone client —— 与Converter服务端配合使用，包括看到的用户界面、创建和管理转换任务等</li>
+<li>Vmware vCenter Converter引导CD：是单独的组件，可用于在物理机上执行冷克隆</li>
+</ul>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2015/04/05/vmware-vcenter-vconverter/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
                 <a class="post-title-link" href="/2015/03/25/vagrant/" itemprop="url">
                   在Mac在Mac/win7下上使用Vagrant打造本地开发环境
                 </a>
@@ -642,262 +903,11 @@
 
 
     
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/03/02/rpm-yum-recover/" itemprop="url">
-                  rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2015-03-02T01:21:25+08:00" content="2015-03-02">
-              2015-03-02
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/Linux/" itemprop="url" rel="index">
-                    <span itemprop="name">Linux</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2015/03/02/rpm-yum-recover/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/03/02/rpm-yum-recover/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <h1 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h1><p>在 CentOS 6.4 x86_64 上无论通过yum或rpm安装软件时，出现以下错误：<br><figure class="highlight subunit"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">yum install glibc-devel</div><div class="line">...</div><div class="line"><span class="keyword">error: </span>rpmts_HdrFromFdno: Header V3 RSA/SHA1 Signature, key ID c105b9de: BAD</div><div class="line">...</div><div class="line">Problem opening package *.el6.x86_64.rpm</div></pre></td></tr></table></figure></p>
-<h2 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h2><p><code>rpm -ivh</code>单独去安装软件也提示上面的错误。<code>rpm -qa</code> 无法列出系统中安装过的软件包，但许多库文件和软件命令是存在的。也尝试过<code>rpm --rebuilddb</code>来重建数据库，但情况依然没有得到改善（centos官网说千万不要在系统broken的情况下rebuilddb，不然有可能变成destroy）</p>
-<p>由上面的推断可知问题出现在rpm这个软件包管理工具本身，但此时又无法通过rpm来重新安装自己，所以只能找到具体是什么因素导致的。好在官网的这篇较新的文章正好就是解决该BUG：<a href="https://www.centos.org/forums/viewtopic.php?p=214791&amp;f=13#p214791">WARNING: nss-softokn-3.14.3-19.el6_6 updates may be broken</a> ：</p>
-<p>大致是说当你使用<code>yum update</code>去更新你的系统时，<code>nss-softokn</code>、<code>nss-softokn-freebl</code>和其它软件一起都得到更新，所以不会有问题。但如果单独去更新某一个软件，如<code>yum update nss-softokn</code>或<code>yum install &lt;software&gt;</code>引起它的依赖包也升级，使得<code>nss-softokn</code>和<code>nss-softokn-freebl</code>版本不匹配，就会导致 rpm/yum 全面停止工作，表现就是上面的<code>key .. BAD</code>。</p>
-<h2 id="解决"><a href="#解决" class="headerlink" title="解决"></a>解决</h2><p>解决起来也很方便，首先你可以通过<code>cat /var/log/messages|grep nss</code>看到<code>nss-softokn-freebl</code>的版本：<br><figure class="highlight less"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"># <span class="selector-tag">cat</span> /<span class="selector-tag">var</span>/<span class="selector-tag">log</span>/<span class="selector-tag">messages</span>|<span class="selector-tag">grep</span> <span class="selector-tag">nss-softokn</span></div><div class="line"><span class="selector-tag">Mar</span>  <span class="selector-tag">2</span> <span class="selector-tag">09</span><span class="selector-pseudo">:56</span><span class="selector-pseudo">:18</span> <span class="selector-tag">poprod</span> <span class="selector-tag">yum</span><span class="selector-attr">[14920]</span>: <span class="selector-tag">Updated</span>: <span class="selector-tag">nss-softokn-3</span><span class="selector-class">.14</span><span class="selector-class">.3-19</span><span class="selector-class">.el6_6</span><span class="selector-class">.x86_64</span></div><div class="line"><span class="selector-tag">Mar</span>  <span class="selector-tag">2</span> <span class="selector-tag">14</span><span class="selector-pseudo">:43</span><span class="selector-pseudo">:29</span> <span class="selector-tag">poprod</span> <span class="selector-tag">yum</span><span class="selector-attr">[33040]</span>: <span class="selector-tag">Installed</span>: <span class="selector-tag">nss-softokn-freebl-3</span><span class="selector-class">.14</span><span class="selector-class">.3-19</span><span class="selector-class">.el6_6</span><span class="selector-class">.x86_64</span></div><div class="line"><span class="selector-tag">Mar</span>  <span class="selector-tag">2</span> <span class="selector-tag">14</span><span class="selector-pseudo">:44</span><span class="selector-pseudo">:14</span> <span class="selector-tag">poprod</span> <span class="selector-tag">yum</span><span class="selector-attr">[33047]</span>: <span class="selector-tag">Installed</span>: <span class="selector-tag">nss-softokn-freebl-3</span><span class="selector-class">.14</span><span class="selector-class">.3-19</span><span class="selector-class">.el6_6</span><span class="selector-class">.x86_64</span></div><div class="line">...</div></pre></td></tr></table></figure></p>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2015/03/02/rpm-yum-recover/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/02/28/baidu-complain/" itemprop="url">
-                  我为何厌恶百度的产品
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2015-02-28T15:21:25+08:00" content="2015-02-28">
-              2015-02-28
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/Feel/" itemprop="url" rel="index">
-                    <span itemprop="name">Feel</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2015/02/28/baidu-complain/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/02/28/baidu-complain/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-            <p>今天因为使用百度云同步盘出错，导致我的文件永远丢失，忍无可忍<strong>又</strong>给“百度倾听”发了条牢骚。</p>
-<p>事情是这样的，我在 MarkdownPad2 修改最近写的3篇文章，文章正好在百度云同步盘的同步目录下，因为一直养成了一边编辑一边<code>Ctrl+S</code>保存的习惯，难道由于这3篇文章反复修改，百度云同步盘竟然支撑不住？弹出窗口大概是说同步出错，需要重启应用（近期出现过好几次），随手点了个确定，MarkdownPad2提示我当前编辑的文件不存在，是否继续保留在窗口，反正文章修改完了，也没多想，duang，悲剧发生了，两个小星期的成果都不见了。还在失落当中……</p>
-<p>为什么叫“又”呢，因为在去年1月份的时候也在手机上使用过百度云同步盘，不记得是同步什么，也不是文件丢失。Android版有一个“仅在wifi下同步”的选项，像我这种3G流量哪够同步文件使用啊，当时还觉得挺贴心的，开着应用在后台一上午，中午吃饭拿起手看时，尼玛提示我本月流量已超50多M，也给百度意见反馈写了200多字的声讨书，结果几天后回复的内容不知是从哪摘抄的一段无价值的内容。还有一次是登录注销的问题，20多天后才回复邮件，结尾还不忘带上小米的广告，简直让用户抓狂。（邮件正文就不贴了，每每出现这样的问题都十分狂躁，不少脏话）</p>
-<p>我想这样的同步工具最多对于百度是个附属产品，并不能带来多大收益，在团队投入上并不尽心。给我自己的教诲是，选择产品或工具，不能因为公司名声大而就给予信任，一个公司能够把一件事情做好了就会迎来不错的口碑，选择它的主打产品。说到这里不得不继续吐槽了，百度搜索应该是它的命脉了，但对于我用习惯了google来说，没有条件不得不使用百度搜索，索引到的结果，唉~ 大！惊！失！色！</p>
-<p>如此种种，不得不让我怀疑百度其他产品的使用问题。</p>
-<p>无奈 Dropbox 在国内被封，也只有偶尔在家用电脑时打开VPN才能访问，被百度云同步盘伤过那么多次心之后，感觉再也不会用了，还是老老实实挂VPN吧，虽麻烦但也免去了不必要的担忧。</p>
-
-          
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/9/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/9/">9</a><span class="page-number current">10</span><a class="page-number" href="/page/11/">11</a><span class="space">&hellip;</span><a class="page-number" href="/page/18/">18</a><a class="extend next" rel="next" href="/page/11/"><i class="fa fa-angle-right"></i></a>
+    <a class="extend prev" rel="prev" href="/page/9/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/9/">9</a><span class="page-number current">10</span><a class="page-number" href="/page/11/">11</a><span class="space">&hellip;</span><a class="page-number" href="/page/19/">19</a><a class="extend next" rel="next" href="/page/11/"><i class="fa fa-angle-right"></i></a>
   </nav>
 
 
@@ -938,7 +948,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">90</span>
+              <span class="site-state-item-count">92</span>
               <span class="site-state-item-name">posts</span>
             </a>
           </div>

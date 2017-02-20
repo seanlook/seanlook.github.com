@@ -281,6 +281,283 @@
             
               
                 
+                <a class="post-title-link" href="/2015/12/14/mysql-replicas/" itemprop="url">
+                  使用 Xtrabackup 在线对MySQL做主从复制
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2015-12-14T10:21:25+08:00" content="2015-12-14">
+              2015-12-14
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/12/14/mysql-replicas/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/12/14/mysql-replicas/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h2 id="1-说明"><a href="#1-说明" class="headerlink" title="1. 说明"></a>1. 说明</h2><h3 id="1-1-xtrabackup"><a href="#1-1-xtrabackup" class="headerlink" title="1.1 xtrabackup"></a>1.1 xtrabackup</h3><p>mysqldump对于导出10G以下的数据库或几个表，还是适用的，而且更快捷。一旦数据量达到100-500G，无论是对原库的压力还是导出的性能，mysqldump就力不从心了。Percona-Xtrabackup备份工具，是实现MySQL在线热备工作的不二选择，可进行全量、增量、单表备份和还原。（但当数据量更大时，可能需要考虑分库分表，或使用 LVM 快照来加快备份速度了）</p>
+<p>2.2版本 xtrabackup 能对InnoDB和XtraDB存储引擎的数据库非阻塞地备份，innobackupex通过perl封装了一层xtrabackup，对MyISAM的备份通过加表读锁的方式实现。2.3版本 xtrabackup 命令直接支持MyISAM引擎。</p>
+<p>XtraBackup优势 ：</p>
+<ol>
+<li>无需停止数据库进行InnoDB热备</li>
+<li>增量备份MySQL</li>
+<li>流压缩到传输到其它服务器</li>
+<li>能比较容易地创建主从同步</li>
+<li>备份MySQL时不会增大服务器负载</li>
+</ol>
+<h3 id="1-2-replication"><a href="#1-2-replication" class="headerlink" title="1.2 replication"></a>1.2 replication</h3><ol>
+<li><p><strong>为什么要做主从复制？</strong><br>我想这是要在实施以前要想清楚的问题。是为了实现读写分离，减轻主库负载或数据分析？ 为了数据安全，做备份恢复？主从切换做高可用？<br>大部分场景下，以上三个问号一主一从都能够解决，而且任何生产环境都建议你至少要有一个从库，假如你的读操作压力特别大，甚至要做一主多从，还可以不同的slave扮演不同的角色，例如使用不同的索引，或者不同的存储引擎，或使用一个小内存server做slave只用于备份。（当然slave太多也会对master的负载和网络带宽造成压力，此时可以考虑级联复制，即 A-&gt;B-&gt;C ）</p>
+<p> 还有需要考虑的是，一主一从，一旦做了主从切换，不通过其它HA手段干预的话，业务访问的还是原IP，而且原主库很容易就作废了。于是 主-主 复制就产生了，凭借各自不同的 server-id ，可以避免 “A的变化同步到B，B应用变化又同步到A” 这样循环复制的问题。但建议是，主主复制，其中一个主库强制设置为只读，主从切换后架构依然是可用的。</p>
+<p> 复制过程是slave主动向master拉取，而不是master去推的，所以理想情况下做搭建主从时不需要master做出任何改变甚至停服，slave失败也不影响主库。</p>
+</li>
+</ol>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2015/12/14/mysql-replicas/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2015/11/01/nan-shan-hike/" itemprop="url">
+                  南山南
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2015-11-01T11:59:31+08:00" content="2015-11-01">
+              2015-11-01
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/生活/" itemprop="url" rel="index">
+                    <span itemprop="name">生活</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/生活/随记/" itemprop="url" rel="index">
+                    <span itemprop="name">随记</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/11/01/nan-shan-hike/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/11/01/nan-shan-hike/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>今天11月1号，深圳的天气正好从这一天凉了起来，傍晚回住处的公交车上给家里打了个电话，是爸爸接的，说家里已经有点冷了。</p>
+<p>现在对冷没什么概念了，深圳是一个没有冬天的城市，一件外套就能过冬。也就是今天起风了出门才稍稍感觉到凉，昨天还热的不行呢——那是因为去爬山了。</p>
+<p>南山，2年前来这里的第一个月就听说过，但两次上过梧桐山，上半年爬过凤凰山，就偏偏离自己最近的南山未曾到访。山虽然不高，但一直放着不去还能再找到人陪我去不成，于是就响应党组织号召，登山去。</p>
+<p>周六下午，小明从公司过去，而我从家里坐公交过去，照计划的时间应该2点半可以集合，无奈在深大转车多等了20分钟，结果是小明跟其他人一起先从海关登山口上山，先到山顶者有奖，我晚十分钟到出发点，去追他们。出乎意料，迈进登山口就一直上台阶，上啊上啊上，T恤已经全湿了，我竟然还穿着紧身牛仔裤！（其实主要考虑到晚上吃饭方便）。由于平时也打打球，体力不算太差，20分钟上到了全程海拔一半的样子，还没追上，双腿力量也下降了，正好碰到没跟上大部队的两个人，就一起走了。后半程坡也小了很多，吹来一丝微风能感觉到背上一阵凉意。此时群里已经有人到观景台发图了，但奇怪的是那么一大波上去怎么才有2个人发图，原来拼的不仅仅是体力，还有手机信号……</p>
+<p>三点半时基本上都到顶了，风景还不错，能看到深圳湾大桥（据说晚上很美），和对面的香港。</p>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/nan-hilltop.jpg" alt="nan-hilltop.jpg"></p>
+<p>团体里大部分我是认识的，有我以前的同事，和球场上认识的伙伴。虽然我已离职近4个月，但我党组织关系还在TP，也交了党费，这才有机会和他们一起出来。还有经费，号召大家买书，于是买了《摄影的艺术》《皮囊》等，小明也为他单反买了本，我看中的是他那本室内装饰和川菜食谱，嘿嘿。</p>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2015/11/01/nan-shan-hike/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
                 <a class="post-title-link" href="/2015/10/25/weekends-badminton-ktv/" itemprop="url">
                   周末腐败地
                 </a>
@@ -660,285 +937,11 @@
 
 
     
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/07/14/nice-is-not-nice/" itemprop="url">
-                  nice is not nice
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2015-07-14T00:49:31+08:00" content="2015-07-14">
-              2015-07-14
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/生活/" itemprop="url" rel="index">
-                    <span itemprop="name">生活</span>
-                  </a>
-                </span>
-
-                
-                
-                  , 
-                
-
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/生活/随记/" itemprop="url" rel="index">
-                    <span itemprop="name">随记</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2015/07/14/nice-is-not-nice/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/07/14/nice-is-not-nice/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>看到身边朋友在玩一个叫 nice 的应用，也试用了一把。</p>
-<p>从下载量来说它是LOFTER的2倍，它们都可以划分为图片社交。这样说对于网易乐乎来说是不公平的，lofter定位是轻博客，类似于国外的tumblr，生产高质量的内容，尤其是图片。（jianshu倾向于文字，类似国外的medium）</p>
-<p>而nice呢，注重图片几乎到放弃文字的地步，简单的通过打标签来注解图片，炫耀的意思不言而喻，而恰好它打的是陌生人社交的牌，大家都互相不认识，不会引起熟人间拉仇恨的嫌疑。陌生人之间也丝毫不吝啬自己的赞，这种低成本却又能给对方带来好感的点赞行为，实际都是虚伪在作怪。我因为应用要求上传了一个阿狸的头像，几分钟内也能收到十多个赞，我当时都蒙了。但是确实喜欢听到被点赞的通知，这大概能解释为什么女生偏爱这个app——全nice内容无非就是自拍照、吃的什么、逛街——无特效，不发图。</p>
-<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/nice-app.jpg" alt="nice-app.jpg"></p>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2015/07/14/nice-is-not-nice/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/07/07/ec-the-first-day/" itemprop="url">
-                  EC的第一天
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2015-07-07T00:49:31+08:00" content="2015-07-07">
-              2015-07-07
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/生活/" itemprop="url" rel="index">
-                    <span itemprop="name">生活</span>
-                  </a>
-                </span>
-
-                
-                
-                  , 
-                
-
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/生活/随记/" itemprop="url" rel="index">
-                    <span itemprop="name">随记</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2015/07/07/ec-the-first-day/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/07/07/ec-the-first-day/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>第一天入职 <a href="www.scrm.com">EC</a>，总体感觉还不错，就是不知道日后的工作怎样。eva给我们五个介绍了公司的制度和福利，公共免费wifi，下午四点下午茶有水果，办公电脑不限网（中午休息时间竟然有人直接打dota，还有看动漫的）。sunny跟我们签的2年合同。好了夸完说说其他的感受。</p>
-<p>公司产品——EC营客通。主要这一个产品，有web、PC、android、IOS平台，而且主要卖点是与腾讯qq无缝连接，同时也能连接手机通讯录、邮箱、excel，号称“连接一切”，不然怎么叫 Easy Connection 。试用了移动端，其实功能很简单:支持各种数据来源的导入，加比较全的手机通讯录功能，，再加定时提醒功能（这不是最近我在试用的 『滴答清单』的功能吗），最后是外勤签到和统计的功能。并没有多少先进的科学方法，或令人眼前一亮的新功能。</p>
-<p>PC端的功能稍微复杂一点，但界面简直就是qq的副本，没了qq秀和游戏广告。这不禁让我想到了企业qq RTX，四像四不像。我想ec存在的价值在于，让员工有意识的通过工具去区分工作和生活。至于要做中国的Salesforce，路途还非常非常遥远，因为它“不止连接”。</p>
-<p>至于我很早就了解到的纷享销客，内部培训的时候除了说方向不一样外，还有贬低对手的意思，什么操作性crm与分析型crm。试用了一把，纷享销客也有分析统计预测的功能，走的路线确实完全不一样，似乎fxiaoke更注重于流程审批、知识共享、外勤签到等功能。究竟哪一个是以后的方向，还是各自结合，还很难说。salesforce估值400多亿肯定是有它的道理，如果2年之内没达到sf现在的原型，就很难有更大发展了。</p>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2015/07/07/ec-the-first-day/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/5/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/5/">5</a><span class="page-number current">6</span><a class="page-number" href="/page/7/">7</a><span class="space">&hellip;</span><a class="page-number" href="/page/18/">18</a><a class="extend next" rel="next" href="/page/7/"><i class="fa fa-angle-right"></i></a>
+    <a class="extend prev" rel="prev" href="/page/5/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/5/">5</a><span class="page-number current">6</span><a class="page-number" href="/page/7/">7</a><span class="space">&hellip;</span><a class="page-number" href="/page/19/">19</a><a class="extend next" rel="next" href="/page/7/"><i class="fa fa-angle-right"></i></a>
   </nav>
 
 
@@ -979,7 +982,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">90</span>
+              <span class="site-state-item-count">92</span>
               <span class="site-state-item-name">posts</span>
             </a>
           </div>

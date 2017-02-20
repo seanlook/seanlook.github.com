@@ -281,6 +281,266 @@
             
               
                 
+                <a class="post-title-link" href="/2014/11/03/docker-run-container-with-shell-daemon_process/" itemprop="url">
+                  docker如何创建一个运行后台进程的容器并同时提供shell终端
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2014-11-03T20:21:25+08:00" content="2014-11-03">
+              2014-11-03
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Virtualization/" itemprop="url" rel="index">
+                    <span itemprop="name">Virtualization</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Virtualization/Docker/" itemprop="url" rel="index">
+                    <span itemprop="name">Docker</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2014/11/03/docker-run-container-with-shell-daemon_process/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2014/11/03/docker-run-container-with-shell-daemon_process/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>只看标题还不是很明显，本文实现docker的这样一种比较常用的功能：通过<code>docker run</code>启动一个容器后，容器中已经运行了一个后台进程（这里以监听80端口的nginx为例），同时进入一个shell终端可供操作，而不受限于只能在前台运行nginx与运行shell终端之间的一种。这个例子实现了，那么其他类似的运行多任务docker就可以以此类推。另外本文还提供了一种在docker容器内部安装软件（<code>vim</code>）的方法，对于定制自己需要的镜像大有帮助。<br>你可能需要先阅读<a href="hhttp://seanlook.com/2014/10/31/docker-command-best-use-1/">docker专题(2)：docker常用管理命令（上）</a>、<a href="http://seanlook.com/2014/11/05/docker-command-best-use-2/">docker专题(2)：docker常用管理命令（下）</a>来理解更多。</p>
+<h2 id="1-已经pull了官方的nginx-1-7-6的镜像（也可以从私服获取）"><a href="#1-已经pull了官方的nginx-1-7-6的镜像（也可以从私服获取）" class="headerlink" title="1. 已经pull了官方的nginx 1.7.6的镜像（也可以从私服获取）"></a>1. 已经pull了官方的<a href="https://registry.hub.docker.com/_/nginx/">nginx 1.7.6</a>的镜像（也可以从私服获取）</h2><figure class="highlight lsl"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"># docker images|grep nginx</div><div class="line">nginx              <span class="number">1.7</span><span class="number">.6</span>          <span class="number">561</span>ed4952ef0     <span class="number">10</span> days ago         <span class="number">100</span> MB</div></pre></td></tr></table></figure>
+<h2 id="2-根据官方指示启动这个容器"><a href="#2-根据官方指示启动这个容器" class="headerlink" title="2. 根据官方指示启动这个容器"></a>2. 根据官方指示启动这个容器</h2><figure class="highlight xml"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">先做好自己要显示的页面</div><div class="line"># echo "<span class="tag">&lt;<span class="name">h2</span> &gt;</span>This is nginx official container running <span class="tag">&lt;/<span class="name">h2</span>&gt;</span> <span class="tag">&lt;<span class="name">br</span> /&gt;</span> static files:/tmp/doccker/index.html" &gt; /tmp/docker/index.html</div></pre></td></tr></table></figure>
+<p>使用官方image启动一个容器，名字nginx_dist，把host的目录（包含刚才的html）映射到容器中nginx server的root，绑定80端口：</p>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2014/11/03/docker-run-container-with-shell-daemon_process/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2014/11/03/one-troubleshooting-for-centos-corrupt/" itemprop="url">
+                  记一次错误卸载软件包导致Linux系统崩溃的修复解决过程
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2014-11-03T01:21:25+08:00" content="2014-11-03">
+              2014-11-03
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2014/11/03/one-troubleshooting-for-centos-corrupt/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2014/11/03/one-troubleshooting-for-centos-corrupt/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>首先问题产生的缘由很简单，是我一同事在安装oracle一套软件时，按照要求需要binutils软件包的32位版本，然而在Oracle Linux已经装有64位，按理说是可以安装i686的，我猜应该是32位的版本低于这个已有的64位所以导致冲突而安装失败，因此同事就用<code>yum remove binutils</code>，这个命令也奇葩，由于是root权限导致依赖于它的200多个软件包也被卸载，最终导致网络断开，系统崩溃，在vSphere虚拟机上重新启动发现再也起不来。下面看问题：</p>
+<h2 id="1-Kernel-panic-not-syncing-Attempted-to-kill-init"><a href="#1-Kernel-panic-not-syncing-Attempted-to-kill-init" class="headerlink" title="1. Kernel panic - not syncing: Attempted to kill init!"></a>1. Kernel panic - not syncing: Attempted to kill init!</h2><p><img src="http://sean-images.qiniudn.com/kernel-panic.png" alt="kernel_panic"></p>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2014/11/03/one-troubleshooting-for-centos-corrupt/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
                 <a class="post-title-link" href="/2014/10/31/docker-command-best-use-1/" itemprop="url">
                   docker常用管理命令（上）
                 </a>
@@ -657,269 +917,11 @@
 
 
     
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/10/28/vsphere-recover-from-missing-vmdk/" itemprop="url">
-                  误删vSphere虚拟机.vmdk文件的恢复
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2014-10-28T15:21:25+08:00" content="2014-10-28">
-              2014-10-28
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/Virtualization/" itemprop="url" rel="index">
-                    <span itemprop="name">Virtualization</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2014/10/28/vsphere-recover-from-missing-vmdk/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2014/10/28/vsphere-recover-from-missing-vmdk/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <h2 id="1-错误描述"><a href="#1-错误描述" class="headerlink" title="1. 错误描述"></a>1. 错误描述</h2><p>在vSphere上，一次重启虚拟服务器时出现启动不了，提示找不到vmdk虚拟磁盘文件：<br><img src="http://sean-images.qiniudn.com/vmdk_not_found.png" alt="vmdk_not_found"></p>
-<h2 id="2-原因分析"><a href="#2-原因分析" class="headerlink" title="2. 原因分析"></a>2. 原因分析</h2><p>查看这台虚拟服务器的摘要信息，对比datastore上其他可用的虚拟机，发现损坏的服务器上确实缺少一个vmdk磁盘文件，但是可以看见一个50G的<code>xxx-flat.vmdk</code>文件；而正常的服务器只有<code>xxx.vmdk</code>，没有<code>xxx-flat.vmdk</code>，关机之后两个文件都存在，而且真实的磁盘容量从vmdk转移到了<code>xxx-flat.vmdk</code>。<br>虚拟主机在运行的时候，实际在使用的是<code>xxx-flat.vmdk</code>，然而<code>xxx.vmdk</code>是可以同时被删除的，才导致了问题。</p>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2014/10/28/vsphere-recover-from-missing-vmdk/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/10/26/docker-installed-centos6-successfully/" itemprop="url">
-                  在 CentOS 6.x上安装 docker.io成功
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2014-10-26T19:45:25+08:00" content="2014-10-26">
-              2014-10-26
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/Virtualization/" itemprop="url" rel="index">
-                    <span itemprop="name">Virtualization</span>
-                  </a>
-                </span>
-
-                
-                
-                  , 
-                
-
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/Virtualization/Docker/" itemprop="url" rel="index">
-                    <span itemprop="name">Docker</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2014/10/26/docker-installed-centos6-successfully/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2014/10/26/docker-installed-centos6-successfully/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>docker是什么就不多说了，见<a href="http://seanlook.com/2014/12/18/docker-introduction/">docker基础原理介绍</a>。<br>docker容器最早受到RHEL完善的支持是从最近的CentOS 7.0开始的，官方说明是只能运行于64位架构平台，内核版本为2.6.32-431及以上（即&gt;=CentOS 6.5，运行docker时实际提示3.8.0及以上），升级内核请参考<a href="http://seanlook.com/2014/10/24/upgrade-centos6_kernel-to-3.10.x/">CentOS 6.x 内核升级（2.6.32 -&gt; 3.10.58）过程记录</a><br>需要注意的是CentOS 6.5与7.0的安装是有一点点不同的，CentOS-6上docker的安装包叫docker-io，并且来源于Fedora epel库，这个仓库维护了大量的没有包含在发行版中的软件，所以先要安装EPEL，而CentOS-7的docker直接包含在官方镜像源的Extras仓库（CentOS-Base.repo下的[extras]节enable=1启用）。前提是都需要联网，具体安装过程如下。</p>
-<p>###1. 禁用selinux###<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># getenforce</span></div><div class="line">enforcing</div><div class="line"><span class="comment"># setenforce 0</span></div><div class="line">permissive</div><div class="line"><span class="comment"># vi /etc/selinux/config</span></div><div class="line">SELINUX=disabled</div><div class="line">...</div></pre></td></tr></table></figure></p>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2014/10/26/docker-installed-centos6-successfully/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/15/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/15/">15</a><span class="page-number current">16</span><a class="page-number" href="/page/17/">17</a><a class="page-number" href="/page/18/">18</a><a class="extend next" rel="next" href="/page/17/"><i class="fa fa-angle-right"></i></a>
+    <a class="extend prev" rel="prev" href="/page/15/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/15/">15</a><span class="page-number current">16</span><a class="page-number" href="/page/17/">17</a><span class="space">&hellip;</span><a class="page-number" href="/page/19/">19</a><a class="extend next" rel="next" href="/page/17/"><i class="fa fa-angle-right"></i></a>
   </nav>
 
 
@@ -960,7 +962,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">90</span>
+              <span class="site-state-item-count">92</span>
               <span class="site-state-item-name">posts</span>
             </a>
           </div>

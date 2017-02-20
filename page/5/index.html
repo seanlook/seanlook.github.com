@@ -281,6 +281,261 @@
             
               
                 
+                <a class="post-title-link" href="/2016/04/22/mysql-sql-mode-troubleshooting/" itemprop="url">
+                  MySQL sql_mode 说明（及处理一起 sql_mode 引发的问题）
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2016-04-22T16:32:49+08:00" content="2016-04-22">
+              2016-04-22
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/04/22/mysql-sql-mode-troubleshooting/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/04/22/mysql-sql-mode-troubleshooting/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h2 id="1-MySQL莫名变成了-Strict-SQL-Mode"><a href="#1-MySQL莫名变成了-Strict-SQL-Mode" class="headerlink" title="1. MySQL莫名变成了 Strict SQL Mode"></a>1. MySQL莫名变成了 Strict SQL Mode</h2><p>最近测试组那边反应数据库部分写入失败，app层提示是插入成功，但表里面里面没有产生数据，而两个写入操作的另外一个表有数据。因为 insert 失败在数据库层面是看不出来的，于是找php的同事看下错误信息：</p>
+<figure class="highlight rust"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">[<span class="literal">Err</span>] <span class="number">1364</span> - Field `f_company_id` doesn<span class="symbol">'t</span> have a <span class="keyword">default</span> value</div></pre></td></tr></table></figure>
+<p>很明显2个 insert 操作，第一条成功，第二条失败了，但因为没有控制在一个事务当中，导致app里面依然提示成功，这是客户入库操作，心想如果线上也有这个问题得是多大的代价。</p>
+<p>不说开发的问题，好端端的mysql怎么突然就部分表写入失败呢？根据上面的问题很快能猜到是 sql_mode 问题： NOT NULL 列没有默认值但代码里也没给值，在非严格模式下，int列默认为0，string列默认为’’了，所以不成问题；但在严格模式下，是直接返回失败的。</p>
+<p>一看，果然：<br><figure class="highlight asciidoc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="section">mysql&gt; show variables like "sql_mode";</div><div class="line">+---------------+--------------------------------------------+</span></div><div class="line"><span class="section">| Variable_name | Value                                      |</div><div class="line">+---------------+--------------------------------------------+</span></div><div class="line"><span class="section">| sql_mode      | STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION |</div><div class="line">+---------------+--------------------------------------------+</span></div></pre></td></tr></table></figure></p>
+<p>但是一直是没问题的的，就突然出现了，有谁会去改 sql_mode 呢，生产环境产生这个问题的风险有多大？所以必须揪出来。</p>
+<p>先 <code>set global sql_mode=&#39;&#39;</code> ，让他们用着先（文后会给解决问题根本的办法），同时打开general_log看是哪一个用户有类似设置 sql_mode 命令：<br><figure class="highlight basic"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"><span class="symbol">1134456 </span>Query   SET autocommit=<span class="number">1</span></div><div class="line"><span class="symbol">1134456 </span>Query   Set sql_mode=<span class="comment">'NO_ENGINE_SUBSITUTION,STRICT_TRANS_TABLES'</span></div><div class="line"><span class="symbol">1134457 </span>Connect ecuser@<span class="number">10.0.200.173</span> <span class="keyword">on</span></div><div class="line"><span class="symbol">1134457 </span>Query   /* mysql-connector-java-<span class="number">5.1.35</span> ...</div></pre></td></tr></table></figure></p>
+<p>看出是java组那边哪个框架建立连接的时候使用设置了sql_mode，但这是session级别的，不影响php那边用户的连接。</p>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2016/04/22/mysql-sql-mode-troubleshooting/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2016/04/05/mysql-avoid-or-query/" itemprop="url">
+                  MySQL避免索引列使用 OR 条件
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2016-04-05T16:32:49+08:00" content="2016-04-05">
+              2016-04-05
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/04/05/mysql-avoid-or-query/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/04/05/mysql-avoid-or-query/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>这个亏已经吃过很多次了，在开发以前的sql代码里面，许多以 or 作为where条件的查询，甚至更新。这里举例来说明使用 or 的弊端，以及改进办法。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">select</span> f_crm_id <span class="keyword">from</span> d_dbname1.t_tbname1 <span class="keyword">where</span>  f_xxx_id = <span class="number">926067</span>  </div><div class="line"><span class="keyword">and</span> (f_mobile =<span class="string">'1234567891'</span> <span class="keyword">or</span> f_phone =<span class="string">'1234567891'</span> ) <span class="keyword">limit</span> <span class="number">1</span></div></pre></td></tr></table></figure>
+<p>从查询语句很容易看出，f_mobile和f_phone两个字段都有可能存电话号码，一般思路都是用 or 去一条sql解决，但表数据量一大简直是灾难：<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-avoid-or-1.png" alt=""></p>
+<p>t_tbanme1上有索引<code>idx_id_mobile(f_xxx_id,f_mobile)</code>, <code>idx_phone(f_phone)</code>,<code>idx_id_email(f_id,f_email)</code>，explain 的结果却使用了 idx_id_email 索引，有时候运气好可能走 idx_id_mobile f_xxx_id</p>
+<p><strong>因为mysql的每条查询，每个表上只能选择一个索引</strong>。如果使用了 idx_id_mobile 索引，恰好有一条数据，因为有 limit 1 ，那么恭喜很快得到结果；但如果 f_mobile 没有数据，那 f_phone 字段只能在f_id条件下挨个查找，扫描12w行。 or 跟 and 不一样，甚至有开发认为添加 <code>(f_xxx_id,f_mobile,f_phone)</code>不就完美了吗，要吐血了~<br>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2016/04/05/mysql-avoid-or-query/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
                 <a class="post-title-link" href="/2016/03/28/mysql-sysbench/" itemprop="url">
                   使用sysbench对mysql压力测试
                 </a>
@@ -666,288 +921,11 @@
 
 
     
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/12/14/mysql-replicas/" itemprop="url">
-                  使用 Xtrabackup 在线对MySQL做主从复制
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2015-12-14T10:21:25+08:00" content="2015-12-14">
-              2015-12-14
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2015/12/14/mysql-replicas/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/12/14/mysql-replicas/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <h2 id="1-说明"><a href="#1-说明" class="headerlink" title="1. 说明"></a>1. 说明</h2><h3 id="1-1-xtrabackup"><a href="#1-1-xtrabackup" class="headerlink" title="1.1 xtrabackup"></a>1.1 xtrabackup</h3><p>mysqldump对于导出10G以下的数据库或几个表，还是适用的，而且更快捷。一旦数据量达到100-500G，无论是对原库的压力还是导出的性能，mysqldump就力不从心了。Percona-Xtrabackup备份工具，是实现MySQL在线热备工作的不二选择，可进行全量、增量、单表备份和还原。（但当数据量更大时，可能需要考虑分库分表，或使用 LVM 快照来加快备份速度了）</p>
-<p>2.2版本 xtrabackup 能对InnoDB和XtraDB存储引擎的数据库非阻塞地备份，innobackupex通过perl封装了一层xtrabackup，对MyISAM的备份通过加表读锁的方式实现。2.3版本 xtrabackup 命令直接支持MyISAM引擎。</p>
-<p>XtraBackup优势 ：</p>
-<ol>
-<li>无需停止数据库进行InnoDB热备</li>
-<li>增量备份MySQL</li>
-<li>流压缩到传输到其它服务器</li>
-<li>能比较容易地创建主从同步</li>
-<li>备份MySQL时不会增大服务器负载</li>
-</ol>
-<h3 id="1-2-replication"><a href="#1-2-replication" class="headerlink" title="1.2 replication"></a>1.2 replication</h3><ol>
-<li><p><strong>为什么要做主从复制？</strong><br>我想这是要在实施以前要想清楚的问题。是为了实现读写分离，减轻主库负载或数据分析？ 为了数据安全，做备份恢复？主从切换做高可用？<br>大部分场景下，以上三个问号一主一从都能够解决，而且任何生产环境都建议你至少要有一个从库，假如你的读操作压力特别大，甚至要做一主多从，还可以不同的slave扮演不同的角色，例如使用不同的索引，或者不同的存储引擎，或使用一个小内存server做slave只用于备份。（当然slave太多也会对master的负载和网络带宽造成压力，此时可以考虑级联复制，即 A-&gt;B-&gt;C ）</p>
-<p> 还有需要考虑的是，一主一从，一旦做了主从切换，不通过其它HA手段干预的话，业务访问的还是原IP，而且原主库很容易就作废了。于是 主-主 复制就产生了，凭借各自不同的 server-id ，可以避免 “A的变化同步到B，B应用变化又同步到A” 这样循环复制的问题。但建议是，主主复制，其中一个主库强制设置为只读，主从切换后架构依然是可用的。</p>
-<p> 复制过程是slave主动向master拉取，而不是master去推的，所以理想情况下做搭建主从时不需要master做出任何改变甚至停服，slave失败也不影响主库。</p>
-</li>
-</ol>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2015/12/14/mysql-replicas/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/11/01/nan-shan-hike/" itemprop="url">
-                  南山南
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2015-11-01T11:59:31+08:00" content="2015-11-01">
-              2015-11-01
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/生活/" itemprop="url" rel="index">
-                    <span itemprop="name">生活</span>
-                  </a>
-                </span>
-
-                
-                
-                  , 
-                
-
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/生活/随记/" itemprop="url" rel="index">
-                    <span itemprop="name">随记</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2015/11/01/nan-shan-hike/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/11/01/nan-shan-hike/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>今天11月1号，深圳的天气正好从这一天凉了起来，傍晚回住处的公交车上给家里打了个电话，是爸爸接的，说家里已经有点冷了。</p>
-<p>现在对冷没什么概念了，深圳是一个没有冬天的城市，一件外套就能过冬。也就是今天起风了出门才稍稍感觉到凉，昨天还热的不行呢——那是因为去爬山了。</p>
-<p>南山，2年前来这里的第一个月就听说过，但两次上过梧桐山，上半年爬过凤凰山，就偏偏离自己最近的南山未曾到访。山虽然不高，但一直放着不去还能再找到人陪我去不成，于是就响应党组织号召，登山去。</p>
-<p>周六下午，小明从公司过去，而我从家里坐公交过去，照计划的时间应该2点半可以集合，无奈在深大转车多等了20分钟，结果是小明跟其他人一起先从海关登山口上山，先到山顶者有奖，我晚十分钟到出发点，去追他们。出乎意料，迈进登山口就一直上台阶，上啊上啊上，T恤已经全湿了，我竟然还穿着紧身牛仔裤！（其实主要考虑到晚上吃饭方便）。由于平时也打打球，体力不算太差，20分钟上到了全程海拔一半的样子，还没追上，双腿力量也下降了，正好碰到没跟上大部队的两个人，就一起走了。后半程坡也小了很多，吹来一丝微风能感觉到背上一阵凉意。此时群里已经有人到观景台发图了，但奇怪的是那么一大波上去怎么才有2个人发图，原来拼的不仅仅是体力，还有手机信号……</p>
-<p>三点半时基本上都到顶了，风景还不错，能看到深圳湾大桥（据说晚上很美），和对面的香港。</p>
-<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/nan-hilltop.jpg" alt="nan-hilltop.jpg"></p>
-<p>团体里大部分我是认识的，有我以前的同事，和球场上认识的伙伴。虽然我已离职近4个月，但我党组织关系还在TP，也交了党费，这才有机会和他们一起出来。还有经费，号召大家买书，于是买了《摄影的艺术》《皮囊》等，小明也为他单反买了本，我看中的是他那本室内装饰和川菜食谱，嘿嘿。</p>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2015/11/01/nan-shan-hike/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/4/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/4/">4</a><span class="page-number current">5</span><a class="page-number" href="/page/6/">6</a><span class="space">&hellip;</span><a class="page-number" href="/page/18/">18</a><a class="extend next" rel="next" href="/page/6/"><i class="fa fa-angle-right"></i></a>
+    <a class="extend prev" rel="prev" href="/page/4/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/4/">4</a><span class="page-number current">5</span><a class="page-number" href="/page/6/">6</a><span class="space">&hellip;</span><a class="page-number" href="/page/19/">19</a><a class="extend next" rel="next" href="/page/6/"><i class="fa fa-angle-right"></i></a>
   </nav>
 
 
@@ -988,7 +966,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">90</span>
+              <span class="site-state-item-count">92</span>
               <span class="site-state-item-name">posts</span>
             </a>
           </div>
