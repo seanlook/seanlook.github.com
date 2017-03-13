@@ -281,6 +281,137 @@
             
               
                 
+                <a class="post-title-link" href="/2016/09/03/diffs-between-rr-and-rc-trx_isolation_level/" itemprop="url">
+                  READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2016-09-03T16:32:49+08:00" content="2016-09-03">
+              2016-09-03
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/09/03/diffs-between-rr-and-rc-trx_isolation_level/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/09/03/diffs-between-rr-and-rc-trx_isolation_level/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>经常会被问到 InnoDB隔离级别中 READ-COMMITED和REPEATABLE-READ 的区别，今天就整理了一下，不再从“脏读”、“幻读”这样的名词解释一样去回答了。</p>
+<h2 id="1-行锁"><a href="#1-行锁" class="headerlink" title="1. 行锁"></a>1. 行锁</h2><p>InnoDB行锁实际锁的是索引记录，为了防止死锁的产生以及维护所需要的隔离级别，在执行sql语句的全过程中，innodb必须对所需要修改的行每条索引记录上锁。如此一来，如果你执行的 UPDATE 没有很好的索引，那么会导致锁定许多行：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">update</span> employees <span class="keyword">set</span> store_id = <span class="number">0</span> <span class="keyword">where</span> store_id = <span class="number">1</span>;</div><div class="line"><span class="comment">---TRANSACTION 1EAB04, ACTIVE 7 sec</span></div><div class="line">633 <span class="keyword">lock</span> <span class="keyword">struct</span>(s), &lt;strong&gt;<span class="keyword">heap</span> <span class="keyword">size</span> <span class="number">96696</span>&lt;/strong&gt;, <span class="number">218786</span> <span class="keyword">row</span> <span class="keyword">lock</span>(s), <span class="keyword">undo</span> <span class="keyword">log</span> entries <span class="number">1</span></div><div class="line">MySQL <span class="keyword">thread</span> <span class="keyword">id</span> <span class="number">4</span>, OS <span class="keyword">thread</span> handle <span class="number">0x7f8dfc35d700</span>, <span class="keyword">query</span> <span class="keyword">id</span> <span class="number">47</span> localhost root</div><div class="line"><span class="keyword">show</span> <span class="keyword">engine</span> <span class="keyword">innodb</span> <span class="keyword">status</span></div></pre></td></tr></table></figure></p>
+<p>上面的 <code>employees</code> 表 <code>store_id</code> 列没有索引。注意 UPDATE 已经执行完成（没有提交），但依然有 218786 个行锁没有释放，还有一个undo记录。这意味着只有一行被更改，但却持有了额外的锁。堆大小（heap size）代表了分配给锁使用的内存数量。</p>
+<p>在 REPEATABLE-READ 级别，事务持有的 <strong>每个锁</strong> 在整个事务期间一直被持有。</p>
+<p>在 READ-COMMITED 级别，事务里面特定语句结束之后，不匹配该sql语句扫描条件的锁，会被释放。</p>
+<p>下面是上述相同的 UPDATE 在 READ-COMMITED 级别下的结果：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"><span class="comment">---TRANSACTION 1EAB06, ACTIVE 11 sec</span></div><div class="line">631 <span class="keyword">lock</span> <span class="keyword">struct</span>(s), &lt;strong&gt;<span class="keyword">heap</span> <span class="keyword">size</span> <span class="number">96696</span>&lt;/strong&gt;, <span class="number">1</span> <span class="keyword">row</span> <span class="keyword">lock</span>(s), <span class="keyword">undo</span> <span class="keyword">log</span> entries <span class="number">1</span></div><div class="line">MySQL <span class="keyword">thread</span> <span class="keyword">id</span> <span class="number">4</span>, OS <span class="keyword">thread</span> handle <span class="number">0x7f8dfc35d700</span>, <span class="keyword">query</span> <span class="keyword">id</span> <span class="number">62</span> localhost root</div><div class="line"><span class="keyword">show</span> <span class="keyword">engine</span> <span class="keyword">innodb</span> <span class="keyword">status</span></div></pre></td></tr></table></figure></p>
+<p>可以看到 heap size 没有变化，但是现在我们只持有一个行锁。无论什么隔离级别下，InnoDB 会为扫描过的每条索引记录创建锁，不同的是在 RC 模式，一旦语句执行完毕（事务未必完成），不符合扫描条件的记录上的锁会被随即释放。释放这些锁后，堆内存并不会马上释放，所以heap size看到与 RR 模式是一样的，但是持有的锁数量明显小了很多。</p>
+<p>这也就意味着在 RC 级别下的事务A，只要A的UPDATE <strong>语句</strong> 完成了，其它事务可以修改A中也扫描过的行，但在 RR 级别下不允许。</p>
+<h2 id="2-Read-View"><a href="#2-Read-View" class="headerlink" title="2. Read View"></a>2. Read View</h2><h3 id="REPEATABLE-READ"><a href="#REPEATABLE-READ" class="headerlink" title="REPEATABLE-READ"></a>REPEATABLE-READ</h3><p>在 REPEATABLE-READ 级别，<em>read view</em> 对象在事务一开启就被创建，这个一致性快照在整个事务期间一直保持打开。在同一个事务里，前后间隔几个小时执行一遍相同的 SELECT，你会得到完全一样的结果，这就是所谓的 MVCC (multiple version concurrency control)，它是通过行版本号和UNDO段来实现的。</p>
+<p>在 REPEATABLE-READ 级别， InnoDB会为范围扫描创建间隙锁（gap locks）：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">select</span> * <span class="keyword">from</span> some_table <span class="keyword">where</span> <span class="keyword">id</span> &gt; <span class="number">100</span> <span class="keyword">FOR</span> <span class="keyword">UPDATE</span>;</div></pre></td></tr></table></figure></p>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2016/09/03/diffs-between-rr-and-rc-trx_isolation_level/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
                 <a class="post-title-link" href="/2016/08/30/mysql-ppt-trx_isolation-lock/" itemprop="url">
                   浅析MySQL事务隔离级别与锁 分享
                 </a>
@@ -551,6 +682,128 @@
             
               
                 
+                <a class="post-title-link" href="/2016/05/27/mysql-pt-osc-add-primarykey/" itemprop="url">
+                  使用pt-osc修改主键时注意
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2016-05-27T16:32:49+08:00" content="2016-05-27">
+              2016-05-27
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/05/27/mysql-pt-osc-add-primarykey/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/05/27/mysql-pt-osc-add-primarykey/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：<br><figure class="highlight applescript"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">原表上有个复合主键，现在要添加一个自增<span class="built_in">id</span>作为主键，如何进行</div></pre></td></tr></table></figure></p>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2016/05/27/mysql-pt-osc-add-primarykey/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
                 <a class="post-title-link" href="/2016/05/27/mysql-pt-online-schema-change/" itemprop="url">
                   pt-online-schema-change使用说明、限制与比较
                 </a>
@@ -682,275 +935,6 @@
 
 
     
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2016/05/27/mysql-pt-osc-add-primarykey/" itemprop="url">
-                  使用pt-osc修改主键时注意
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2016-05-27T16:32:49+08:00" content="2016-05-27">
-              2016-05-27
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2016/05/27/mysql-pt-osc-add-primarykey/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/05/27/mysql-pt-osc-add-primarykey/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：<br><figure class="highlight applescript"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">原表上有个复合主键，现在要添加一个自增<span class="built_in">id</span>作为主键，如何进行</div></pre></td></tr></table></figure></p>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2016/05/27/mysql-pt-osc-add-primarykey/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2016/05/24/mysql-online-ddl-concept/" itemprop="url">
-                  mysql 5.6 原生Online DDL解析
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2016-05-24T16:32:49+08:00" content="2016-05-24">
-              2016-05-24
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2016/05/24/mysql-online-ddl-concept/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/05/24/mysql-online-ddl-concept/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>做MySQL的都知道，数据库操作里面，DDL操作（比如CREATE,DROP,ALTER等）代价是非常高的，特别是在单表上千万的情况下，加个索引或改个列类型，就有可能堵塞整个表的读写。</p>
-<p>然后 mysql 5.6 开始，大家期待的Online DDL出现了，可以实现修改表结构的同时，依然允许DML操作(select,insert,update,delete)。在这个特性出现以前，用的比较多的工具是<code>pt-online-schema-change</code>，比较请参考<a href="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change">pt-online-schema-change使用说明、限制与比较</a>或 <a href="http://www.fromdual.ch/online-ddl_vs_pt-online-schema-change">ONLINE DDL VS PT-ONLINE-SCHEMA-CHANGE</a> 。</p>
-<h2 id="1-Online-DDL"><a href="#1-Online-DDL" class="headerlink" title="1. Online DDL"></a>1. Online DDL</h2><p>在 MySQL 5.1 （带InnoDB Plugin）和5.5中，有个新特性叫 Fast Index Creation（下称 FIC），就是在添加或者删除二级<strong>索引</strong>的时候，可以不用复制原表。对于之前的版本对于索引的添加删除这类DDL操作，MySQL数据库的操作过程为如下：</p>
-<ol>
-<li>首先新建Temp table，表结构是 ALTAR TABLE 新定义的结构</li>
-<li>然后把原表中数据导入到这个Temp table</li>
-<li>删除原表</li>
-<li>最后把临时表rename为原来的表名</li>
-</ol>
-<p>为了保持数据的一致性，中间复制数据（Copy Table）全程锁表只读，如果有写请求进来将无法提供服务，连接数爆张。</p>
-<p>引入FIC之后，创建二级索引时会对原表加上一个S锁，创建过程不需要重建表（no-rebuild）；删除InnoDB二级索引只需要更新内部视图，并标记这个索引的空间可用，去掉数据库元数据上该索引的定义即可。这个过程也只允许读操作，不能写入，但大大加快了修改索引的速度（不含主键索引，InnoDB IOT的特性决定了修改主键依然需要 Copy Table ）。</p>
-<p>FIC只对索引的创建删除有效，MySQL 5.6 Online DDL把这种特性扩展到了添加列、删除列、修改列类型、列重命名、设置默认值等等，实际效果要看所使用的选项和操作类别来定。</p>
-<h3 id="1-1-Online-DDL选项"><a href="#1-1-Online-DDL选项" class="headerlink" title="1.1 Online DDL选项"></a>1.1 Online DDL选项</h3><p>MySQL 在线DDL分为 <code>INPLACE</code> 和 <code>COPY</code> 两种方式，通过在ALTER语句的ALGORITHM参数指定。</p>
-<ul>
-<li><code>ALGORITHM=INPLACE</code>，可以避免重建表带来的IO和CPU消耗，保证ddl期间依然有良好的性能和并发。</li>
-<li><code>ALGORITHM=COPY</code>，需要拷贝原始表，所以不允许并发DML写操作，可读。这种copy方式的效率还是不如 inplace ，因为前者需要记录undo和redo log，而且因为临时占用buffer pool引起短时间内性能受影响。</li>
-</ul>
-<p>上面只是 Online DDL 内部的实现方式，此外还有 LOCK 选项控制是否锁表，根据不同的DDL操作类型有不同的表现：默认mysql尽可能不去锁表，但是像修改主键这样的昂贵操作不得不选择锁表。</p>
-<ul>
-<li><code>LOCK=NONE</code>，即DDL期间允许并发读写涉及的表，比如为了保证 ALTER TABLE 时不影响用户注册或支付，可以明确指定，好处是如果不幸该 alter语句不支持对该表的继续写入，则会提示失败，而不会直接发到库上执行。<code>ALGORITHM=COPY</code>默认LOCK级别</li>
-<li><code>LOCK=SHARED</code>，即DDL期间表上的写操作会被阻塞，但不影响读取。</li>
-<li><code>LOCK=DEFAULT</code>，让mysql自己去判断lock的模式，原则是mysql尽可能不去锁表</li>
-<li><code>LOCK=EXCLUSIVE</code>，即DDL期间该表不可用，堵塞任何读写请求。如果你想alter操作在最短的时间内完成，或者表短时间内不可用能接受，可以手动指定。</li>
-</ul>
-<p>但是有一点需要说明，无论任何模式下，online ddl开始之前都需要一个短时间排它锁(exclusive)来准备环境，所以alter命令发出后，会首先等待该表上的其它操作完成，在alter命令之后的请求会出现等待<code>waiting meta data lock</code>。同样在ddl结束之前，也要等待alter期间所有的事务完成，也会堵塞一小段时间。所以尽量在ALTER TABLE之前确保没有大事务在执行，否则一样出现连环锁表。</p>
-<h3 id="1-2-考虑不同的DDL操作类别"><a href="#1-2-考虑不同的DDL操作类别" class="headerlink" title="1.2 考虑不同的DDL操作类别"></a>1.2 考虑不同的DDL操作类别</h3><p>从上面的介绍可以看出，不是5.6支持在线ddl就可以随心所欲的alter table，锁不锁表要看情况：</p>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2016/05/24/mysql-online-ddl-concept/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -996,7 +980,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">92</span>
+              <span class="site-state-item-count">93</span>
               <span class="site-state-item-name">posts</span>
             </a>
           </div>

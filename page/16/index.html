@@ -281,6 +281,143 @@
             
               
                 
+                <a class="post-title-link" href="/2014/11/05/docker-command-best-use-2/" itemprop="url">
+                  docker常用管理命令（下）
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2014-11-05T16:21:25+08:00" content="2014-11-05">
+              2014-11-05
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Virtualization/" itemprop="url" rel="index">
+                    <span itemprop="name">Virtualization</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Virtualization/Docker/" itemprop="url" rel="index">
+                    <span itemprop="name">Docker</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2014/11/05/docker-command-best-use-2/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2014/11/05/docker-command-best-use-2/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>本文承接<a href="http://seanlook.com/2014/10/31/docker-command-best-use-1/">docker专题(2)：docker常用管理命令（上）</a>。</p>
+<h3 id="1-开启-停止-重启container（start-stop-restart）"><a href="#1-开启-停止-重启container（start-stop-restart）" class="headerlink" title="1. 开启/停止/重启container（start/stop/restart）"></a>1. 开启/停止/重启container（start/stop/restart）</h3><p>容器可以通过<code>run</code>新建一个来运行，也可以重新<code>start</code>已经停止的container，但<code>start</code>不能够再指定容器启动时运行的指令，因为docker只能有一个前台进程。<br>容器stop（或<code>Ctrl+D</code>）时，会在保存当前容器的状态之后退出，下次start时保有上次关闭时更改。而且每次进入<code>attach</code>进去的界面是一样的，与第一次run启动或commit提交的时刻相同。<br><figure class="highlight elixir"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">CONTAINER_ID=<span class="variable">$(</span>docker start &lt;containner_id&gt;)</div><div class="line">docker stop <span class="variable">$CONTAINER_ID</span></div><div class="line">docker restart <span class="variable">$CONTAINER_ID</span></div></pre></td></tr></table></figure></p>
+<p>关于这几个命令可以通过一个完整的实例使用：<a href="http://seanlook.com/2014/11/03/docker-run-container-with-shell-daemon_process/">docker如何创建一个运行后台进程的容器并同时提供shell终端</a>。</p>
+<h3 id="2-连接到正在运行中的container（attach）"><a href="#2-连接到正在运行中的container（attach）" class="headerlink" title="2. 连接到正在运行中的container（attach）"></a>2. 连接到正在运行中的container（attach）</h3><p>要<code>attach</code>上去的容器必须正在运行，可以同时连接上同一个container来共享屏幕（与<code>screen</code>命令的attach类似）。<br>官方文档中说<code>attach</code>后可以通过<code>CTRL-C</code>来detach，但实际上经过我的测试，如果container当前在运行bash，<code>CTRL-C</code>自然是当前行的输入，没有退出；如果container当前正在前台运行进程，如输出nginx的access.log日志，<code>CTRL-C</code>不仅会导致退出容器，而且还stop了。这不是我们想要的，detach的意思按理应该是脱离容器终端，但容器依然运行。好在<code>attach</code>是可以带上<code>--sig-proxy=false</code>来确保<code>CTRL-D</code>或<code>CTRL-C</code>不会关闭容器。</p>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2014/11/05/docker-command-best-use-2/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
                 <a class="post-title-link" href="/2014/11/03/docker-run-container-with-shell-daemon_process/" itemprop="url">
                   docker如何创建一个运行后台进程的容器并同时提供shell终端
                 </a>
@@ -782,141 +919,6 @@
 
 
     
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/10/29/apache-3tomcat-cluster-jk-memcached/" itemprop="url">
-                  apache+3tomcat+jk+memcached集群环境搭建
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2014-10-29T10:21:25+08:00" content="2014-10-29">
-              2014-10-29
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/Linux/" itemprop="url" rel="index">
-                    <span itemprop="name">Linux</span>
-                  </a>
-                </span>
-
-                
-                
-                  , 
-                
-
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/Linux/Web-Server/" itemprop="url" rel="index">
-                    <span itemprop="name">Web_Server</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2014/10/29/apache-3tomcat-cluster-jk-memcached/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2014/10/29/apache-3tomcat-cluster-jk-memcached/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>注意本文不讨论原理，只讲述具体的搭建过程，而且步骤都经过了整理，否则过程可能会出现其他异常，请自行google。apache与tomcat整合的方式除了jk之外，使用apache自带的mod_ajp_proxy模块也可以很方便的完成。<br>先来看一下架构图：<br><img src="http://sean-images.qiniudn.com/apache_tomcat_cluster_msm.png" alt="apache_tomcat_cluster_msm"><br>属于正式环境中原session复制方案的改进。</p>
-<h1 id="1-所需软件包"><a href="#1-所需软件包" class="headerlink" title="1. 所需软件包"></a>1. 所需软件包</h1><figure class="highlight css"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line"><span class="selector-tag">jrrt-3</span><span class="selector-class">.1</span><span class="selector-class">.2-1</span><span class="selector-class">.6</span><span class="selector-class">.0-linux-x64</span><span class="selector-class">.bin</span>（或<span class="selector-tag">jdk1</span><span class="selector-class">.6</span><span class="selector-class">.0_33</span>）   <span class="selector-tag">jvm</span></div><div class="line"><span class="selector-tag">httpd-2</span><span class="selector-class">.2</span><span class="selector-class">.26</span><span class="selector-class">.tar</span><span class="selector-class">.gz</span>                              <span class="selector-tag">web</span>服务器，处理静态资源</div><div class="line"><span class="selector-tag">apache-tomcat-6</span><span class="selector-class">.0</span><span class="selector-class">.32</span><span class="selector-class">.tar</span><span class="selector-class">.gz</span>                      应用服务器，<span class="selector-tag">Servlet</span>容器处理动态请求</div><div class="line"><span class="selector-tag">tomcat-connectors-1</span><span class="selector-class">.2</span><span class="selector-class">.30-src</span><span class="selector-class">.tar</span><span class="selector-class">.gz</span>              <span class="selector-tag">apache</span>与<span class="selector-tag">tomcat</span>整合插件<span class="selector-tag">mod_jk</span><span class="selector-class">.so</span></div><div class="line"><span class="selector-tag">tomcat-native</span><span class="selector-class">.tar</span><span class="selector-class">.gz</span>                             <span class="selector-tag">APR</span>加速<span class="selector-tag">tomcat</span>，提高线程并发能力。使用<span class="selector-tag">tomcat</span>自带版本。</div><div class="line"><span class="selector-tag">memcached-session-manager</span>                        使用<span class="selector-tag">msm</span>解决多<span class="selector-tag">tomcat</span>集群时<span class="selector-tag">session</span>同步问题所需<span class="selector-tag">jar</span>包</div><div class="line">    <span class="selector-tag">asm-3</span><span class="selector-class">.2</span><span class="selector-class">.jar</span>, <span class="selector-tag">couchbase-client-1</span><span class="selector-class">.2</span><span class="selector-class">.2</span><span class="selector-class">.jar</span>, </div><div class="line">    <span class="selector-tag">kryo-1</span><span class="selector-class">.04</span><span class="selector-class">.jar</span>, <span class="selector-tag">kryo-serializers-0</span><span class="selector-class">.11</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">msm-kryo-serializer-1</span><span class="selector-class">.6</span><span class="selector-class">.5</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">memcached-session-manager-1</span><span class="selector-class">.6</span><span class="selector-class">.5</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">memcached-session-manager-tc6-1</span><span class="selector-class">.6</span><span class="selector-class">.5</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">minlog-1</span><span class="selector-class">.2</span><span class="selector-class">.jar</span>, <span class="selector-tag">reflectasm-1</span><span class="selector-class">.01</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">spymemcached-2</span><span class="selector-class">.10</span><span class="selector-class">.2</span><span class="selector-class">.jar</span></div></pre></td></tr></table></figure>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2014/10/29/apache-3tomcat-cluster-jk-memcached/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -962,7 +964,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">92</span>
+              <span class="site-state-item-count">93</span>
               <span class="site-state-item-name">posts</span>
             </a>
           </div>

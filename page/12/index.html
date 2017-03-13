@@ -281,6 +281,138 @@
             
               
                 
+                <a class="post-title-link" href="/2015/01/29/shell-batch-replace-files-from-rar-zip/" itemprop="url">
+                  Linux下rar及zip压缩包中批量替换某文件脚本
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2015-01-29T18:21:25+08:00" content="2015-01-29">
+              2015-01-29
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/01/29/shell-batch-replace-files-from-rar-zip/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/01/29/shell-batch-replace-files-from-rar-zip/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>本需求是自己负责的一个生产系统上，有大量以zip和rar结尾的压缩文件散落在文件系统的各个文件夹，先在需要把压缩包里包含某一个特定文件（如tftpd32.exe或Tftpd32.exe，版本较旧），全都替换成比较新的tftpd32.exe版本。压缩文件总数约5000个，需要替换的数量约1500个。</p>
+<p>因为是生产环境，不敢轻易乱动，所以脚本考虑的因素就非常多，不允许中间执行过程出现异常，所以找到文件后实际执行替换操作之前做好备份，并且将操作过程记录日志。</p>
+<p>以下几点需要考虑：</p>
+<ul>
+<li>分别处理zip和rar文件，为减低脚本的复杂程度，分作两个shell脚本。</li>
+<li>rar在Linux下默认是没有安装解压缩工具，下载rarlinux-x64-5.2.0.tar.gz</li>
+<li>zip包中文件含有中文文件名，unzip测试解压缩或列出内容时出现文件名乱码，原因是zip在压缩时不记录当时的编码格式。这个问题非常棘手，乱码打进压缩包是绝对不允许的，网上<a href="http://www.zhihu.com/question/20523036">有几种解压办法</a>有几种办法都不能很好的应对我的场景：并不需要实际解压zip文件，而只需使用 <code>l</code> ——列出文件列表、获取目录及文件名，<code>d</code> ——从压缩包中直接删除某个文件，<code>a</code> ——向压缩包添加一个文件。实际解压到文件系统上是不是乱码我们并不关心。<br>最后的解决办法是使用<code>p7zip</code>工具，配合<code>LANG</code>变量解决。</li>
+<li>向压缩包里添加新文件时，要保持里面的目录结构，则必须在文件系统上存在同样的 相对目录/文件 。所以每次都要在脚本执行目录下创建临时目录tmp_dir，还要及时删除。但如果文件在压缩包的根目录下，这个临时目录就是当前脚本执行目录。</li>
+<li>有可能会存在一个压缩包中多个文件夹中包含不止一个tftpd32.exe文件。</li>
+<li>每个文件都有一个CRC值，处理文件名大小写不同但实质是同一个文件时有效。</li>
+</ul>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2015/01/29/shell-batch-replace-files-from-rar-zip/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
                 <a class="post-title-link" href="/2015/01/22/openldap_ldif_example/" itemprop="url">
                   LDIF修改ldap记录或配置示例
                 </a>
@@ -797,156 +929,6 @@
 
 
     
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/01/15/openldap_introduction/" itemprop="url">
-                  LDAP服务器的概念和原理简单介绍
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2015-01-15T01:21:25+08:00" content="2015-01-15">
-              2015-01-15
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/Linux/" itemprop="url" rel="index">
-                    <span itemprop="name">Linux</span>
-                  </a>
-                </span>
-
-                
-                
-                  , 
-                
-
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/Linux/OpenLDAP/" itemprop="url" rel="index">
-                    <span itemprop="name">OpenLDAP</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2015/01/15/openldap_introduction/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/01/15/openldap_introduction/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <h2 id="1-目录服务"><a href="#1-目录服务" class="headerlink" title="1. 目录服务"></a>1. 目录服务</h2><p>目录是一个为查询、浏览和搜索而优化的专业分布式数据库，它呈树状结构组织数据，就好象Linux/Unix系统中的文件目录一样。目录数据库和关系数据库不同，它有优异的读性能，但写性能差，并且没有事务处理、回滚等复杂功能，不适于存储修改频繁的数据。所以目录天生是用来查询的，就好象它的名字一样。</p>
-<p>目录服务是由目录数据库和一套访问协议组成的系统。类似以下的信息适合储存在目录中：</p>
-<ul>
-<li>企业员工信息，如姓名、电话、邮箱等；</li>
-<li>公用证书和安全密钥；</li>
-<li>公司的物理设备信息，如服务器，它的IP地址、存放位置、厂商、购买时间等；</li>
-</ul>
-<p><a href="http://www.openldap.org/doc/admin24/intro.html">LDAP</a>是轻量目录访问协议(Lightweight Directory Access Protocol)的缩写，LDAP是从X.500目录访问协议的基础上发展过来的，目前的版本是v3.0。与LDAP一样提供类似的目录服务软件还有<a href="http://directory.apache.org/apacheds/">ApacheDS</a>、<a href="https://technet.microsoft.com/en-us/library/dd448614.aspx">Active Directory</a>、<a href="http://www.redhat.com/en/technologies/cloud-computing/directory-server">Red Hat Directory Service</a> 。</p>
-<h2 id="2-LDAP特点"><a href="#2-LDAP特点" class="headerlink" title="2. LDAP特点"></a>2. LDAP特点</h2><ul>
-<li>LDAP的结构用树来表示，而不是用表格。正因为这样，就不能用SQL语句了</li>
-<li>LDAP可以很快地得到查询结果，不过在写方面，就慢得多</li>
-<li>LDAP提供了静态数据的快速查询方式</li>
-<li>Client/server模型，Server 用于存储数据，Client提供操作目录信息树的工具</li>
-<li>这些工具可以将数据库的内容以文本格式（LDAP 数据交换格式，LDIF）呈现在您的面前</li>
-<li>LDAP是一种开放Internet标准，LDAP协议是跨平台的Interent协议</li>
-</ul>
-<h2 id="3-LDAP组织数据的方式"><a href="#3-LDAP组织数据的方式" class="headerlink" title="3. LDAP组织数据的方式"></a>3. LDAP组织数据的方式</h2><p><img src="http://sean-images.qiniudn.com/ldap_intro_dctree.png" alt="ldap_intro_dctree"></p>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2015/01/15/openldap_introduction/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -992,7 +974,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">92</span>
+              <span class="site-state-item-count">93</span>
               <span class="site-state-item-name">posts</span>
             </a>
           </div>

@@ -281,6 +281,141 @@
             
               
                 
+                <a class="post-title-link" href="/2014/10/29/apache-3tomcat-cluster-jk-memcached/" itemprop="url">
+                  apache+3tomcat+jk+memcached集群环境搭建
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2014-10-29T10:21:25+08:00" content="2014-10-29">
+              2014-10-29
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Linux/Web-Server/" itemprop="url" rel="index">
+                    <span itemprop="name">Web_Server</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2014/10/29/apache-3tomcat-cluster-jk-memcached/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2014/10/29/apache-3tomcat-cluster-jk-memcached/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>注意本文不讨论原理，只讲述具体的搭建过程，而且步骤都经过了整理，否则过程可能会出现其他异常，请自行google。apache与tomcat整合的方式除了jk之外，使用apache自带的mod_ajp_proxy模块也可以很方便的完成。<br>先来看一下架构图：<br><img src="http://sean-images.qiniudn.com/apache_tomcat_cluster_msm.png" alt="apache_tomcat_cluster_msm"><br>属于正式环境中原session复制方案的改进。</p>
+<h1 id="1-所需软件包"><a href="#1-所需软件包" class="headerlink" title="1. 所需软件包"></a>1. 所需软件包</h1><figure class="highlight css"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line"><span class="selector-tag">jrrt-3</span><span class="selector-class">.1</span><span class="selector-class">.2-1</span><span class="selector-class">.6</span><span class="selector-class">.0-linux-x64</span><span class="selector-class">.bin</span>（或<span class="selector-tag">jdk1</span><span class="selector-class">.6</span><span class="selector-class">.0_33</span>）   <span class="selector-tag">jvm</span></div><div class="line"><span class="selector-tag">httpd-2</span><span class="selector-class">.2</span><span class="selector-class">.26</span><span class="selector-class">.tar</span><span class="selector-class">.gz</span>                              <span class="selector-tag">web</span>服务器，处理静态资源</div><div class="line"><span class="selector-tag">apache-tomcat-6</span><span class="selector-class">.0</span><span class="selector-class">.32</span><span class="selector-class">.tar</span><span class="selector-class">.gz</span>                      应用服务器，<span class="selector-tag">Servlet</span>容器处理动态请求</div><div class="line"><span class="selector-tag">tomcat-connectors-1</span><span class="selector-class">.2</span><span class="selector-class">.30-src</span><span class="selector-class">.tar</span><span class="selector-class">.gz</span>              <span class="selector-tag">apache</span>与<span class="selector-tag">tomcat</span>整合插件<span class="selector-tag">mod_jk</span><span class="selector-class">.so</span></div><div class="line"><span class="selector-tag">tomcat-native</span><span class="selector-class">.tar</span><span class="selector-class">.gz</span>                             <span class="selector-tag">APR</span>加速<span class="selector-tag">tomcat</span>，提高线程并发能力。使用<span class="selector-tag">tomcat</span>自带版本。</div><div class="line"><span class="selector-tag">memcached-session-manager</span>                        使用<span class="selector-tag">msm</span>解决多<span class="selector-tag">tomcat</span>集群时<span class="selector-tag">session</span>同步问题所需<span class="selector-tag">jar</span>包</div><div class="line">    <span class="selector-tag">asm-3</span><span class="selector-class">.2</span><span class="selector-class">.jar</span>, <span class="selector-tag">couchbase-client-1</span><span class="selector-class">.2</span><span class="selector-class">.2</span><span class="selector-class">.jar</span>, </div><div class="line">    <span class="selector-tag">kryo-1</span><span class="selector-class">.04</span><span class="selector-class">.jar</span>, <span class="selector-tag">kryo-serializers-0</span><span class="selector-class">.11</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">msm-kryo-serializer-1</span><span class="selector-class">.6</span><span class="selector-class">.5</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">memcached-session-manager-1</span><span class="selector-class">.6</span><span class="selector-class">.5</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">memcached-session-manager-tc6-1</span><span class="selector-class">.6</span><span class="selector-class">.5</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">minlog-1</span><span class="selector-class">.2</span><span class="selector-class">.jar</span>, <span class="selector-tag">reflectasm-1</span><span class="selector-class">.01</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">spymemcached-2</span><span class="selector-class">.10</span><span class="selector-class">.2</span><span class="selector-class">.jar</span></div></pre></td></tr></table></figure>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2014/10/29/apache-3tomcat-cluster-jk-memcached/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
                 <a class="post-title-link" href="/2014/10/28/vsphere-recover-from-missing-vmdk/" itemprop="url">
                   误删vSphere虚拟机.vmdk文件的恢复
                 </a>
@@ -787,173 +922,6 @@
 
 
     
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/10/06/linux-level2/" itemprop="url">
-                  Linux进阶培训-tplink
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2014-10-06T16:32:49+08:00" content="2014-10-06">
-              2014-10-06
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/Linux/" itemprop="url" rel="index">
-                    <span itemprop="name">Linux</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2014/10/06/linux-level2/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2014/10/06/linux-level2/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>本文没啥实际内容，是给新人做linux培训的第二课进阶篇，主要着眼于体系，把一些工具混个眼熟。</p>
-<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-01.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-02.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-03.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-04.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-05.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-06.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-07.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-08.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-09.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-10.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-11.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-12.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-13.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-14.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-15.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-16.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-17.PNG" alt=""></p>
-<h2 id="目录"><a href="#目录" class="headerlink" title="目录"></a>目录</h2><ul>
-<li>Linux磁盘管理(进阶)</li>
-<li>Linux内存管理</li>
-<li>Linux进程管理(进阶)</li>
-<li>Linux网络管理(进阶)</li>
-<li>Linux系统状态监控与调优</li>
-<li>常见服务</li>
-<li>Linux安全策略</li>
-<li>其他</li>
-</ul>
-<h2 id="Linux磁盘管理（进阶）"><a href="#Linux磁盘管理（进阶）" class="headerlink" title="Linux磁盘管理（进阶）"></a>Linux磁盘管理（进阶）</h2><ul>
-<li>ext4文件系统格式<ul>
-<li>Inode、block、superblock、MBR</li>
-<li>VFS</li>
-</ul>
-</li>
-<li>LVM<ul>
-<li>pv、lv、vg</li>
-<li>lvdisplay、lvextend、vgdisplay、pvcreate…</li>
-</ul>
-</li>
-<li>RAID<ul>
-<li>raid0、raid1、raid5、raid10</li>
-<li>r/w速度、磁盘利用率、安全性的权衡</li>
-</ul>
-</li>
-<li>磁盘IO性能<ul>
-<li>dd、iostat、iotop</li>
-<li>I/O等待</li>
-</ul>
-</li>
-</ul>
-<h2 id="Linux内存管里（基础）"><a href="#Linux内存管里（基础）" class="headerlink" title="Linux内存管里（基础）"></a>Linux内存管里（基础）</h2><ul>
-<li>物理内存与虚拟内存<ul>
-<li>Swap space，分页存取</li>
-</ul>
-</li>
-<li>buffer与cache区分</li>
-<li>内存监控命令<ul>
-<li>free、vmstat</li>
-</ul>
-</li>
-<li>/proc文件系统</li>
-</ul>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2014/10/06/linux-level2/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -999,7 +967,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">92</span>
+              <span class="site-state-item-count">93</span>
               <span class="site-state-item-name">posts</span>
             </a>
           </div>

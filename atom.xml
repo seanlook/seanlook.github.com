@@ -5,7 +5,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://seanlook.com/"/>
-  <updated>2017-02-17T08:32:49.000Z</updated>
+  <updated>2017-03-03T08:32:49.000Z</updated>
   <id>http://seanlook.com/</id>
   
   <author>
@@ -14,6 +14,113 @@
   </author>
   
   <generator uri="http://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>MySQL根据离线binlog快速“闪回”</title>
+    <link href="http://seanlook.com/2017/03/03/mysql-flashback_use_purged-binlog/"/>
+    <id>http://seanlook.com/2017/03/03/mysql-flashback_use_purged-binlog/</id>
+    <published>2017-03-03T08:32:49.000Z</published>
+    <updated>2017-03-03T08:32:49.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>昨天突然有个客户说误操作，自己删除了大量数据，CTO直接将我拉到一个讨论组里，说要帮他们恢复数据。他们自己挖的坑，打算让开发那边根据业务日志去恢复，被告知只记录的删除主键这样的信息，物理删除，无能为力。</p>
+<p>上服务器看了下记录的日志，发现好几台上面都有被误删的记录输出。阿里RDS虽然可以克隆一个恢复到删除时间点前的实例，但这散落的几万个id找起来费力，还有就是几个表之间关联的数据也要恢复，觉得麻烦。</p>
+<p>想到 MySQL 的闪回方案。以前看过好几篇相关文章，甚至差点自己用pythonl撸一个来解析binlog，反转得到回滚sql，实在没空，这下要急用了。赶紧找了下网上“现成的方案”。</p>
+<p>正文开始</p>
+<hr>
+<p>MySQL（含阿里RDS）快速闪回可以说是对数据库误操作的后悔药，flashback功能可以将数据库返回到误操作之前。但是即使oracle数据库也只支持短时间内的闪回。</p>
+<p>网上现有开源的MySQL闪回实现，原理都是解析binlog，生成反向sql: (必须为row模式)</p>
+<ol>
+<li>对于 delete 操作，生成insert （DELETE_ROWS_EVENT）</li>
+<li>对于 update 操作，交换binlog里面值的顺序 （UPDATE_ROWS_EVENT）</li>
+<li>对于 insert 操作，反向生成delete （WRITE_ROWS_EVENT）</li>
+<li>对于多个event，要逆向生成sql</li>
+</ol>
+<p>开源实现：</p>
+<ul>
+<li><a href="https://github.com/58daojia-dba/mysqlbinlog_flashback" target="_blank" rel="external">https://github.com/58daojia-dba/mysqlbinlog_flashback</a></li>
+<li><a href="https://github.com/danfengcao/binlog2sql/" target="_blank" rel="external">https://github.com/danfengcao/binlog2sql/</a></li>
+</ul>
+<p>上面两种实现方式，都是通过 python-mysql-replication 包，模拟出原库的一个从库，然后 <code>show binary logs</code> 来获取binlog，发起同步binlog的请求，再解析EVENT。但是阿里云 RDS 的binlog在同步给从库之后，<strong> 很快就被 purge 掉了 </strong>。如果要恢复 <strong> 昨天</strong> 的 <strong> 部分数据 </strong>，两种方案都是拿不到binlog的。也就是闪回的时间有限。</p>
+<p>还有一些比较简单的实现，就是解析 binlog 物理文件，实现回滚，如 <code>binlog-rollback.pl</code> ，试过，但是速度太慢。</p>
+<p>为了不影响速度，又想使用比较成熟的闪回方案，我们可以这样做：</p>
+<ol>
+<li>借助一个自建的 mysqld 实例，将已purge掉的binlog拷贝到该实例的目录下</li>
+<li>在自建实例里，提前创建好需要恢复的表（结构），因为工具需要连接上来从 <code>information_schema.columns</code> 获取元数据信息</li>
+<li>拷贝的时候，可以替换掉mysql实例自己的binlog文件名，保持连续</li>
+<li>可能要修改 <code>mysql-bin.index</code>，确保文件名还能被mysqld识别到</li>
+<li>重启mysql实例，<code>show binary logs</code> 看一下是否在列表里面</li>
+<li>接下来就可以使用上面任何一种工具，模拟从库，指定一个binlog文件，开始时间，结束时间，得到回滚SQL</li>
+<li>再根据业务逻辑，筛选出需要的sql</li>
+</ol>
+<a id="more"></a>
+<p>总之就是借助另外一个mysql，把binlog event传输过来。温馨提示：</p>
+<ol>
+<li>两个实例间版本不要跨度太大</li>
+<li>注意文件权限</li>
+<li>如果原库开启了gtid，这个自建实例也要开启gtid</li>
+</ol>
+<p>示例：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line">python mysqlbinlog_back.py --host=<span class="string">"localhost"</span> --username=<span class="string">"ecuser"</span> --password=<span class="string">"ecuser"</span> --port=<span class="number">3306</span> \</div><div class="line">--schema=dbname --tables=<span class="string">"t_xx1,t_xx2,t_xx3"</span> -S <span class="string">"mysql-bin.000019"</span> -E <span class="string">"2017-03-02 13:00:00"</span> -N <span class="string">"2017-03-02 14:09:00"</span> -I -U</div><div class="line"></div><div class="line">===log will also  write to .//mysqlbinlog_flashback.log===</div><div class="line">parameter=&#123;<span class="string">'start_binlog_file'</span>: <span class="string">'mysql-bin.000019'</span>, <span class="string">'stream'</span>: <span class="keyword">None</span>, <span class="string">'keep_data'</span>: <span class="keyword">True</span>,</div><div class="line"> <span class="string">'file'</span>: &#123;<span class="string">'data_create'</span>: <span class="keyword">None</span>, <span class="string">'flashback'</span>: <span class="keyword">None</span>, <span class="string">'data'</span>: <span class="keyword">None</span>&#125;, <span class="string">'add_schema_name'</span>: <span class="keyword">False</span>, <span class="string">'start_time'</span>: <span class="keyword">None</span>, <span class="string">'keep_current_data'</span>: <span class="keyword">False</span>, <span class="string">'start_to_timestamp'</span>: <span class="number">1488430800</span>,</div><div class="line"> <span class="string">'mysql_setting'</span>: &#123;<span class="string">'passwd'</span>: <span class="string">'ecuser'</span>, <span class="string">'host'</span>: <span class="string">'localhost'</span>, <span class="string">'charset'</span>: <span class="string">'utf8'</span>, <span class="string">'port'</span>: <span class="number">3306</span>, <span class="string">'user'</span>: <span class="string">'ecuser'</span>&#125;,</div><div class="line"> <span class="string">'table_name'</span>: <span class="string">'t_xx1,t_xx2,t_xx3'</span>, <span class="string">'skip_delete'</span>: <span class="keyword">False</span>, <span class="string">'schema'</span>: <span class="string">'dbname'</span>, <span class="string">'stat'</span>: &#123;<span class="string">'flash_sql'</span>: &#123;&#125;&#125;,</div><div class="line"> <span class="string">'table_name_array'</span>: [<span class="string">'t_xx1'</span>, <span class="string">'t_xx2'</span>, <span class="string">'t_xx3'</span>],</div><div class="line"> <span class="string">'one_binlog_file'</span>: <span class="keyword">False</span>, <span class="string">'output_file_path'</span>: <span class="string">'./log'</span>, <span class="string">'start_position'</span>: <span class="number">4</span>, <span class="string">'skip_update'</span>: <span class="keyword">True</span>,</div><div class="line"> <span class="string">'dump_event'</span>: <span class="keyword">False</span>, <span class="string">'end_to_timestamp'</span>: <span class="number">1488434940</span>, <span class="string">'skip_insert'</span>: <span class="keyword">True</span>, <span class="string">'schema_array'</span>: [<span class="string">'dbname'</span>]</div><div class="line">&#125;</div><div class="line">scan <span class="number">10000</span> events ....<span class="keyword">from</span> binlogfile=mysql-bin<span class="number">.000019</span>,timestamp=<span class="number">2017</span><span class="number">-03</span><span class="number">-02</span>T11:<span class="number">42</span>:<span class="number">14</span></div><div class="line">scan <span class="number">20000</span> events ....<span class="keyword">from</span> binlogfile=mysql-bin<span class="number">.000019</span>,timestamp=<span class="number">2017</span><span class="number">-03</span><span class="number">-02</span>T11:<span class="number">42</span>:<span class="number">29</span></div><div class="line">...</div></pre></td></tr></table></figure>
+<p>提示：<br>binlog为ROW格式，dml影响的每一行都会记录两个event：Table_map和Row_log。而table_map里面的table_id并不会影响它在哪个实例上应用，这个id可以认为是逻辑上，记录表结构版本的机制 —— 当它在 table_definition_cache 没有找到表定义时，id自增1，分配给要记录到binlog的表。</p>
+<p><strong>mysqlbinlog_back.py 使用经验</strong> ：</p>
+<ul>
+<li>务必指定库名、表明，开始的binlog文件名，起始时间，结束时间。可以加快scan的速度。</li>
+<li>根据恢复的需要，选择 -I, -U, -D，指定回滚哪些类型的操作。</li>
+<li>如果只是恢复部分表数据（非完全闪回），做不到关联表的正确恢复。比如需要恢复delete数据，但无法恢复业务里因为delete引起其它表更新的数据，除非完全闪回。</li>
+<li>不支持表字段是 enum 类型的，比如 t_xx3 的f_do_type字段。可以把自建实例上的enum定义改成int。</li>
+</ul>
+<p><strong>参考</strong></p>
+<ol>
+<li><a href="http://dinglin.iteye.com/blog/1539167" target="_blank" rel="external">http://dinglin.iteye.com/blog/1539167</a></li>
+<li><a href="http://www.penglixun.com/tech/database/mysql_flashback_feature.html/comment-page-1#comment-1207998" target="_blank" rel="external">http://www.penglixun.com/tech/database/mysql_flashback_feature.html/comment-page-1#comment-1207998</a></li>
+<li><a href="http://www.cnblogs.com/yuyue2014/p/3721172.html" target="_blank" rel="external">http://www.cnblogs.com/yuyue2014/p/3721172.html</a></li>
+</ol>
+<hr>
+<p>本文链接地址：<a href="http://seanlook.com/2017/03/02/mysql-flashback_use_purged-binlog/">http://seanlook.com/2017/03/02/mysql-flashback_use_purged-binlog/</a></p>
+<hr>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;昨天突然有个客户说误操作，自己删除了大量数据，CTO直接将我拉到一个讨论组里，说要帮他们恢复数据。他们自己挖的坑，打算让开发那边根据业务日志去恢复，被告知只记录的删除主键这样的信息，物理删除，无能为力。&lt;/p&gt;
+&lt;p&gt;上服务器看了下记录的日志，发现好几台上面都有被误删的记录输出。阿里RDS虽然可以克隆一个恢复到删除时间点前的实例，但这散落的几万个id找起来费力，还有就是几个表之间关联的数据也要恢复，觉得麻烦。&lt;/p&gt;
+&lt;p&gt;想到 MySQL 的闪回方案。以前看过好几篇相关文章，甚至差点自己用pythonl撸一个来解析binlog，反转得到回滚sql，实在没空，这下要急用了。赶紧找了下网上“现成的方案”。&lt;/p&gt;
+&lt;p&gt;正文开始&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;MySQL（含阿里RDS）快速闪回可以说是对数据库误操作的后悔药，flashback功能可以将数据库返回到误操作之前。但是即使oracle数据库也只支持短时间内的闪回。&lt;/p&gt;
+&lt;p&gt;网上现有开源的MySQL闪回实现，原理都是解析binlog，生成反向sql: (必须为row模式)&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;对于 delete 操作，生成insert （DELETE_ROWS_EVENT）&lt;/li&gt;
+&lt;li&gt;对于 update 操作，交换binlog里面值的顺序 （UPDATE_ROWS_EVENT）&lt;/li&gt;
+&lt;li&gt;对于 insert 操作，反向生成delete （WRITE_ROWS_EVENT）&lt;/li&gt;
+&lt;li&gt;对于多个event，要逆向生成sql&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;开源实现：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/58daojia-dba/mysqlbinlog_flashback&quot;&gt;https://github.com/58daojia-dba/mysqlbinlog_flashback&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/danfengcao/binlog2sql/&quot;&gt;https://github.com/danfengcao/binlog2sql/&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;上面两种实现方式，都是通过 python-mysql-replication 包，模拟出原库的一个从库，然后 &lt;code&gt;show binary logs&lt;/code&gt; 来获取binlog，发起同步binlog的请求，再解析EVENT。但是阿里云 RDS 的binlog在同步给从库之后，&lt;strong&gt; 很快就被 purge 掉了 &lt;/strong&gt;。如果要恢复 &lt;strong&gt; 昨天&lt;/strong&gt; 的 &lt;strong&gt; 部分数据 &lt;/strong&gt;，两种方案都是拿不到binlog的。也就是闪回的时间有限。&lt;/p&gt;
+&lt;p&gt;还有一些比较简单的实现，就是解析 binlog 物理文件，实现回滚，如 &lt;code&gt;binlog-rollback.pl&lt;/code&gt; ，试过，但是速度太慢。&lt;/p&gt;
+&lt;p&gt;为了不影响速度，又想使用比较成熟的闪回方案，我们可以这样做：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;借助一个自建的 mysqld 实例，将已purge掉的binlog拷贝到该实例的目录下&lt;/li&gt;
+&lt;li&gt;在自建实例里，提前创建好需要恢复的表（结构），因为工具需要连接上来从 &lt;code&gt;information_schema.columns&lt;/code&gt; 获取元数据信息&lt;/li&gt;
+&lt;li&gt;拷贝的时候，可以替换掉mysql实例自己的binlog文件名，保持连续&lt;/li&gt;
+&lt;li&gt;可能要修改 &lt;code&gt;mysql-bin.index&lt;/code&gt;，确保文件名还能被mysqld识别到&lt;/li&gt;
+&lt;li&gt;重启mysql实例，&lt;code&gt;show binary logs&lt;/code&gt; 看一下是否在列表里面&lt;/li&gt;
+&lt;li&gt;接下来就可以使用上面任何一种工具，模拟从库，指定一个binlog文件，开始时间，结束时间，得到回滚SQL&lt;/li&gt;
+&lt;li&gt;再根据业务逻辑，筛选出需要的sql&lt;/li&gt;
+&lt;/ol&gt;
+    
+    </summary>
+    
+      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
+    
+    
+      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
+    
+  </entry>
   
   <entry>
     <title>关于MySQL自增主键的几点问题（下）</title>
@@ -48,7 +155,6 @@
 <li>如果load data 的文件自带主键值，那么另一个会话获取的自增值很容易产生重复。</li>
 <li>有一点我不太确定的，还是提出来以免误导大家：网上看到文章说 load data 在主从复制环境中，statement格式下 从库是把主库上执行的 load data 文件传输过来，也运用一遍，如果真是这样的话，binlog里面记录的就不应该是上图的格式才对。这个我还没有去深究 :) ，参考 <a href="http://dba.stackexchange.com/questions/40400/loading-data-in-mysql-using-load-data-infile-replication-safe#" target="_blank" rel="external">这里 stackexchange</a> 。</li>
 </ol>
-<p>SET @@session.auto_increment_increment=1, @@session.auto_increment_offset=1/<em>!</em>/;</p>
 <hr>
 <p>本文链接地址：<a href="http://seanlook.com/2017/02/17/mysql-autoincrement_2/">http://seanlook.com/2017/02/17/mysql-autoincrement_2/</a></p>
 <hr>
@@ -916,6 +1022,54 @@
   </entry>
   
   <entry>
+    <title>使用pt-osc修改主键时注意</title>
+    <link href="http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/"/>
+    <id>http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/</id>
+    <published>2016-05-27T08:32:49.000Z</published>
+    <updated>2016-05-27T08:32:49.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：<br><figure class="highlight applescript"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">原表上有个复合主键，现在要添加一个自增<span class="built_in">id</span>作为主键，如何进行</div></pre></td></tr></table></figure></p>
+<a id="more"></a>
+<p>会涉及到以下修改动作：</p>
+<ol>
+<li>删除复合主键定义</li>
+<li>添加新的自增主键</li>
+<li>原复合主键字段，修改成唯一索引</li>
+</ol>
+<p>如果你够聪明，应该会把这三个操作放在同一个 alter table 命令执行。percona手册里有两个地方对修改主键进行了特殊注解：</p>
+<blockquote>
+<p>–alter<br>A notable exception is when a PRIMARY KEY or UNIQUE INDEX is being created from existing columns as part of the ALTER clause; in that case it will use these column(s) for the DELETE trigger.</p>
+<p>–[no]check-alter</p>
+<ul>
+<li>DROP PRIMARY KEY<br>If –alter contain DROP PRIMARY KEY (case- and space-insensitive), a warning is printed and the tool exits unless –dry-run is specified. Altering the primary key can be dangerous, but the tool can handle it. The tool’s triggers, particularly the DELETE trigger, are most affected by altering the primary key because the tool prefers to use the primary key for its triggers. You should first run the tool with –dry-run and –print and verify that the triggers are correct.</li>
+</ul>
+</blockquote>
+<p>由上一篇文章 <a href="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/">pt-online-schema-change使用说明、限制与比较</a> 可知，pt-osc会在原表t1上创建 AFTER DELETE/UPDATE/INSERT 三个触发器，修改主键影响最大的就是 DELETE 触发器：新表t2上的主键字段在旧表t1上不存在，无法根据主键条件触发删除新表t2数据。<code>but the tool can handle it</code>，原因是pt-osc把触发器改成了下面的形式：<br><figure class="highlight autohotkey"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">CREATE TRIGGER `pt_osc_confluence_sbtest3_del` AFTER DELETE ON `confluence`.`sbtest3` FOR EACH ROW DELETE IGNORE FROM `confluence`.`_sbtest3_new` </div><div class="line">WHERE `confluence`.`_sbtest3_new`.`id` &lt;=&gt; OLD.`id` <span class="literal">AND</span> `confluence`.`_sbtest3_new`.`k` &lt;=&gt; OLD.`k`</div><div class="line"></div><div class="line">注：sbtest3表上以(id,k)作为复合主键</div></pre></td></tr></table></figure></p>
+<p>但是如果id或k列上没有索引，这个删除的代价非常高，所以一定要同时添加复合（唯一）索引 <code>(id,k)</code> .</p>
+<p>而对于INSERT,UPDATE的触发器，依然是 <code>REPLACE INTO</code>语法，因为它采用的是先插入，如果违反主键或唯一约束，则根据主键或意义约束删除这条数据，再执行插入。（但是注意你不能依赖于新表的主键递增，因为如果原表有update，新表就会先插入这一条，导致id与原表记录所在顺序不一样）</p>
+<p>所以如果使用pt-osc去修改删除主键，务必同时添加原主键为 UNIQUE KEY，否则很有可能导致性能问题：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line">$ pt-online-schema-<span class="keyword">change</span> <span class="comment">--user=ecuser --password=ecuser --host=10.0.201.34  \</span></div><div class="line"><span class="comment">--alter "DROP PRIMARY KEY,add column pk int auto_increment primary key,add unique key uk_id_k(id,k)" \</span></div><div class="line">D=confluence,t=sbtest3 <span class="comment">--print --dry-run</span></div><div class="line"></div><div class="line"><span class="comment">--alter contains 'DROP PRIMARY KEY'.  Dropping and altering the primary key can be dangerous, </span></div><div class="line">especially <span class="keyword">if</span> the original <span class="keyword">table</span> does <span class="keyword">not</span> have other <span class="keyword">unique</span> indexes.  ==&gt;注意 dry-run的输出</div><div class="line"></div><div class="line"><span class="keyword">ALTER</span> <span class="keyword">TABLE</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> <span class="keyword">DROP</span> PRIMARY <span class="keyword">KEY</span>,<span class="keyword">add</span> <span class="keyword">column</span> pk <span class="built_in">int</span> auto_increment primary <span class="keyword">key</span>,<span class="keyword">add</span> <span class="keyword">unique</span> <span class="keyword">key</span> uk_id_k(<span class="keyword">id</span>,k)</div><div class="line">Altered <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> OK.</div><div class="line"><span class="keyword">Using</span> original <span class="keyword">table</span> <span class="keyword">index</span> PRIMARY <span class="keyword">for</span> the <span class="keyword">DELETE</span> <span class="keyword">trigger</span> instead <span class="keyword">of</span> <span class="keyword">new</span> <span class="keyword">table</span> <span class="keyword">index</span> PRIMARY because ==&gt; 使用原表主键值判断</div><div class="line">the <span class="keyword">new</span> <span class="keyword">table</span> <span class="keyword">index</span> uses <span class="keyword">column</span> pk which does <span class="keyword">not</span> exist <span class="keyword">in</span> the original table.</div><div class="line"></div><div class="line"><span class="keyword">CREATE</span> <span class="keyword">TRIGGER</span> <span class="string">`pt_osc_confluence_sbtest3_del`</span> <span class="keyword">AFTER</span> <span class="keyword">DELETE</span> <span class="keyword">ON</span> <span class="string">`confluence`</span>.<span class="string">`sbtest3`</span> <span class="keyword">FOR</span> <span class="keyword">EACH</span> <span class="keyword">ROW</span> <span class="keyword">DELETE</span> <span class="keyword">IGNORE</span> <span class="keyword">FROM</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> </div><div class="line"><span class="keyword">WHERE</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span>.<span class="string">`id`</span> &lt;=&gt; OLD.<span class="string">`id`</span> <span class="keyword">AND</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span>.<span class="string">`k`</span> &lt;=&gt; OLD.<span class="string">`k`</span></div></pre></td></tr></table></figure>
+<hr>
+<p>原文链接地址：<a href="http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/">http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/</a></p>
+<hr>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：&lt;br&gt;&lt;figure class=&quot;highlight applescript&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;原表上有个复合主键，现在要添加一个自增&lt;span class=&quot;built_in&quot;&gt;id&lt;/span&gt;作为主键，如何进行&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;&lt;/p&gt;
+    
+    </summary>
+    
+      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
+    
+    
+      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
+    
+      <category term="Percona-toolkit" scheme="http://seanlook.com/tags/Percona-toolkit/"/>
+    
+  </entry>
+  
+  <entry>
     <title>pt-online-schema-change使用说明、限制与比较</title>
     <link href="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/"/>
     <id>http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/</id>
@@ -1054,54 +1208,6 @@
 &lt;li&gt;&lt;p&gt;&lt;code&gt;--max-lag&lt;/code&gt;&lt;br&gt;默认1s。每个chunk拷贝完成后，会查看所有复制Slave的延迟情况（&lt;code&gt;Seconds_Behind_Master&lt;/code&gt;）。要是延迟大于该值，则暂停复制数据，直到所有从的滞后小于这个值。&lt;code&gt;--check-interval&lt;/code&gt;配合使用，指定出现从库滞后超过 max-lag，则该工具将睡眠多长时间，默认1s，再检查。如&lt;code&gt;--max-lag=5 --check-interval=2&lt;/code&gt;。&lt;br&gt;熟悉percona-toolkit的人都知道&lt;code&gt;--recursion-method&lt;/code&gt;可以用来指定从库dsn记录。另外，如果从库被停止，将会永远等待，直到从开始同步，并且延迟小于该值。&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;&lt;p&gt;&lt;code&gt;--chunk-time&lt;/code&gt;&lt;br&gt;默认0.5s，即拷贝数据行的时候，为了尽量保证0.5s内拷完一个chunk，动态调整chunk-size的大小，以适应服务器性能的变化。&lt;br&gt;也可以通过另外一个选项&lt;code&gt;--chunk-size&lt;/code&gt;禁止动态调整，即每次固定拷贝 1k 行，如果指定则默认1000行，且比 chunk-time 优先生效&lt;/p&gt;
-    
-    </summary>
-    
-      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
-    
-    
-      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
-    
-      <category term="Percona-toolkit" scheme="http://seanlook.com/tags/Percona-toolkit/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>使用pt-osc修改主键时注意</title>
-    <link href="http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/"/>
-    <id>http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/</id>
-    <published>2016-05-27T08:32:49.000Z</published>
-    <updated>2016-05-27T08:32:49.000Z</updated>
-    
-    <content type="html"><![CDATA[<p>使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：<br><figure class="highlight applescript"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">原表上有个复合主键，现在要添加一个自增<span class="built_in">id</span>作为主键，如何进行</div></pre></td></tr></table></figure></p>
-<a id="more"></a>
-<p>会涉及到以下修改动作：</p>
-<ol>
-<li>删除复合主键定义</li>
-<li>添加新的自增主键</li>
-<li>原复合主键字段，修改成唯一索引</li>
-</ol>
-<p>如果你够聪明，应该会把这三个操作放在同一个 alter table 命令执行。percona手册里有两个地方对修改主键进行了特殊注解：</p>
-<blockquote>
-<p>–alter<br>A notable exception is when a PRIMARY KEY or UNIQUE INDEX is being created from existing columns as part of the ALTER clause; in that case it will use these column(s) for the DELETE trigger.</p>
-<p>–[no]check-alter</p>
-<ul>
-<li>DROP PRIMARY KEY<br>If –alter contain DROP PRIMARY KEY (case- and space-insensitive), a warning is printed and the tool exits unless –dry-run is specified. Altering the primary key can be dangerous, but the tool can handle it. The tool’s triggers, particularly the DELETE trigger, are most affected by altering the primary key because the tool prefers to use the primary key for its triggers. You should first run the tool with –dry-run and –print and verify that the triggers are correct.</li>
-</ul>
-</blockquote>
-<p>由上一篇文章 <a href="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/">pt-online-schema-change使用说明、限制与比较</a> 可知，pt-osc会在原表t1上创建 AFTER DELETE/UPDATE/INSERT 三个触发器，修改主键影响最大的就是 DELETE 触发器：新表t2上的主键字段在旧表t1上不存在，无法根据主键条件触发删除新表t2数据。<code>but the tool can handle it</code>，原因是pt-osc把触发器改成了下面的形式：<br><figure class="highlight autohotkey"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">CREATE TRIGGER `pt_osc_confluence_sbtest3_del` AFTER DELETE ON `confluence`.`sbtest3` FOR EACH ROW DELETE IGNORE FROM `confluence`.`_sbtest3_new` </div><div class="line">WHERE `confluence`.`_sbtest3_new`.`id` &lt;=&gt; OLD.`id` <span class="literal">AND</span> `confluence`.`_sbtest3_new`.`k` &lt;=&gt; OLD.`k`</div><div class="line"></div><div class="line">注：sbtest3表上以(id,k)作为复合主键</div></pre></td></tr></table></figure></p>
-<p>但是如果id或k列上没有索引，这个删除的代价非常高，所以一定要同时添加复合（唯一）索引 <code>(id,k)</code> .</p>
-<p>而对于INSERT,UPDATE的触发器，依然是 <code>REPLACE INTO</code>语法，因为它采用的是先插入，如果违反主键或唯一约束，则根据主键或意义约束删除这条数据，再执行插入。（但是注意你不能依赖于新表的主键递增，因为如果原表有update，新表就会先插入这一条，导致id与原表记录所在顺序不一样）</p>
-<p>所以如果使用pt-osc去修改删除主键，务必同时添加原主键为 UNIQUE KEY，否则很有可能导致性能问题：</p>
-<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line">$ pt-online-schema-<span class="keyword">change</span> <span class="comment">--user=ecuser --password=ecuser --host=10.0.201.34  \</span></div><div class="line"><span class="comment">--alter "DROP PRIMARY KEY,add column pk int auto_increment primary key,add unique key uk_id_k(id,k)" \</span></div><div class="line">D=confluence,t=sbtest3 <span class="comment">--print --dry-run</span></div><div class="line"></div><div class="line"><span class="comment">--alter contains 'DROP PRIMARY KEY'.  Dropping and altering the primary key can be dangerous, </span></div><div class="line">especially <span class="keyword">if</span> the original <span class="keyword">table</span> does <span class="keyword">not</span> have other <span class="keyword">unique</span> indexes.  ==&gt;注意 dry-run的输出</div><div class="line"></div><div class="line"><span class="keyword">ALTER</span> <span class="keyword">TABLE</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> <span class="keyword">DROP</span> PRIMARY <span class="keyword">KEY</span>,<span class="keyword">add</span> <span class="keyword">column</span> pk <span class="built_in">int</span> auto_increment primary <span class="keyword">key</span>,<span class="keyword">add</span> <span class="keyword">unique</span> <span class="keyword">key</span> uk_id_k(<span class="keyword">id</span>,k)</div><div class="line">Altered <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> OK.</div><div class="line"><span class="keyword">Using</span> original <span class="keyword">table</span> <span class="keyword">index</span> PRIMARY <span class="keyword">for</span> the <span class="keyword">DELETE</span> <span class="keyword">trigger</span> instead <span class="keyword">of</span> <span class="keyword">new</span> <span class="keyword">table</span> <span class="keyword">index</span> PRIMARY because ==&gt; 使用原表主键值判断</div><div class="line">the <span class="keyword">new</span> <span class="keyword">table</span> <span class="keyword">index</span> uses <span class="keyword">column</span> pk which does <span class="keyword">not</span> exist <span class="keyword">in</span> the original table.</div><div class="line"></div><div class="line"><span class="keyword">CREATE</span> <span class="keyword">TRIGGER</span> <span class="string">`pt_osc_confluence_sbtest3_del`</span> <span class="keyword">AFTER</span> <span class="keyword">DELETE</span> <span class="keyword">ON</span> <span class="string">`confluence`</span>.<span class="string">`sbtest3`</span> <span class="keyword">FOR</span> <span class="keyword">EACH</span> <span class="keyword">ROW</span> <span class="keyword">DELETE</span> <span class="keyword">IGNORE</span> <span class="keyword">FROM</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> </div><div class="line"><span class="keyword">WHERE</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span>.<span class="string">`id`</span> &lt;=&gt; OLD.<span class="string">`id`</span> <span class="keyword">AND</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span>.<span class="string">`k`</span> &lt;=&gt; OLD.<span class="string">`k`</span></div></pre></td></tr></table></figure>
-<hr>
-<p>原文链接地址：<a href="http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/">http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/</a></p>
-<hr>
-]]></content>
-    
-    <summary type="html">
-    
-      &lt;p&gt;使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：&lt;br&gt;&lt;figure class=&quot;highlight applescript&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;原表上有个复合主键，现在要添加一个自增&lt;span class=&quot;built_in&quot;&gt;id&lt;/span&gt;作为主键，如何进行&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;&lt;/p&gt;
     
     </summary>
     
@@ -2179,172 +2285,6 @@ http://www.iteye.com/topic/1141229
 &lt;p&gt;例如：&lt;/p&gt;
 &lt;figure class=&quot;highlight gherkin&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;2&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;3&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;4&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;5&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;6&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;7&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;8&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;9&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;10&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;11&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;12&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;13&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;14&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;15&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;16&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;17&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;mysql&amp;gt; CREATE TABLE `tc_integer` (&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  `f_id` bigint(20) PRIMARY KEY AUTO_INCREMENT,&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  `f_type` tinyint,&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  `f_flag` tinyint(1),&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  `f_num` smallint(5) unsigned ZEROFILL&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;) ENGINE=InnoDB DEFAULT CHARSET=utf8;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;mysql&amp;gt; desc tc_integer;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;+----------------+-------------------------------+------+-----+---------+----------------+&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;|&lt;span class=&quot;string&quot;&gt; Field          &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; Type                          &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; Null &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; Key &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; Default &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; Extra          &lt;/span&gt;|&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;+----------------+-------------------------------+------+-----+---------+----------------+&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;|&lt;span class=&quot;string&quot;&gt; f_id           &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; bigint(20)                    &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; NO   &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; PRI &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; NULL    &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; auto_increment &lt;/span&gt;|&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;|&lt;span class=&quot;string&quot;&gt; f_type         &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; tinyint(4)                    &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; YES  &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt;     &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; NULL    &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt;                &lt;/span&gt;|&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;|&lt;span class=&quot;string&quot;&gt; f_flag         &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; tinyint(1)                    &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; YES  &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt;     &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; NULL    &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt;                &lt;/span&gt;|&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;|&lt;span class=&quot;string&quot;&gt; f_num          &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; smallint(5) unsigned zerofill &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; YES  &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt;     &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; NULL    &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt;                &lt;/span&gt;|&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;+----------------+-------------------------------+------+-----+---------+----------------+&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;4 rows in set (0.01 sec)&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;
 &lt;p&gt;插入几条数据看一下：&lt;br&gt;
-    
-    </summary>
-    
-      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
-    
-    
-      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
-    
-      <category term="schema设计" scheme="http://seanlook.com/tags/schema%E8%AE%BE%E8%AE%A1/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>MySQL字符数据类型char与varchar的区别</title>
-    <link href="http://seanlook.com/2016/04/28/mysql-char-varchar-set/"/>
-    <id>http://seanlook.com/2016/04/28/mysql-char-varchar-set/</id>
-    <published>2016-04-28T08:32:49.000Z</published>
-    <updated>2016-04-28T08:32:49.000Z</updated>
-    
-    <content type="html"><![CDATA[<p>数据类型差不多是接触mysql一开始就了解的内容，最近遇到几个现象如varchar自动转mediumtext，blob存储性能的问题，不得不回头明确一下关于MySQL常用数据类型的选择。</p>
-<p><a href="http://dev.mysql.com/doc/refman/5.6/en/char.html" target="_blank" rel="external">mysql手册这里</a> 已经讲的很清楚了。它们都是定义字符串型字段时常用的类型，但它们存储和检索的方式有不同，最大长度和尾部的空格是否保留也有差别。</p>
-<p><code>char</code>类型是使用固定长度空间进行存储，范围0-255。比如<code>CHAR(30)</code>能放30个字符，存放abcd时，尾部会以空格补齐，实际占用空间 30 * 3bytes (utf8)。检索它的时候尾部空格会被去除。</p>
-<p>char善于存储经常改变的值，或者长度相对固定的值，比如type、ip地址或md5之类的数据，不容易产生碎片。关于它的效率可以参考<a href="http://bbs.chinaunix.net/thread-1696053-1-1.html" target="_blank" rel="external">这里</a>。</p>
-<p><code>varchar</code>类型保存可变长度字符串，范围0-65535（但受到单行最大64kb的限制）。比如用 <code>varchar(30)</code> 去存放abcd，实际使用5个字节，因为还需要使用额外1个字节来标识字串长度（0-255使用1个字节，超过255需要2个字节）。</p>
-<p>varchar善于存储值的长短不一的列，也是用的最多的一种类型，节省磁盘空间。update时varchar列时，如果新数据比原数据大，数据库需要重新开辟空间，这一点会有性能略有损耗，但innodb引擎下查询效率比char高一点。这也是innodb官方推荐的类型。</p>
-<p>如果存储时真实长度超过了char或者varchar定义的最大长度呢？</p>
-<ul>
-<li>在SQL严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示错误，即插入失败</li>
-<li>在SQL非严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示warning，但可以成功</li>
-<li>如果尾部要被截断的是空格，无论SQL所处模式，varchar都可以插入成功但提示warning；char也可以插入成功，并且无任何提示</li>
-</ul>
-<p>这里特意提到SQL的严格模式，是因为在工作中也遇到过一些坑，参考<a href="">MySQL的sql_mode严格模式注意点</a>。</p>
-<p>贴上官方的一个表格：</p>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>CHAR(4)</th>
-<th>Storage Required</th>
-<th>VARCHAR(4)</th>
-<th>Storage Required</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>‘’</td>
-<td>‘    ‘</td>
-<td>4 bytes</td>
-<td>‘’</td>
-<td>1 byte</td>
-</tr>
-<tr>
-<td>‘ab’</td>
-<td>‘ab  ‘</td>
-<td>4 bytes</td>
-<td>‘ab’</td>
-<td>3 bytes</td>
-</tr>
-<tr>
-<td>‘abcd’</td>
-<td>‘abcd’</td>
-<td>4 bytes</td>
-<td>‘abcd’</td>
-<td>5 bytes</td>
-</tr>
-<tr>
-<td>‘abcdefgh’</td>
-<td>‘abcd’</td>
-<td>4 bytes</td>
-<td>‘abcd’</td>
-<td>5 bytes</td>
-</tr>
-</tbody>
-</table>
-<p>另外，mysql字段值比较时默认是不区分大小写的，这是由于他们的校对规则（一般是 utf8_general_ci）决定的，按字符比较，所以查询时 值尾部 的空格也是被忽略的，除非建表时对列指定 <code>BINARY</code> （校对字符集变成utf8_bin）或者<code>select * from vc where binary v=&#39;ab  &#39;;</code>，就会按字节比较，即比较时区分大小写和尾部空格。</p>
-<p>需要注意的是，使用varchar不能因为长度可变就随意分大空间，比如90个字节能放够的列定义成varchar(200)，因为开辟内存时是以200字节进行的，遇到需要filesort或tmp table作业可能会带来不利影响。</p>
-<a id="more"></a>
-<p>最后研究一下字符集对存储长度影响，以 <code>create table tc_utf8(c1 int primary key auto_increment, c2 char(30), c3 varchar(N)) charset=utf8;</code> 为例：</p>
-<p>字符集为utf8，于是中文每个字符占3个字节，英文还是1个字节，所以N最大为 (65535-1-2-4-30*3)/3 = 21812，即最多能存放21812个英文、数字、汉字。其中65535是单行最大限制，减1是NULL标识位，减2的是头部的2个字节标识长度，减30*3的原因是char(30)占用90个字节，最后除以3还是因为utf8最长用3个字节表示一个字符。</p>
-<p>但有人会说，utf8的英文字符只需要1个字节表示，并不占用3个字节，在存ASCII字符的情况下N是不是可以更大呢。答案是否定的，因为定义表的时候mysql事先并不知道c3要存的是英文还在中文，只能以最大来计。mysql也是以这种方式来确保行最大 65535 bytes 限制：数据行只要出现一个ascii字符（如英文字母、数字），就永远达不到65535，数据行全中文则刚好满。</p>
-<p>还有一种特殊情况：</p>
-<figure class="highlight asciidoc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div></pre></td><td class="code"><pre><div class="line"><span class="section">mysql&gt; show variables like "char%";</span></div><div class="line">+--------------------------+----------------------------+</div><div class="line"><span class="section">| Variable_name            | Value                      |</span></div><div class="line">+--------------------------+----------------------------+</div><div class="line">| character<span class="emphasis">_set_</span>client     | utf8                       |</div><div class="line">| character<span class="emphasis">_set_</span>connection | utf8                       |</div><div class="line">| character<span class="emphasis">_set_</span>database   | utf8                       |</div><div class="line">| character<span class="emphasis">_set_</span>filesystem | binary                     |</div><div class="line">| character<span class="emphasis">_set_</span>results    | utf8                       |</div><div class="line">| character<span class="emphasis">_set_</span>server     | latin1                     |</div><div class="line">| character<span class="emphasis">_set_</span>system     | utf8                       |</div><div class="line"><span class="section">| character_sets_dir       | /usr/share/mysql/charsets/ |</span></div><div class="line">+--------------------------+----------------------------+</div><div class="line">8 rows in set (0.12 sec)</div><div class="line"></div><div class="line"><span class="section">mysql&gt; select @@sql_mode;</span></div><div class="line">+------------------------+</div><div class="line"><span class="section">| @@sql_mode             |</span></div><div class="line">+------------------------+</div><div class="line"><span class="section">| NO_ENGINE_SUBSTITUTION |</span></div><div class="line">+------------------------+</div><div class="line">1 rows in set (0.13 sec)</div><div class="line"></div><div class="line">mysql&gt; create table tc<span class="emphasis">_utf8_</span>21812(c1 int primary key auto<span class="emphasis">_increment, c2 char(30), c3 varchar(21812)) charset=utf8;</span></div><div class="line">Query OK, 0 rows affected (0.10 sec)</div><div class="line"></div><div class="line">mysql&gt; create table tc<span class="emphasis">_utf8_</span>21813(c1 int primary key auto<span class="emphasis">_increment, c2 char(30), c3 varchar(21845)) charset=utf8;</span></div><div class="line">Row size too large. The maximum row size for the used table type, not counting BLOBs, is 65535. This includes storage overhead, check the manual. You have to change some columns to TEXT or BLOBs</div><div class="line"></div><div class="line">mysql&gt; create table tc<span class="emphasis">_utf8_</span>21846(c1 int primary key auto<span class="emphasis">_increment, c2 char(30), c3 varchar(21846)) charset=utf8;</span></div><div class="line">Query OK, 0 rows affected, 1 warnings (0.10 sec)</div><div class="line"></div><div class="line"><span class="section">mysql&gt; show warnings;</span></div><div class="line">+-------+------+---------------------------------------------+</div><div class="line"><span class="section">| Level | Code | Message                                     |</span></div><div class="line">+-------+------+---------------------------------------------+</div><div class="line"><span class="section">| Note  | 1246 | Converting column 'c3' from VARCHAR to TEXT |</span></div><div class="line">+-------+------+---------------------------------------------+</div><div class="line">1 rows in set (0.14 sec)</div></pre></td></tr></table></figure>
-<p>即在非严格模式下，因为N=21813 &gt; 21812，所以报 Row size too large 错误。但N=21846 &gt; (65535/3)时，只是出现warnings，varchar自动变成了mediumtext 类型。</p>
-<p>细心的朋友可能注意到上面开始我看了一下字符集 <code>show variabels like &quot;char%&quot;;</code>，因为接下来要说明另外一个问题：客户端字符集与database不一样的情况。</p>
-<p>我们回到 N&lt;=21812 的正常情况：</p>
-<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="string">`tc_utf8`</span> (</div><div class="line">  <span class="string">`c1`</span> <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span> AUTO_INCREMENT,</div><div class="line">  <span class="string">`c2`</span> <span class="built_in">char</span>(<span class="number">30</span>) <span class="keyword">DEFAULT</span> <span class="literal">NULL</span>,</div><div class="line">  <span class="string">`c3`</span> <span class="built_in">varchar</span>(<span class="number">30</span>) <span class="keyword">DEFAULT</span> <span class="literal">NULL</span>,</div><div class="line">  PRIMARY <span class="keyword">KEY</span> (<span class="string">`c1`</span>)</div><div class="line">) <span class="keyword">ENGINE</span>=<span class="keyword">InnoDB</span> <span class="keyword">DEFAULT</span> <span class="keyword">CHARSET</span>=utf8;</div></pre></td></tr></table></figure>
-<p>插入一些数据：</p>
-<figure class="highlight asciidoc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div></pre></td><td class="code"><pre><div class="line">mysql&gt; set names utf8;</div><div class="line">mysql&gt; insert into tc<span class="emphasis">_utf8(c2,c3) values('en_</span>30',repeat(<span class="emphasis">'a'</span>,30));</div><div class="line">Query OK, 1 rows affected (17.87 sec)</div><div class="line"></div><div class="line">mysql&gt; insert into tc<span class="emphasis">_utf8(c2,c3) values('en_</span>31',repeat(<span class="emphasis">'b'</span>,31));</div><div class="line">Query OK, 1 rows affected, 1 warnings (0.10 sec)</div><div class="line"></div><div class="line"><span class="section">mysql&gt; show warnings;</span></div><div class="line">+---------+------+-----------------------------------------+</div><div class="line"><span class="section">| Level   | Code | Message                                 |</span></div><div class="line">+---------+------+-----------------------------------------+</div><div class="line"><span class="section">| Warning | 1265 | Data truncated for column 'c3' at row 1 |</span></div><div class="line">+---------+------+-----------------------------------------+</div><div class="line">1 rows in set (0.14 sec)</div><div class="line"></div><div class="line">mysql&gt; insert into tc<span class="emphasis">_utf8(c2,c3) values('zh_</span>30',repeat(<span class="emphasis">'中'</span>,30));</div><div class="line">Query OK, 1 rows affected (0.18 sec)</div><div class="line"></div><div class="line">mysql&gt; insert into tc<span class="emphasis">_utf8(c2,c3) values('zh_</span>31',repeat(<span class="emphasis">'文'</span>,31));</div><div class="line">Query OK, 1 rows affected, 1 warnings (0.09 sec)</div><div class="line"></div><div class="line">意料之中，汉字同样被截断</div><div class="line"></div><div class="line"><span class="section">ysql&gt; select c2,c3,length(c3),char_length(c3) from tc_utf8;</span></div><div class="line">+-------+------------+-----------------+------------------------------------------------------------------------+</div><div class="line"><span class="section">| c2    | length(c3) | char_length(c3) | c3                                                                     |</span></div><div class="line">+-------+------------+-----------------+------------------------------------------------------------------------+</div><div class="line">| en<span class="emphasis">_30 |         30 |              30 | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa                                         |</span></div><div class="line">| en_31 |         30 |              30 | bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb                                         |</div><div class="line">| zh<span class="emphasis">_30 |         90 |              30 | 中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中 |</span></div><div class="line">| zh_31 |         90 |              30 | 文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文 |</div><div class="line"><span class="code">+-------+</span>------------<span class="code">+-----------------+</span>------------------------------------------------------------------------+</div><div class="line">4 rows in set (0.00 sec)</div></pre></td></tr></table></figure>
-<p>上面的en_30代表insert的时候存入<em>30</em>个<em>英文</em>字符。可以看到30个a占用30个字节，30个汉字占用90个字节，大于30的会被截断，证实了文章一开头的说法。</p>
-<figure class="highlight asciidoc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div></pre></td><td class="code"><pre><div class="line">mysql&gt; set names latin1;</div><div class="line"></div><div class="line">mysql&gt; insert into tc<span class="emphasis">_utf8(c2,c3) values('zh_</span>30<span class="emphasis">_latin1',repeat('中',30));</span></div><div class="line">Query OK, 1 rows affected, 1 warnings (0.10 sec)</div><div class="line"></div><div class="line"><span class="section">mysql&gt; show warnings;</span></div><div class="line">+---------+------+-----------------------------------------+</div><div class="line"><span class="section">| Level   | Code | Message                                 |</span></div><div class="line">+---------+------+-----------------------------------------+</div><div class="line"><span class="section">| Warning | 1265 | Data truncated for column 'c3' at row 1 |</span></div><div class="line">+---------+------+-----------------------------------------+</div><div class="line">1 rows in set (0.14 sec)</div><div class="line"></div><div class="line">mysql&gt; insert into tc<span class="emphasis">_utf8(c2,c3) values('zh_</span>10<span class="emphasis">_latin1',repeat('中',10));</span></div><div class="line">Query OK, 1 rows affected (0.10 sec)</div><div class="line"></div><div class="line">mysql&gt; insert into tc<span class="emphasis">_utf8(c2,c3) values('zh_</span>10<span class="emphasis">_latin1',repeat('文',10));</span></div><div class="line">Query OK, 1 rows affected (0.11 sec)</div><div class="line"></div><div class="line">mysql&gt; insert into tc<span class="emphasis">_utf8(c2,c3) values('zh_</span>11<span class="emphasis">_latin1',repeat('文',11));</span></div><div class="line">Query OK, 1 rows affected, 1 warnings (0.12 sec)</div><div class="line"></div><div class="line">截断</div></pre></td></tr></table></figure>
-<p>上面的实验显示，db table是utf8，但客户端连接时使用latin1，在非严格模式下 varchar(30) <strong>只能存10</strong>个汉字，多余的尾部被截断了</p>
-<p>我们来看一下占用字节的情况：（2,3行的乱码是意料之中的）</p>
-<figure class="highlight gherkin"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line">mysql&gt; select c1,c2,c3,length(c3),char_length(c3) from tc_utf8;</div><div class="line">+----+--------------+--------------------------------+------------+-----------------+</div><div class="line">|<span class="string"> c1 </span>|<span class="string"> c2           </span>|<span class="string"> c3                             </span>|<span class="string"> length(c3) </span>|<span class="string"> char_length(c3) </span>|</div><div class="line">+----+--------------+--------------------------------+------------+-----------------+</div><div class="line">|<span class="string"> 1  </span>|<span class="string"> en_30        </span>|<span class="string"> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa </span>|<span class="string"> 30         </span>|<span class="string"> 30              </span>|</div><div class="line">|<span class="string"> 2  </span>|<span class="string"> en_31        </span>|<span class="string"> bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb </span>|<span class="string"> 30         </span>|<span class="string"> 30              </span>|</div><div class="line">|<span class="string"> 3  </span>|<span class="string"> zh_30        </span>|<span class="string"> ?????????????????????????????? </span>|<span class="string"> 90         </span>|<span class="string"> 30              </span>|</div><div class="line">|<span class="string"> 4  </span>|<span class="string"> zh_31        </span>|<span class="string"> ?????????????????????????????? </span>|<span class="string"> 90         </span>|<span class="string"> 30              </span>|</div><div class="line">|<span class="string"> 5  </span>|<span class="string"> zh_30_latin1 </span>|<span class="string"> 中中中中中中中中中中 </span>|<span class="string"> 60         </span>|<span class="string"> 30              </span>|</div><div class="line">|<span class="string"> 6  </span>|<span class="string"> zh_10_latin1 </span>|<span class="string"> 中中中中中中中中中中 </span>|<span class="string"> 60         </span>|<span class="string"> 30              </span>|</div><div class="line">|<span class="string"> 7  </span>|<span class="string"> zh_10_latin1 </span>|<span class="string"> 文文文文文文文文文文 </span>|<span class="string"> 80         </span>|<span class="string"> 30              </span>|</div><div class="line">|<span class="string"> 9  </span>|<span class="string"> zh_11_latin1 </span>|<span class="string"> 文文文文文文文文文文 </span>|<span class="string"> 80         </span>|<span class="string"> 30              </span>|</div><div class="line">+----+--------------+--------------------------------+------------+-----------------+</div><div class="line">8 rows in set (0.14 sec)</div></pre></td></tr></table></figure>
-<p>看到char_length函数算出的中、英文字符个数都是30，但一个“中”占6字节，一个“文”占8字节，是不是很诧异，这中间有数次的编码转换过程，有兴趣 可以参考 <a href="http://mysql.rjweb.org/doc.php/charcoll" target="_blank" rel="external">http://mysql.rjweb.org/doc.php/charcoll</a> ，是可以模拟出来的。</p>
-<p>在严格模式下就没这么复杂了，所以尽量使用 STRICT_TRANS_TABLES ，避免意外的情况带入生产环境。早期设计的时候就要保持客户端与数据库字符集一致。</p>
-<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><ul>
-<li><a href="http://dev.mysql.com/doc/refman/5.7/en/char.html" target="_blank" rel="external">MySQL manual:The CHAR and VARCHAR Types</a></li>
-<li><a href="http://get.ftqq.com/723.get" target="_blank" rel="external">MySQL字符集指南–进阶篇V0.7</a></li>
-<li><a href="http://mysql.rjweb.org/doc.php/charcoll" target="_blank" rel="external">MySQL字符集与校对规则</a></li>
-<li><a href="http://www.mysqltutorial.org/mysql-string-length/" target="_blank" rel="external">MySQL String Length</a></li>
-<li><a href="http://sunny90.com/a/database/2014/0819/24.html" target="_blank" rel="external">http://sunny90.com/a/database/2014/0819/24.html</a></li>
-</ul>
-<hr>
-<p>本文链接地址：<a href="http://seanlook.com/2016/04/28/mysql-char-varchar-set/">http://seanlook.com/2016/04/28/mysql-char-varchar-set/</a></p>
-<hr>
-]]></content>
-    
-    <summary type="html">
-    
-      &lt;p&gt;数据类型差不多是接触mysql一开始就了解的内容，最近遇到几个现象如varchar自动转mediumtext，blob存储性能的问题，不得不回头明确一下关于MySQL常用数据类型的选择。&lt;/p&gt;
-&lt;p&gt;&lt;a href=&quot;http://dev.mysql.com/doc/refman/5.6/en/char.html&quot;&gt;mysql手册这里&lt;/a&gt; 已经讲的很清楚了。它们都是定义字符串型字段时常用的类型，但它们存储和检索的方式有不同，最大长度和尾部的空格是否保留也有差别。&lt;/p&gt;
-&lt;p&gt;&lt;code&gt;char&lt;/code&gt;类型是使用固定长度空间进行存储，范围0-255。比如&lt;code&gt;CHAR(30)&lt;/code&gt;能放30个字符，存放abcd时，尾部会以空格补齐，实际占用空间 30 * 3bytes (utf8)。检索它的时候尾部空格会被去除。&lt;/p&gt;
-&lt;p&gt;char善于存储经常改变的值，或者长度相对固定的值，比如type、ip地址或md5之类的数据，不容易产生碎片。关于它的效率可以参考&lt;a href=&quot;http://bbs.chinaunix.net/thread-1696053-1-1.html&quot;&gt;这里&lt;/a&gt;。&lt;/p&gt;
-&lt;p&gt;&lt;code&gt;varchar&lt;/code&gt;类型保存可变长度字符串，范围0-65535（但受到单行最大64kb的限制）。比如用 &lt;code&gt;varchar(30)&lt;/code&gt; 去存放abcd，实际使用5个字节，因为还需要使用额外1个字节来标识字串长度（0-255使用1个字节，超过255需要2个字节）。&lt;/p&gt;
-&lt;p&gt;varchar善于存储值的长短不一的列，也是用的最多的一种类型，节省磁盘空间。update时varchar列时，如果新数据比原数据大，数据库需要重新开辟空间，这一点会有性能略有损耗，但innodb引擎下查询效率比char高一点。这也是innodb官方推荐的类型。&lt;/p&gt;
-&lt;p&gt;如果存储时真实长度超过了char或者varchar定义的最大长度呢？&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;在SQL严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示错误，即插入失败&lt;/li&gt;
-&lt;li&gt;在SQL非严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示warning，但可以成功&lt;/li&gt;
-&lt;li&gt;如果尾部要被截断的是空格，无论SQL所处模式，varchar都可以插入成功但提示warning；char也可以插入成功，并且无任何提示&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;这里特意提到SQL的严格模式，是因为在工作中也遇到过一些坑，参考&lt;a href=&quot;&quot;&gt;MySQL的sql_mode严格模式注意点&lt;/a&gt;。&lt;/p&gt;
-&lt;p&gt;贴上官方的一个表格：&lt;/p&gt;
-&lt;table&gt;
-&lt;thead&gt;
-&lt;tr&gt;
-&lt;th&gt;Value&lt;/th&gt;
-&lt;th&gt;CHAR(4)&lt;/th&gt;
-&lt;th&gt;Storage Required&lt;/th&gt;
-&lt;th&gt;VARCHAR(4)&lt;/th&gt;
-&lt;th&gt;Storage Required&lt;/th&gt;
-&lt;/tr&gt;
-&lt;/thead&gt;
-&lt;tbody&gt;
-&lt;tr&gt;
-&lt;td&gt;‘’&lt;/td&gt;
-&lt;td&gt;‘    ‘&lt;/td&gt;
-&lt;td&gt;4 bytes&lt;/td&gt;
-&lt;td&gt;‘’&lt;/td&gt;
-&lt;td&gt;1 byte&lt;/td&gt;
-&lt;/tr&gt;
-&lt;tr&gt;
-&lt;td&gt;‘ab’&lt;/td&gt;
-&lt;td&gt;‘ab  ‘&lt;/td&gt;
-&lt;td&gt;4 bytes&lt;/td&gt;
-&lt;td&gt;‘ab’&lt;/td&gt;
-&lt;td&gt;3 bytes&lt;/td&gt;
-&lt;/tr&gt;
-&lt;tr&gt;
-&lt;td&gt;‘abcd’&lt;/td&gt;
-&lt;td&gt;‘abcd’&lt;/td&gt;
-&lt;td&gt;4 bytes&lt;/td&gt;
-&lt;td&gt;‘abcd’&lt;/td&gt;
-&lt;td&gt;5 bytes&lt;/td&gt;
-&lt;/tr&gt;
-&lt;tr&gt;
-&lt;td&gt;‘abcdefgh’&lt;/td&gt;
-&lt;td&gt;‘abcd’&lt;/td&gt;
-&lt;td&gt;4 bytes&lt;/td&gt;
-&lt;td&gt;‘abcd’&lt;/td&gt;
-&lt;td&gt;5 bytes&lt;/td&gt;
-&lt;/tr&gt;
-&lt;/tbody&gt;
-&lt;/table&gt;
-&lt;p&gt;另外，mysql字段值比较时默认是不区分大小写的，这是由于他们的校对规则（一般是 utf8_general_ci）决定的，按字符比较，所以查询时 值尾部 的空格也是被忽略的，除非建表时对列指定 &lt;code&gt;BINARY&lt;/code&gt; （校对字符集变成utf8_bin）或者&lt;code&gt;select * from vc where binary v=&amp;#39;ab  &amp;#39;;&lt;/code&gt;，就会按字节比较，即比较时区分大小写和尾部空格。&lt;/p&gt;
-&lt;p&gt;需要注意的是，使用varchar不能因为长度可变就随意分大空间，比如90个字节能放够的列定义成varchar(200)，因为开辟内存时是以200字节进行的，遇到需要filesort或tmp table作业可能会带来不利影响。&lt;/p&gt;
     
     </summary>
     

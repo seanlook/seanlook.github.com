@@ -281,6 +281,184 @@
             
               
                 
+                <a class="post-title-link" href="/2016/04/28/mysql-char-varchar-set/" itemprop="url">
+                  MySQL字符数据类型char与varchar的区别
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">Posted on</span>
+            <time itemprop="dateCreated" datetime="2016-04-28T16:32:49+08:00" content="2016-04-28">
+              2016-04-28
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/04/28/mysql-char-varchar-set/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/04/28/mysql-char-varchar-set/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>数据类型差不多是接触mysql一开始就了解的内容，最近遇到几个现象如varchar自动转mediumtext，blob存储性能的问题，不得不回头明确一下关于MySQL常用数据类型的选择。</p>
+<p><a href="http://dev.mysql.com/doc/refman/5.6/en/char.html">mysql手册这里</a> 已经讲的很清楚了。它们都是定义字符串型字段时常用的类型，但它们存储和检索的方式有不同，最大长度和尾部的空格是否保留也有差别。</p>
+<p><code>char</code>类型是使用固定长度空间进行存储，范围0-255。比如<code>CHAR(30)</code>能放30个字符，存放abcd时，尾部会以空格补齐，实际占用空间 30 * 3bytes (utf8)。检索它的时候尾部空格会被去除。</p>
+<p>char善于存储经常改变的值，或者长度相对固定的值，比如type、ip地址或md5之类的数据，不容易产生碎片。关于它的效率可以参考<a href="http://bbs.chinaunix.net/thread-1696053-1-1.html">这里</a>。</p>
+<p><code>varchar</code>类型保存可变长度字符串，范围0-65535（但受到单行最大64kb的限制）。比如用 <code>varchar(30)</code> 去存放abcd，实际使用5个字节，因为还需要使用额外1个字节来标识字串长度（0-255使用1个字节，超过255需要2个字节）。</p>
+<p>varchar善于存储值的长短不一的列，也是用的最多的一种类型，节省磁盘空间。update时varchar列时，如果新数据比原数据大，数据库需要重新开辟空间，这一点会有性能略有损耗，但innodb引擎下查询效率比char高一点。这也是innodb官方推荐的类型。</p>
+<p>如果存储时真实长度超过了char或者varchar定义的最大长度呢？</p>
+<ul>
+<li>在SQL严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示错误，即插入失败</li>
+<li>在SQL非严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示warning，但可以成功</li>
+<li>如果尾部要被截断的是空格，无论SQL所处模式，varchar都可以插入成功但提示warning；char也可以插入成功，并且无任何提示</li>
+</ul>
+<p>这里特意提到SQL的严格模式，是因为在工作中也遇到过一些坑，参考<a href="">MySQL的sql_mode严格模式注意点</a>。</p>
+<p>贴上官方的一个表格：</p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>CHAR(4)</th>
+<th>Storage Required</th>
+<th>VARCHAR(4)</th>
+<th>Storage Required</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>‘’</td>
+<td>‘    ‘</td>
+<td>4 bytes</td>
+<td>‘’</td>
+<td>1 byte</td>
+</tr>
+<tr>
+<td>‘ab’</td>
+<td>‘ab  ‘</td>
+<td>4 bytes</td>
+<td>‘ab’</td>
+<td>3 bytes</td>
+</tr>
+<tr>
+<td>‘abcd’</td>
+<td>‘abcd’</td>
+<td>4 bytes</td>
+<td>‘abcd’</td>
+<td>5 bytes</td>
+</tr>
+<tr>
+<td>‘abcdefgh’</td>
+<td>‘abcd’</td>
+<td>4 bytes</td>
+<td>‘abcd’</td>
+<td>5 bytes</td>
+</tr>
+</tbody>
+</table>
+<p>另外，mysql字段值比较时默认是不区分大小写的，这是由于他们的校对规则（一般是 utf8_general_ci）决定的，按字符比较，所以查询时 值尾部 的空格也是被忽略的，除非建表时对列指定 <code>BINARY</code> （校对字符集变成utf8_bin）或者<code>select * from vc where binary v=&#39;ab  &#39;;</code>，就会按字节比较，即比较时区分大小写和尾部空格。</p>
+<p>需要注意的是，使用varchar不能因为长度可变就随意分大空间，比如90个字节能放够的列定义成varchar(200)，因为开辟内存时是以200字节进行的，遇到需要filesort或tmp table作业可能会带来不利影响。</p>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2016/04/28/mysql-char-varchar-set/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
                 <a class="post-title-link" href="/2016/04/22/mysql-sql-mode-troubleshooting/" itemprop="url">
                   MySQL sql_mode 说明（及处理一起 sql_mode 引发的问题）
                 </a>
@@ -785,142 +963,6 @@
 
 
     
-      
-
-  
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/12/29/mysql_replica_pt-table-checksum/" itemprop="url">
-                  生产环境使用 pt-table-checksum 检查MySQL数据一致性
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            <span class="post-meta-item-icon">
-              <i class="fa fa-calendar-o"></i>
-            </span>
-            <span class="post-meta-item-text">Posted on</span>
-            <time itemprop="dateCreated" datetime="2015-12-29T10:21:25+08:00" content="2015-12-29">
-              2015-12-29
-            </time>
-          </span>
-
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                &nbsp; | &nbsp;
-                <a href="/2015/12/29/mysql_replica_pt-table-checksum/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/12/29/mysql_replica_pt-table-checksum/" itemprop="commentsCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-
-          
-          
-
-          
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>公司数据中心从托管机房迁移到阿里云，需要对mysql迁移（Replication）后的数据一致性进行校验，但又不能对生产环境使用造成影响，pt-table-checksum 成为了绝佳也是唯一的检查工具。</p>
-<p><code>pt-table-checksum</code> 是 Percona-Toolkit 的组件之一，用于检测MySQL主、从库的数据是否一致。其原理是在主库执行基于statement的sql语句来生成主库数据块的checksum，把相同的sql语句传递到从库执行，并在从库上计算相同数据块的checksum，最后，比较主从库上相同数据块的checksum值，由此判断主从数据是否一致。检测过程根据唯一索引将表按row切分为块（chunk），以为单位计算，可以避免锁表。检测时会自动判断复制延迟、 master的负载， 超过阀值后会自动将检测暂停，减小对线上服务的影响。</p>
-<p><code>pt-table-checksum</code> 默认情况下可以应对绝大部分场景，官方说，即使上千个库、上万亿的行，它依然可以很好的工作，这源自于设计很简单，一次检查一个表，不需要太多的内存和多余的操作；必要时，<code>pt-table-checksum</code> 会根据服务器负载动态改变 chunk 大小，减少从库的延迟。</p>
-<p>为了减少对数据库的干预，<code>pt-table-checksum</code>还会自动侦测并连接到从库，当然如果失败，可以指定<code>--recursion-method</code>选项来告诉从库在哪里。它的易用性还体现在，复制若有延迟，在从库 checksum 会暂停直到赶上主库的计算时间点（也通过选项<code>--</code>设定一个可容忍的延迟最大值，超过这个值也认为不一致）。 </p>
-<p>为了保证主数据库服务的安全，该工具实现了许多保护措施：</p>
-<ol>
-<li>自动设置 <code>innodb_lock_wait_timeout</code> 为1s，避免引起</li>
-<li>默认当数据库有25个以上的并发查询时，<code>pt-table-checksum</code>会暂停。可以设置 <code>--max-load</code> 选项来设置这个阀值</li>
-<li>当用 Ctrl+C 停止任务后，工具会正常的完成当前 chunk 检测，下次使用 <code>--resume</code> 选项启动可以恢复继续下一个 chunk</li>
-</ol>
-<h2 id="工作过程"><a href="#工作过程" class="headerlink" title="工作过程"></a>工作过程</h2><p>直接看 <a href="http://www.nettedfish.com/blog/2013/06/04/check-replication-consistency-by-pt-table-checksum/">nettedfish</a> 的说明：</p>
-<blockquote>
-<p>1. 连接到主库：pt工具连接到主库，然后自动发现主库的所有从库。默认采用show full processlist来查找从库，但是这只有在主从实例端口相同的情况下才有效。<br>3. 查找主库或者从库是否有复制过滤规则：这是为了安全而默认检查的选项。你可以关闭这个检查，但是这可能导致checksum的sql语句要么不会同步到从库，要么到了从库发现从库没有要被checksum的表，这都会导致从库同步卡库。<br>5. 开始获取表，一个个的计算。<br>6. 如果是表的第一个chunk，那么chunk-size一般为1000；如果不是表的第一个chunk，那么采用19步中分析出的结果。<br>7. 检查表结构，进行数据类型转换等，生成checksum的sql语句。<br>8. 根据表上的索引和数据的分布，选择最合适的split表的方法。<br>9. 开始checksum表。<br>10. 默认在chunk一个表之前，先删除上次这个表相关的计算结果。除非–resume。<br>14. 根据explain的结果，判断chunk的size是否超过了你定义的chunk-size的上限。如果超过了，为了不影响线上性能，这个chunk将被忽略。<br>15. 把要checksum的行加上for update锁，并计算。<br>17-18. 把计算结果存储到master_crc master_count列中。<br>19. 调整下一个chunk的大小。<br>20. 等待从库追上主库。如果没有延迟备份的从库在运行，最好检查所有的从库，如果发现延迟最大的从库延迟超过max-lag秒，pt工具在这里将暂停。<br>21. 如果发现主库的max-load超过某个阈值，pt工具在这里将暂停。<br>22. 继续下一个chunk，直到这个table被chunk完毕。<br>23-24. 等待从库执行完checksum，便于生成汇总的统计结果。每个表汇总并统计一次。<br>25-26. 循环每个表，直到结束。<br>校验结束后，在每个从库上，执行如下的sql语句即可看到是否有主从不一致发生： </p>
-</blockquote>
-<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">select</span> * <span class="keyword">from</span> percona.checksums <span class="keyword">where</span> master_cnt &lt;&gt; this_cnt <span class="keyword">OR</span> master_crc &lt;&gt; this_crc <span class="keyword">OR</span> </div><div class="line"><span class="keyword">ISNULL</span>(master_crc) &lt;&gt; <span class="keyword">ISNULL</span>(this_crc) \G</div></pre></td></tr></table></figure>
-          <div class="post-more-link text-center">
-            <a class="btn" href="/2015/12/29/mysql_replica_pt-table-checksum/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -966,7 +1008,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">92</span>
+              <span class="site-state-item-count">93</span>
               <span class="site-state-item-name">posts</span>
             </a>
           </div>
