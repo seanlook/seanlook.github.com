@@ -5,7 +5,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://seanlook.com/"/>
-  <updated>2017-03-03T08:32:49.000Z</updated>
+  <updated>2017-03-11T08:32:49.000Z</updated>
   <id>http://seanlook.com/</id>
   
   <author>
@@ -16,6 +16,83 @@
   <generator uri="http://hexo.io/">Hexo</generator>
   
   <entry>
+    <title>index merge 引起的死锁分析</title>
+    <link href="http://seanlook.com/2017/03/11/mysql-index_merge-deadlock/"/>
+    <id>http://seanlook.com/2017/03/11/mysql-index_merge-deadlock/</id>
+    <published>2017-03-11T08:32:49.000Z</published>
+    <updated>2017-03-11T08:32:49.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>在看线上一个 MySQL innodb status 时，发现有死锁信息，而且出现的频率还不低。于是分析了一下，把过程记录下来。</p>
+<h2 id="1-概要"><a href="#1-概要" class="headerlink" title="1. 概要"></a>1. 概要</h2><p>表结构：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> t_mytb1 (</div><div class="line">  f_id <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">unsigned</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> AUTO_INCREMENT,</div><div class="line">  f_fid <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">unsigned</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">'0'</span>,</div><div class="line">  f_sid <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">unsigned</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">'0'</span>,</div><div class="line">  f_mode <span class="built_in">varchar</span>(<span class="number">32</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">''</span>,</div><div class="line">  f_read <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">unsigned</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">'0'</span>,</div><div class="line">  f_xxx1 <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">unsigned</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">'0'</span>,</div><div class="line">  f_xxx2 <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">unsigned</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">'0'</span>,</div><div class="line">  f_wx_zone <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">unsigned</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">'0'</span>,</div><div class="line">  PRIMARY <span class="keyword">KEY</span> (f_id),</div><div class="line">  <span class="keyword">KEY</span> idx_sid (f_sid),</div><div class="line">  <span class="keyword">KEY</span> idx_fid (f_fid)</div><div class="line">) <span class="keyword">ENGINE</span>=<span class="keyword">InnoDB</span> <span class="keyword">DEFAULT</span> <span class="keyword">CHARSET</span>=utf8mb4;</div></pre></td></tr></table></figure></p>
+<p>处理后的死锁信息：<br><figure class="highlight vbscript"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div></pre></td><td class="code"><pre><div class="line">LATEST DETECTED DEADLOCK</div><div class="line">------------------------</div><div class="line"><span class="number">2017</span><span class="number">-02</span><span class="number">-28</span> <span class="number">13</span>:<span class="number">58</span>:<span class="number">29</span> <span class="number">7</span>f25a3efd700</div><div class="line">*** (<span class="number">1</span>) TRANSACTION:</div><div class="line">TRANSACTION <span class="number">4907718431</span>, ACTIVE <span class="number">0.010</span> sec fetching rows</div><div class="line">mysql tables <span class="keyword">in</span> use <span class="number">3</span>, locked <span class="number">3</span></div><div class="line">LOCK WAIT <span class="number">154</span> lock struct(s), heap size <span class="number">30248</span>, <span class="number">10</span> row lock(s)</div><div class="line">LOCK BLOCKING MySQL thread id: <span class="number">13589250</span> block <span class="number">13589247</span></div><div class="line">MySQL thread id <span class="number">13589247</span>, OS thread handle <span class="number">0x7f25a17e3700</span>, query id <span class="number">27061926722</span> <span class="number">10.47</span><span class="number">.52</span><span class="number">.51</span> ecweb Searching rows <span class="keyword">for</span> update</div><div class="line">UPDATE `d_db1`.`t_mytb1` <span class="keyword">SET</span> `f_read` = f_read+<span class="number">1</span> WHERE (f_fid=<span class="number">91243</span>) <span class="keyword">AND</span> (f_sid=<span class="number">100</span>) <span class="keyword">AND</span> (f_mode=<span class="comment">'浏览器')</span></div><div class="line">*** (<span class="number">1</span>) WAITING <span class="keyword">FOR</span> THIS LOCK <span class="keyword">TO</span> BE GRANTED:</div><div class="line">RECORD LOCKS <span class="built_in">space</span> id <span class="number">13288</span> page no <span class="number">375</span> n bits <span class="number">352</span> index `PRIMARY` of table `d_db1`.`t_mytb1` trx id <span class="number">4907718431</span> lock_mode X locks rec but <span class="keyword">not</span> gap waiting</div><div class="line">Record lock, heap no <span class="number">245</span> PHYSICAL RECORD: n_fields <span class="number">10</span>; compact format; info bits <span class="number">0</span></div><div class="line"> <span class="number">0</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">0000</span>a63b; <span class="built_in">asc</span>    ;;;</div><div class="line"> <span class="number">1</span>: <span class="built_in">len</span> <span class="number">6</span>; <span class="built_in">hex</span> <span class="number">0001246304</span>a7; <span class="built_in">asc</span>   $c  ;;</div><div class="line"> <span class="number">2</span>: <span class="built_in">len</span> <span class="number">7</span>; <span class="built_in">hex</span> <span class="number">7</span>f000ac0162428; <span class="built_in">asc</span>      $(;;</div><div class="line"> <span class="number">3</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">00016470</span>; <span class="built_in">asc</span>   dp;;</div><div class="line"> <span class="number">4</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">00000064</span>; <span class="built_in">asc</span>    d;;</div><div class="line"> <span class="number">5</span>: <span class="built_in">len</span> <span class="number">9</span>; <span class="built_in">hex</span> e6b58fe8a788e599a8; <span class="built_in">asc</span>          ;;</div><div class="line"> <span class="number">6</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">0000244</span>f; <span class="built_in">asc</span>   $O;;</div><div class="line"> <span class="number">7</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">0000007</span>c; <span class="built_in">asc</span>    |;;</div><div class="line"> <span class="number">8</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">00000000</span>; <span class="built_in">asc</span>     ;;</div><div class="line"> <span class="number">9</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">00000000</span>; <span class="built_in">asc</span>     ;;</div><div class="line"></div><div class="line">*** (<span class="number">2</span>) TRANSACTION:</div><div class="line">TRANSACTION <span class="number">4907718435</span>, ACTIVE <span class="number">0.007</span> sec fetching rows</div><div class="line">mysql tables <span class="keyword">in</span> use <span class="number">3</span>, locked <span class="number">3</span></div><div class="line"><span class="number">154</span> lock struct(s), heap size <span class="number">30248</span>, <span class="number">3</span> row lock(s)</div><div class="line">MySQL thread id <span class="number">13589250</span>, OS thread handle <span class="number">0x7f25a3efd700</span>, query id <span class="number">27061926757</span> <span class="number">10.47</span><span class="number">.104</span><span class="number">.140</span> ecweb Searching rows <span class="keyword">for</span> update</div><div class="line">UPDATE `d_db1`.`t_mytb1` <span class="keyword">SET</span> `f_read` = f_read+<span class="number">1</span> WHERE (f_fid=<span class="number">91248</span>) <span class="keyword">AND</span> (f_sid=<span class="number">100</span>) <span class="keyword">AND</span> (f_mode=<span class="comment">'浏览器')</span></div><div class="line">*** (<span class="number">2</span>) HOLDS THE LOCK(S):</div><div class="line">RECORD LOCKS <span class="built_in">space</span> id <span class="number">13288</span> page no <span class="number">375</span> n bits <span class="number">352</span> index `PRIMARY` of table `d_db1`.`t_mytb1` trx id <span class="number">4907718435</span> lock_mode X locks rec but <span class="keyword">not</span> gap</div><div class="line">Record lock, heap no <span class="number">245</span> PHYSICAL RECORD: n_fields <span class="number">10</span>; compact format; info bits <span class="number">0</span></div><div class="line"> <span class="number">0</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">0000</span>a63b; <span class="built_in">asc</span>    ;;;  -- <span class="number">42555</span></div><div class="line"> <span class="number">1</span>: <span class="built_in">len</span> <span class="number">6</span>; <span class="built_in">hex</span> <span class="number">0001246304</span>a7; <span class="built_in">asc</span>   $c  ;;  -- <span class="number">4905436327</span></div><div class="line"> <span class="number">2</span>: <span class="built_in">len</span> <span class="number">7</span>; <span class="built_in">hex</span> <span class="number">7</span>f000ac0162428; <span class="built_in">asc</span>      $(;;</div><div class="line"> <span class="number">3</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">00016470</span>; <span class="built_in">asc</span>   dp;;  -- <span class="number">91248</span></div><div class="line"> <span class="number">4</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">00000064</span>; <span class="built_in">asc</span>    d;;  -- <span class="number">100</span></div><div class="line"> <span class="number">5</span>: <span class="built_in">len</span> <span class="number">9</span>; <span class="built_in">hex</span> e6b58fe8a788e599a8; <span class="built_in">asc</span>          ;;</div><div class="line"> <span class="number">6</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">0000244</span>f; <span class="built_in">asc</span>   $O;;  -- <span class="number">9295</span></div><div class="line"> <span class="number">7</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">0000007</span>c; <span class="built_in">asc</span>    |;;  -- <span class="number">124</span></div><div class="line"> <span class="number">8</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">00000000</span>; <span class="built_in">asc</span>     ;;</div><div class="line"> <span class="number">9</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">00000000</span>; <span class="built_in">asc</span>     ;;</div><div class="line"></div><div class="line">*** (<span class="number">2</span>) WAITING <span class="keyword">FOR</span> THIS LOCK <span class="keyword">TO</span> BE GRANTED:</div><div class="line">RECORD LOCKS <span class="built_in">space</span> id <span class="number">13288</span> page no <span class="number">202</span> n bits <span class="number">1272</span> index `idx_sid` of table `d_db1`.`t_mytb1` trx id <span class="number">4907718435</span> lock_mode X locks rec but <span class="keyword">not</span> gap waiting</div><div class="line">Record lock, heap no <span class="number">705</span> PHYSICAL RECORD: n_fields <span class="number">2</span>; compact format; info bits <span class="number">0</span></div><div class="line"> <span class="number">0</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">00000064</span>; <span class="built_in">asc</span>    d;;  -- <span class="number">100</span></div><div class="line"> <span class="number">1</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">0000</span>a633; <span class="built_in">asc</span>    <span class="number">3</span>;;  -- <span class="number">42547</span></div><div class="line"></div><div class="line">*** WE ROLL BACK TRANSACTION (<span class="number">2</span>)</div></pre></td></tr></table></figure></p>
+<p>乍一看很奇怪，tx1和tx2 两个 UPDATE 各自以 f_fid 为条件更新的记录互不影响才对，即使91243，91248两个值有可能出现在同一条数据上（因为f_fid上是二级索引），那顶多也就是个更新锁等待，谁后来谁等待，怎么会出现互相争用对方已持有的锁，从而而被死锁检测机制捕获？</p>
+<p>当然把 update 语句拿到数据库中 EXPLAIN 一下就可以看出端倪。这里不妨先分析一下输出的锁情况：</p>
+<p><strong>先看 Tx2 (对应trx id 4907718435)</strong> :  </p>
+<ol>
+<li><p><code>RECORD LOCKS space id 13288 page no 375 n bits 352</code> 告诉我们是表空间id 13288 (可从 <code>information_schema.INNODB_SYS_DATAFILES</code> 查到对应ibd文件) 即 t_mytb1 表，第 375 号页面的 245 位置的记录被锁，并且是 idx PRIMARY 上的记录锁（注：本实例隔离级别为RC）。 Tx2正持有这把记录锁。<br>因为是聚集索引，显示了完整记录</p>
+<figure class="highlight ldif"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="attribute">0</span>: 主键f_id=42555</div><div class="line"><span class="attribute">1</span>: DB_TRX_ID = 4905436327</div><div class="line"><span class="attribute">2</span>: DB_ROLL_PTR指向undo记录的地址</div><div class="line"><span class="attribute">3</span>: f_fid=91248</div><div class="line"><span class="attribute">4</span>: f_sid=100</div><div class="line">   ...</div></pre></td></tr></table></figure>
+</li>
+<li><p>然而Tx2还在等待一个记录锁（lock_mode X locks rec but not gap waiting），但这把锁来自二级索引 <code>idx_sid</code> 索引上的记录锁。在 RC 级别下没有GAP lock，行锁除了加在符合条件的二级索引 f_sid=100 上外，还会对主键加record lock。<br>二级索引值：</p>
+<a id="more"></a>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="attribute">0</span>: f_sid=100</div><div class="line"><span class="attribute">1</span>: 主键f_id=42547</div></pre></td></tr></table></figure>
+</li>
+</ol>
+<p>明显它们是两条不同的记录。</p>
+<p><strong>看看 Tx1（对应trx id 4907718431）</strong><br>Tx1 事务等待的锁，就是上面 Tx2 已持有的记录锁 f_id=42555 。但是由于输出的关系，没有看到它持有的锁。既然这里出现死锁，可以推断，Tx1执行update时，已获得 f_id=42547 的记录锁，这样才导致死锁，否则的话只会出现一方等待。</p>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-secondary-index-merge.png" alt=""></p>
+<p>InnoDB最终选择回滚 Tx2 是可以理解的 —— 它只获得了一个记录锁，资源占用最少。目前还无法解释的是关于锁数量这一部分：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">mysql tables in <span class="keyword">use</span> <span class="number">3</span>, <span class="keyword">locked</span> <span class="number">3</span></div><div class="line"><span class="number">154</span> <span class="keyword">lock</span> <span class="keyword">struct</span>(s), <span class="keyword">heap</span> <span class="keyword">size</span> <span class="number">30248</span>, <span class="number">3</span> <span class="keyword">row</span> <span class="keyword">lock</span>(s)</div></pre></td></tr></table></figure></p>
+<h2 id="2-死锁产生的原因-——-index-merge"><a href="#2-死锁产生的原因-——-index-merge" class="headerlink" title="2. 死锁产生的原因 —— index merge"></a>2. 死锁产生的原因 —— index merge</h2><p>上面任何一个 update 的explain结果：<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-index_merge-deadlock.png" alt=""></p>
+<p>可以看到 EXTRA 列 <code>Using intersect(idx_sid, idx_fid)</code>。</p>
+<p>索引合并是 5.0 就引入的一种优化手段，意指在查询语句里，可以在一个表上使用多个索引，同时扫描，最后进行结果合并。上面的例子里，条件 <code>f_fid=xxx and f_sid=xxx</code>，因为表上有 <em>f_fid</em> 和 <em>f_sid</em> 两个单列索引，优化器在成本模型里进行估算，认为一边使用 f_fid=91243 索引扫描，一边使用 f_sid=100 索引扫描，然后对两个结果集取交集，会更快。结果在高并发更新情况下：</p>
+<ul>
+<li>Tx2通过 f_fid 索引锁住了记录 42555，欲通过 f_sid 锁定另一条记录 42547</li>
+<li>Tx1 已通过 f_sid 锁定 42547，欲通过 f_fid 锁住记录42555</li>
+<li>死锁发生</li>
+</ul>
+<h3 id="关于索引合并"><a href="#关于索引合并" class="headerlink" title="关于索引合并"></a>关于索引合并</h3><p>intersection 只是 索引合并中的一种，还有 union, sort_union 。可以用到  index_merge 是有比较苛刻的条件。</p>
+<ol>
+<li>首先是 Range 优先(&gt;5.6.7)。比如 key1=1 or (key1=2 and key2=3)，其中key1是可以转化成 range scan 的，不会使用 index merge</li>
+<li>其次，Intersect和Union要符合 ROR，即 Rowid-Ordered-Retrival：<blockquote>
+<p>Intersect和Union都需要使用的索引是ROR的，也就时ROWID ORDERED，即针对不同的索引扫描出来的数据必须是同时按照ROWID排序的，这里的 ROWID其实也就是InnoDB的主键(如果不定义主键，InnoDB会隐式添加ROWID列作为主键)。只有每个索引是ROR的，才能进行归并排序，你懂的。 当然你可能会有疑惑，查不记录后内部进行一次sort不一样么，何必必须要ROR呢，不错，所以有了SORT-UNION。SORT-UNION就是每个非ROR的索引 排序后再进行Merge<br> – 来自 <a href="http://www.cnblogs.com/nocode/archive/2013/01/28/2880654.html" target="_blank" rel="external">http://www.cnblogs.com/nocode/archive/2013/01/28/2880654.html</a></p>
+</blockquote>
+</li>
+</ol>
+<p>像 <em>key1=v1 or key2=v2</em> ， key1与key2是单列索引，并且无其它索引可用，就有可能看到 Using Union(xx,xxx) 。更多内容可见参考链接。</p>
+<h2 id="3-解决-——-加联合索引"><a href="#3-解决-——-加联合索引" class="headerlink" title="3. 解决 —— 加联合索引"></a>3. 解决 —— 加联合索引</h2><p>解决这个死锁可能你也想到了，添加联合索引 <code>idx_fid_sid(f_fid, f_sid)</code>，这样一来查询会选择这一个索引，至于 idx_sid 这个单列索引还需不需要，看业务场景。</p>
+<p>另外，如果懂点业务的话，会发现这个更新之所以这么频繁，实际上试一个阅读量计数的功能，放到redis里可极大的提高并发能力，定时持久化到mysql表。</p>
+<p>最后提一句 index_merge 是有选项可以关闭的：<br><figure class="highlight applescript"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">mysql&gt; select @@optimizer_switch;</div><div class="line">index_merge=<span class="keyword">on</span>,index_merge_union=<span class="keyword">on</span>,index_merge_sort_union=<span class="keyword">on</span>,index_merge_intersection=<span class="keyword">on</span> ...</div></pre></td></tr></table></figure></p>
+<p>如果优化器选择了index_merge，一般是索引没建好，我看不让它使用比较更好。</p>
+<hr>
+<p>  原文链接地址：<a href="http://seanlook.com/2017/03/11/mysql-index_merge-deadlock/">http://seanlook.com/2017/03/11/mysql-index_merge-deadlock/</a></p>
+<hr>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;在看线上一个 MySQL innodb status 时，发现有死锁信息，而且出现的频率还不低。于是分析了一下，把过程记录下来。&lt;/p&gt;
+&lt;h2 id=&quot;1-概要&quot;&gt;&lt;a href=&quot;#1-概要&quot; class=&quot;headerlink&quot; title=&quot;1. 概要&quot;&gt;&lt;/a&gt;1. 概要&lt;/h2&gt;&lt;p&gt;表结构：&lt;br&gt;&lt;figure class=&quot;highlight sql&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;2&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;3&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;4&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;5&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;6&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;7&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;8&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;9&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;10&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;11&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;12&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;13&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;CREATE&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;TABLE&lt;/span&gt; t_mytb1 (&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  f_id &lt;span class=&quot;built_in&quot;&gt;int&lt;/span&gt;(&lt;span class=&quot;number&quot;&gt;11&lt;/span&gt;) &lt;span class=&quot;keyword&quot;&gt;unsigned&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;NOT&lt;/span&gt; &lt;span class=&quot;literal&quot;&gt;NULL&lt;/span&gt; AUTO_INCREMENT,&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  f_fid &lt;span class=&quot;built_in&quot;&gt;int&lt;/span&gt;(&lt;span class=&quot;number&quot;&gt;11&lt;/span&gt;) &lt;span class=&quot;keyword&quot;&gt;unsigned&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;NOT&lt;/span&gt; &lt;span class=&quot;literal&quot;&gt;NULL&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;DEFAULT&lt;/span&gt; &lt;span class=&quot;string&quot;&gt;&#39;0&#39;&lt;/span&gt;,&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  f_sid &lt;span class=&quot;built_in&quot;&gt;int&lt;/span&gt;(&lt;span class=&quot;number&quot;&gt;11&lt;/span&gt;) &lt;span class=&quot;keyword&quot;&gt;unsigned&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;NOT&lt;/span&gt; &lt;span class=&quot;literal&quot;&gt;NULL&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;DEFAULT&lt;/span&gt; &lt;span class=&quot;string&quot;&gt;&#39;0&#39;&lt;/span&gt;,&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  f_mode &lt;span class=&quot;built_in&quot;&gt;varchar&lt;/span&gt;(&lt;span class=&quot;number&quot;&gt;32&lt;/span&gt;) &lt;span class=&quot;keyword&quot;&gt;NOT&lt;/span&gt; &lt;span class=&quot;literal&quot;&gt;NULL&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;DEFAULT&lt;/span&gt; &lt;span class=&quot;string&quot;&gt;&#39;&#39;&lt;/span&gt;,&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  f_read &lt;span class=&quot;built_in&quot;&gt;int&lt;/span&gt;(&lt;span class=&quot;number&quot;&gt;11&lt;/span&gt;) &lt;span class=&quot;keyword&quot;&gt;unsigned&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;NOT&lt;/span&gt; &lt;span class=&quot;literal&quot;&gt;NULL&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;DEFAULT&lt;/span&gt; &lt;span class=&quot;string&quot;&gt;&#39;0&#39;&lt;/span&gt;,&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  f_xxx1 &lt;span class=&quot;built_in&quot;&gt;int&lt;/span&gt;(&lt;span class=&quot;number&quot;&gt;11&lt;/span&gt;) &lt;span class=&quot;keyword&quot;&gt;unsigned&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;NOT&lt;/span&gt; &lt;span class=&quot;literal&quot;&gt;NULL&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;DEFAULT&lt;/span&gt; &lt;span class=&quot;string&quot;&gt;&#39;0&#39;&lt;/span&gt;,&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  f_xxx2 &lt;span class=&quot;built_in&quot;&gt;int&lt;/span&gt;(&lt;span class=&quot;number&quot;&gt;11&lt;/span&gt;) &lt;span class=&quot;keyword&quot;&gt;unsigned&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;NOT&lt;/span&gt; &lt;span class=&quot;literal&quot;&gt;NULL&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;DEFAULT&lt;/span&gt; &lt;span class=&quot;string&quot;&gt;&#39;0&#39;&lt;/span&gt;,&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  f_wx_zone &lt;span class=&quot;built_in&quot;&gt;int&lt;/span&gt;(&lt;span class=&quot;number&quot;&gt;11&lt;/span&gt;) &lt;span class=&quot;keyword&quot;&gt;unsigned&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;NOT&lt;/span&gt; &lt;span class=&quot;literal&quot;&gt;NULL&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;DEFAULT&lt;/span&gt; &lt;span class=&quot;string&quot;&gt;&#39;0&#39;&lt;/span&gt;,&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  PRIMARY &lt;span class=&quot;keyword&quot;&gt;KEY&lt;/span&gt; (f_id),&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  &lt;span class=&quot;keyword&quot;&gt;KEY&lt;/span&gt; idx_sid (f_sid),&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  &lt;span class=&quot;keyword&quot;&gt;KEY&lt;/span&gt; idx_fid (f_fid)&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;) &lt;span class=&quot;keyword&quot;&gt;ENGINE&lt;/span&gt;=&lt;span class=&quot;keyword&quot;&gt;InnoDB&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;DEFAULT&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;CHARSET&lt;/span&gt;=utf8mb4;&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;&lt;/p&gt;
+&lt;p&gt;处理后的死锁信息：&lt;br&gt;&lt;figure class=&quot;highlight vbscript&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;2&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;3&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;4&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;5&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;6&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;7&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;8&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;9&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;10&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;11&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;12&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;13&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;14&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;15&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;16&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;17&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;18&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;19&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;20&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;21&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;22&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;23&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;24&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;25&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;26&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;27&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;28&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;29&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;30&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;31&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;32&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;33&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;34&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;35&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;36&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;37&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;38&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;39&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;40&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;41&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;42&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;43&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;44&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;45&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;46&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;47&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;48&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;49&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;50&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;51&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;LATEST DETECTED DEADLOCK&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;------------------------&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;number&quot;&gt;2017&lt;/span&gt;&lt;span class=&quot;number&quot;&gt;-02&lt;/span&gt;&lt;span class=&quot;number&quot;&gt;-28&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;13&lt;/span&gt;:&lt;span class=&quot;number&quot;&gt;58&lt;/span&gt;:&lt;span class=&quot;number&quot;&gt;29&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;7&lt;/span&gt;f25a3efd700&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;*** (&lt;span class=&quot;number&quot;&gt;1&lt;/span&gt;) TRANSACTION:&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;TRANSACTION &lt;span class=&quot;number&quot;&gt;4907718431&lt;/span&gt;, ACTIVE &lt;span class=&quot;number&quot;&gt;0.010&lt;/span&gt; sec fetching rows&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;mysql tables &lt;span class=&quot;keyword&quot;&gt;in&lt;/span&gt; use &lt;span class=&quot;number&quot;&gt;3&lt;/span&gt;, locked &lt;span class=&quot;number&quot;&gt;3&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;LOCK WAIT &lt;span class=&quot;number&quot;&gt;154&lt;/span&gt; lock struct(s), heap size &lt;span class=&quot;number&quot;&gt;30248&lt;/span&gt;, &lt;span class=&quot;number&quot;&gt;10&lt;/span&gt; row lock(s)&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;LOCK BLOCKING MySQL thread id: &lt;span class=&quot;number&quot;&gt;13589250&lt;/span&gt; block &lt;span class=&quot;number&quot;&gt;13589247&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;MySQL thread id &lt;span class=&quot;number&quot;&gt;13589247&lt;/span&gt;, OS thread handle &lt;span class=&quot;number&quot;&gt;0x7f25a17e3700&lt;/span&gt;, query id &lt;span class=&quot;number&quot;&gt;27061926722&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;10.47&lt;/span&gt;&lt;span class=&quot;number&quot;&gt;.52&lt;/span&gt;&lt;span class=&quot;number&quot;&gt;.51&lt;/span&gt; ecweb Searching rows &lt;span class=&quot;keyword&quot;&gt;for&lt;/span&gt; update&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;UPDATE `d_db1`.`t_mytb1` &lt;span class=&quot;keyword&quot;&gt;SET&lt;/span&gt; `f_read` = f_read+&lt;span class=&quot;number&quot;&gt;1&lt;/span&gt; WHERE (f_fid=&lt;span class=&quot;number&quot;&gt;91243&lt;/span&gt;) &lt;span class=&quot;keyword&quot;&gt;AND&lt;/span&gt; (f_sid=&lt;span class=&quot;number&quot;&gt;100&lt;/span&gt;) &lt;span class=&quot;keyword&quot;&gt;AND&lt;/span&gt; (f_mode=&lt;span class=&quot;comment&quot;&gt;&#39;浏览器&#39;)&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;*** (&lt;span class=&quot;number&quot;&gt;1&lt;/span&gt;) WAITING &lt;span class=&quot;keyword&quot;&gt;FOR&lt;/span&gt; THIS LOCK &lt;span class=&quot;keyword&quot;&gt;TO&lt;/span&gt; BE GRANTED:&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;RECORD LOCKS &lt;span class=&quot;built_in&quot;&gt;space&lt;/span&gt; id &lt;span class=&quot;number&quot;&gt;13288&lt;/span&gt; page no &lt;span class=&quot;number&quot;&gt;375&lt;/span&gt; n bits &lt;span class=&quot;number&quot;&gt;352&lt;/span&gt; index `PRIMARY` of table `d_db1`.`t_mytb1` trx id &lt;span class=&quot;number&quot;&gt;4907718431&lt;/span&gt; lock_mode X locks rec but &lt;span class=&quot;keyword&quot;&gt;not&lt;/span&gt; gap waiting&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;Record lock, heap no &lt;span class=&quot;number&quot;&gt;245&lt;/span&gt; PHYSICAL RECORD: n_fields &lt;span class=&quot;number&quot;&gt;10&lt;/span&gt;; compact format; info bits &lt;span class=&quot;number&quot;&gt;0&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;0&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;4&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;0000&lt;/span&gt;a63b; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;    ;;;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;1&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;6&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;0001246304&lt;/span&gt;a7; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;   $c  ;;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;2&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;7&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;7&lt;/span&gt;f000ac0162428; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;      $(;;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;3&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;4&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;00016470&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;   dp;;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;4&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;4&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;00000064&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;    d;;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;5&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;9&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; e6b58fe8a788e599a8; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;          ;;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;6&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;4&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;0000244&lt;/span&gt;f; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;   $O;;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;7&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;4&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;0000007&lt;/span&gt;c; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;    |;;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;8&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;4&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;00000000&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;     ;;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;9&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;4&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;00000000&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;     ;;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;*** (&lt;span class=&quot;number&quot;&gt;2&lt;/span&gt;) TRANSACTION:&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;TRANSACTION &lt;span class=&quot;number&quot;&gt;4907718435&lt;/span&gt;, ACTIVE &lt;span class=&quot;number&quot;&gt;0.007&lt;/span&gt; sec fetching rows&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;mysql tables &lt;span class=&quot;keyword&quot;&gt;in&lt;/span&gt; use &lt;span class=&quot;number&quot;&gt;3&lt;/span&gt;, locked &lt;span class=&quot;number&quot;&gt;3&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;number&quot;&gt;154&lt;/span&gt; lock struct(s), heap size &lt;span class=&quot;number&quot;&gt;30248&lt;/span&gt;, &lt;span class=&quot;number&quot;&gt;3&lt;/span&gt; row lock(s)&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;MySQL thread id &lt;span class=&quot;number&quot;&gt;13589250&lt;/span&gt;, OS thread handle &lt;span class=&quot;number&quot;&gt;0x7f25a3efd700&lt;/span&gt;, query id &lt;span class=&quot;number&quot;&gt;27061926757&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;10.47&lt;/span&gt;&lt;span class=&quot;number&quot;&gt;.104&lt;/span&gt;&lt;span class=&quot;number&quot;&gt;.140&lt;/span&gt; ecweb Searching rows &lt;span class=&quot;keyword&quot;&gt;for&lt;/span&gt; update&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;UPDATE `d_db1`.`t_mytb1` &lt;span class=&quot;keyword&quot;&gt;SET&lt;/span&gt; `f_read` = f_read+&lt;span class=&quot;number&quot;&gt;1&lt;/span&gt; WHERE (f_fid=&lt;span class=&quot;number&quot;&gt;91248&lt;/span&gt;) &lt;span class=&quot;keyword&quot;&gt;AND&lt;/span&gt; (f_sid=&lt;span class=&quot;number&quot;&gt;100&lt;/span&gt;) &lt;span class=&quot;keyword&quot;&gt;AND&lt;/span&gt; (f_mode=&lt;span class=&quot;comment&quot;&gt;&#39;浏览器&#39;)&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;*** (&lt;span class=&quot;number&quot;&gt;2&lt;/span&gt;) HOLDS THE LOCK(S):&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;RECORD LOCKS &lt;span class=&quot;built_in&quot;&gt;space&lt;/span&gt; id &lt;span class=&quot;number&quot;&gt;13288&lt;/span&gt; page no &lt;span class=&quot;number&quot;&gt;375&lt;/span&gt; n bits &lt;span class=&quot;number&quot;&gt;352&lt;/span&gt; index `PRIMARY` of table `d_db1`.`t_mytb1` trx id &lt;span class=&quot;number&quot;&gt;4907718435&lt;/span&gt; lock_mode X locks rec but &lt;span class=&quot;keyword&quot;&gt;not&lt;/span&gt; gap&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;Record lock, heap no &lt;span class=&quot;number&quot;&gt;245&lt;/span&gt; PHYSICAL RECORD: n_fields &lt;span class=&quot;number&quot;&gt;10&lt;/span&gt;; compact format; info bits &lt;span class=&quot;number&quot;&gt;0&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;0&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;4&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;0000&lt;/span&gt;a63b; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;    ;;;  -- &lt;span class=&quot;number&quot;&gt;42555&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;1&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;6&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;0001246304&lt;/span&gt;a7; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;   $c  ;;  -- &lt;span class=&quot;number&quot;&gt;4905436327&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;2&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;7&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;7&lt;/span&gt;f000ac0162428; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;      $(;;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;3&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;4&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;00016470&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;   dp;;  -- &lt;span class=&quot;number&quot;&gt;91248&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;4&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;4&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;00000064&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;    d;;  -- &lt;span class=&quot;number&quot;&gt;100&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;5&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;9&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; e6b58fe8a788e599a8; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;          ;;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;6&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;4&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;0000244&lt;/span&gt;f; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;   $O;;  -- &lt;span class=&quot;number&quot;&gt;9295&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;7&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;4&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;0000007&lt;/span&gt;c; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;    |;;  -- &lt;span class=&quot;number&quot;&gt;124&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;8&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;4&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;00000000&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;     ;;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;9&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;4&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;00000000&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;     ;;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;*** (&lt;span class=&quot;number&quot;&gt;2&lt;/span&gt;) WAITING &lt;span class=&quot;keyword&quot;&gt;FOR&lt;/span&gt; THIS LOCK &lt;span class=&quot;keyword&quot;&gt;TO&lt;/span&gt; BE GRANTED:&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;RECORD LOCKS &lt;span class=&quot;built_in&quot;&gt;space&lt;/span&gt; id &lt;span class=&quot;number&quot;&gt;13288&lt;/span&gt; page no &lt;span class=&quot;number&quot;&gt;202&lt;/span&gt; n bits &lt;span class=&quot;number&quot;&gt;1272&lt;/span&gt; index `idx_sid` of table `d_db1`.`t_mytb1` trx id &lt;span class=&quot;number&quot;&gt;4907718435&lt;/span&gt; lock_mode X locks rec but &lt;span class=&quot;keyword&quot;&gt;not&lt;/span&gt; gap waiting&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;Record lock, heap no &lt;span class=&quot;number&quot;&gt;705&lt;/span&gt; PHYSICAL RECORD: n_fields &lt;span class=&quot;number&quot;&gt;2&lt;/span&gt;; compact format; info bits &lt;span class=&quot;number&quot;&gt;0&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;0&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;4&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;00000064&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;    d;;  -- &lt;span class=&quot;number&quot;&gt;100&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt; &lt;span class=&quot;number&quot;&gt;1&lt;/span&gt;: &lt;span class=&quot;built_in&quot;&gt;len&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;4&lt;/span&gt;; &lt;span class=&quot;built_in&quot;&gt;hex&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;0000&lt;/span&gt;a633; &lt;span class=&quot;built_in&quot;&gt;asc&lt;/span&gt;    &lt;span class=&quot;number&quot;&gt;3&lt;/span&gt;;;  -- &lt;span class=&quot;number&quot;&gt;42547&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;*** WE ROLL BACK TRANSACTION (&lt;span class=&quot;number&quot;&gt;2&lt;/span&gt;)&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;&lt;/p&gt;
+&lt;p&gt;乍一看很奇怪，tx1和tx2 两个 UPDATE 各自以 f_fid 为条件更新的记录互不影响才对，即使91243，91248两个值有可能出现在同一条数据上（因为f_fid上是二级索引），那顶多也就是个更新锁等待，谁后来谁等待，怎么会出现互相争用对方已持有的锁，从而而被死锁检测机制捕获？&lt;/p&gt;
+&lt;p&gt;当然把 update 语句拿到数据库中 EXPLAIN 一下就可以看出端倪。这里不妨先分析一下输出的锁情况：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;先看 Tx2 (对应trx id 4907718435)&lt;/strong&gt; :  &lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;&lt;code&gt;RECORD LOCKS space id 13288 page no 375 n bits 352&lt;/code&gt; 告诉我们是表空间id 13288 (可从 &lt;code&gt;information_schema.INNODB_SYS_DATAFILES&lt;/code&gt; 查到对应ibd文件) 即 t_mytb1 表，第 375 号页面的 245 位置的记录被锁，并且是 idx PRIMARY 上的记录锁（注：本实例隔离级别为RC）。 Tx2正持有这把记录锁。&lt;br&gt;因为是聚集索引，显示了完整记录&lt;/p&gt;
+&lt;figure class=&quot;highlight ldif&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;2&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;3&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;4&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;5&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;6&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;attribute&quot;&gt;0&lt;/span&gt;: 主键f_id=42555&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;attribute&quot;&gt;1&lt;/span&gt;: DB_TRX_ID = 4905436327&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;attribute&quot;&gt;2&lt;/span&gt;: DB_ROLL_PTR指向undo记录的地址&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;attribute&quot;&gt;3&lt;/span&gt;: f_fid=91248&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;attribute&quot;&gt;4&lt;/span&gt;: f_sid=100&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;   ...&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;然而Tx2还在等待一个记录锁（lock_mode X locks rec but not gap waiting），但这把锁来自二级索引 &lt;code&gt;idx_sid&lt;/code&gt; 索引上的记录锁。在 RC 级别下没有GAP lock，行锁除了加在符合条件的二级索引 f_sid=100 上外，还会对主键加record lock。&lt;br&gt;二级索引值：&lt;/p&gt;
+    
+    </summary>
+    
+      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
+    
+    
+      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
+    
+      <category term="mysql优化" scheme="http://seanlook.com/tags/mysql%E4%BC%98%E5%8C%96/"/>
+    
+  </entry>
+  
+  <entry>
     <title>MySQL根据离线binlog快速“闪回”</title>
     <link href="http://seanlook.com/2017/03/03/mysql-flashback_use_purged-binlog/"/>
     <id>http://seanlook.com/2017/03/03/mysql-flashback_use_purged-binlog/</id>
@@ -24,7 +101,7 @@
     
     <content type="html"><![CDATA[<p>昨天突然有个客户说误操作，自己删除了大量数据，CTO直接将我拉到一个讨论组里，说要帮他们恢复数据。他们自己挖的坑，打算让开发那边根据业务日志去恢复，被告知只记录的删除主键这样的信息，物理删除，无能为力。</p>
 <p>上服务器看了下记录的日志，发现好几台上面都有被误删的记录输出。阿里RDS虽然可以克隆一个恢复到删除时间点前的实例，但这散落的几万个id找起来费力，还有就是几个表之间关联的数据也要恢复，觉得麻烦。</p>
-<p>想到 MySQL 的闪回方案。以前看过好几篇相关文章，甚至差点自己用pythonl撸一个来解析binlog，反转得到回滚sql，实在没空，这下要急用了。赶紧找了下网上“现成的方案”。</p>
+<p>想到 MySQL 的闪回方案。以前看过好几篇相关文章，甚至差点自己用python撸一个来解析binlog，反转得到回滚sql，实在没空，这下要急用了。赶紧找了下网上“现成的方案”。</p>
 <p>正文开始</p>
 <hr>
 <p>MySQL（含阿里RDS）快速闪回可以说是对数据库误操作的后悔药，flashback功能可以将数据库返回到误操作之前。但是即使oracle数据库也只支持短时间内的闪回。</p>
@@ -76,7 +153,7 @@
 <li><a href="http://www.cnblogs.com/yuyue2014/p/3721172.html" target="_blank" rel="external">http://www.cnblogs.com/yuyue2014/p/3721172.html</a></li>
 </ol>
 <hr>
-<p>本文链接地址：<a href="http://seanlook.com/2017/03/02/mysql-flashback_use_purged-binlog/">http://seanlook.com/2017/03/02/mysql-flashback_use_purged-binlog/</a></p>
+<p>本文链接地址：<a href="http://seanlook.com/2017/03/03/mysql-flashback_use_purged-binlog/">http://seanlook.com/2017/03/03/mysql-flashback_use_purged-binlog/</a></p>
 <hr>
 ]]></content>
     
@@ -84,7 +161,7 @@
     
       &lt;p&gt;昨天突然有个客户说误操作，自己删除了大量数据，CTO直接将我拉到一个讨论组里，说要帮他们恢复数据。他们自己挖的坑，打算让开发那边根据业务日志去恢复，被告知只记录的删除主键这样的信息，物理删除，无能为力。&lt;/p&gt;
 &lt;p&gt;上服务器看了下记录的日志，发现好几台上面都有被误删的记录输出。阿里RDS虽然可以克隆一个恢复到删除时间点前的实例，但这散落的几万个id找起来费力，还有就是几个表之间关联的数据也要恢复，觉得麻烦。&lt;/p&gt;
-&lt;p&gt;想到 MySQL 的闪回方案。以前看过好几篇相关文章，甚至差点自己用pythonl撸一个来解析binlog，反转得到回滚sql，实在没空，这下要急用了。赶紧找了下网上“现成的方案”。&lt;/p&gt;
+&lt;p&gt;想到 MySQL 的闪回方案。以前看过好几篇相关文章，甚至差点自己用python撸一个来解析binlog，反转得到回滚sql，实在没空，这下要急用了。赶紧找了下网上“现成的方案”。&lt;/p&gt;
 &lt;p&gt;正文开始&lt;/p&gt;
 &lt;hr&gt;
 &lt;p&gt;MySQL（含阿里RDS）快速闪回可以说是对数据库误操作的后悔药，flashback功能可以将数据库返回到误操作之前。但是即使oracle数据库也只支持短时间内的闪回。&lt;/p&gt;
@@ -1022,54 +1099,6 @@
   </entry>
   
   <entry>
-    <title>使用pt-osc修改主键时注意</title>
-    <link href="http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/"/>
-    <id>http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/</id>
-    <published>2016-05-27T08:32:49.000Z</published>
-    <updated>2016-05-27T08:32:49.000Z</updated>
-    
-    <content type="html"><![CDATA[<p>使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：<br><figure class="highlight applescript"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">原表上有个复合主键，现在要添加一个自增<span class="built_in">id</span>作为主键，如何进行</div></pre></td></tr></table></figure></p>
-<a id="more"></a>
-<p>会涉及到以下修改动作：</p>
-<ol>
-<li>删除复合主键定义</li>
-<li>添加新的自增主键</li>
-<li>原复合主键字段，修改成唯一索引</li>
-</ol>
-<p>如果你够聪明，应该会把这三个操作放在同一个 alter table 命令执行。percona手册里有两个地方对修改主键进行了特殊注解：</p>
-<blockquote>
-<p>–alter<br>A notable exception is when a PRIMARY KEY or UNIQUE INDEX is being created from existing columns as part of the ALTER clause; in that case it will use these column(s) for the DELETE trigger.</p>
-<p>–[no]check-alter</p>
-<ul>
-<li>DROP PRIMARY KEY<br>If –alter contain DROP PRIMARY KEY (case- and space-insensitive), a warning is printed and the tool exits unless –dry-run is specified. Altering the primary key can be dangerous, but the tool can handle it. The tool’s triggers, particularly the DELETE trigger, are most affected by altering the primary key because the tool prefers to use the primary key for its triggers. You should first run the tool with –dry-run and –print and verify that the triggers are correct.</li>
-</ul>
-</blockquote>
-<p>由上一篇文章 <a href="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/">pt-online-schema-change使用说明、限制与比较</a> 可知，pt-osc会在原表t1上创建 AFTER DELETE/UPDATE/INSERT 三个触发器，修改主键影响最大的就是 DELETE 触发器：新表t2上的主键字段在旧表t1上不存在，无法根据主键条件触发删除新表t2数据。<code>but the tool can handle it</code>，原因是pt-osc把触发器改成了下面的形式：<br><figure class="highlight autohotkey"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">CREATE TRIGGER `pt_osc_confluence_sbtest3_del` AFTER DELETE ON `confluence`.`sbtest3` FOR EACH ROW DELETE IGNORE FROM `confluence`.`_sbtest3_new` </div><div class="line">WHERE `confluence`.`_sbtest3_new`.`id` &lt;=&gt; OLD.`id` <span class="literal">AND</span> `confluence`.`_sbtest3_new`.`k` &lt;=&gt; OLD.`k`</div><div class="line"></div><div class="line">注：sbtest3表上以(id,k)作为复合主键</div></pre></td></tr></table></figure></p>
-<p>但是如果id或k列上没有索引，这个删除的代价非常高，所以一定要同时添加复合（唯一）索引 <code>(id,k)</code> .</p>
-<p>而对于INSERT,UPDATE的触发器，依然是 <code>REPLACE INTO</code>语法，因为它采用的是先插入，如果违反主键或唯一约束，则根据主键或意义约束删除这条数据，再执行插入。（但是注意你不能依赖于新表的主键递增，因为如果原表有update，新表就会先插入这一条，导致id与原表记录所在顺序不一样）</p>
-<p>所以如果使用pt-osc去修改删除主键，务必同时添加原主键为 UNIQUE KEY，否则很有可能导致性能问题：</p>
-<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line">$ pt-online-schema-<span class="keyword">change</span> <span class="comment">--user=ecuser --password=ecuser --host=10.0.201.34  \</span></div><div class="line"><span class="comment">--alter "DROP PRIMARY KEY,add column pk int auto_increment primary key,add unique key uk_id_k(id,k)" \</span></div><div class="line">D=confluence,t=sbtest3 <span class="comment">--print --dry-run</span></div><div class="line"></div><div class="line"><span class="comment">--alter contains 'DROP PRIMARY KEY'.  Dropping and altering the primary key can be dangerous, </span></div><div class="line">especially <span class="keyword">if</span> the original <span class="keyword">table</span> does <span class="keyword">not</span> have other <span class="keyword">unique</span> indexes.  ==&gt;注意 dry-run的输出</div><div class="line"></div><div class="line"><span class="keyword">ALTER</span> <span class="keyword">TABLE</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> <span class="keyword">DROP</span> PRIMARY <span class="keyword">KEY</span>,<span class="keyword">add</span> <span class="keyword">column</span> pk <span class="built_in">int</span> auto_increment primary <span class="keyword">key</span>,<span class="keyword">add</span> <span class="keyword">unique</span> <span class="keyword">key</span> uk_id_k(<span class="keyword">id</span>,k)</div><div class="line">Altered <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> OK.</div><div class="line"><span class="keyword">Using</span> original <span class="keyword">table</span> <span class="keyword">index</span> PRIMARY <span class="keyword">for</span> the <span class="keyword">DELETE</span> <span class="keyword">trigger</span> instead <span class="keyword">of</span> <span class="keyword">new</span> <span class="keyword">table</span> <span class="keyword">index</span> PRIMARY because ==&gt; 使用原表主键值判断</div><div class="line">the <span class="keyword">new</span> <span class="keyword">table</span> <span class="keyword">index</span> uses <span class="keyword">column</span> pk which does <span class="keyword">not</span> exist <span class="keyword">in</span> the original table.</div><div class="line"></div><div class="line"><span class="keyword">CREATE</span> <span class="keyword">TRIGGER</span> <span class="string">`pt_osc_confluence_sbtest3_del`</span> <span class="keyword">AFTER</span> <span class="keyword">DELETE</span> <span class="keyword">ON</span> <span class="string">`confluence`</span>.<span class="string">`sbtest3`</span> <span class="keyword">FOR</span> <span class="keyword">EACH</span> <span class="keyword">ROW</span> <span class="keyword">DELETE</span> <span class="keyword">IGNORE</span> <span class="keyword">FROM</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> </div><div class="line"><span class="keyword">WHERE</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span>.<span class="string">`id`</span> &lt;=&gt; OLD.<span class="string">`id`</span> <span class="keyword">AND</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span>.<span class="string">`k`</span> &lt;=&gt; OLD.<span class="string">`k`</span></div></pre></td></tr></table></figure>
-<hr>
-<p>原文链接地址：<a href="http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/">http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/</a></p>
-<hr>
-]]></content>
-    
-    <summary type="html">
-    
-      &lt;p&gt;使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：&lt;br&gt;&lt;figure class=&quot;highlight applescript&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;原表上有个复合主键，现在要添加一个自增&lt;span class=&quot;built_in&quot;&gt;id&lt;/span&gt;作为主键，如何进行&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;&lt;/p&gt;
-    
-    </summary>
-    
-      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
-    
-    
-      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
-    
-      <category term="Percona-toolkit" scheme="http://seanlook.com/tags/Percona-toolkit/"/>
-    
-  </entry>
-  
-  <entry>
     <title>pt-online-schema-change使用说明、限制与比较</title>
     <link href="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/"/>
     <id>http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/</id>
@@ -1208,6 +1237,54 @@
 &lt;li&gt;&lt;p&gt;&lt;code&gt;--max-lag&lt;/code&gt;&lt;br&gt;默认1s。每个chunk拷贝完成后，会查看所有复制Slave的延迟情况（&lt;code&gt;Seconds_Behind_Master&lt;/code&gt;）。要是延迟大于该值，则暂停复制数据，直到所有从的滞后小于这个值。&lt;code&gt;--check-interval&lt;/code&gt;配合使用，指定出现从库滞后超过 max-lag，则该工具将睡眠多长时间，默认1s，再检查。如&lt;code&gt;--max-lag=5 --check-interval=2&lt;/code&gt;。&lt;br&gt;熟悉percona-toolkit的人都知道&lt;code&gt;--recursion-method&lt;/code&gt;可以用来指定从库dsn记录。另外，如果从库被停止，将会永远等待，直到从开始同步，并且延迟小于该值。&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;&lt;p&gt;&lt;code&gt;--chunk-time&lt;/code&gt;&lt;br&gt;默认0.5s，即拷贝数据行的时候，为了尽量保证0.5s内拷完一个chunk，动态调整chunk-size的大小，以适应服务器性能的变化。&lt;br&gt;也可以通过另外一个选项&lt;code&gt;--chunk-size&lt;/code&gt;禁止动态调整，即每次固定拷贝 1k 行，如果指定则默认1000行，且比 chunk-time 优先生效&lt;/p&gt;
+    
+    </summary>
+    
+      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
+    
+    
+      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
+    
+      <category term="Percona-toolkit" scheme="http://seanlook.com/tags/Percona-toolkit/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>使用pt-osc修改主键时注意</title>
+    <link href="http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/"/>
+    <id>http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/</id>
+    <published>2016-05-27T08:32:49.000Z</published>
+    <updated>2016-05-27T08:32:49.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：<br><figure class="highlight applescript"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">原表上有个复合主键，现在要添加一个自增<span class="built_in">id</span>作为主键，如何进行</div></pre></td></tr></table></figure></p>
+<a id="more"></a>
+<p>会涉及到以下修改动作：</p>
+<ol>
+<li>删除复合主键定义</li>
+<li>添加新的自增主键</li>
+<li>原复合主键字段，修改成唯一索引</li>
+</ol>
+<p>如果你够聪明，应该会把这三个操作放在同一个 alter table 命令执行。percona手册里有两个地方对修改主键进行了特殊注解：</p>
+<blockquote>
+<p>–alter<br>A notable exception is when a PRIMARY KEY or UNIQUE INDEX is being created from existing columns as part of the ALTER clause; in that case it will use these column(s) for the DELETE trigger.</p>
+<p>–[no]check-alter</p>
+<ul>
+<li>DROP PRIMARY KEY<br>If –alter contain DROP PRIMARY KEY (case- and space-insensitive), a warning is printed and the tool exits unless –dry-run is specified. Altering the primary key can be dangerous, but the tool can handle it. The tool’s triggers, particularly the DELETE trigger, are most affected by altering the primary key because the tool prefers to use the primary key for its triggers. You should first run the tool with –dry-run and –print and verify that the triggers are correct.</li>
+</ul>
+</blockquote>
+<p>由上一篇文章 <a href="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/">pt-online-schema-change使用说明、限制与比较</a> 可知，pt-osc会在原表t1上创建 AFTER DELETE/UPDATE/INSERT 三个触发器，修改主键影响最大的就是 DELETE 触发器：新表t2上的主键字段在旧表t1上不存在，无法根据主键条件触发删除新表t2数据。<code>but the tool can handle it</code>，原因是pt-osc把触发器改成了下面的形式：<br><figure class="highlight autohotkey"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">CREATE TRIGGER `pt_osc_confluence_sbtest3_del` AFTER DELETE ON `confluence`.`sbtest3` FOR EACH ROW DELETE IGNORE FROM `confluence`.`_sbtest3_new` </div><div class="line">WHERE `confluence`.`_sbtest3_new`.`id` &lt;=&gt; OLD.`id` <span class="literal">AND</span> `confluence`.`_sbtest3_new`.`k` &lt;=&gt; OLD.`k`</div><div class="line"></div><div class="line">注：sbtest3表上以(id,k)作为复合主键</div></pre></td></tr></table></figure></p>
+<p>但是如果id或k列上没有索引，这个删除的代价非常高，所以一定要同时添加复合（唯一）索引 <code>(id,k)</code> .</p>
+<p>而对于INSERT,UPDATE的触发器，依然是 <code>REPLACE INTO</code>语法，因为它采用的是先插入，如果违反主键或唯一约束，则根据主键或意义约束删除这条数据，再执行插入。（但是注意你不能依赖于新表的主键递增，因为如果原表有update，新表就会先插入这一条，导致id与原表记录所在顺序不一样）</p>
+<p>所以如果使用pt-osc去修改删除主键，务必同时添加原主键为 UNIQUE KEY，否则很有可能导致性能问题：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line">$ pt-online-schema-<span class="keyword">change</span> <span class="comment">--user=ecuser --password=ecuser --host=10.0.201.34  \</span></div><div class="line"><span class="comment">--alter "DROP PRIMARY KEY,add column pk int auto_increment primary key,add unique key uk_id_k(id,k)" \</span></div><div class="line">D=confluence,t=sbtest3 <span class="comment">--print --dry-run</span></div><div class="line"></div><div class="line"><span class="comment">--alter contains 'DROP PRIMARY KEY'.  Dropping and altering the primary key can be dangerous, </span></div><div class="line">especially <span class="keyword">if</span> the original <span class="keyword">table</span> does <span class="keyword">not</span> have other <span class="keyword">unique</span> indexes.  ==&gt;注意 dry-run的输出</div><div class="line"></div><div class="line"><span class="keyword">ALTER</span> <span class="keyword">TABLE</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> <span class="keyword">DROP</span> PRIMARY <span class="keyword">KEY</span>,<span class="keyword">add</span> <span class="keyword">column</span> pk <span class="built_in">int</span> auto_increment primary <span class="keyword">key</span>,<span class="keyword">add</span> <span class="keyword">unique</span> <span class="keyword">key</span> uk_id_k(<span class="keyword">id</span>,k)</div><div class="line">Altered <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> OK.</div><div class="line"><span class="keyword">Using</span> original <span class="keyword">table</span> <span class="keyword">index</span> PRIMARY <span class="keyword">for</span> the <span class="keyword">DELETE</span> <span class="keyword">trigger</span> instead <span class="keyword">of</span> <span class="keyword">new</span> <span class="keyword">table</span> <span class="keyword">index</span> PRIMARY because ==&gt; 使用原表主键值判断</div><div class="line">the <span class="keyword">new</span> <span class="keyword">table</span> <span class="keyword">index</span> uses <span class="keyword">column</span> pk which does <span class="keyword">not</span> exist <span class="keyword">in</span> the original table.</div><div class="line"></div><div class="line"><span class="keyword">CREATE</span> <span class="keyword">TRIGGER</span> <span class="string">`pt_osc_confluence_sbtest3_del`</span> <span class="keyword">AFTER</span> <span class="keyword">DELETE</span> <span class="keyword">ON</span> <span class="string">`confluence`</span>.<span class="string">`sbtest3`</span> <span class="keyword">FOR</span> <span class="keyword">EACH</span> <span class="keyword">ROW</span> <span class="keyword">DELETE</span> <span class="keyword">IGNORE</span> <span class="keyword">FROM</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> </div><div class="line"><span class="keyword">WHERE</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span>.<span class="string">`id`</span> &lt;=&gt; OLD.<span class="string">`id`</span> <span class="keyword">AND</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span>.<span class="string">`k`</span> &lt;=&gt; OLD.<span class="string">`k`</span></div></pre></td></tr></table></figure>
+<hr>
+<p>原文链接地址：<a href="http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/">http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/</a></p>
+<hr>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：&lt;br&gt;&lt;figure class=&quot;highlight applescript&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;原表上有个复合主键，现在要添加一个自增&lt;span class=&quot;built_in&quot;&gt;id&lt;/span&gt;作为主键，如何进行&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;&lt;/p&gt;
     
     </summary>
     
@@ -2013,278 +2090,6 @@ http://www.iteye.com/topic/1141229
 &lt;p&gt;用 explain 看了下扫描行数和索引选择情况： &lt;/p&gt;
 &lt;figure class=&quot;highlight asciidoc&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;2&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;3&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;4&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;5&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;6&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;7&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;8&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;mysql&amp;gt;explain SELECT f&lt;span class=&quot;emphasis&quot;&gt;_col3_&lt;/span&gt;id,f&lt;span class=&quot;emphasis&quot;&gt;_qq1_&lt;/span&gt;id FROM d&lt;span class=&quot;emphasis&quot;&gt;_dbname.t_&lt;/span&gt;tb1 WHERE f&lt;span class=&quot;emphasis&quot;&gt;_col1_&lt;/span&gt;id=1226391 &lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;section&quot;&gt;and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233);&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;+------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;section&quot;&gt;| id   | select_type   | table   | type   | possible_keys                  | key           | key_len    | ref    | rows   | Extra                              |&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;+------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;section&quot;&gt;| 1    | SIMPLE        | t_tb1   | ref    | uid_type_frid,idx_corpid_qq1id | uid_type_frid | 8          | const  | 1386   | Using index condition; Using where |&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;+------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;共返回 1 行记录,花费 11.52 ms.&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;
 &lt;p&gt;t_tb1 表上有个索引&lt;code&gt;uid_type_frid(f_col2_id,f_type)&lt;/code&gt;、&lt;code&gt;idx_corp_id_qq1id(f_col1_id,f_qq1_id)&lt;/code&gt;，而且如果选择后者时，f_qq1_id的过滤效果应该很佳，但却选择了前者。当使用 hint &lt;code&gt;use index(idx_corp_id_qq1id)&lt;/code&gt;时：&lt;br&gt;
-    
-    </summary>
-    
-      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
-    
-    
-      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
-    
-      <category term="schema设计" scheme="http://seanlook.com/tags/schema%E8%AE%BE%E8%AE%A1/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>MySQL数字类型int与tinyint、float与decimal如何选择</title>
-    <link href="http://seanlook.com/2016/04/29/mysql-numeric-int-float/"/>
-    <id>http://seanlook.com/2016/04/29/mysql-numeric-int-float/</id>
-    <published>2016-04-29T08:32:49.000Z</published>
-    <updated>2016-04-29T08:32:49.000Z</updated>
-    
-    <content type="html"><![CDATA[<p>最近在准备给开发做一个mysql数据库开发规范方面培训，一步一步来，结合在生产环境发现的数据库方面的问题，从几个常用的数据类型说起。</p>
-<h2 id="int、tinyint与bigint"><a href="#int、tinyint与bigint" class="headerlink" title="int、tinyint与bigint"></a>int、tinyint与bigint</h2><p>它们都是（精确）整型数据类型，但是占用字节数和表达的范围不同。首先没有这个表就说不过去了：</p>
-<table>
-<thead>
-<tr>
-<th>Type</th>
-<th>Storage</th>
-<th>Minimum Value</th>
-<th>Maximum Value</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td></td>
-<td>(Bytes)</td>
-<td>(Signed/Unsigned)</td>
-<td>(Signed/Unsigned)</td>
-</tr>
-<tr>
-<td>TINYINT</td>
-<td>1</td>
-<td>-128</td>
-<td>127</td>
-</tr>
-<tr>
-<td></td>
-<td></td>
-<td>0</td>
-<td>255</td>
-</tr>
-<tr>
-<td>SMALLINT</td>
-<td>2</td>
-<td>-32768</td>
-<td>32767</td>
-</tr>
-<tr>
-<td></td>
-<td></td>
-<td>0</td>
-<td>65535</td>
-</tr>
-<tr>
-<td>MEDIUMINT</td>
-<td>3</td>
-<td>-8388608</td>
-<td>8388607</td>
-</tr>
-<tr>
-<td></td>
-<td></td>
-<td>0</td>
-<td>16777215</td>
-</tr>
-<tr>
-<td>INT</td>
-<td>4</td>
-<td>-2147483648</td>
-<td>2147483647</td>
-</tr>
-<tr>
-<td></td>
-<td></td>
-<td>0</td>
-<td>4294967295</td>
-</tr>
-<tr>
-<td>BIGINT</td>
-<td>8</td>
-<td>-9223372036854775808</td>
-<td>9223372036854775807</td>
-</tr>
-<tr>
-<td></td>
-<td></td>
-<td>0</td>
-<td>18446744073709551615</td>
-</tr>
-</tbody>
-</table>
-<p>只需要知道对应类型占多少字节就能推算出范围了，比如int占 4 bytes,即4*8=32bits，大约10位数字，也能理解为什么int默认显示位数是11。</p>
-<p>遇到比较多的是tinyint和bigint，tinyint一般用于存放status,type这种数值小的数据，不够用时可能会用smallint。bigint一般用于自增主键。</p>
-<p>为了避免数据库被过度设计，布尔、枚举类型也采用tinyint。</p>
-<p>还有一点也是经常被提到的关于 int(M) 中M的理解，int型数据无论是int(4)还是int(11)，都已经占用了 4 bytes 存储空间，M表示的只是显示宽度(display width, max value 255)，并不是定义int的长度。</p>
-<p>例如：</p>
-<figure class="highlight gherkin"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div></pre></td><td class="code"><pre><div class="line">mysql&gt; CREATE TABLE `tc_integer` (</div><div class="line">  `f_id` bigint(20) PRIMARY KEY AUTO_INCREMENT,</div><div class="line">  `f_type` tinyint,</div><div class="line">  `f_flag` tinyint(1),</div><div class="line">  `f_num` smallint(5) unsigned ZEROFILL</div><div class="line">) ENGINE=InnoDB DEFAULT CHARSET=utf8;</div><div class="line"></div><div class="line">mysql&gt; desc tc_integer;</div><div class="line">+----------------+-------------------------------+------+-----+---------+----------------+</div><div class="line">|<span class="string"> Field          </span>|<span class="string"> Type                          </span>|<span class="string"> Null </span>|<span class="string"> Key </span>|<span class="string"> Default </span>|<span class="string"> Extra          </span>|</div><div class="line">+----------------+-------------------------------+------+-----+---------+----------------+</div><div class="line">|<span class="string"> f_id           </span>|<span class="string"> bigint(20)                    </span>|<span class="string"> NO   </span>|<span class="string"> PRI </span>|<span class="string"> NULL    </span>|<span class="string"> auto_increment </span>|</div><div class="line">|<span class="string"> f_type         </span>|<span class="string"> tinyint(4)                    </span>|<span class="string"> YES  </span>|<span class="string">     </span>|<span class="string"> NULL    </span>|<span class="string">                </span>|</div><div class="line">|<span class="string"> f_flag         </span>|<span class="string"> tinyint(1)                    </span>|<span class="string"> YES  </span>|<span class="string">     </span>|<span class="string"> NULL    </span>|<span class="string">                </span>|</div><div class="line">|<span class="string"> f_num          </span>|<span class="string"> smallint(5) unsigned zerofill </span>|<span class="string"> YES  </span>|<span class="string">     </span>|<span class="string"> NULL    </span>|<span class="string">                </span>|</div><div class="line">+----------------+-------------------------------+------+-----+---------+----------------+</div><div class="line">4 rows in set (0.01 sec)</div></pre></td></tr></table></figure>
-<p>插入几条数据看一下：<br><a id="more"></a></p>
-<figure class="highlight asciidoc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div></pre></td><td class="code"><pre><div class="line">mysql&gt; insert into tc<span class="emphasis">_integer values(1, 1, 1, 1);</span></div><div class="line">Query OK, 1 row affected (0.02 sec)</div><div class="line"></div><div class="line">mysql&gt; insert into tc<span class="emphasis">_integer values(9223372036854775808, 127, 127, 65535);</span></div><div class="line">Query OK, 1 row affected, 1 warning (0.01 sec)</div><div class="line"></div><div class="line"><span class="section">mysql&gt; show warnings;</span></div><div class="line">+---------+------+-----------------------------------------------+</div><div class="line"><span class="section">| Level   | Code | Message                                       |</span></div><div class="line">+---------+------+-----------------------------------------------+</div><div class="line"><span class="section">| Warning | 1264 | Out of range value for column 'f_id' at row 1 |</span></div><div class="line">+---------+------+-----------------------------------------------+</div><div class="line">1 row in set (0.00 sec)</div><div class="line"></div><div class="line"><span class="section">mysql&gt; select i.*, length(i.f_flag) as len_flag from tc_integer i;</span></div><div class="line">+---------------------+--------------+---------------+----------------+----------+</div><div class="line"><span class="section">| f_id                | f_type       | f_flag        | f_num          | len_flag |</span></div><div class="line">+---------------------+--------------+---------------+----------------+----------+</div><div class="line">|                   1 |            1 |             1 |          00001 |        1 |</div><div class="line"><span class="section">| 9223372036854775807 |          127 |           127 |          65535 |        3 |</span></div><div class="line">+---------------------+--------------+---------------+----------------+----------+</div><div class="line">2 rows in set (0.00 sec)</div><div class="line"></div><div class="line"><span class="section">mysql&gt; select * from tc_integer where f_num=' 01' and f_num=1 and f_num=f_flag;</span></div><div class="line">+------+--------------+---------------+----------------+</div><div class="line"><span class="section">| f_id | f_type       | f_flag        | f_num          |</span></div><div class="line">+------+--------------+---------------+----------------+</div><div class="line"><span class="section">|    1 |            1 |             1 |          00001 |</span></div><div class="line">+------+--------------+---------------+----------------+</div><div class="line">1 row in set (0.00 sec)</div></pre></td></tr></table></figure>
-<p>上面的实验说明了几个问题：</p>
-<ul>
-<li>f_id列插入比最大值还大的数，出现warnings，并且最终的值自动变成 9223372036854775807 。这个坑曾经在迁移到阿里RDS时遇到过，他们的迁移工具是java写的，结果我们的主键值大于java INTEGER里面的最大限制，导致 duplicate key问题。</li>
-<li>f_flag的显示宽度为1，但并不影响更多位数的显示。也证实了tinyint(1)并不像char(1)那样限制存储长度</li>
-<li>f_num定义成无符号的zerofill类型，能存储的最大数值是65535，而signed才是32767。（当列上使用zerofill时，unsigned会自动加上）</li>
-<li>zerofill的作用是在显示检索结果的时候，左边用0补齐到display width，实际存储时不补0的，仅作为返回结果meta data的一部分。查询的条件值忽略0和空格</li>
-<li>length()在numeric类型中作用于char_length()一样，因为字节数已经固定了。</li>
-</ul>
-<p>zerofill的使用可能会在复杂join时因为了解不够深入而带来问题，所以最终的结论也很简单：除非极端的特殊需要，尽量不用zerofill，建表时这类int无需指定 (11) 这样的显示宽度。</p>
-<h2 id="float与decimal"><a href="#float与decimal" class="headerlink" title="float与decimal"></a>float与decimal</h2><p>MySQL使用<code>DECIMAL</code>类型去存储对精度要求比较高的数值，比如金额，也叫定点数，decimal在mysql内存是以<del>字符串</del>二进制存储的。声明语法是<code>DECIMAL(M,D)</code>，<del>占用字节 M+2 bytes</del>。M是数字最大位数（精度precision），范围1-65；D是小数点右侧数字个数（标度scale），范围0-30，但不得超过M。</p>
-<p>占用字节数计算方法 —— 小数和整数分别计算，每9位数占4字节，剩余部分如下表换算：</p>
-<table>
-<thead>
-<tr>
-<th>Leftover Digits</th>
-<th>Number of Bytes</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>0</td>
-<td>0</td>
-</tr>
-<tr>
-<td>1–2</td>
-<td>1</td>
-</tr>
-<tr>
-<td>3–4</td>
-<td>2</td>
-</tr>
-<tr>
-<td>5–6</td>
-<td>3</td>
-</tr>
-<tr>
-<td>7–9</td>
-<td>4</td>
-</tr>
-</tbody>
-</table>
-<p>比如<code>DECIMAL(18,9)</code>，整数部分和小数部分各9位，所以各占4字节，共8bytes<br>再比如<code>DECIMAL(20,6)</code>，整数14位，需要4字节存9位，还需3字节存5位；小数6位，需3字节。共10bytes<br>（感谢 consatan 在评论区提出文中错误）</p>
-<p>比如定义<code>DECIMAL(7,3)</code>：</p>
-<ul>
-<li>能存的数值范围是 -9999.999 ~ 9999.999，占用4个字节</li>
-<li>123.12 -&gt; 123.120，因为小数点后未满3位，补0</li>
-<li>123.1245 -&gt; 123.125，小数点只留3位，多余的自动四舍五入截断</li>
-<li>12345.12 -&gt; 保存失败，因为小数点未满3位，补0变成12345.120，超过了7位。严格模式下报错，非严格模式存成9999.999</li>
-</ul>
-<p>MySQL使用<code>FLOAT</code>和<code>DOUBLE</code>来表示近似数值类型，这是因为十进制0.1在电脑里用二进制是无法精确表示的，<a href="https://segmentfault.com/a/1190000004112565" target="_blank" rel="external">只能尽可能的接近</a>。</p>
-<p>单精度浮点数float占4字节，float标准语法允许通过<code>FLOAT(M)</code>的形式指定精度，但是这个精度值M只是决定存储大小： 0-23与默认不指定效果相同，24-53就变成双精度的<code>DOUBLE</code>了。</p>
-<p>float还有非MySQL自己实现的<em>非标准</em>语法<code>FLOAT(M,D)</code>，代表最多存储M个数字长度，其中小数点后数字个数为D。效果与 DECIMAL(M,D)很相似。</p>
-<p>double 和 float 的区别是double精度高，有效数字16位（float精度7位）。但double消耗内存是float的两倍，占8字节，double的运算速度比float慢得多。</p>
-<figure class="highlight lsl"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">msyql&gt; create table tc_float(fid int primary <span class="type">key</span> auto_increment,f_float <span class="type">float</span>, f_float10 <span class="type">float</span>(<span class="number">10</span>), f_float25 <span class="type">float</span>(<span class="number">25</span>), f_float7_3 <span class="type">float</span>(<span class="number">7</span>,<span class="number">3</span>), f_float9_2 <span class="type">float</span>(<span class="number">9</span>,<span class="number">2</span>), f_float30_3 <span class="type">float</span>(<span class="number">30</span>,<span class="number">3</span>), f_decimal9_2 decimal(<span class="number">9</span>,<span class="number">2</span>));</div><div class="line"></div><div class="line">mysql&gt; insert into tc_float(f_float,f_float10,f_float25) values(<span class="number">123456</span>,<span class="number">123456</span>,<span class="number">123456</span>);</div><div class="line">mysql&gt; insert into tc_float(f_float,f_float10,f_float25) values(<span class="number">1234567.89</span>,<span class="number">12345.67</span>,<span class="number">1234567.89</span>);</div><div class="line">mysql&gt; select * from tc_float;</div><div class="line">+-----+----------+-----------+------------+------------+------------+-------------+--------------+</div><div class="line">| fid | f_float  | f_float10 | f_float25  | f_float7_3 | f_float9_2 | f_float30_3 | f_decimal9_2 |</div><div class="line">+-----+----------+-----------+------------+------------+------------+-------------+--------------+</div><div class="line">|   <span class="number">1</span> |   <span class="number">123456</span> |    <span class="number">123456</span> |     <span class="number">123456</span> | NULL       | NULL       | NULL        | NULL         |</div><div class="line">|   <span class="number">2</span> |  <span class="number">1234570</span> |   <span class="number">12345.7</span> | <span class="number">1234567.89</span> | NULL       | NULL       | NULL        | NULL         |</div><div class="line">+-----+----------+-----------+------------+------------+------------+-------------+--------------+</div></pre></td></tr></table></figure>
-<ul>
-<li>可以看到float与float(10)是没区别的，float默认能精确到6位有效数字</li>
-</ul>
-<figure class="highlight asciidoc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div></pre></td><td class="code"><pre><div class="line">mysql&gt; insert into tc<span class="emphasis">_float(f_</span>float9<span class="emphasis">_2,f_</span>decimal9<span class="emphasis">_2) values(123456.78,123456.78);</span></div><div class="line">mysql&gt; insert into tc_float(f<span class="emphasis">_float9_</span>2,f<span class="emphasis">_decimal9_</span>2) values(1234567.1,1234567.125);</div><div class="line">Query OK, 1 row affected, 1 warning (0.00 sec)</div><div class="line"></div><div class="line"><span class="section">mysql&gt; show warnings;</span></div><div class="line">+-------+------+---------------------------------------------------+</div><div class="line"><span class="section">| Level | Code | Message                                           |</span></div><div class="line">+-------+------+---------------------------------------------------+</div><div class="line"><span class="section">| Note  | 1265 | Data truncated for column 'f_decimal9_2' at row 1 |</span></div><div class="line">+-------+------+---------------------------------------------------+</div><div class="line">1 row in set (0.00 sec)</div><div class="line"></div><div class="line"><span class="section">mysql&gt; select * from tc_float;</span></div><div class="line">+-----+----------+-----------+------------+------------+------------+-------------+--------------+</div><div class="line"><span class="section">| fid | f_float  | f_float10 | f_float25  | f_float7_3 | f_float9_2 | f_float30_3 | f_decimal9_2 |</span></div><div class="line">+-----+----------+-----------+------------+------------+------------+-------------+--------------+</div><div class="line">|   6 | NULL     | NULL      | NULL       | NULL       |  123456.78 | NULL        |    123456.78 |</div><div class="line"><span class="section">|   9 | NULL     | NULL      | NULL       | NULL       | 1234567.12 | NULL        |   1234567.13 |</span></div><div class="line">+-----+----------+-----------+------------+------------+------------+-------------+--------------+</div><div class="line"></div><div class="line">mysql&gt; insert into tc<span class="emphasis">_float(f_</span>float7<span class="emphasis">_3) values(12345.1);</span></div><div class="line">ERROR 1264 (22003): Out of range value for column 'f_float7<span class="emphasis">_3' at row 1</span></div></pre></td></tr></table></figure>
-<ul>
-<li>float(9,2)与decimal(9,2)是很像的，并没有前面提到24位一下6位有效数字的限制</li>
-<li>他们俩之间的差别就在精度上，f_float9_2本应该是 1234567.10，结果小数点变成 .12 。f_decimal9_2因为标度为2，所以 .125 四舍五入成 .13</li>
-<li>将 12345.1 插入f_float7_3列，因为转成标度3时 12345.100，整个位数大于7，所以 out of range 了</li>
-</ul>
-<p>另外在编程中应尽量避免做浮点数的比较，否则可能会导致一些潜在的问题。</p>
-<p>坚决不允许使用float去存money，使用decimal更加稳妥，但使用decimal做除法依旧会产生浮点型，所以特殊情况请考虑使用整型，货币单位使用 分 ，或者除法在最后进行。</p>
-<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><ul>
-<li><a href="http://www.path8.net/tn/archives/951" target="_blank" rel="external">MySQL各数据类型的区别</a></li>
-<li><a href="http://dev.mysql.com/doc/refman/5.6/en/out-of-range-and-overflow.html" target="_blank" rel="external">MySQL manual Out-of-Range and Overflow Handling</a></li>
-<li><a href="http://www.intechgrity.com/mysql-datatypes-working-with-fraction-and-decimal-dec/" target="_blank" rel="external">MySQL FLOAT vs DEC: working with fraction and decimal</a></li>
-<li><a href="http://www.noelherrick.com/blog/always-use-decimal-for-money" target="_blank" rel="external">Never use floats for money</a></li>
-</ul>
-<hr>
-<p>本文链接地址：<a href="http://seanlook.com/2016/04/29/mysql-numeric-int-float/">http://seanlook.com/2016/04/29/mysql-numeric-int-float/</a></p>
-<hr>
-]]></content>
-    
-    <summary type="html">
-    
-      &lt;p&gt;最近在准备给开发做一个mysql数据库开发规范方面培训，一步一步来，结合在生产环境发现的数据库方面的问题，从几个常用的数据类型说起。&lt;/p&gt;
-&lt;h2 id=&quot;int、tinyint与bigint&quot;&gt;&lt;a href=&quot;#int、tinyint与bigint&quot; class=&quot;headerlink&quot; title=&quot;int、tinyint与bigint&quot;&gt;&lt;/a&gt;int、tinyint与bigint&lt;/h2&gt;&lt;p&gt;它们都是（精确）整型数据类型，但是占用字节数和表达的范围不同。首先没有这个表就说不过去了：&lt;/p&gt;
-&lt;table&gt;
-&lt;thead&gt;
-&lt;tr&gt;
-&lt;th&gt;Type&lt;/th&gt;
-&lt;th&gt;Storage&lt;/th&gt;
-&lt;th&gt;Minimum Value&lt;/th&gt;
-&lt;th&gt;Maximum Value&lt;/th&gt;
-&lt;/tr&gt;
-&lt;/thead&gt;
-&lt;tbody&gt;
-&lt;tr&gt;
-&lt;td&gt;&lt;/td&gt;
-&lt;td&gt;(Bytes)&lt;/td&gt;
-&lt;td&gt;(Signed/Unsigned)&lt;/td&gt;
-&lt;td&gt;(Signed/Unsigned)&lt;/td&gt;
-&lt;/tr&gt;
-&lt;tr&gt;
-&lt;td&gt;TINYINT&lt;/td&gt;
-&lt;td&gt;1&lt;/td&gt;
-&lt;td&gt;-128&lt;/td&gt;
-&lt;td&gt;127&lt;/td&gt;
-&lt;/tr&gt;
-&lt;tr&gt;
-&lt;td&gt;&lt;/td&gt;
-&lt;td&gt;&lt;/td&gt;
-&lt;td&gt;0&lt;/td&gt;
-&lt;td&gt;255&lt;/td&gt;
-&lt;/tr&gt;
-&lt;tr&gt;
-&lt;td&gt;SMALLINT&lt;/td&gt;
-&lt;td&gt;2&lt;/td&gt;
-&lt;td&gt;-32768&lt;/td&gt;
-&lt;td&gt;32767&lt;/td&gt;
-&lt;/tr&gt;
-&lt;tr&gt;
-&lt;td&gt;&lt;/td&gt;
-&lt;td&gt;&lt;/td&gt;
-&lt;td&gt;0&lt;/td&gt;
-&lt;td&gt;65535&lt;/td&gt;
-&lt;/tr&gt;
-&lt;tr&gt;
-&lt;td&gt;MEDIUMINT&lt;/td&gt;
-&lt;td&gt;3&lt;/td&gt;
-&lt;td&gt;-8388608&lt;/td&gt;
-&lt;td&gt;8388607&lt;/td&gt;
-&lt;/tr&gt;
-&lt;tr&gt;
-&lt;td&gt;&lt;/td&gt;
-&lt;td&gt;&lt;/td&gt;
-&lt;td&gt;0&lt;/td&gt;
-&lt;td&gt;16777215&lt;/td&gt;
-&lt;/tr&gt;
-&lt;tr&gt;
-&lt;td&gt;INT&lt;/td&gt;
-&lt;td&gt;4&lt;/td&gt;
-&lt;td&gt;-2147483648&lt;/td&gt;
-&lt;td&gt;2147483647&lt;/td&gt;
-&lt;/tr&gt;
-&lt;tr&gt;
-&lt;td&gt;&lt;/td&gt;
-&lt;td&gt;&lt;/td&gt;
-&lt;td&gt;0&lt;/td&gt;
-&lt;td&gt;4294967295&lt;/td&gt;
-&lt;/tr&gt;
-&lt;tr&gt;
-&lt;td&gt;BIGINT&lt;/td&gt;
-&lt;td&gt;8&lt;/td&gt;
-&lt;td&gt;-9223372036854775808&lt;/td&gt;
-&lt;td&gt;9223372036854775807&lt;/td&gt;
-&lt;/tr&gt;
-&lt;tr&gt;
-&lt;td&gt;&lt;/td&gt;
-&lt;td&gt;&lt;/td&gt;
-&lt;td&gt;0&lt;/td&gt;
-&lt;td&gt;18446744073709551615&lt;/td&gt;
-&lt;/tr&gt;
-&lt;/tbody&gt;
-&lt;/table&gt;
-&lt;p&gt;只需要知道对应类型占多少字节就能推算出范围了，比如int占 4 bytes,即4*8=32bits，大约10位数字，也能理解为什么int默认显示位数是11。&lt;/p&gt;
-&lt;p&gt;遇到比较多的是tinyint和bigint，tinyint一般用于存放status,type这种数值小的数据，不够用时可能会用smallint。bigint一般用于自增主键。&lt;/p&gt;
-&lt;p&gt;为了避免数据库被过度设计，布尔、枚举类型也采用tinyint。&lt;/p&gt;
-&lt;p&gt;还有一点也是经常被提到的关于 int(M) 中M的理解，int型数据无论是int(4)还是int(11)，都已经占用了 4 bytes 存储空间，M表示的只是显示宽度(display width, max value 255)，并不是定义int的长度。&lt;/p&gt;
-&lt;p&gt;例如：&lt;/p&gt;
-&lt;figure class=&quot;highlight gherkin&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;2&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;3&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;4&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;5&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;6&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;7&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;8&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;9&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;10&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;11&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;12&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;13&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;14&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;15&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;16&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;17&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;mysql&amp;gt; CREATE TABLE `tc_integer` (&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  `f_id` bigint(20) PRIMARY KEY AUTO_INCREMENT,&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  `f_type` tinyint,&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  `f_flag` tinyint(1),&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  `f_num` smallint(5) unsigned ZEROFILL&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;) ENGINE=InnoDB DEFAULT CHARSET=utf8;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;mysql&amp;gt; desc tc_integer;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;+----------------+-------------------------------+------+-----+---------+----------------+&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;|&lt;span class=&quot;string&quot;&gt; Field          &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; Type                          &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; Null &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; Key &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; Default &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; Extra          &lt;/span&gt;|&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;+----------------+-------------------------------+------+-----+---------+----------------+&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;|&lt;span class=&quot;string&quot;&gt; f_id           &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; bigint(20)                    &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; NO   &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; PRI &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; NULL    &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; auto_increment &lt;/span&gt;|&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;|&lt;span class=&quot;string&quot;&gt; f_type         &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; tinyint(4)                    &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; YES  &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt;     &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; NULL    &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt;                &lt;/span&gt;|&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;|&lt;span class=&quot;string&quot;&gt; f_flag         &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; tinyint(1)                    &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; YES  &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt;     &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; NULL    &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt;                &lt;/span&gt;|&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;|&lt;span class=&quot;string&quot;&gt; f_num          &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; smallint(5) unsigned zerofill &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; YES  &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt;     &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt; NULL    &lt;/span&gt;|&lt;span class=&quot;string&quot;&gt;                &lt;/span&gt;|&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;+----------------+-------------------------------+------+-----+---------+----------------+&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;4 rows in set (0.01 sec)&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;
-&lt;p&gt;插入几条数据看一下：&lt;br&gt;
     
     </summary>
     
