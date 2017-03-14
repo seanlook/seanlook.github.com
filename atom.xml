@@ -59,7 +59,7 @@
 </ol>
 <p>像 <em>key1=v1 or key2=v2</em> ， key1与key2是单列索引，并且无其它索引可用，就有可能看到 Using Union(xx,xxx) 。更多内容可见参考链接。</p>
 <h2 id="3-解决-——-加联合索引"><a href="#3-解决-——-加联合索引" class="headerlink" title="3. 解决 —— 加联合索引"></a>3. 解决 —— 加联合索引</h2><p>解决这个死锁可能你也想到了，添加联合索引 <code>idx_fid_sid(f_fid, f_sid)</code>，这样一来查询会选择这一个索引，至于 idx_sid 这个单列索引还需不需要，看业务场景。</p>
-<p>另外，如果懂点业务的话，会发现这个更新之所以这么频繁，实际上试一个阅读量计数的功能，放到redis里可极大的提高并发能力，定时持久化到mysql表。</p>
+<p>另外，如果懂点业务的话，会发现这个更新之所以这么频繁，实际上是一个阅读量计数的功能，放到redis里可极大的提高并发能力，定时持久化到mysql表。</p>
 <p>最后提一句 index_merge 是有选项可以关闭的：<br><figure class="highlight applescript"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">mysql&gt; select @@optimizer_switch;</div><div class="line">index_merge=<span class="keyword">on</span>,index_merge_union=<span class="keyword">on</span>,index_merge_sort_union=<span class="keyword">on</span>,index_merge_intersection=<span class="keyword">on</span> ...</div></pre></td></tr></table></figure></p>
 <p>如果优化器选择了index_merge，一般是索引没建好，我看不让它使用比较更好。</p>
 <p><strong> 参考文章 </strong>  </p>
