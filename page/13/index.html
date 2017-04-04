@@ -316,6 +316,181 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/01/21/openldap-install-guide-ssl/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2015/01/21/openldap-install-guide-ssl/" itemprop="url">
+                  OpenLDAP(2.4.3x)服务器搭建及配置说明
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-01-21T01:21:25+08:00">
+                2015-01-21
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/OpenLDAP/" itemprop="url" rel="index">
+                    <span itemprop="name">OpenLDAP</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2015/01/21/openldap-install-guide-ssl/" class="leancloud_visitors" data-flag-title="OpenLDAP(2.4.3x)服务器搭建及配置说明">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>本文采用的是从源码编译安装，适合Ubuntu和CentOS平台，通过<code>apt-get</code>或<code>yum</code>方式安装参考补充部分。openldap原理介绍参考<a href="http://seanlook.com/2015/01/15/openldap_introduction/">这里</a>。</p>
+<p>环境：<br>Ubuntu: 14.04.1 (trusty), x86_64<br>OpenLDAP: 2.4.31<br>Berkery DB: 5.1.29</p>
+<h1 id="1-安装"><a href="#1-安装" class="headerlink" title="1 安装"></a>1 安装</h1><h2 id="1-1-准备编译环境和依赖包"><a href="#1-1-准备编译环境和依赖包" class="headerlink" title="1.1 准备编译环境和依赖包"></a>1.1 准备编译环境和依赖包</h2><figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># apt-get install build-essential</span></div><div class="line"><span class="meta"># apt-get install libssl-dev</span></div></pre></td></tr></table></figure>
+<p>下载<a href="ftp://ftp.openldap.org/pub/OpenLDAP/openldap-release/openldap-2.4.31.tgz"><code>openldap-2.4.31.tgz</code></a>和<a href="http://download.oracle.com/berkeley-db/db-5.1.29.NC.tar.gz"><code>db-5.1.29.NC.tar.gz</code></a>并解压：</p>
+<figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># cd /usr/local/src</span></div><div class="line">src# wget ftp:<span class="comment">//ftp.openldap.org/pub/OpenLDAP/openldap-release/openldap-2.4.31.tgz</span></div><div class="line"><span class="meta"># wget http://download.oracle.com/berkeley-db/db-5.1.29.NC.tar.gz</span></div><div class="line"><span class="meta"># tar -zxf openldap-2.4.31.tgz</span></div><div class="line"><span class="meta"># tar -zxf db-5.1.29.NC.tar.gz</span></div><div class="line"></div><div class="line"><span class="meta"># cd db-5.1.29.NC/build_unix/</span></div><div class="line"><span class="meta"># ../dist/configure --prefix=/usr/local/berkeleydb-5.1</span></div><div class="line"><span class="meta"># make &amp;&amp; make install</span></div></pre></td></tr></table></figure>
+<p>建议人工指定<code>--prefix</code>，默认会安装到<code>/usr/local/BerkeleyDB.5.1</code>。上面的<code>make</code>过程会比较长，另外如果gcc版本在4.7及以上，可能会出现如下<a href="http://osdir.com/ml/freebsd-current/2012-05/msg00050.html">warning</a>，可以忽略：<br><figure class="highlight groovy"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">..<span class="regexp">/src/</span>dbinc/atomic.<span class="string">h:</span><span class="number">179</span>:<span class="number">19</span>: <span class="string">warning:</span> conflicting types <span class="keyword">for</span> built-<span class="keyword">in</span> function</div><div class="line"> ‘__atomic_compare_exchange’ [enabled by <span class="keyword">default</span>]</div></pre></td></tr></table></figure></p>
+<h2 id="1-2-安装openldap"><a href="#1-2-安装openldap" class="headerlink" title="1.2 安装openldap"></a>1.2 安装openldap</h2><p>设置一些环境变量，修改<code>/etc/profile</code>或<code>/etc/bash.bashrc</code>：</p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2015/01/21/openldap-install-guide-ssl/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/01/18/openssl-self-sign-ca/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -998,175 +1173,11 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/12/31/feel-2014-end/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/12/31/feel-2014-end/" itemprop="url">
-                  只怕时间走的太过匆忙，忘记了躲在角落中的我
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-12-31T00:21:25+08:00">
-                2014-12-31
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Feel/" itemprop="url" rel="index">
-                    <span itemprop="name">Feel</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-          
-
-          
-          
-             <span id="/2014/12/31/feel-2014-end/" class="leancloud_visitors" data-flag-title="只怕时间走的太过匆忙，忘记了躲在角落中的我">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          
-青春是一道明媚的伤痕，疼的酣畅淋漓，走的跌跌撞撞，她不顾一切遍体鳞伤，但仍庆幸，生命中仍有人为她执着与疯狂。
-
-
-很久没有静下来总结过自己了，拥有大把的自由时间反而没有停下来写写东西。还记得上一次这种类似的总结是在毕业那会儿，qq空间里被各种日志刷屏，于是自己也写过一篇，只是没发，现在也找不到去哪
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2014/12/31/feel-2014-end/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/12/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/12/">12</a><span class="page-number current">13</span><a class="page-number" href="/page/14/">14</a><span class="space">&hellip;</span><a class="page-number" href="/page/19/">19</a><a class="extend next" rel="next" href="/page/14/"><i class="fa fa-angle-right"></i></a>
+    <a class="extend prev" rel="prev" href="/page/12/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/12/">12</a><span class="page-number current">13</span><a class="page-number" href="/page/14/">14</a><span class="space">&hellip;</span><a class="page-number" href="/page/20/">20</a><a class="extend next" rel="next" href="/page/14/"><i class="fa fa-angle-right"></i></a>
   </nav>
 
 
@@ -1211,7 +1222,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">95</span>
+                <span class="site-state-item-count">96</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -1233,7 +1244,7 @@
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">113</span>
+                <span class="site-state-item-count">114</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>

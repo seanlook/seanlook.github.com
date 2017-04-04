@@ -316,6 +316,174 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/10/23/mysql-utf8mb4/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2016/10/23/mysql-utf8mb4/" itemprop="url">
+                  mysql使用utf8mb4经验吐血总结
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-10-23T16:32:49+08:00">
+                2016-10-23
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2016/10/23/mysql-utf8mb4/" class="leancloud_visitors" data-flag-title="mysql使用utf8mb4经验吐血总结">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h2 id="1-utf8-与-utf8mb4-异同"><a href="#1-utf8-与-utf8mb4-异同" class="headerlink" title="1. utf8 与 utf8mb4 异同"></a>1. utf8 与 utf8mb4 异同</h2><p>先看 官方手册 <a href="https://dev.mysql.com/doc/refman/5.6/en/charset-unicode-utf8mb4.html">https://dev.mysql.com/doc/refman/5.6/en/charset-unicode-utf8mb4.html</a> 的说明：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">The character <span class="keyword">set</span> named utf8 uses a maximum <span class="keyword">of</span> three <span class="keyword">bytes</span> per <span class="built_in">character</span> <span class="keyword">and</span> contains <span class="keyword">only</span> BMP characters. The utf8mb4 <span class="built_in">character</span> <span class="keyword">set</span> uses a maximum <span class="keyword">of</span> four <span class="keyword">bytes</span> per <span class="built_in">character</span> supports supplementary <span class="keyword">characters</span>:</div><div class="line"></div><div class="line">- <span class="keyword">For</span> a BMP <span class="built_in">character</span>, utf8 <span class="keyword">and</span> utf8mb4 have identical <span class="keyword">storage</span> characteristics: same code <span class="keyword">values</span>, same <span class="keyword">encoding</span>, same length.</div><div class="line">- <span class="keyword">For</span> a supplementary <span class="built_in">character</span>, utf8 cannot <span class="keyword">store</span> the <span class="built_in">character</span> <span class="keyword">at</span> all, whereas utf8mb4 requires four <span class="keyword">bytes</span> <span class="keyword">to</span> <span class="keyword">store</span> it. Because utf8 cannot <span class="keyword">store</span> the <span class="built_in">character</span> <span class="keyword">at</span> all, you have <span class="keyword">no</span> supplementary <span class="keyword">characters</span> <span class="keyword">in</span> utf8 <span class="keyword">columns</span> <span class="keyword">and</span> need <span class="keyword">not</span> worry about converting <span class="keyword">characters</span> <span class="keyword">or</span> losing <span class="keyword">data</span> <span class="keyword">when</span> upgrading utf8 <span class="keyword">data</span> <span class="keyword">from</span> older <span class="keyword">versions</span> <span class="keyword">of</span> MySQL.</div></pre></td></tr></table></figure></p>
+<p>MySQL在 5.5.3 之后增加了 <code>utf8mb4</code> 字符编码，mb4即 most bytes 4。简单说 utf8mb4 是 utf8 的超集并完全兼容utf8，能够用四个字节存储更多的字符。</p>
+<p>但抛开数据库，标准的 UTF-8 字符集编码是可以用 1~4 个字节去编码21位字符，这几乎包含了是世界上所有能看见的语言了。然而在MySQL里实现的utf8最长使用3个字节，也就是只支持到了 Unicode 中的 <a href="https://zh.wikipedia.org/wiki/Unicode%E5%AD%97%E7%AC%A6%E5%B9%B3%E9%9D%A2%E6%98%A0%E5%B0%84">基本多文本平面</a>（U+0000至U+FFFF），包含了控制符、拉丁文，中、日、韩等绝大多数国际字符，但并不是所有，最常见的就算现在手机端常用的表情字符 emoji和一些不常用的汉字，如 “墅” ，这些需要四个字节才能编码出来。</p>
+<p>注：QQ里面的内置的表情不算，它是通过特殊映射到的一个gif图片。一般输入法自带的就是。</p>
+<p>也就是当你的数据库里要求能够存入这些表情或宽字符时，可以把字段定义为 utf8mb4，同时要注意连接字符集也要设置为utf8mb4，否则在 <a href="http://seanlook.com/2016/04/22/mysql-sql-mode-troubleshooting/">严格模式</a> 下会出现 <code>Incorrect string value: /xF0/xA1/x8B/xBE/xE5/xA2… for column &#39;name&#39;</code>这样的错误，非严格模式下此后的数据会被截断。</p>
+<p>提示：另外一种能够存储emoji的方式是，不关心数据库表字符集，只要连接字符集使用 latin1，但相信我，你绝对不想这个干，一是这种字符集混用管理极不规范，二是存储空间被放大（读者可以想下为什么）。</p>
+<h2 id="2-utf8mb4-unicode-ci-与-utf8mb4-general-ci-如何选择"><a href="#2-utf8mb4-unicode-ci-与-utf8mb4-general-ci-如何选择" class="headerlink" title="2. utf8mb4_unicode_ci 与 utf8mb4_general_ci 如何选择"></a>2. utf8mb4_unicode_ci 与 utf8mb4_general_ci 如何选择</h2><p>字符除了需要存储，还需要排序或比较大小，涉及到与编码字符集对应的 排序字符集（collation）。ut8mb4对应的排序字符集常用的有 <code>utf8mb4_unicode_ci</code>、<code>utf8mb4_general_ci</code>，到底采用哪个在 stackoverflow 上有个讨论，<a href="http://stackoverflow.com/questions/766809/whats-the-difference-between-utf8-general-ci-and-utf8-unicode-ci">What’s the difference between utf8_general_ci and utf8_unicode_ci</a></p>
+<p>主要从排序准确性和性能两方面看：</p>
+<ul>
+<li>准确性<br><code>utf8mb4_unicode_ci</code> 是基于标准的Unicode来排序和比较，能够在各种语言之间精确排序<br><code>utf8mb4_general_ci</code> 没有实现Unicode排序规则，在遇到某些特殊语言或字符是，排序结果可能不是所期望的。<br><strong>但是在绝大多数情况下，这种特殊字符的顺序一定要那么精确吗</strong>。比如Unicode把<code>ß</code>、<code>Œ</code>当成<code>ss</code>和<code>OE</code>来看；而general会把它们当成<code>s</code>、<code>e</code>，再如<code>ÀÁÅåāă</code>各自都与 <code>A</code> 相等。</li>
+<li>性能<br><code>utf8mb4_general_ci</code> 在比较和排序的时候更快<br><code>utf8mb4_unicode_ci</code> 在特殊情况下，Unicode排序规则为了能够处理特殊字符的情况，实现了略微复杂的排序算法。<br><strong>但是在绝大多数情况下，不会发生此类复杂比较</strong>。general理论上比Unicode可能快些，但相比现在的CPU来说，它远远不足以成为考虑性能的因素，索引涉及、SQL设计才是。
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2016/10/23/mysql-utf8mb4/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/10/17/mysql-charset-handshake-cdb/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -943,172 +1111,26 @@
         
           
           这段时间在公司内部准备了一个分享，主题是关于 MySQL事务与锁，准备过程内容很多，也深入弄清楚了一些以前比较迷糊的地方，加上后面的讨论也就一个半小时。
-主要涉及的是乐观锁与悲观锁，InnoDB多版本并发控制的实现，以及隔离级别与各种情况加锁分析，因为涉及的主要还是开发人员，所以不是很深奥。也算花了
-          ...
+主要涉及的是乐观锁与悲观锁，InnoDB多版本并发控制的实现，以及隔离级别与各种情况加锁分析，因为涉及的主要还是开发人员，所以不是很深奥。也算花了不少心血，分享一下。
+slideshare: http://www.slideshare.net/ssuser5a0bc0/my-sql-seanlook
+
+
+	
+	  
+	
+
+
+
+
+原文连接地址：http://seanlook.com/2016/08/30/mysql-ppt-trx_isolation-lock/
+
+
+–&gt;
+-->
+          
           <!--noindex-->
           <div class="post-button text-center">
             <a class="btn" href="/2016/08/30/mysql-ppt-trx_isolation-lock/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/06/11/mysql-advanced-query-tuning-percona/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2016/06/11/mysql-advanced-query-tuning-percona/" itemprop="url">
-                  Advanced MySQL Query Tuning .pdf
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-06-11T16:32:49+08:00">
-                2016-06-11
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-          
-
-          
-          
-             <span id="/2016/06/11/mysql-advanced-query-tuning-percona/" class="leancloud_visitors" data-flag-title="Advanced MySQL Query Tuning .pdf">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          端午在家无聊，又不想学习。于是在Youtube随便逛，看到一个很不错的分享，来自 Percona Database Performance。下面是演示稿：
-slideshare: http://www.slideshare.net/ssuser5a0bc0/webinar-2013-advanced
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2016/06/11/mysql-advanced-query-tuning-percona/#more" rel="contents">
               Read more &raquo;
             </a>
           </div>
@@ -1149,7 +1171,7 @@ slideshare: http://www.slideshare.net/ssuser5a0bc0/webinar-2013-advanced
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/2/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><a class="page-number" href="/page/2/">2</a><span class="page-number current">3</span><a class="page-number" href="/page/4/">4</a><span class="space">&hellip;</span><a class="page-number" href="/page/19/">19</a><a class="extend next" rel="next" href="/page/4/"><i class="fa fa-angle-right"></i></a>
+    <a class="extend prev" rel="prev" href="/page/2/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><a class="page-number" href="/page/2/">2</a><span class="page-number current">3</span><a class="page-number" href="/page/4/">4</a><span class="space">&hellip;</span><a class="page-number" href="/page/20/">20</a><a class="extend next" rel="next" href="/page/4/"><i class="fa fa-angle-right"></i></a>
   </nav>
 
 
@@ -1194,7 +1216,7 @@ slideshare: http://www.slideshare.net/ssuser5a0bc0/webinar-2013-advanced
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">95</span>
+                <span class="site-state-item-count">96</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -1216,7 +1238,7 @@ slideshare: http://www.slideshare.net/ssuser5a0bc0/webinar-2013-advanced
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">113</span>
+                <span class="site-state-item-count">114</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>
