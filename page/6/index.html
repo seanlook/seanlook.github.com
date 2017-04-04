@@ -316,6 +316,183 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/03/28/mysql-sysbench/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2016/03/28/mysql-sysbench/" itemprop="url">
+                  使用sysbench对mysql压力测试
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-03-28T16:32:49+08:00">
+                2016-03-28
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2016/03/28/mysql-sysbench/" class="leancloud_visitors" data-flag-title="使用sysbench对mysql压力测试">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>sysbench是一个模块化的、跨平台、多线程基准测试工具，主要用于评估测试各种不同系统参数下的数据库负载情况。关于这个项目的详细介绍请看：<a href="https://github.com/akopytov/sysbench">https://github.com/akopytov/sysbench</a> 。<br>它主要包括以下几种方式的测试：</p>
+<ol>
+<li>cpu性能</li>
+<li>磁盘io性能</li>
+<li>调度程序性能</li>
+<li>内存分配及传输速度</li>
+<li>POSIX线程性能</li>
+<li>数据库性能(OLTP基准测试)</li>
+</ol>
+<p>sysbench的数据库OLTP测试支持MySQL、PostgreSQL、Oracle，目前主要用于Linux操作系统，开源社区已经将sysbench移植到了Windows，并支持SQL Server的基准测试。</p>
+<p>废话不多说，开始。</p>
+<h2 id="1-sysbench安装"><a href="#1-sysbench安装" class="headerlink" title="1. sysbench安装"></a>1. sysbench安装</h2><ul>
+<li>mysql版本: mysql-community-server-5.6.29   </li>
+<li>OS: CentOS 6.7 X86_64</li>
+<li>sysbench 0.5相比0.4版本有一些变化，包括oltp测试结合了lua脚本，还多了一些隐藏选项，本文会涉及得到一部分。</li>
+</ul>
+<p>目前许多仓库里已编译好的二进制sysbench还是0.4.x版本，不过现在主流也还是github上的0.5，可以从 <a href="http://www.lefred.be/node/154">这里</a>下载0.5版本的rpm包直接安装，不过我选择自己编译，因为只有这个办法是通用的。</p>
+<figure class="highlight groovy"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// 先安装编译依赖环境</span></div><div class="line">$ sudo yum install gcc gcc-c++ automake make  libtool mysql-community-devel</div><div class="line"></div><div class="line">$ cd <span class="regexp">/tmp &amp;&amp; git clone https:/</span><span class="regexp">/github.com/</span>akopytov/sysbench.git</div><div class="line"></div><div class="line">$ cd <span class="regexp">/tmp/</span>sysbench &amp;&amp; ./autogen.sh</div><div class="line">$ .<span class="regexp">/configure --prefix=/</span>usr<span class="regexp">/local/</span>sysbench<span class="number">-0.5</span></div><div class="line">$ ./make &amp;&amp; sudo make install</div><div class="line"></div><div class="line"><span class="comment">// 0.5版本需要oltp.lua测试脚本</span></div><div class="line"><span class="comment">// 如果是rpm包方式安装的，在 /usr/share/doc/sysbench/tests/db/ 下可找到</span></div><div class="line">$ cd <span class="regexp">/usr/</span>local<span class="regexp">/sysbench &amp;&amp; sudo mkdir -p share/</span>tests/db</div><div class="line">$ cp <span class="regexp">/tmp/</span>sysbench<span class="regexp">/sysbench/</span>tests<span class="regexp">/db/</span>*.lua share<span class="regexp">/tests/</span>db/</div><div class="line">$ .<span class="regexp">/bin/</span>sysbench --version</div><div class="line">sysbench <span class="number">0.5</span></div></pre></td></tr></table></figure>
+<p>如果需要测试PostgreSQL、Oracle，则在configure时需要加上 –with-oracle 或者 –with-pgsql 参数</p>
+<h2 id="2-使用sysbench对mysql压测"><a href="#2-使用sysbench对mysql压测" class="headerlink" title="2. 使用sysbench对mysql压测"></a>2. 使用sysbench对mysql压测</h2><h3 id="2-1-只读示例"><a href="#2-1-只读示例" class="headerlink" title="2.1 只读示例"></a>2.1 只读示例</h3><figure class="highlight brainfuck"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="string">.</span><span class="comment">/bin/sysbench</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">test=</span><span class="string">.</span><span class="comment">/share/tests/db/oltp</span><span class="string">.</span><span class="comment">lua</span> <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">mysql</span><span class="literal">-</span><span class="comment">host=10</span><span class="string">.</span><span class="comment">0</span><span class="string">.</span><span class="comment">201</span><span class="string">.</span><span class="comment">36</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">mysql</span><span class="literal">-</span><span class="comment">port=8066</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">mysql</span><span class="literal">-</span><span class="comment">user=ecuser</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">mysql</span><span class="literal">-</span><span class="comment">password=ecuser</span> <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">mysql</span><span class="literal">-</span><span class="comment">db=dbtest1a</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">tables</span><span class="literal">-</span><span class="comment">count=10</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">table</span><span class="literal">-</span><span class="comment">size=500000</span> <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">report</span><span class="literal">-</span><span class="comment">interval=10</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">dist</span><span class="literal">-</span><span class="comment">type=uniform</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">rand</span><span class="literal">-</span><span class="comment">init=on</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">max</span><span class="literal">-</span><span class="comment">requests=0</span> <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">test</span><span class="literal">-</span><span class="comment">mode=nontrx</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">nontrx</span><span class="literal">-</span><span class="comment">mode=select</span> <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">read</span><span class="literal">-</span><span class="comment">only=on</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">skip</span><span class="literal">-</span><span class="comment">trx=on</span> <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">max</span><span class="literal">-</span><span class="comment">time=120</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">num</span><span class="literal">-</span><span class="comment">threads=12</span> <span class="comment">\</span></div><div class="line"><span class="title">[</span><span class="comment">prepare|run|cleanup</span><span class="title">]</span></div></pre></td></tr></table></figure>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2016/03/28/mysql-sysbench/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/01/18/mac-mini-zturn/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -992,178 +1169,6 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/10/25/weekends-badminton-ktv/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/10/25/weekends-badminton-ktv/" itemprop="url">
-                  周末腐败地
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-10-25T15:44:31+08:00">
-                2015-10-25
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/生活/" itemprop="url" rel="index">
-                    <span itemprop="name">生活</span>
-                  </a>
-                </span>
-
-                
-                
-                  , 
-                
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/生活/随记/" itemprop="url" rel="index">
-                    <span itemprop="name">随记</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-          
-
-          
-          
-             <span id="/2015/10/25/weekends-badminton-ktv/" class="leancloud_visitors" data-flag-title="周末腐败地">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>下午一点钟才起来，今天本来也没什么安排，算不上睡懒觉，毕竟昨晚四点钟才睡。</p>
-<p>昨天（周六）公司写字楼的物业举办了一届羽毛球赛，七点钟就起来坐地铁来到侨城东，看来公司包的场地是华侨城锦绣花园的一个社区羽毛球馆，果然住着一群有钱人。我八点35到场，热个身，大概9点钟开始抽签，抽了个7号，也就是其他谁也抽到7号那就与我对打。运气太背了，一个估计有170斤的对手笑呵呵的站在我面前。人家力气大，专打我后场球，我手臂疼痛感还没恢复，被秒了。</p>
-<p>剩下没事只给我司的人拍照了。哎，虽然我手机拍照效果一般，但也不差，pp拍出来噪点严重，不清晰。然后觉得反正现在也没事，物业方也没找到合适的裁判，我就顺口应了句“我来吧”，裁女单。额，场面有多和谐我就不讲了，双方是挽着手上场的。本以为完事了，结果，又要裁男单，裁复赛，最后决赛。当时我想现在空下这么多场地，好好练几个球，可大家都不愿意顶替我去裁。最后前三甲决赛，就我一个喊着，“13比11，这一局比赛结束”——决赛果然精彩，双方咬着分不放。因为是循环赛，按最后每人赢的局数定名次，三人打了七局。这还是我第一次当裁判呢。</p>
-<p>回来时都12点多了，又困又累，一同事顺路就开车送我到了西乡。本以为可以冲个澡，睡四五个小时，结果，公司客户在投诉网站使用很慢，远程到公司找了一个小时原因没结果，还趴在桌上睡着了。（程序员节还出事情呢？）</p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2015/10/25/weekends-badminton-ktv/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -1213,7 +1218,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">94</span>
+                <span class="site-state-item-count">95</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -1235,7 +1240,7 @@
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">112</span>
+                <span class="site-state-item-count">113</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>

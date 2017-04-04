@@ -316,6 +316,178 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/12/05/mysql_mysqldump_options_examples/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2014/12/05/mysql_mysqldump_options_examples/" itemprop="url">
+                  MySQL备份命令mysqldump参数说明与示例
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-12-05T20:21:25+08:00">
+                2014-12-05
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2014/12/05/mysql_mysqldump_options_examples/" class="leancloud_visitors" data-flag-title="MySQL备份命令mysqldump参数说明与示例">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h3 id="1-语法选项说明"><a href="#1-语法选项说明" class="headerlink" title="1. 语法选项说明"></a>1. 语法选项说明</h3><ul>
+<li><code>-h, --host=name</code><br>主机名</li>
+<li><p><code>-P[ port_num], --port=port_num</code><br>用于连接MySQL服务器的的TCP/IP端口号</p>
+</li>
+<li><p><code>--master-data</code><br>这个选项可以把binlog的位置和文件名添加到输出中，如果等于1，将会打印成一个<code>CHANGE MASTER</code>命令；如果等于2，会加上注释前缀。并且这个选项会自动打开<code>--lock-all-tables</code>，除非同时设置了<code>--single-transaction</code>（这种情况下，全局读锁只会在开始dump的时候加上一小段时间，不要忘了阅读<code>--single-transaction</code>的部分）。在任何情况下，所有日志中的操作都会发生在导出的准确时刻。这个选项会自动关闭<code>--lock-tables</code>。 </p>
+</li>
+<li><p><code>-x, --lock-all-tables</code><br>锁定所有库中所有的表。这是通过在整个dump的过程中持有全局读锁来实现的。会自动关闭<code>--single-transaction</code>和<code>--lock-tables</code>。</p>
+</li>
+<li><p><code>--single-transaction</code><br>通过将导出操作封装在一个事务内来使得导出的数据是一个一致性快照。只有当表使用支持MVCC的存储引擎（目前只有InnoDB）时才可以工作；其他引擎不能保证导出是一致的。当导出开启了<code>--single-transaction</code>选项时，要确保导出文件有效（正确的表数据和二进制日志位置），就要保证没有其他连接会执行如下语句：<code>ALTER TABLE, DROP TABLE, RENAME TABLE, TRUNCATE TABLE</code>，这会导致一致性快照失效。这个选项开启后会自动关闭<code>--lock-tables</code>。 </p>
+</li>
+<li><p><code>-l, --lock-tables</code><br>对所有表加读锁。（默认是打开的，用<code>--skip-lock-tables</code>来关闭，上面的选项会把关闭<code>-l</code>选项）</p>
+</li>
+<li><p><code>-F, --flush-logs</code><br>在开始导出前刷新服务器的日志文件。注意，如果你一次性导出很多数据库（使用 <code>-databases=</code>或<code>--all-databases</code>选项），导出每个库时都会触发日志刷新。例外是当使用了<code>--lock-all-tables</code>或<code>--master-data</code>时：日志只会被刷新一次，那个时候所有表都会被锁住。所以如果你希望你的导出和日志刷新发生在同一个确定的时刻，你需要使用<code>--lock-all-tables</code>，或者<code>--master-data</code>配合<code>--flush-logs</code>。</p>
+</li>
+</ul>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2014/12/05/mysql_mysqldump_options_examples/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/12/05/mysql_incremental_backup_example/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -993,179 +1165,6 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/11/13/deploy-private-docker-registry-with-nginx-ssl/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/11/13/deploy-private-docker-registry-with-nginx-ssl/" itemprop="url">
-                  搭建docker内网私服（docker-registry with nginx&ssl on centos）
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-11-13T20:21:25+08:00">
-                2014-11-13
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Virtualization/" itemprop="url" rel="index">
-                    <span itemprop="name">Virtualization</span>
-                  </a>
-                </span>
-
-                
-                
-                  , 
-                
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Virtualization/Docker/" itemprop="url" rel="index">
-                    <span itemprop="name">Docker</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-          
-
-          
-          
-             <span id="/2014/11/13/deploy-private-docker-registry-with-nginx-ssl/" class="leancloud_visitors" data-flag-title="搭建docker内网私服（docker-registry with nginx&ssl on centos）">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>主要思路：<br><img src="http://sean-images.qiniudn.com/docker-registry-deploy.png" alt="docker-registry-deploy"></p>
-<h2 id="1-Docker-Registry-说明"><a href="#1-Docker-Registry-说明" class="headerlink" title="1. Docker Registry 说明"></a>1. Docker Registry 说明</h2><p>关于如何创建和使用本地仓库，其实已经有很多文章介绍了。因为docker技术正处于发展和完善阶段，所以有些文章要么内容已经过时，要么给出了错误的配置，导致无法正常创建仓库。本文记录的是个人完整的搭建过程，<code>docker version</code>为1.1.2。</p>
-<p>官方提供了<a href="https://registry.hub.docker.com/">Docker Hub</a>网站来作为一个公开的集中仓库。然而，本地访问Docker Hub速度往往很慢，并且很多时候我们需要一个本地的私有仓库只供网内使用。</p>
-<p>Docker仓库实际上提供两方面的功能，一个是镜像管理，一个是认证。前者主要由<a href="https://github.com/docker/docker-registry">docker-registry</a>项目来实现，通过http服务来上传下载；后者可以通过docker-index（闭源）项目或者利用现成认证方案（如nginx）实现http请求管理。</p>
-<p>docker-registry既然也是软件应用，自然最简单的方法就是使用官方提供的已经部署好的镜像registry。官方文档中也给出了建议，直接运行<code>sudo docker run -p 5000:5000 registry</code>命令。这样确实能启动一个registry服务器，但是所有上传的镜像其实都是由docker容器管理，放在了/var/lib/docker/….某个目录下。而且一旦删除容器，镜像也会被删除。因此，我们需要想办法告诉docker容器镜像应该存放在哪里。registry镜像中启动后镜像默认位置是<code>/tmp/registry</code>，因此直接映射这个位置即可，比如到本机的<code>/opt/data/registry</code>目录下。</p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2014/11/13/deploy-private-docker-registry-with-nginx-ssl/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -1215,7 +1214,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">94</span>
+                <span class="site-state-item-count">95</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -1237,7 +1236,7 @@
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">112</span>
+                <span class="site-state-item-count">113</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>
