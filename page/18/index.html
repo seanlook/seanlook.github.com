@@ -316,6 +316,668 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/10/31/docker-command-best-use-1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2014/10/31/docker-command-best-use-1/" itemprop="url">
+                  docker常用管理命令（上）
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-10-31T20:21:25+08:00">
+                2014-10-31
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/Docker/" itemprop="url" rel="index">
+                    <span itemprop="name">Docker</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2014/10/31/docker-command-best-use-1/" class="leancloud_visitors" data-flag-title="docker常用管理命令（上）">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>本文只记录docker命令在大部分情境下的使用，如果想了解每一个选项的细节，请参考官方文档，这里只作为自己以后的备忘记录下来。</p>
+<p>根据自己的理解，总的来说分为以下几种：<br>容器生命周期管理 — <code>docker [run|start|stop|restart|kill|rm|pause|unpause]</code><br>容器操作运维 — <code>docker [ps|inspect|top|attach|events|logs|wait|export|port]</code><br>容器rootfs命令 — <code>docker [commit|cp|diff]</code><br>镜像仓库 — <code>docker [login|pull|push|search]</code><br>本地镜像管理 — <code>docker [images|rmi|tag|build|history|save|import]</code><br>其他命令 — <code>docker [info|version]</code></p>
+<p>看一个变迁图<br><img src="http://sean-images.qiniudn.com/docker_cli_stage.png" alt="docker_cli_stage"></p>
+<h3 id="1-列出机器上的镜像（images）"><a href="#1-列出机器上的镜像（images）" class="headerlink" title="1. 列出机器上的镜像（images）"></a>1. 列出机器上的镜像（images）</h3><figure class="highlight crmsh"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># docker images </span></div><div class="line">REPOSITORY               <span class="keyword">TAG</span>             <span class="title">IMAGE</span> ID        CREATED         VIRTUAL SIZE</div><div class="line">ubuntu                   <span class="number">14.10</span>           <span class="number">2185</span>fd50e2ca    <span class="number">13</span> days ago     <span class="number">236.9</span> MB</div><div class="line">…</div></pre></td></tr></table></figure>
+<p>其中我们可以根据REPOSITORY来判断这个镜像是来自哪个服务器，如果没有 / 则表示官方镜像，类似于<code>username/repos_name</code>表示Github的个人公共库，类似于<code>regsistory.example.com:5000/repos_name</code>则表示的是私服。<br>IMAGE ID列其实是缩写，要显示完整则带上<code>--no-trunc</code>选项</p>
+<h3 id="2-在docker-index中搜索image（search）"><a href="#2-在docker-index中搜索image（search）" class="headerlink" title="2. 在docker index中搜索image（search）"></a>2. 在docker index中搜索image（search）</h3><p><code>Usage: docker search TERM</code><br><figure class="highlight nginx"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># docker search seanlo</span></div><div class="line"><span class="attribute">NAME</span>                DESCRIPTION           STARS     OFFICIAL   AUTOMATED</div><div class="line">seanloook/centos6   sean<span class="string">'s docker repos         0</span></div></pre></td></tr></table></figure></p>
+<p>搜索的范围是官方镜像和所有个人公共镜像。NAME列的 / 后面是仓库的名字。</p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2014/10/31/docker-command-best-use-1/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/10/29/multiple-tomcats-service-script/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2014/10/29/multiple-tomcats-service-script/" itemprop="url">
+                  管理多tomcat服务shell脚本（CentOS）
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-10-29T18:21:25+08:00">
+                2014-10-29
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Tomcat/" itemprop="url" rel="index">
+                    <span itemprop="name">Tomcat</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2014/10/29/multiple-tomcats-service-script/" class="leancloud_visitors" data-flag-title="管理多tomcat服务shell脚本（CentOS）">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>该脚本改自csdn上的一个shell，忘记出处了，只记得它能够简单的通过<code>service tomcat [stop|start|restart]</code>来方便的管理Linux服务器上的tomcat，这可以满足大部分人的需求，然而并不适合我所管理的CentOS上的tomcat应用：通过端口区分的3台tomcat集群。如果每一次管理tomcat或查看日志，都<code>cd /apps/test/tomcat0/log/</code>然后切换到另外一个<code>cd ../../</code>或<code>cd /apps/test/tomcat1/log/</code>，麻烦至极。因此“懒人”创造了这个脚本<code>tomcat</code>：</p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2014/10/29/multiple-tomcats-service-script/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/10/29/apache-3tomcat-cluster-jk-memcached/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2014/10/29/apache-3tomcat-cluster-jk-memcached/" itemprop="url">
+                  apache+3tomcat+jk+memcached集群环境搭建
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-10-29T10:21:25+08:00">
+                2014-10-29
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/Web-Server/" itemprop="url" rel="index">
+                    <span itemprop="name">Web_Server</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2014/10/29/apache-3tomcat-cluster-jk-memcached/" class="leancloud_visitors" data-flag-title="apache+3tomcat+jk+memcached集群环境搭建">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>注意本文不讨论原理，只讲述具体的搭建过程，而且步骤都经过了整理，否则过程可能会出现其他异常，请自行google。apache与tomcat整合的方式除了jk之外，使用apache自带的mod_ajp_proxy模块也可以很方便的完成。<br>先来看一下架构图：<br><img src="http://sean-images.qiniudn.com/apache_tomcat_cluster_msm.png" alt="apache_tomcat_cluster_msm"><br>属于正式环境中原session复制方案的改进。</p>
+<h1 id="1-所需软件包"><a href="#1-所需软件包" class="headerlink" title="1. 所需软件包"></a>1. 所需软件包</h1><figure class="highlight css"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line"><span class="selector-tag">jrrt-3</span><span class="selector-class">.1</span><span class="selector-class">.2-1</span><span class="selector-class">.6</span><span class="selector-class">.0-linux-x64</span><span class="selector-class">.bin</span>（或<span class="selector-tag">jdk1</span><span class="selector-class">.6</span><span class="selector-class">.0_33</span>）   <span class="selector-tag">jvm</span></div><div class="line"><span class="selector-tag">httpd-2</span><span class="selector-class">.2</span><span class="selector-class">.26</span><span class="selector-class">.tar</span><span class="selector-class">.gz</span>                              <span class="selector-tag">web</span>服务器，处理静态资源</div><div class="line"><span class="selector-tag">apache-tomcat-6</span><span class="selector-class">.0</span><span class="selector-class">.32</span><span class="selector-class">.tar</span><span class="selector-class">.gz</span>                      应用服务器，<span class="selector-tag">Servlet</span>容器处理动态请求</div><div class="line"><span class="selector-tag">tomcat-connectors-1</span><span class="selector-class">.2</span><span class="selector-class">.30-src</span><span class="selector-class">.tar</span><span class="selector-class">.gz</span>              <span class="selector-tag">apache</span>与<span class="selector-tag">tomcat</span>整合插件<span class="selector-tag">mod_jk</span><span class="selector-class">.so</span></div><div class="line"><span class="selector-tag">tomcat-native</span><span class="selector-class">.tar</span><span class="selector-class">.gz</span>                             <span class="selector-tag">APR</span>加速<span class="selector-tag">tomcat</span>，提高线程并发能力。使用<span class="selector-tag">tomcat</span>自带版本。</div><div class="line"><span class="selector-tag">memcached-session-manager</span>                        使用<span class="selector-tag">msm</span>解决多<span class="selector-tag">tomcat</span>集群时<span class="selector-tag">session</span>同步问题所需<span class="selector-tag">jar</span>包</div><div class="line">    <span class="selector-tag">asm-3</span><span class="selector-class">.2</span><span class="selector-class">.jar</span>, <span class="selector-tag">couchbase-client-1</span><span class="selector-class">.2</span><span class="selector-class">.2</span><span class="selector-class">.jar</span>, </div><div class="line">    <span class="selector-tag">kryo-1</span><span class="selector-class">.04</span><span class="selector-class">.jar</span>, <span class="selector-tag">kryo-serializers-0</span><span class="selector-class">.11</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">msm-kryo-serializer-1</span><span class="selector-class">.6</span><span class="selector-class">.5</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">memcached-session-manager-1</span><span class="selector-class">.6</span><span class="selector-class">.5</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">memcached-session-manager-tc6-1</span><span class="selector-class">.6</span><span class="selector-class">.5</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">minlog-1</span><span class="selector-class">.2</span><span class="selector-class">.jar</span>, <span class="selector-tag">reflectasm-1</span><span class="selector-class">.01</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">spymemcached-2</span><span class="selector-class">.10</span><span class="selector-class">.2</span><span class="selector-class">.jar</span></div></pre></td></tr></table></figure>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2014/10/29/apache-3tomcat-cluster-jk-memcached/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/10/28/vsphere-recover-from-missing-vmdk/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2014/10/28/vsphere-recover-from-missing-vmdk/" itemprop="url">
+                  误删vSphere虚拟机.vmdk文件的恢复
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-10-28T15:21:25+08:00">
+                2014-10-28
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Virtualization/" itemprop="url" rel="index">
+                    <span itemprop="name">Virtualization</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2014/10/28/vsphere-recover-from-missing-vmdk/" class="leancloud_visitors" data-flag-title="误删vSphere虚拟机.vmdk文件的恢复">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h2 id="1-错误描述"><a href="#1-错误描述" class="headerlink" title="1. 错误描述"></a>1. 错误描述</h2><p>在vSphere上，一次重启虚拟服务器时出现启动不了，提示找不到vmdk虚拟磁盘文件：<br><img src="http://sean-images.qiniudn.com/vmdk_not_found.png" alt="vmdk_not_found"></p>
+<h2 id="2-原因分析"><a href="#2-原因分析" class="headerlink" title="2. 原因分析"></a>2. 原因分析</h2><p>查看这台虚拟服务器的摘要信息，对比datastore上其他可用的虚拟机，发现损坏的服务器上确实缺少一个vmdk磁盘文件，但是可以看见一个50G的<code>xxx-flat.vmdk</code>文件；而正常的服务器只有<code>xxx.vmdk</code>，没有<code>xxx-flat.vmdk</code>，关机之后两个文件都存在，而且真实的磁盘容量从vmdk转移到了<code>xxx-flat.vmdk</code>。<br>虚拟主机在运行的时候，实际在使用的是<code>xxx-flat.vmdk</code>，然而<code>xxx.vmdk</code>是可以同时被删除的，才导致了问题。</p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2014/10/28/vsphere-recover-from-missing-vmdk/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/10/26/docker-installed-centos6-successfully/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -477,711 +1139,6 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/10/25/markdown-tips/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/10/25/markdown-tips/" itemprop="url">
-                  markdown语法备忘笔记
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-10-25T01:21:25+08:00">
-                2014-10-25
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/其它/" itemprop="url" rel="index">
-                    <span itemprop="name">其它</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-          
-
-          
-          
-             <span id="/2014/10/25/markdown-tips/" class="leancloud_visitors" data-flag-title="markdown语法备忘笔记">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>##1. 什么是markdown##</p>
-<p>##2. 我选择的markdown编辑器##<br>首先选择适合自己的markdown编辑器需要考虑几个方面：<br>平台：Mac OS X, Windows, Online, 插件形式<br>预览：实时预览、html预览<br>语法：选定某一款后，适应自己的习惯，不必太复杂<br>其它：如主题，快捷键，同步等</p>
-<p>###首先来说一下以下几款为什么我没选用：（纯属个人喜好）###</p>
-<ul>
-<li>Sublime Text的插件markdown preview，编辑和预览是分离的，在浏览器里预览。</li>
-<li>CuteMarkEd，独立编辑器，支持多平台，不知道为什么我的编辑和预览窗口字体都那么丑。</li>
-<li>MarkdownPad，独立编辑器，windows下口碑比较好的，但我把曾经写好的md文章放进去，格式不太对，应该是语法上略有差别，其它都还好。它多标签页的形式可以加分。<br>社区活跃，新功能反馈及时，例如 toc replace</li>
-<li>vim或emacs的markdown插件，windows平台下我还是正常一点吧。<br>###习惯采用的编辑器###</li>
-<li>Haroopad，不得不说韩国人开发的软件体验上超赞，与segmentfault的文章写作一样，左右实时预览，多种主题可选。如果能实现多标签页就更好了。各平台上都可以使用，还有vim编辑模式。<br><img src="http://git.oschina.net/uploads/images/2016/0304/111256_dcf5a8a6_416534.png" alt="markdown_haroopad"></li>
-<li>马克飞象，google浏览器插件，专为印象笔记开发的浏览器markdown扩展，用起来特别舒服，自动保存在本地缓存，没有导出html格式或浏览器在线预览的功能，但比MaDe好用多了。（现在有离线客户端版）<br><img src="http://git.oschina.net/uploads/images/2016/0304/111321_cd78274a_416534.png" alt="markdown_makefeixiang"></li>
-<li>在线markdown编辑器（首先你得有网络）<br>[github]：不用多说<br><a href="http://mahua.jser.me/">MaHua</a>：与Mac OS X上相传甚广的Mou风格类似<br><a href="https://www.zybuluo.com/mdeditor">cmd markdown</a>：大牛开发的<br>##3. 常用markdown语法##<h3 id="标题-粗斜体"><a href="#标题-粗斜体" class="headerlink" title="标题/粗斜体"></a>标题/粗斜体</h3></li>
-</ul>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2014/10/25/markdown-tips/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/10/24/upgrade-centos6_kernel-to-3.10.x/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/10/24/upgrade-centos6_kernel-to-3.10.x/" itemprop="url">
-                  CentOS 6.x 内核升级（2.6.32 -> 3.10.58）过程记录
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-10-24T01:21:25+08:00">
-                2014-10-24
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Linux/" itemprop="url" rel="index">
-                    <span itemprop="name">Linux</span>
-                  </a>
-                </span>
-
-                
-                
-                  , 
-                
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Linux/CentOS/" itemprop="url" rel="index">
-                    <span itemprop="name">CentOS</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-          
-
-          
-          
-             <span id="/2014/10/24/upgrade-centos6_kernel-to-3.10.x/" class="leancloud_visitors" data-flag-title="CentOS 6.x 内核升级（2.6.32 -> 3.10.58）过程记录">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>本人升级的目的是想在CentOS6.2上运行docker，官方建议内核版本在3.8.0及以上，于是就自己从Linux内核官方网站上下载源码，自己编译。</p>
-<p>##1. 准备工作##</p>
-<p>###1.1 确认内核及版本信息###<br><figure class="highlight python"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">[root@hostname ~]<span class="comment"># uname -r</span></div><div class="line"><span class="number">2.6</span><span class="number">.32</span><span class="number">-220.</span>el6.x86_64</div><div class="line">[root@hostname ~]<span class="comment"># cat /etc/centos-release </span></div><div class="line">CentOS release <span class="number">6.2</span> (Final)</div></pre></td></tr></table></figure></p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2014/10/24/upgrade-centos6_kernel-to-3.10.x/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/10/06/linux-level2/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/10/06/linux-level2/" itemprop="url">
-                  Linux进阶培训-tplink
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-10-06T16:32:49+08:00">
-                2014-10-06
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Linux/" itemprop="url" rel="index">
-                    <span itemprop="name">Linux</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-          
-
-          
-          
-             <span id="/2014/10/06/linux-level2/" class="leancloud_visitors" data-flag-title="Linux进阶培训-tplink">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>本文没啥实际内容，是给新人做linux培训的第二课进阶篇，主要着眼于体系，把一些工具混个眼熟。</p>
-<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-01.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-02.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-03.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-04.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-05.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-06.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-07.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-08.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-09.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-10.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-11.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-12.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-13.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-14.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-15.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-16.PNG" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/linux-level2-17.PNG" alt=""></p>
-<h2 id="目录"><a href="#目录" class="headerlink" title="目录"></a>目录</h2><ul>
-<li>Linux磁盘管理(进阶)</li>
-<li>Linux内存管理</li>
-<li>Linux进程管理(进阶)</li>
-<li>Linux网络管理(进阶)</li>
-<li>Linux系统状态监控与调优</li>
-<li>常见服务</li>
-<li>Linux安全策略</li>
-<li>其他</li>
-</ul>
-<h2 id="Linux磁盘管理（进阶）"><a href="#Linux磁盘管理（进阶）" class="headerlink" title="Linux磁盘管理（进阶）"></a>Linux磁盘管理（进阶）</h2><ul>
-<li>ext4文件系统格式<ul>
-<li>Inode、block、superblock、MBR</li>
-<li>VFS</li>
-</ul>
-</li>
-<li>LVM<ul>
-<li>pv、lv、vg</li>
-<li>lvdisplay、lvextend、vgdisplay、pvcreate…</li>
-</ul>
-</li>
-<li>RAID<ul>
-<li>raid0、raid1、raid5、raid10</li>
-<li>r/w速度、磁盘利用率、安全性的权衡</li>
-</ul>
-</li>
-<li>磁盘IO性能<ul>
-<li>dd、iostat、iotop</li>
-<li>I/O等待</li>
-</ul>
-</li>
-</ul>
-<h2 id="Linux内存管里（基础）"><a href="#Linux内存管里（基础）" class="headerlink" title="Linux内存管里（基础）"></a>Linux内存管里（基础）</h2><ul>
-<li>物理内存与虚拟内存<ul>
-<li>Swap space，分页存取</li>
-</ul>
-</li>
-<li>buffer与cache区分</li>
-<li>内存监控命令<ul>
-<li>free、vmstat</li>
-</ul>
-</li>
-<li>/proc文件系统</li>
-</ul>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2014/10/06/linux-level2/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/09/07/linux-security-general-settings/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/09/07/linux-security-general-settings/" itemprop="url">
-                  CentOS 6 服务器安全配置指南（通用）
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-09-07T01:21:25+08:00">
-                2014-09-07
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Linux/" itemprop="url" rel="index">
-                    <span itemprop="name">Linux</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-          
-
-          
-          
-             <span id="/2014/09/07/linux-security-general-settings/" class="leancloud_visitors" data-flag-title="CentOS 6 服务器安全配置指南（通用）">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>Linux是一个开放式系统，可以在网络上找到许多现成的程序和工具，这既方便了用户，也方便了黑客，因为他们也能很容易地找到程序和工具来潜入Linux系统，或者盗取Linux系统上的重要信息。不过，只要我们仔细地设定Linux的各种系统功能，并且加上必要的安全措施，就能让黑客们无机可乘。一般来说，对Linux系统的安全设定包括取消不必要的服务、限制远程存取、隐藏重要资料、修补安全漏洞、采用安全工具以及经常性的安全检查等。</p>
-<p>本文是可参考的实际操作，不涉及如IP欺骗这样的原理，而且安全问题也不算几行命令就能预防的，这里只是linux系统上基本的安全加固方法，后续有新的内容再添加进来。</p>
-<p>注：所有文件在修改之前都要进行备份如 <code>cp /etc/passwd{,.dist}</code></p>
-<h2 id="1-禁用不使用的用户"><a href="#1-禁用不使用的用户" class="headerlink" title="1. 禁用不使用的用户"></a>1. 禁用不使用的用户</h2><p>注意：不建议直接删除，当你需要某个用户时，自己重新添加会很麻烦。也可以<code>usermod -L</code>或<code>passwd -l user</code>锁定。</p>
-<p><code>cp /etc/passwd{,.bak}</code>  修改之前先备份<br><code>vi /etc/passwd</code> 编辑用户，在前面加上#注释掉此行</p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2014/09/07/linux-security-general-settings/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -1231,7 +1188,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">96</span>
+                <span class="site-state-item-count">100</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -1253,7 +1210,7 @@
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">114</span>
+                <span class="site-state-item-count">116</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>

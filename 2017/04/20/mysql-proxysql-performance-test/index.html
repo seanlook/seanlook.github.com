@@ -1,0 +1,1189 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="en">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="mysql,中间件,proxysql," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0" />
+
+
+
+
+
+
+<meta name="description" content="本文会通过sysbench对ProxySQL进行基准测试，并与直连的性能进行对比。与此同时也对 Maxscale 和 Qihu360 Atlas 放在一起参考。提示：压测前确保把query cache完全关掉。
+1. proxysql vs 直连1.1 select nontrx12345./bin/sysbench --test=/root/sysbench2/sysbench/tests/db">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ProxySQL之性能测试对比">
+<meta property="og:url" content="http://seanlook.com/2017/04/20/mysql-proxysql-performance-test/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="本文会通过sysbench对ProxySQL进行基准测试，并与直连的性能进行对比。与此同时也对 Maxscale 和 Qihu360 Atlas 放在一起参考。提示：压测前确保把query cache完全关掉。
+1. proxysql vs 直连1.1 select nontrx12345./bin/sysbench --test=/root/sysbench2/sysbench/tests/db">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-perf-qps.png">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-perf-rt.png">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-perf-qps-maxscale-atlas.png">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-perf-qps-oltp-maxscale-atlas.png">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-perf-qps-src-data.png">
+<meta property="og:updated_time" content="2017-04-20T13:32:49.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="ProxySQL之性能测试对比">
+<meta name="twitter:description" content="本文会通过sysbench对ProxySQL进行基准测试，并与直连的性能进行对比。与此同时也对 Maxscale 和 Qihu360 Atlas 放在一起参考。提示：压测前确保把query cache完全关掉。
+1. proxysql vs 直连1.1 select nontrx12345./bin/sysbench --test=/root/sysbench2/sysbench/tests/db">
+<meta name="twitter:image" content="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-perf-qps.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post","offset":12,"offset_float":0,"b2t":false,"scrollpercent":false},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: 'WNWHBKUL26',
+      apiKey: 'cec5cc7d455c77d448433aa60f989766',
+      indexName: 'seanlook',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://seanlook.com/2017/04/20/mysql-proxysql-performance-test/"/>
+
+
+
+
+
+  <title> ProxySQL之性能测试对比 | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s95.cnzz.com/z_stat.php?id=1253513173&web_id=1253513173" language="JavaScript"></script>
+  </div>
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Sean's Notes</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">Stay hungry, stay foolish.</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            About
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocapitalize="off" autocomplete="off" autocorrect="off"
+             placeholder="Searching..." spellcheck="false"
+             type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/04/20/mysql-proxysql-performance-test/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                ProxySQL之性能测试对比
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-04-20T21:32:49+08:00">
+                2017-04-20
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a class="cloud-tie-join-count" href="/2017/04/20/mysql-proxysql-performance-test/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count join-count" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2017/04/20/mysql-proxysql-performance-test/" class="leancloud_visitors" data-flag-title="ProxySQL之性能测试对比">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>本文会通过sysbench对ProxySQL进行基准测试，并与直连的性能进行对比。与此同时也对 Maxscale 和 Qihu360 Atlas 放在一起参考。<br>提示：压测前确保把query cache完全关掉。</p>
+<h1 id="1-proxysql-vs-直连"><a href="#1-proxysql-vs-直连" class="headerlink" title="1. proxysql vs 直连"></a>1. proxysql vs 直连</h1><h2 id="1-1-select-nontrx"><a href="#1-1-select-nontrx" class="headerlink" title="1.1 select nontrx"></a>1.1 select nontrx</h2><figure class="highlight brainfuck"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="string">.</span><span class="comment">/bin/sysbench</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">test=/root/sysbench2/sysbench/tests/db/oltp</span><span class="string">.</span><span class="comment">lua</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">mysql</span><span class="literal">-</span><span class="comment">host=10</span><span class="string">.</span><span class="comment">0</span><span class="string">.</span><span class="comment">100</span><span class="string">.</span><span class="comment">36</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">mysql</span><span class="literal">-</span><span class="comment">port=6033</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">mysql</span><span class="literal">-</span><span class="comment">user=myuser</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">mysql</span><span class="literal">-</span><span class="comment">password=mypass</span> <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">mysql</span><span class="literal">-</span><span class="comment">db=db15</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">tables</span><span class="literal">-</span><span class="comment">count=20</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">table</span><span class="literal">-</span><span class="comment">size=5000000</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">report</span><span class="literal">-</span><span class="comment">interval=20</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">dist</span><span class="literal">-</span><span class="comment">type=uniform</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">rand</span><span class="literal">-</span><span class="comment">init=on</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">max</span><span class="literal">-</span><span class="comment">requests=0</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">test</span><span class="literal">-</span><span class="comment">mode=nontrx</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">nontrx</span><span class="literal">-</span><span class="comment">mode=select</span> <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">read</span><span class="literal">-</span><span class="comment">only=on</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">skip</span><span class="literal">-</span><span class="comment">trx=on</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">max</span><span class="literal">-</span><span class="comment">time=120</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">num</span><span class="literal">-</span><span class="comment">threads=2</span> <span class="comment">run</span></div><div class="line"></div><div class="line"><span class="comment">num</span><span class="literal">-</span><span class="comment">threads依次加大</span> <span class="comment">2</span> <span class="comment">5</span> <span class="comment">10</span> <span class="comment">20</span> <span class="comment">50</span> <span class="comment">100</span> <span class="comment">200</span> <span class="comment">400</span></div></pre></td></tr></table></figure>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-perf-qps.png" alt="QPS Trends for ProxySQL"><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-perf-rt.png" alt="Response Time Trends for ProxySQL">  </p>
+<p>sysbench线程并发数达到10以下，性能损失在30%以上；达到20，性能损失减少到10%左右。看到proxysql承载的并发数越高，性能损失越少；最好的时候在50线程数，相比直连损失5%。</p>
+<h2 id="1-2-oltp-dml"><a href="#1-2-oltp-dml" class="headerlink" title="1.2 oltp dml"></a>1.2 oltp dml</h2><p>混合读写测试。proxysql结果图应该与上面相差无几，因为是主要好在计算 query digest 和规则匹配，与select无异，可参考下节的图示。</p>
+<p>sysbench 压测命令：<br><figure class="highlight lsl"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">./bin/sysbench --test=/root/sysbench2/sysbench/tests/db/oltp.lua --mysql-host=<span class="number">10.0</span><span class="number">.100</span><span class="number">.34</span> --mysql-port=<span class="number">3306</span> --mysql-user=myuser --mysql-password=mypass \</div><div class="line">--mysql-db=db15 --oltp-tables-count=<span class="number">20</span> --oltp-table-size=<span class="number">5000000</span> --report-interval=<span class="number">20</span> --oltp-dist-type=uniform --rand-init=on --max-requests=<span class="number">0</span> --oltp-read-only=off --max-time=<span class="number">120</span> \</div><div class="line">--num-threads=<span class="number">2</span> run</div><div class="line"></div><div class="line">num-threads依次加大 <span class="number">2</span> <span class="number">5</span> <span class="number">10</span> <span class="number">16</span> <span class="number">20</span> <span class="number">50</span> <span class="number">100</span> <span class="number">200</span> <span class="number">400</span></div><div class="line">分别对PrxoySQL, Maxscale, Atlas, 直连，四种情况做基准测试</div></pre></td></tr></table></figure></p>
+<h1 id="2-proxysql-vs-maxscale-vs-atlas"><a href="#2-proxysql-vs-maxscale-vs-atlas" class="headerlink" title="2. proxysql vs maxscale vs atlas"></a>2. proxysql vs maxscale vs atlas</h1><p>作者自己也有指出，在客户端并发数不高的情况下，maxscale表现比proxysql要好。这里我也特意对maxscale和atlas一起做了个对比。配置基本是最小化的，没有很复杂的规则，只是中间转发。</p>
+<ul>
+<li>ProxySQL  (v1.3.5): mysql-threads=4</li>
+<li>Atlas 360 (v2.2.1): event-threads=4</li>
+<li>maxscale  (v1.4.5): threads=4</li>
+</ul>
+<p><strong> 2.1 select nontrx </strong><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-perf-qps-maxscale-atlas.png" alt="QPS(select) Trends for ProxySQL/Maxscale/atlas"></p>
+<p>oltp混合读写基准测试，没有复杂配置的情况下，ProxySQL与Maxscale神奇般的几乎重合，Qihu360的atlas要弱一些。</p>
+<p><strong> 2.2 oltp dml </strong><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-perf-qps-oltp-maxscale-atlas.png" alt="QPS(oltp) Trends for ProxySQL/Maxscale/atlas"></p>
+<p>原始数据：<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-perf-qps-src-data.png" alt="ProxySQL Performance Test Source Data"></p>
+<h1 id="3-rewrite-vs-non-rewrite"><a href="#3-rewrite-vs-non-rewrite" class="headerlink" title="3. rewrite vs non-rewrite"></a>3. rewrite vs non-rewrite</h1><p>下面来测一下 query rewrite 对性能的影响，考虑到将来如果要分表，可以在ProxySQL这一层做，应用端无需改动表名。<br>为了达到效果，这里rewrite只是为表增加了个别名：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="comment">-- proxysql admin cli</span></div><div class="line"><span class="keyword">update</span> mysql_query_rules <span class="keyword">set</span> match_pattern=<span class="string">"(.*)(sbtest\d+)(.*)"</span>,replace_pattern=<span class="string">"\1\2 as ttt \3"</span> <span class="keyword">where</span> rule_id &gt;=<span class="number">61</span> <span class="keyword">and</span> rule_id &lt;=<span class="number">92</span>;</div><div class="line"><span class="keyword">load</span> mysql <span class="keyword">query</span> <span class="keyword">rules</span> <span class="keyword">to</span> run;</div></pre></td></tr></table></figure></p>
+<p>sysbench num-threads=20 的结果：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">replace?</th>
+<th>qps</th>
+<th>response time avg(ms)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">proxysql replace</td>
+<td>15734.49</td>
+<td>17.79</td>
+</tr>
+<tr>
+<td style="text-align:left">proxysql no-replace</td>
+<td>16764.66</td>
+<td>16.70</td>
+</tr>
+<tr>
+<td style="text-align:left">直连</td>
+<td>18778.43</td>
+<td>14.91</td>
+</tr>
+</tbody>
+</table>
+<p>在20个并发线程下，有 rewrite 是 no-rewrite 性能的 93.9% 。测试线程数继续加大到 50，差别更小。</p>
+<h1 id="4-lots-of-rules"><a href="#4-lots-of-rules" class="headerlink" title="4. lots of rules"></a>4. lots of rules</h1><p>测试ProxySQL定义的 query rules 数量（并匹配但不apply），对性能的影响。</p>
+<p>测试的规则时批量插入大量能匹配sysbench查询的规则，但 mysql_query_rules.apply=0 :<br><figure class="highlight lsl"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">insert into mysql_query_rules(active,schemaname,apply,flagIN) values</div><div class="line">  (<span class="number">1</span>,'db15',<span class="number">0</span>,<span class="number">0</span>),(<span class="number">1</span>,'db15',<span class="number">0</span>,<span class="number">0</span>),(<span class="number">1</span>,'db15',<span class="number">0</span>,<span class="number">0</span>),(<span class="number">1</span>,'db15',<span class="number">0</span>,<span class="number">0</span>),(<span class="number">1</span>,'db15',<span class="number">0</span>,<span class="number">0</span>), ...</div><div class="line"></div><div class="line"># <span class="number">2</span> <span class="number">100</span> <span class="number">200</span> <span class="number">400</span> <span class="number">800</span> <span class="number">1200</span> <span class="number">2000</span></div></pre></td></tr></table></figure></p>
+<p>这里偶然发现一个问题，flagIN=0的规则必须要在 !=0 的规则前面，否则flagOUT找不到下一个新链入口.(经作者回复是参数 <code>mysql-query_processor_iterations</code> 控制的)<br>下面的结果是 sysbench num-threads=20 的几轮数据：（由于结果接近，没作图）</p>
+<table>
+<thead>
+<tr>
+<th>matched rules</th>
+<th>QPS</th>
+<th>RT avg</th>
+<th>CPU%</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2</td>
+<td>16741.54</td>
+<td>16.69</td>
+<td>151</td>
+</tr>
+<tr>
+<td>100</td>
+<td>16743.54</td>
+<td>16.69</td>
+<td>152</td>
+</tr>
+<tr>
+<td>200</td>
+<td>16749.94</td>
+<td>16.71</td>
+<td>159</td>
+</tr>
+<tr>
+<td>400</td>
+<td>16556.09</td>
+<td>16.91</td>
+<td>176</td>
+</tr>
+<tr>
+<td>800</td>
+<td>16522.02</td>
+<td>16.94</td>
+<td>203</td>
+</tr>
+<tr>
+<td>1200</td>
+<td>16477.70</td>
+<td>16.99</td>
+<td>220</td>
+</tr>
+<tr>
+<td>2000</td>
+<td>16333.59</td>
+<td>17.14</td>
+<td>263</td>
+</tr>
+</tbody>
+</table>
+<p>看到匹配到的规则随着增多，QPS变化不大，只是略微下降；平均响应时间增加在3%以内；倒是ProxySQL对CPU的负载增加比较明显，匹配的规则从 2 个增加到 2000，cpu使用增加了 74% 。 </p>
+<p>参考：</p>
+<ul>
+<li><a href="https://www.percona.com/blog/2017/04/10/proxysql-rules-do-i-have-too-many/#comment-10967989" target="_blank" rel="external">https://www.percona.com/blog/2017/04/10/proxysql-rules-do-i-have-too-many/#comment-10967989</a></li>
+</ul>
+<hr>
+<p>原文连接地址：<a href="http://seanlook.com/2017/04/20/mysql-proxysql-performance-test/">http://seanlook.com/2017/04/20/mysql-proxysql-performance-test/</a></p>
+<hr>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+  <div style="padding: 10px 0; margin: 20px auto; width: 90%; text-align: center;">
+    <div>支持可请我喝杯茶 ^_- (上限10个铜板)</div>
+    <button id="rewardButton" disable="enable" onclick="var qr = document.getElementById('QR'); if (qr.style.display === 'none') {qr.style.display='block';} else {qr.style.display='none'}">
+      <span>赏</span>
+    </button>
+    <div id="QR" style="display: none;">
+      
+        <div id="wechat" style="display: inline-block">
+          <img id="wechat_qr" src="/images/reward_wechat_seanlook.jpg" alt="seanlook WeChat Pay"/>
+          <p>微信打赏</p>
+        </div>
+      
+      
+    </div>
+  </div>
+
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/mysql/" rel="tag"># mysql</a>
+          
+            <a href="/tags/中间件/" rel="tag"># 中间件</a>
+          
+            <a href="/tags/proxysql/" rel="tag"># proxysql</a>
+          
+        </div>
+      
+
+      
+        
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2017/04/17/mysql-proxysql-multiplexing/" rel="next" title="ProxySQL之连接复用（multiplexing）以及相关问题说明">
+                <i class="fa fa-chevron-left"></i> ProxySQL之连接复用（multiplexing）以及相关问题说明
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div id="cloud-tie-wrapper" class="cloud-tie-wrapper"></div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+           
+              <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+          
+        </div>
+        <nav class="site-state motion-element">
+
+          
+            <div class="site-state-item site-state-posts">
+              <a href="/archives">
+                <span class="site-state-item-count">100</span>
+                <span class="site-state-item-name">posts</span>
+              </a>
+            </div>
+          
+
+          
+            
+            
+            <div class="site-state-item site-state-categories">
+              <a href="/categories/index.html">
+                <span class="site-state-item-count">23</span>
+                <span class="site-state-item-name">categories</span>
+              </a>
+            </div>
+          
+
+          
+            
+            
+            <div class="site-state-item site-state-tags">
+              <a href="/tags/index.html">
+                <span class="site-state-item-count">116</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+        
+
+
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-proxysql-vs-直连"><span class="nav-text">1. proxysql vs 直连</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-select-nontrx"><span class="nav-text">1.1 select nontrx</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-oltp-dml"><span class="nav-text">1.2 oltp dml</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-proxysql-vs-maxscale-vs-atlas"><span class="nav-text">2. proxysql vs maxscale vs atlas</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-rewrite-vs-non-rewrite"><span class="nav-text">3. rewrite vs non-rewrite</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-lots-of-rules"><span class="nav-text">4. lots of rules</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2017</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+
+        
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.0"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.0"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.0"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+    
+    <script>
+      var cloudTieConfig = {
+        url: document.location.href, 
+        sourceId: "",
+        productKey: "3d000b541d9f41c0a57ee847ba7212f3",
+        target: "cloud-tie-wrapper"
+      };
+    </script>
+    <script src="https://img1.ws.126.net/f2e/tie/yun/sdk/loader.js"></script>
+  
+
+
+
+
+
+
+
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+      search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.popup').toggle();
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+      $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = $( "entry", xmlResponse ).map(function() {
+            return {
+              title: $( "title", this ).text(),
+              content: $("content",this).text(),
+              url: $( "url" , this).text()
+            };
+          }).get();
+          var $input = document.getElementById(search_id);
+          var $resultContent = document.getElementById(content_id);
+          $input.addEventListener('input', function(){
+            var matchcounts = 0;
+            var str='<ul class=\"search-result-list\">';
+            var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+            $resultContent.innerHTML = "";
+            if (this.value.trim().length > 1) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var content_index = [];
+                var data_title = data.title.trim().toLowerCase();
+                var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                var data_url = decodeURIComponent(data.url);
+                var index_title = -1;
+                var index_content = -1;
+                var first_occur = -1;
+                // only match artiles with not empty titles and contents
+                if(data_title != '') {
+                  keywords.forEach(function(keyword, i) {
+                    index_title = data_title.indexOf(keyword);
+                    index_content = data_content.indexOf(keyword);
+                    if( index_title >= 0 || index_content >= 0 ){
+                      isMatch = true;
+                      if (i == 0) {
+                        first_occur = index_content;
+                      }
+                    }
+
+                  });
+                }
+                // show search results
+                if (isMatch) {
+                  matchcounts += 1;
+                  str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                  var content = data.content.trim().replace(/<[^>]+>/g,"");
+                  if (first_occur >= 0) {
+                    // cut out 100 characters
+                    var start = first_occur - 20;
+                    var end = first_occur + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if(start == 0){
+                      end = 50;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    var match_content = content.substring(start, end);
+                    // highlight all keywords
+                    keywords.forEach(function(keyword){
+                      var regS = new RegExp(keyword, "gi");
+                      match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                    });
+
+                    str += "<p class=\"search-result\">" + match_content +"...</p>"
+                  }
+                  str += "</li>";
+                }
+              })};
+            str += "</ul>";
+            if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+            if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+            $resultContent.innerHTML = str;
+          });
+          proceedsearch();
+        }
+      });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.1.js"></script>
+  <script>AV.initialize("NliJVBn0857TMk5HYrIRt5wp-gzGzoHsz", "jB9B4QG8Rm8YP04RQqnsKy5M");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

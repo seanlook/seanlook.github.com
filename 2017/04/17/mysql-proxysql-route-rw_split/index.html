@@ -1,0 +1,1134 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="en">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="mysql,中间件,proxysql," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0" />
+
+
+
+
+
+
+<meta name="description" content="本文演示使用ProxySQL来完成读写分离和后端分库的一个实际配置过程，安装及配置项介绍见前文 ProxySQL之安装及配置详解。
+环境1234567891011instance0: 10.0.200.195 (db0,db2,db4,db6)instance1: 10.0.200.196 (db1,db3,db5,db7)instance2: 10.0.200.199 (db2,db6,db10">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ProxySQL之读写分离与分库路由演示">
+<meta property="og:url" content="http://seanlook.com/2017/04/17/mysql-proxysql-route-rw_split/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="本文演示使用ProxySQL来完成读写分离和后端分库的一个实际配置过程，安装及配置项介绍见前文 ProxySQL之安装及配置详解。
+环境1234567891011instance0: 10.0.200.195 (db0,db2,db4,db6)instance1: 10.0.200.196 (db1,db3,db5,db7)instance2: 10.0.200.199 (db2,db6,db10">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-rw-lb-deploy.png">
+<meta property="og:updated_time" content="2017-04-17T07:32:49.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="ProxySQL之读写分离与分库路由演示">
+<meta name="twitter:description" content="本文演示使用ProxySQL来完成读写分离和后端分库的一个实际配置过程，安装及配置项介绍见前文 ProxySQL之安装及配置详解。
+环境1234567891011instance0: 10.0.200.195 (db0,db2,db4,db6)instance1: 10.0.200.196 (db1,db3,db5,db7)instance2: 10.0.200.199 (db2,db6,db10">
+<meta name="twitter:image" content="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-rw-lb-deploy.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post","offset":12,"offset_float":0,"b2t":false,"scrollpercent":false},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: 'WNWHBKUL26',
+      apiKey: 'cec5cc7d455c77d448433aa60f989766',
+      indexName: 'seanlook',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://seanlook.com/2017/04/17/mysql-proxysql-route-rw_split/"/>
+
+
+
+
+
+  <title> ProxySQL之读写分离与分库路由演示 | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s95.cnzz.com/z_stat.php?id=1253513173&web_id=1253513173" language="JavaScript"></script>
+  </div>
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Sean's Notes</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">Stay hungry, stay foolish.</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            About
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocapitalize="off" autocomplete="off" autocorrect="off"
+             placeholder="Searching..." spellcheck="false"
+             type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/04/17/mysql-proxysql-route-rw_split/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                ProxySQL之读写分离与分库路由演示
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-04-17T15:32:49+08:00">
+                2017-04-17
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a class="cloud-tie-join-count" href="/2017/04/17/mysql-proxysql-route-rw_split/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count join-count" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2017/04/17/mysql-proxysql-route-rw_split/" class="leancloud_visitors" data-flag-title="ProxySQL之读写分离与分库路由演示">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>本文演示使用ProxySQL来完成读写分离和后端分库的一个实际配置过程，安装及配置项介绍见前文 <a href="http://seanlook.com/2017/04/10/mysql-proxysql-install-config/">ProxySQL之安装及配置详解</a>。</p>
+<p>环境<br><figure class="highlight css"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line"><span class="selector-tag">instance0</span>: 10<span class="selector-class">.0</span><span class="selector-class">.200</span><span class="selector-class">.195</span> (<span class="selector-tag">db0</span>,<span class="selector-tag">db2</span>,<span class="selector-tag">db4</span>,<span class="selector-tag">db6</span>)</div><div class="line"><span class="selector-tag">instance1</span>: 10<span class="selector-class">.0</span><span class="selector-class">.200</span><span class="selector-class">.196</span> (<span class="selector-tag">db1</span>,<span class="selector-tag">db3</span>,<span class="selector-tag">db5</span>,<span class="selector-tag">db7</span>)</div><div class="line"><span class="selector-tag">instance2</span>: 10<span class="selector-class">.0</span><span class="selector-class">.200</span><span class="selector-class">.199</span> (<span class="selector-tag">db2</span>,<span class="selector-tag">db6</span>,<span class="selector-tag">db10</span>,<span class="selector-tag">db14</span>)</div><div class="line"><span class="selector-tag">instance3</span>: 10<span class="selector-class">.0</span><span class="selector-class">.201</span><span class="selector-class">.112</span> (<span class="selector-tag">db3</span>,<span class="selector-tag">db7</span>,<span class="selector-tag">db11</span>,<span class="selector-tag">db15</span>)</div><div class="line"></div><div class="line"><span class="selector-tag">instance0</span> <span class="selector-tag">slave</span>: 192<span class="selector-class">.168</span><span class="selector-class">.1</span><span class="selector-class">.94</span><span class="selector-pseudo">:3316</span></div><div class="line"><span class="selector-tag">instance1</span> <span class="selector-tag">slave</span>: 192<span class="selector-class">.168</span><span class="selector-class">.1</span><span class="selector-class">.94</span><span class="selector-pseudo">:3326</span></div><div class="line"><span class="selector-tag">instance2</span> <span class="selector-tag">slave</span>: 192<span class="selector-class">.168</span><span class="selector-class">.1</span><span class="selector-class">.94</span><span class="selector-pseudo">:3336</span></div><div class="line"><span class="selector-tag">instance3</span> <span class="selector-tag">slave</span>: 192<span class="selector-class">.168</span><span class="selector-class">.1</span><span class="selector-class">.94</span><span class="selector-pseudo">:3346</span></div><div class="line"></div><div class="line"><span class="selector-tag">proxysql</span> <span class="selector-tag">node0</span>: 10<span class="selector-class">.0</span><span class="selector-class">.100</span><span class="selector-class">.36</span></div></pre></td></tr></table></figure></p>
+<p>现在想达到这样一个目的：客户端应用连接上 proxysql 的ip:port，连接时指定分库db名，执行sql时自动路由到对应的实例、对应的库。考虑下面的部署结构：<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-rw-lb-deploy.png" alt="ProxySQL Deploy"></p>
+<p>任何一个proxysql节点都是对等的，路由请求到后端instance的各个database上。</p>
+<h1 id="1-配置后端DB"><a href="#1-配置后端DB" class="headerlink" title="1. 配置后端DB"></a>1. 配置后端DB</h1><figure class="highlight lsl"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div></pre></td><td class="code"><pre><div class="line">-- proxysql admin cli</div><div class="line"></div><div class="line">insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values</div><div class="line">  (<span class="number">100</span>, '<span class="number">10.0</span><span class="number">.200</span><span class="number">.195</span>', <span class="number">3307</span>, <span class="number">1</span>, 'db0,ReadWrite'),</div><div class="line">  (<span class="number">1000</span>, '<span class="number">10.0</span><span class="number">.200</span><span class="number">.195</span>', <span class="number">3307</span>, <span class="number">1</span>, 'db0,ReadWrite'),(<span class="number">1000</span>, '<span class="number">192.168</span><span class="number">.1</span><span class="number">.94</span>', <span class="number">3316</span>, <span class="number">9</span>, 'db0,ReadOnly');</div><div class="line"></div><div class="line">insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values</div><div class="line">  (<span class="number">101</span>, '<span class="number">10.0</span><span class="number">.200</span><span class="number">.196</span>', <span class="number">3307</span>, <span class="number">1</span>, 'db1,ReadWrite'),</div><div class="line">  (<span class="number">1001</span>, '<span class="number">10.0</span><span class="number">.200</span><span class="number">.196</span>', <span class="number">3307</span>, <span class="number">1</span>, 'db1,ReadWrite'),(<span class="number">1001</span>, '<span class="number">192.168</span><span class="number">.1</span><span class="number">.94</span>', <span class="number">3326</span>, <span class="number">9</span>, 'db1,ReadOnly');</div><div class="line"></div><div class="line">insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values</div><div class="line">  (<span class="number">102</span>, '<span class="number">10.0</span><span class="number">.200</span><span class="number">.199</span>', <span class="number">3307</span>, <span class="number">1</span>, 'db2,ReadWrite'),</div><div class="line">  (<span class="number">1002</span>, '<span class="number">10.0</span><span class="number">.200</span><span class="number">.199</span>', <span class="number">3307</span>, <span class="number">1</span>, 'db2,ReadWrite'),(<span class="number">1002</span>, '<span class="number">192.168</span><span class="number">.1</span><span class="number">.94</span>', <span class="number">3336</span>, <span class="number">9</span>, 'db2,ReadOnly');</div><div class="line"></div><div class="line">insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values</div><div class="line">  (<span class="number">103</span>, '<span class="number">10.0</span><span class="number">.201</span><span class="number">.112</span>', <span class="number">3307</span>, <span class="number">1</span>, 'db3,ReadWrite'),</div><div class="line">  (<span class="number">1003</span>, '<span class="number">10.0</span><span class="number">.201</span><span class="number">.112</span>', <span class="number">3307</span>, <span class="number">1</span>, 'db3,ReadWrite'),(<span class="number">1003</span>, '<span class="number">192.168</span><span class="number">.1</span><span class="number">.94</span>', <span class="number">3346</span>, <span class="number">9</span>, 'db3,ReadOnly');</div></pre></td></tr></table></figure>
+<p>比如 100 是主库，则 1000 是从库，同时主库也可以处理 1/10 的读请求。</p>
+<h1 id="2-配置用户"><a href="#2-配置用户" class="headerlink" title="2. 配置用户"></a>2. 配置用户</h1><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"><span class="comment">-- proxysql admin cli</span></div><div class="line"></div><div class="line"><span class="keyword">insert</span> <span class="keyword">into</span> mysql_users(username, <span class="keyword">password</span>,active,transaction_persistent)</div><div class="line">  <span class="keyword">values</span>(<span class="string">'user0'</span>, <span class="string">'password0'</span>, <span class="number">1</span>, <span class="number">1</span>),(<span class="string">'read1'</span>, <span class="string">'password1'</span>, <span class="number">1</span>, <span class="number">1</span>);</div></pre></td></tr></table></figure>
+<p>这里将 transaction_persistent 设置为1，如果不知道它的含义，请参考前文。</p>
+<p>要确保用户有能够登陆到后端的所有db的权限。</p>
+<h1 id="3-修改全局变量"><a href="#3-修改全局变量" class="headerlink" title="3. 修改全局变量"></a>3. 修改全局变量</h1><figure class="highlight gams"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line">-- proxysql admin cli</div><div class="line"></div><div class="line"><span class="keyword">set</span> mysql-default_charset=<span class="string">'utf8mb4'</span>;</div><div class="line"><span class="keyword">set</span> mysql-query_retries_on_failure=0;</div><div class="line">-- <span class="keyword">set</span> mysql-max_stmts_per_connection=10000;</div><div class="line"><span class="keyword">set</span> mysql-eventslog_filename=<span class="string">'queries.log'</span>;</div><div class="line"></div><div class="line"><span class="keyword">set</span> mysql-ping_timeout_server=1500;</div><div class="line"><span class="keyword">set</span> mysql-monitor_connect_timeout=1000;</div><div class="line"><span class="keyword">set</span> mysql-default_max_latency_ms=2000;</div><div class="line"></div><div class="line"><span class="keyword">set</span> mysql-monitor_username=<span class="string">'monitor'</span>;</div><div class="line"><span class="keyword">set</span> mysql-monitor_password=<span class="string">'monitor'</span>;</div><div class="line"><span class="keyword">set</span> mysql-server_version=<span class="string">'5.6.16'</span>;</div></pre></td></tr></table></figure>
+<p>需要提前给 monitor 账号开通权限，一般共用监控数据库的权限就足够了。</p>
+<p><strong>让上面所有的修改生效</strong>:<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line"><span class="comment">-- proxysql admin cli</span></div><div class="line"><span class="comment">-- 应用</span></div><div class="line"><span class="keyword">load</span> mysql <span class="keyword">users</span> <span class="keyword">to</span> runtime;</div><div class="line"><span class="keyword">load</span> mysql servers <span class="keyword">to</span> runtime;</div><div class="line"><span class="keyword">load</span> mysql <span class="keyword">variables</span> <span class="keyword">to</span> runtime;</div><div class="line"></div><div class="line"><span class="comment">-- 保存到磁盘</span></div><div class="line">save mysql users to disk;</div><div class="line">save mysql servers to disk;</div><div class="line">save mysql variables to disk;</div><div class="line"></div><div class="line">save mysql users to mem;  <span class="comment">-- 可以屏蔽看到的明文密码</span></div></pre></td></tr></table></figure></p>
+<h1 id="4-添加路由规则"><a href="#4-添加路由规则" class="headerlink" title="4. 添加路由规则"></a>4. 添加路由规则</h1><p>一般配置ProxySQL规则步骤是 <a href="https://github.com/sysown/proxysql/issues/653#issuecomment-242122732" target="_blank" rel="external">issues #653</a> :</p>
+<ol>
+<li>配置proxysql，将所有sql都发到主库</li>
+<li>分析表 <code>stats_mysql_query_digest</code> 里面哪几种查询占比高</li>
+<li>筛选哪些些占比高的SELECT，可以路由到从库</li>
+<li>修改 <code>mysql_query_rules</code> 里面的规则，使其生效。不要一味的把所有查询都路由到主库</li>
+</ol>
+<figure class="highlight lsl"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div></pre></td><td class="code"><pre><div class="line">-- [<span class="number">1</span>] read&amp;write split</div><div class="line">insert into mysql_query_rules(rule_id, active,match_digest,apply,flagOUT) values(<span class="number">49</span>, <span class="number">1</span>,'^select\s.*\sfor update',<span class="number">0</span>,<span class="number">21</span>);</div><div class="line">insert into mysql_query_rules(rule_id, active,match_digest,apply,flagOUT) values(<span class="number">50</span>, <span class="number">1</span>,'^\(*select',<span class="number">0</span>,<span class="number">20</span>);</div><div class="line">insert into mysql_query_rules(rule_id, active,match_digest,negate_match_pattern,apply,flagOUT) values(<span class="number">60</span>, <span class="number">1</span>,'^select',<span class="number">1</span>,<span class="number">0</span>,<span class="number">21</span>);</div><div class="line"></div><div class="line">-- 下面最好从rule_id <span class="number">70</span>开始，中间留空</div><div class="line"></div><div class="line">-- [<span class="number">2</span>] flag <span class="number">20</span> read</div><div class="line">insert into mysql_query_rules(active,schemaname,destination_hostgroup,apply,flagIN,flagOUT) values</div><div class="line">  (<span class="number">1</span>,'db0',<span class="number">1000</span>,<span class="number">1</span>,<span class="number">20</span>,<span class="number">20</span>), (<span class="number">1</span>,'db1',<span class="number">1001</span>,<span class="number">1</span>,<span class="number">20</span>,<span class="number">20</span>), (<span class="number">1</span>,'db2',<span class="number">1002</span>,<span class="number">1</span>,<span class="number">20</span>,<span class="number">20</span>), (<span class="number">1</span>,'db3',<span class="number">1003</span>,<span class="number">1</span>,<span class="number">20</span>,<span class="number">20</span>), (<span class="number">1</span>,'db4',<span class="number">1000</span>,<span class="number">1</span>,<span class="number">20</span>,<span class="number">20</span>), (<span class="number">1</span>,'db5',<span class="number">1001</span>,<span class="number">1</span>,<span class="number">20</span>,<span class="number">20</span>), (<span class="number">1</span>,'db6',<span class="number">1002</span>,<span class="number">1</span>,<span class="number">20</span>,<span class="number">20</span>), (<span class="number">1</span>,'db7',<span class="number">1003</span>,<span class="number">1</span>,<span class="number">20</span>,<span class="number">20</span>),</div><div class="line">  (<span class="number">1</span>,'db8',<span class="number">1000</span>,<span class="number">1</span>,<span class="number">20</span>,<span class="number">20</span>), (<span class="number">1</span>,'db9',<span class="number">1001</span>,<span class="number">1</span>,<span class="number">20</span>,<span class="number">20</span>), (<span class="number">1</span>,'db10',<span class="number">1002</span>,<span class="number">1</span>,<span class="number">20</span>,<span class="number">20</span>), (<span class="number">1</span>,'db11',<span class="number">1003</span>,<span class="number">1</span>,<span class="number">20</span>,<span class="number">20</span>), (<span class="number">1</span>,'db12',<span class="number">1000</span>,<span class="number">1</span>,<span class="number">20</span>,<span class="number">20</span>), (<span class="number">1</span>,'db13',<span class="number">1001</span>,<span class="number">1</span>,<span class="number">20</span>,<span class="number">20</span>), (<span class="number">1</span>,'db14',<span class="number">1002</span>,<span class="number">1</span>,<span class="number">20</span>,<span class="number">20</span>), (<span class="number">1</span>,'db15',<span class="number">1003</span>,<span class="number">1</span>,<span class="number">20</span>,<span class="number">20</span>);</div><div class="line"></div><div class="line">-- [<span class="number">3</span>] flag <span class="number">21</span> write</div><div class="line">insert into mysql_query_rules(active,schemaname,destination_hostgroup,apply,flagIN,flagOUT) values</div><div class="line">  (<span class="number">1</span>,'db0',<span class="number">100</span>,<span class="number">1</span>,<span class="number">21</span>,<span class="number">21</span>), (<span class="number">1</span>,'db1',<span class="number">101</span>,<span class="number">1</span>,<span class="number">21</span>,<span class="number">21</span>), (<span class="number">1</span>,'db2',<span class="number">102</span>,<span class="number">1</span>,<span class="number">21</span>,<span class="number">21</span>), (<span class="number">1</span>,'db3',<span class="number">103</span>,<span class="number">1</span>,<span class="number">21</span>,<span class="number">21</span>), (<span class="number">1</span>,'db4',<span class="number">100</span>,<span class="number">1</span>,<span class="number">21</span>,<span class="number">21</span>), (<span class="number">1</span>,'db5',<span class="number">101</span>,<span class="number">1</span>,<span class="number">21</span>,<span class="number">21</span>), (<span class="number">1</span>,'db6',<span class="number">102</span>,<span class="number">1</span>,<span class="number">21</span>,<span class="number">21</span>), (<span class="number">1</span>,'db7',<span class="number">103</span>,<span class="number">1</span>,<span class="number">21</span>,<span class="number">21</span>), </div><div class="line">  (<span class="number">1</span>,'db8',<span class="number">100</span>,<span class="number">1</span>,<span class="number">21</span>,<span class="number">21</span>), (<span class="number">1</span>,'db9',<span class="number">101</span>,<span class="number">1</span>,<span class="number">21</span>,<span class="number">21</span>), (<span class="number">1</span>,'db10',<span class="number">102</span>,<span class="number">1</span>,<span class="number">21</span>,<span class="number">21</span>), (<span class="number">1</span>,'db11',<span class="number">103</span>,<span class="number">1</span>,<span class="number">21</span>,<span class="number">21</span>), (<span class="number">1</span>,'db12',<span class="number">100</span>,<span class="number">1</span>,<span class="number">21</span>,<span class="number">21</span>), (<span class="number">1</span>,'db13',<span class="number">101</span>,<span class="number">1</span>,<span class="number">21</span>,<span class="number">21</span>), (<span class="number">1</span>,'db14',<span class="number">102</span>,<span class="number">1</span>,<span class="number">21</span>,<span class="number">21</span>), (<span class="number">1</span>,'db15',<span class="number">103</span>,<span class="number">1</span>,<span class="number">21</span>,<span class="number">21</span>);</div><div class="line"></div><div class="line">-- [<span class="number">4</span>] no schema given when connect</div><div class="line">insert into mysql_query_rules(rule_id,active,schemaname,apply,flagOUT) values(<span class="number">20</span>,<span class="number">1</span>,'information_schema',<span class="number">0</span>,<span class="number">302</span>);</div><div class="line"></div><div class="line">-- [<span class="number">5</span>] route according to dbX.</div><div class="line">insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) values(<span class="number">1000</span>,<span class="number">1</span>,'([\s\`])db(<span class="number">0</span>|<span class="number">4</span>|<span class="number">8</span>|<span class="number">12</span>)([\.\`])',<span class="number">100</span>,<span class="number">1</span>,<span class="number">302</span>,<span class="number">302</span>);</div><div class="line">insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) values(<span class="number">1001</span>,<span class="number">1</span>,'([\s\`])db(<span class="number">1</span>|<span class="number">5</span>|<span class="number">9</span>|<span class="number">13</span>)([\.\`])',<span class="number">101</span>,<span class="number">1</span>,<span class="number">302</span>,<span class="number">302</span>);</div><div class="line">insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) values(<span class="number">1002</span>,<span class="number">1</span>,'([\s\`])db(<span class="number">2</span>|<span class="number">6</span>|<span class="number">10</span>|<span class="number">14</span>)([\.\`])',<span class="number">102</span>,<span class="number">1</span>,<span class="number">302</span>,<span class="number">302</span>);</div><div class="line">insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) values(<span class="number">1003</span>,<span class="number">1</span>,'([\s\`])db(<span class="number">3</span>|<span class="number">7</span>|<span class="number">11</span>|<span class="number">15</span>)([\.\`])',<span class="number">103</span>,<span class="number">1</span>,<span class="number">302</span>,<span class="number">302</span>);</div><div class="line"></div><div class="line">-- [<span class="number">6</span>] wrong usage</div><div class="line">insert into mysql_query_rules(rule_id,active,match_digest,apply,flagIN,flagOUT,error_msg,comment) </div><div class="line">  values(<span class="number">1404</span>,<span class="number">1</span>,'^SELECT DATABASE\(\)$',<span class="number">1</span>,<span class="number">302</span>,<span class="number">302</span>,'You should specify schema name first', 'use db0 Take long when no schema given for connection');</div><div class="line"></div><div class="line">-- [<span class="number">7</span>] <span class="section">default</span> route</div><div class="line">insert into mysql_query_rules(rule_id,active,apply, flagIN,flagOUT,error_msg,comment) values(<span class="number">9999</span>,<span class="number">1</span>,<span class="number">1</span>, <span class="number">302</span>,<span class="number">302</span>,'No query rules matched (by ProxySQL)', <span class="string">"Don't define the default hostgroup 0 for ME"</span>);</div><div class="line"></div><div class="line">-- [<span class="number">8</span>]</div><div class="line">LOAD MYSQL QUERY RULES TO RUN;</div><div class="line">SAVE MYSQL QUERY RULES TO DISK;</div></pre></td></tr></table></figure>
+<p>逐个解释：</p>
+<ol>
+<li><p>以 select 开头并且不是 for update 类型的SQL，进入到新的规则链flagOUT=20;<br>其它诸如 insert, delete, update, replace, set, show 等语句，都进入到规则链flagOUT=21。  </p>
+<p>有个小技巧，mysql_query_rules 表的rule_id有自增，但最好从中间某个数开始，因为一旦后续可能需要紧急在前面插入规则，从1开始就没空位了。</p>
+<p>这里大家可能有个顾虑，从库上可以执行 <code>set NAMES xxx</code>, <code>set session sql_mode=xxx</code>, <code>SET autocommit=?</code>, <code>commit</code>, <code>rollback</code>, <code>START TRANSACTION</code>, <code>use dbx</code> 这样的语句，不能全路由到主库吧？对此，另起了一篇文章 <a href="http://seanlook.com/2017/04/17/mysql-proxysql-multiplexing">http://seanlook.com/2017/04/17/mysql-proxysql-multiplexing</a> 。</p>
+</li>
+<li><p>flagIN=20 是 <em>只读链</em> 的入口<br>根据连接时指定的dbname，路由到对应的分库上。db0, db4, db8, db12 路由到 hostgroup_id=1000 ，db1, db5, db9, db16 路由到 hostgroup_id=1002 ，依次类推。<br>flagIN=flagOUT 则结束匹配。</p>
+</li>
+<li><p>flagOUT=21 是 <em>读写链</em>的入口<br>与上面的 [2] 类似，但是根据dbname路由到主库。</p>
+</li>
+<li><p>当建立连接的时候没有指定dbname时，分两种情况</p>
+<ul>
+<li>使用连接的时候 <code>use db0</code>，因为mysql协议在每次 use dbname 时都会发送一个 <code>SELECT DATABASE()</code> 命令，第一次由于没有连接上后端任何DB，命令会执行超时失败，再次 use db0 是才成功。具体参考我所提的 <a href="https://github.com/sysown/proxysql/issues/988" target="_blank" rel="external">issue #988</a> 。<br>因此这里我为它添加了一个规则 <strong>[6]</strong>，遇到这种情况马上处理，而不用等待失败。</li>
+<li>使用连接时从未有默认schema，添加规则 <strong>[5]</strong>，使用 <code>schemaname.tablename</code> 的形式匹配 schemaname，然后路由到对应的 hostgroup 。</li>
+</ul>
+</li>
+<li><p>因为没有定义 hostgroup 0，在意外情况什么规则都没匹配上时也依旧会等待失败，所以默认规则（默认路由）返回一个错误。</p>
+</li>
+</ol>
+<h1 id="5-效果演示"><a href="#5-效果演示" class="headerlink" title="5. 效果演示"></a>5. 效果演示</h1><figure class="highlight gherkin"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div></pre></td><td class="code"><pre><div class="line">db0 与 db15 分别在两个实例上：</div><div class="line"></div><div class="line">(ecdba<span class="meta">@10.0.100.36:6033)</span> [(none)]&gt; select <span class="symbol">*</span> from db0.tbl_0;</div><div class="line">+-----+----------------+--------+</div><div class="line">|<span class="string"> fid </span>|<span class="string"> username       </span>|<span class="string"> corpid </span>|</div><div class="line">+-----+----------------+--------+</div><div class="line">|<span class="string">   1 </span>|<span class="string"> db0 aa         </span>|<span class="string">      0 </span>|</div><div class="line">|<span class="string">   2 </span>|<span class="string"> db0 aa         </span>|<span class="string">     16 </span>|</div><div class="line">|<span class="string">   3 </span>|<span class="string"> db0 autocommit </span>|<span class="string">     32 </span>|</div><div class="line">+-----+----------------+--------+</div><div class="line">3 rows in set (0.00 sec)</div><div class="line"></div><div class="line">(ecdba<span class="meta">@10.0.100.36:6033)</span> [(none)]&gt; select <span class="symbol">*</span> from db15.tbl_0;</div><div class="line">+-----+-----------------------------+--------+</div><div class="line">|<span class="string"> fid </span>|<span class="string"> username                    </span>|<span class="string"> corpid </span>|</div><div class="line">+-----+-----------------------------+--------+</div><div class="line">|<span class="string">   1 </span>|<span class="string"> db15 c2dfdf地方大幅度d      </span>|<span class="string">     15 </span>|</div><div class="line">|<span class="string">   2 </span>|<span class="string"> db15 c2dfdf地方大幅度d      </span>|<span class="string">     47 </span>|</div><div class="line">|<span class="string">   3 </span>|<span class="string"> db15 c2dfdf地方大幅度d      </span>|<span class="string">    111 </span>|</div><div class="line">+-----+-----------------------------+--------+</div><div class="line">3 rows in set (0.00 sec)</div><div class="line"></div><div class="line">无法路由时，报错：</div><div class="line">(ecdba<span class="meta">@10.0.100.36:6033)</span> [(none)]&gt; show databases;</div><div class="line">ERROR 1148 (42000): No query rules matched (by ProxySQL)</div><div class="line"></div><div class="line"></div><div class="line">看到 rule 的命中数符合预期：</div><div class="line">-- proxysql admin cli</div><div class="line">(admin<span class="meta">@127.0.0.1:6032)</span> [(none)]&gt; select active,hits, mysql_query_rules.rule_id, schemaname, match_digest, match_pattern, replace_pattern,destination_hostgroup hostgroup,flagIn,flagOUT </div><div class="line"> FROM mysql_query_rules NATURAL JOIN stats.stats_mysql_query_rules ORDER BY mysql_query_rules.rule_id;</div><div class="line">+--------+------+---------+--------------------+--------------+-------------------------------+-----------------+-----------+--------+---------+</div><div class="line">|<span class="string"> active </span>|<span class="string"> hits </span>|<span class="string"> rule_id </span>|<span class="string"> schemaname         </span>|<span class="string"> match_digest </span>|<span class="string"> match_pattern                 </span>|<span class="string"> replace_pattern </span>|<span class="string"> hostgroup </span>|<span class="string"> flagIN </span>|<span class="string"> flagOUT </span>|</div><div class="line">+--------+------+---------+--------------------+--------------+-------------------------------+-----------------+-----------+--------+---------+</div><div class="line">|<span class="string"> 1      </span>|<span class="string"> 3    </span>|<span class="string"> 20      </span>|<span class="string"> information_schema </span>|<span class="string"> NULL         </span>|<span class="string"> NULL                          </span>|<span class="string"> NULL            </span>|<span class="string"> NULL      </span>|<span class="string"> 0      </span>|<span class="string"> 302     </span>|</div><div class="line">|<span class="string"> 1      </span>|<span class="string"> 0    </span>|<span class="string"> 50      </span>|<span class="string"> NULL               </span>|<span class="string"> ^\(*select   </span>|<span class="string"> NULL                          </span>|<span class="string"> NULL            </span>|<span class="string"> NULL      </span>|<span class="string"> 0      </span>|<span class="string"> 20      </span>|</div><div class="line">|<span class="string"> 1      </span>|<span class="string"> 0    </span>|<span class="string"> 60      </span>|<span class="string"> NULL               </span>|<span class="string"> ^select      </span>|<span class="string"> NULL                          </span>|<span class="string"> NULL            </span>|<span class="string"> NULL      </span>|<span class="string"> 0      </span>|<span class="string"> 21      </span>|</div><div class="line">|<span class="string"> 1      </span>|<span class="string"> 0    </span>|<span class="string"> 61      </span>|<span class="string"> db0                </span>|<span class="string"> NULL         </span>|<span class="string"> NULL                          </span>|<span class="string"> NULL            </span>|<span class="string"> 1000      </span>|<span class="string"> 20     </span>|<span class="string"> 20      </span>|</div><div class="line">|<span class="string"> 1      </span>|<span class="string"> 0    </span>|<span class="string"> 62      </span>|<span class="string"> db1                </span>|<span class="string"> NULL         </span>|<span class="string"> NULL                          </span>|<span class="string"> NULL            </span>|<span class="string"> 1001      </span>|<span class="string"> 20     </span>|<span class="string"> 20      </span>|</div><div class="line">|<span class="string"> 1      </span>|<span class="string"> 0    </span>|<span class="string"> 63      </span>|<span class="string"> db2                </span>|<span class="string"> NULL         </span>|<span class="string"> NULL                          </span>|<span class="string"> NULL            </span>|<span class="string"> 1002      </span>|<span class="string"> 20     </span>|<span class="string"> 20      </span>|</div><div class="line">|<span class="string"> 1      </span>|<span class="string"> 0    </span>|<span class="string"> 64      </span>|<span class="string"> db3                </span>|<span class="string"> NULL         </span>|<span class="string"> NULL                          </span>|<span class="string"> NULL            </span>|<span class="string"> 1003      </span>|<span class="string"> 20     </span>|<span class="string"> 20      </span>|</div><div class="line">....</div><div class="line">|<span class="string"> 1      </span>|<span class="string"> 0    </span>|<span class="string"> 77      </span>|<span class="string"> db0                </span>|<span class="string"> NULL         </span>|<span class="string"> NULL                          </span>|<span class="string"> NULL            </span>|<span class="string"> 100       </span>|<span class="string"> 21     </span>|<span class="string"> 21      </span>|</div><div class="line">|<span class="string"> 1      </span>|<span class="string"> 0    </span>|<span class="string"> 78      </span>|<span class="string"> db1                </span>|<span class="string"> NULL         </span>|<span class="string"> NULL                          </span>|<span class="string"> NULL            </span>|<span class="string"> 101       </span>|<span class="string"> 21     </span>|<span class="string"> 21      </span>|</div><div class="line">|<span class="string"> 1      </span>|<span class="string"> 0    </span>|<span class="string"> 79      </span>|<span class="string"> db2                </span>|<span class="string"> NULL         </span>|<span class="string"> NULL                          </span>|<span class="string"> NULL            </span>|<span class="string"> 102       </span>|<span class="string"> 21     </span>|<span class="string"> 21      </span>|</div><div class="line">|<span class="string"> 1      </span>|<span class="string"> 0    </span>|<span class="string"> 80      </span>|<span class="string"> db3                </span>|<span class="string"> NULL         </span>|<span class="string"> NULL                          </span>|<span class="string"> NULL            </span>|<span class="string"> 103       </span>|<span class="string"> 21     </span>|<span class="string"> 21      </span>|</div><div class="line">...</div><div class="line">|<span class="string"> 1      </span>|<span class="string"> 0    </span>|<span class="string"> 92      </span>|<span class="string"> db15               </span>|<span class="string"> NULL         </span>|<span class="string"> NULL                          </span>|<span class="string"> NULL            </span>|<span class="string"> 103       </span>|<span class="string"> 21     </span>|<span class="string"> 21      </span>|</div><div class="line">|<span class="string"> 1      </span>|<span class="string"> 1    </span>|<span class="string"> 1000    </span>|<span class="string"> NULL               </span>|<span class="string"> NULL         </span>|<span class="string"> ([\s\`])db(0</span>|<span class="string">4</span>|<span class="string">8</span>|<span class="string">12)([\.\`])  </span>|<span class="string"> NULL            </span>|<span class="string"> 100       </span>|<span class="string"> 302    </span>|<span class="string"> 302     </span>|</div><div class="line">|<span class="string"> 1      </span>|<span class="string"> 0    </span>|<span class="string"> 1001    </span>|<span class="string"> NULL               </span>|<span class="string"> NULL         </span>|<span class="string"> ([\s\`])db(1</span>|<span class="string">5</span>|<span class="string">9</span>|<span class="string">13)([\.\`])  </span>|<span class="string"> NULL            </span>|<span class="string"> 101       </span>|<span class="string"> 302    </span>|<span class="string"> 302     </span>|</div><div class="line">|<span class="string"> 1      </span>|<span class="string"> 0    </span>|<span class="string"> 1002    </span>|<span class="string"> NULL               </span>|<span class="string"> NULL         </span>|<span class="string"> ([\s\`])db(2</span>|<span class="string">6</span>|<span class="string">10</span>|<span class="string">14)([\.\`]) </span>|<span class="string"> NULL            </span>|<span class="string"> 102       </span>|<span class="string"> 302    </span>|<span class="string"> 302     </span>|</div><div class="line">|<span class="string"> 1      </span>|<span class="string"> 1    </span>|<span class="string"> 1003    </span>|<span class="string"> NULL               </span>|<span class="string"> NULL         </span>|<span class="string"> ([\s\`])db(3</span>|<span class="string">7</span>|<span class="string">11</span>|<span class="string">15)([\.\`]) </span>|<span class="string"> NULL            </span>|<span class="string"> 103       </span>|<span class="string"> 302    </span>|<span class="string"> 302     </span>|</div><div class="line">|<span class="string"> 1      </span>|<span class="string"> 0    </span>|<span class="string"> 1404    </span>|<span class="string"> NULL               </span>|<span class="string"> NULL         </span>|<span class="string"> ^SELECT DATABASE\(\)$         </span>|<span class="string"> NULL            </span>|<span class="string"> NULL      </span>|<span class="string"> 302    </span>|<span class="string"> 302     </span>|</div><div class="line">|<span class="string"> 1      </span>|<span class="string"> 1    </span>|<span class="string"> 9999    </span>|<span class="string"> NULL               </span>|<span class="string"> NULL         </span>|<span class="string"> NULL                          </span>|<span class="string"> NULL            </span>|<span class="string"> NULL      </span>|<span class="string"> 302    </span>|<span class="string"> 302     </span>|</div><div class="line">+--------+------+---------+--------------------+--------------+-------------------------------+-----------------+-----------+--------+---------+</div><div class="line">41 rows in set (0.01 sec)</div><div class="line"></div><div class="line">mysql&gt; select rule_id,schemaname,match_digest,match_pattern,destination_hostgroup,negate_match_pattern,apply,flagIN,flagOUT,error_msg from mysql_query_rules;</div></pre></td></tr></table></figure>
+<p>切换数据库继续：<br><figure class="highlight gherkin"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div></pre></td><td class="code"><pre><div class="line">(ecdba<span class="meta">@10.0.100.36:6033)</span> [(none)]&gt; use db1;</div><div class="line">Database changed</div><div class="line"></div><div class="line">(ecdba<span class="meta">@10.0.100.36:6033)</span> [db1]&gt; select <span class="symbol">*</span> from tbl_0;</div><div class="line">+-----+----------+--------+</div><div class="line">|<span class="string"> fid </span>|<span class="string"> username </span>|<span class="string"> corpid </span>|</div><div class="line">+-----+----------+--------+</div><div class="line">|<span class="string">   1 </span>|<span class="string"> db1 bb   </span>|<span class="string">      1 </span>|</div><div class="line">|<span class="string">   2 </span>|<span class="string"> db1 bb   </span>|<span class="string">     17 </span>|</div><div class="line">|<span class="string">   3 </span>|<span class="string"> db1 bb   </span>|<span class="string">     33 </span>|</div><div class="line">+-----+----------+--------+</div><div class="line">3 rows in set (0.01 sec)</div><div class="line"></div><div class="line">(ecdba<span class="meta">@10.0.100.36:6033)</span> [db1]&gt; select <span class="symbol">*</span> from `db5`.tbl_0;</div><div class="line">+-----+--------------------+--------+</div><div class="line">|<span class="string"> fid </span>|<span class="string"> username           </span>|<span class="string"> corpid </span>|</div><div class="line">+-----+--------------------+--------+</div><div class="line">|<span class="string">   1 </span>|<span class="string"> db5 ces测试 kfjd   </span>|<span class="string">      5 </span>|</div><div class="line">+-----+--------------------+--------+</div><div class="line"></div><div class="line">db6并不在当前实例里：</div><div class="line">(ecdba<span class="meta">@10.0.100.36:6033)</span> [db1]&gt; select <span class="symbol">*</span> from db6.tbl_0;</div><div class="line">ERROR 1146 (42S02): Table 'db6.tbl_0' doesn't exist</div><div class="line"></div><div class="line">现在show databases不会再报错：</div><div class="line">(ecdba<span class="meta">@10.0.100.36:6033)</span> [db1]&gt; show databases;</div><div class="line">+--------------------+</div><div class="line">|<span class="string"> Database           </span>|</div><div class="line">+--------------------+</div><div class="line">|<span class="string"> information_schema </span>|</div><div class="line">|<span class="string"> db1                </span>|</div><div class="line">|<span class="string"> db13               </span>|</div><div class="line">|<span class="string"> db5                </span>|</div><div class="line">|<span class="string"> db9                </span>|</div><div class="line">|<span class="string"> mysql              </span>|</div><div class="line">|<span class="string"> performance_schema </span>|</div><div class="line">+--------------------+</div><div class="line"></div><div class="line"></div><div class="line">看到 stats 模块的统计信息：</div><div class="line">-- proxysql admin cli</div><div class="line">(admin<span class="meta">@127.0.0.1:6032)</span> [(none)]&gt; select hostgroup,schemaname,username,digest,substr(digest_text,120,-120),count_star from stats_mysql_query_digest;</div><div class="line">+-----------+--------------------+----------+--------------------+--------------------------------------------+------------+</div><div class="line">|<span class="string"> hostgroup </span>|<span class="string"> schemaname         </span>|<span class="string"> username </span>|<span class="string"> digest             </span>|<span class="string"> substr(digest_text,120,-120)               </span>|<span class="string"> count_star </span>|</div><div class="line">+-----------+--------------------+----------+--------------------+--------------------------------------------+------------+</div><div class="line">|<span class="string"> 1002      </span>|<span class="string"> db2                </span>|<span class="string"> ecdba    </span>|<span class="string"> 0x45033ED34D21EDF5 </span>|<span class="string"> select * from tbl_0                        </span>|<span class="string"> 1          </span>|</div><div class="line">|<span class="string"> 102       </span>|<span class="string"> db2                </span>|<span class="string"> ecdba    </span>|<span class="string"> 0x02033E45904D3DF0 </span>|<span class="string"> show databases                             </span>|<span class="string"> 1          </span>|</div><div class="line">|<span class="string"> 102       </span>|<span class="string"> db2                </span>|<span class="string"> ecdba    </span>|<span class="string"> 0x99531AEFF718C501 </span>|<span class="string"> show tables                                </span>|<span class="string"> 1          </span>|</div><div class="line">|<span class="string"> 1001      </span>|<span class="string"> db1                </span>|<span class="string"> ecdba    </span>|<span class="string"> 0x620B328FE9D6D71A </span>|<span class="string"> SELECT DATABASE()                          </span>|<span class="string"> 1          </span>|</div><div class="line">|<span class="string"> 1001      </span>|<span class="string"> db1                </span>|<span class="string"> ecdba    </span>|<span class="string"> 0x903E7B5A87B51352 </span>|<span class="string"> select * from db6.tbl_0                    </span>|<span class="string"> 1          </span>|</div><div class="line">|<span class="string"> 1001      </span>|<span class="string"> db1                </span>|<span class="string"> ecdba    </span>|<span class="string"> 0x0CE250A1C0E2C539 </span>|<span class="string"> select * from `db5`.tbl_0                  </span>|<span class="string"> 1          </span>|</div><div class="line">|<span class="string"> 1001      </span>|<span class="string"> db1                </span>|<span class="string"> ecdba    </span>|<span class="string"> 0x45033ED34D21EDF5 </span>|<span class="string"> select * from tbl_0                        </span>|<span class="string"> 1          </span>|</div><div class="line">|<span class="string"> 101       </span>|<span class="string"> db1                </span>|<span class="string"> ecdba    </span>|<span class="string"> 0x02033E45904D3DF0 </span>|<span class="string"> show databases                             </span>|<span class="string"> 2          </span>|</div><div class="line">|<span class="string"> 102       </span>|<span class="string"> db2                </span>|<span class="string"> ecdba    </span>|<span class="string"> 0x6F8289B2913564A0 </span>|<span class="string"> update tbl_0 set username=? where corpid=? </span>|<span class="string"> 1          </span>|</div><div class="line">|<span class="string"> 0         </span>|<span class="string"> information_schema </span>|<span class="string"> ecdba    </span>|<span class="string"> 0x620B328FE9D6D71A </span>|<span class="string"> SELECT DATABASE()                          </span>|<span class="string"> 1          </span>|</div><div class="line">|<span class="string"> 101       </span>|<span class="string"> db1                </span>|<span class="string"> ecdba    </span>|<span class="string"> 0x99531AEFF718C501 </span>|<span class="string"> show tables                                </span>|<span class="string"> 1          </span>|</div><div class="line">|<span class="string"> 0         </span>|<span class="string"> information_schema </span>|<span class="string"> ecdba    </span>|<span class="string"> 0x02033E45904D3DF0 </span>|<span class="string"> show databases                             </span>|<span class="string"> 1          </span>|</div><div class="line">|<span class="string"> 1001      </span>|<span class="string"> db1                </span>|<span class="string"> ecdba    </span>|<span class="string"> 0x7A3428659E1BFDC2 </span>|<span class="string"> select * from db5.tbl_0                    </span>|<span class="string"> 1          </span>|</div><div class="line">|<span class="string"> 103       </span>|<span class="string"> information_schema </span>|<span class="string"> ecdba    </span>|<span class="string"> 0xA951EB38FA9ED6A4 </span>|<span class="string"> select * from db15.tbl_0                   </span>|<span class="string"> 1          </span>|</div><div class="line">|<span class="string"> 100       </span>|<span class="string"> information_schema </span>|<span class="string"> ecdba    </span>|<span class="string"> 0xA132AEDEC5932600 </span>|<span class="string"> select * from db0.tbl_0                    </span>|<span class="string"> 1          </span>|</div><div class="line">|<span class="string"> 0         </span>|<span class="string"> information_schema </span>|<span class="string"> ecdba    </span>|<span class="string"> 0x594F2C744B698066 </span>|<span class="string"> select USER()                              </span>|<span class="string"> 1          </span>|</div><div class="line">|<span class="string"> 0         </span>|<span class="string"> information_schema </span>|<span class="string"> ecdba    </span>|<span class="string"> 0x226CD90D52A2BA0B </span>|<span class="string"> select @@version_comment limit ?           </span>|<span class="string"> 1          </span>|</div><div class="line">+-----------+--------------------+----------+--------------------+--------------------------------------------+------------+</div><div class="line">17 rows in set (0.01 sec)</div></pre></td></tr></table></figure></p>
+<p>达到了读写分离和分实例分库的目的。</p>
+<h1 id="6-另一种规则写法"><a href="#6-另一种规则写法" class="headerlink" title="6. 另一种规则写法"></a>6. 另一种规则写法</h1><p>从上面可以看到，客户端应用在使用的时候，最好都要指定 database name ，上面是因为加了第 5 类规则才避免由于不指定db时所带来的问题，但始终要求对每个 分db 建立自己连接，或者查询之前 use dbname ，当然也可以在获取连接的时候，传递dbname过去，拿到带正确db的连接过来。</p>
+<p>那么其实还有一种办法，不需要指定连接db，而是采用注释 hint 的形式，传递给proxysql，然后来自动路由。将第 4 节的规则 [2],[3] 改成下面的形式：<br><figure class="highlight lsl"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div></pre></td><td class="code"><pre><div class="line">-- [<span class="number">1</span>] read&amp;write split</div><div class="line">-- instance0，read &amp; write</div><div class="line">INSERT INTO mysql_query_rules (rule_id,active,match_pattern,apply,flagIN,flagOUT) VALUES (<span class="number">40</span>,<span class="number">1</span>,<span class="string">"\/\*\s*shard_corp_mod=(0|4|8|12)\s*\*."</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">20</span>);</div><div class="line">INSERT INTO mysql_query_rules (rule_id,active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) VALUES (<span class="number">50</span>,<span class="number">1</span>,'^select',<span class="number">1000</span>,<span class="number">1</span>,<span class="number">20</span>,<span class="number">20</span>);</div><div class="line">INSERT INTO mysql_query_rules (active,match_digest,negate_match_pattern,destination_hostgroup,apply,flagIN,flagOUT) VALUES (<span class="number">1</span>,<span class="string">"^select"</span>,<span class="number">1</span>,<span class="number">100</span>,<span class="number">1</span>,<span class="number">20</span>,<span class="number">20</span>);</div><div class="line"></div><div class="line">INSERT INTO mysql_query_rules (rule_id,active,match_pattern,apply,flagIN,flagOUT) VALUES (<span class="number">60</span>,<span class="number">1</span>,<span class="string">"\/\*\s*shard_corp_mod=(1|5|9|13)\s*\*."</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">21</span>);</div><div class="line">INSERT INTO mysql_query_rules (active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) VALUES (<span class="number">1</span>,'^select',<span class="number">1001</span>,<span class="number">1</span>,<span class="number">21</span>,<span class="number">21</span>);</div><div class="line">INSERT INTO mysql_query_rules (active,match_digest,negate_match_pattern,destination_hostgroup,apply,flagIN,flagOUT) VALUES (<span class="number">1</span>,<span class="string">"^select"</span>,<span class="number">1</span>,<span class="number">101</span>,<span class="number">1</span>,<span class="number">21</span>,<span class="number">21</span>);</div><div class="line"></div><div class="line">INSERT INTO mysql_query_rules (rule_id,active,match_pattern,apply,flagIN,flagOUT) VALUES (<span class="number">70</span>,<span class="number">1</span>,<span class="string">"\/\*\s*shard_corp_mod=(2|6|10|14)\s*\*."</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">22</span>);</div><div class="line">INSERT INTO mysql_query_rules (active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) VALUES (<span class="number">1</span>,'^select',<span class="number">1002</span>,<span class="number">1</span>,<span class="number">22</span>,<span class="number">22</span>);</div><div class="line">INSERT INTO mysql_query_rules (active,match_digest,negate_match_pattern,destination_hostgroup,apply,flagIN,flagOUT) VALUES (<span class="number">1</span>,<span class="string">"^select"</span>,<span class="number">1</span>,<span class="number">102</span>,<span class="number">1</span>,<span class="number">22</span>,<span class="number">22</span>);</div><div class="line"></div><div class="line">INSERT INTO mysql_query_rules (rule_id,active,match_pattern,apply,flagIN,flagOUT) VALUES (<span class="number">80</span>,<span class="number">1</span>,<span class="string">"\/\*\s*shard_corp_mod=(3|7|11|15)\s*\*."</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">23</span>);</div><div class="line">INSERT INTO mysql_query_rules (active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) VALUES (<span class="number">1</span>,'^select',<span class="number">1003</span>,<span class="number">1</span>,<span class="number">23</span>,<span class="number">23</span>);</div><div class="line">INSERT INTO mysql_query_rules (active,match_digest,negate_match_pattern,destination_hostgroup,apply,flagIN,flagOUT) VALUES (<span class="number">1</span>,<span class="string">"^select"</span>,<span class="number">1</span>,<span class="number">103</span>,<span class="number">1</span>,<span class="number">23</span>,<span class="number">23</span>);</div><div class="line"></div><div class="line">-- [<span class="number">2</span>] no <span class="comment">/* shard_corp_mod=? */</span> given</div><div class="line">insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN) values(<span class="number">1000</span>,<span class="number">1</span>,'([\s\`])db(<span class="number">0</span>|<span class="number">4</span>|<span class="number">8</span>|<span class="number">12</span>)([\.\`])',<span class="number">100</span>,<span class="number">1</span>,<span class="number">0</span>);</div><div class="line">insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN) values(<span class="number">1001</span>,<span class="number">1</span>,'([\s\`])db(<span class="number">1</span>|<span class="number">5</span>|<span class="number">9</span>|<span class="number">13</span>)([\.\`])',<span class="number">101</span>,<span class="number">1</span>,<span class="number">0</span>);</div><div class="line">insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN) values(<span class="number">1002</span>,<span class="number">1</span>,'([\s\`])db(<span class="number">2</span>|<span class="number">6</span>|<span class="number">10</span>|<span class="number">14</span>)([\.\`])',<span class="number">102</span>,<span class="number">1</span>,<span class="number">0</span>);</div><div class="line">insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN) values(<span class="number">1003</span>,<span class="number">1</span>,'([\s\`])db(<span class="number">3</span>|<span class="number">7</span>|<span class="number">11</span>|<span class="number">15</span>)([\.\`])',<span class="number">103</span>,<span class="number">1</span>,<span class="number">0</span>);</div><div class="line"></div><div class="line">-- [<span class="number">3</span>] wrong usage</div><div class="line">insert into mysql_query_rules(rule_id,active,schemaname,match_digest,apply,flagIN,error_msg,comment) </div><div class="line">  values(<span class="number">1404</span>,<span class="number">1</span>,'information_schema','^SELECT DATABASE\(\)$',<span class="number">1</span>,<span class="number">0</span>,'You should specify schema name first', 'use db0 Take long when no schema given for connection');</div><div class="line"></div><div class="line">-- [<span class="number">7</span>] <span class="section">default</span> route</div><div class="line">insert into mysql_query_rules(rule_id,active,apply, flagIN,error_msg,comment) values(<span class="number">9999</span>,<span class="number">1</span>,<span class="number">1</span>, <span class="number">0</span>,'No query rules matched (by ProxySQL)', <span class="string">"Don't define the default hostgroup 0 for ME"</span>);</div><div class="line"></div><div class="line">-- [<span class="number">8</span>]</div><div class="line">LOAD MYSQL QUERY RULES TO RUN;</div><div class="line">SAVE MYSQL QUERY RULES TO DISK;</div></pre></td></tr></table></figure></p>
+<p>注意这里[2][3]用的是 <code>match_pattern</code>，而上节用的是<code>match_digest</code>，因为proxysql在处理fingerprint的时候，会去掉注释。如果在命令行测试，要加 <code>-c</code> 避免 HINT 被过滤掉。</p>
+<p>使用时Hint放sql最后面，每个sql都要带mod或者指定实例：<code>select * from db5.tbl_0 /* shard_corp_mod=5 */</code>，真正实施起来，应用端的复杂度以及proxysql的性能，还是有待考虑的。</p>
+<p>关于这些路由规则的写法对ProxySQL性能的影响，欢迎继续阅读这边文章 <a href="http://seanlook.com/2017/04/20/mysql-proxysql-performance-test/">ProxySQL之性能测试对比</a></p>
+<p>参考：</p>
+<ul>
+<li><a href="https://severalnines.com/blog/how-proxysql-adds-failover-and-query-control-your-mysql-replication-setup" target="_blank" rel="external">https://severalnines.com/blog/how-proxysql-adds-failover-and-query-control-your-mysql-replication-setup</a></li>
+<li><a href="https://www.percona.com/blog/2016/08/30/mysql-sharding-with-proxysql/" target="_blank" rel="external">https://www.percona.com/blog/2016/08/30/mysql-sharding-with-proxysql/</a></li>
+</ul>
+<hr>
+<p>原文连接地址：<a href="http://seanlook.com/2017/04/17/mysql-proxysql-route-rw_split/">http://seanlook.com/2017/04/17/mysql-proxysql-route-rw_split/</a></p>
+<hr>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+  <div style="padding: 10px 0; margin: 20px auto; width: 90%; text-align: center;">
+    <div>支持可请我喝杯茶 ^_- (上限10个铜板)</div>
+    <button id="rewardButton" disable="enable" onclick="var qr = document.getElementById('QR'); if (qr.style.display === 'none') {qr.style.display='block';} else {qr.style.display='none'}">
+      <span>赏</span>
+    </button>
+    <div id="QR" style="display: none;">
+      
+        <div id="wechat" style="display: inline-block">
+          <img id="wechat_qr" src="/images/reward_wechat_seanlook.jpg" alt="seanlook WeChat Pay"/>
+          <p>微信打赏</p>
+        </div>
+      
+      
+    </div>
+  </div>
+
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/mysql/" rel="tag"># mysql</a>
+          
+            <a href="/tags/中间件/" rel="tag"># 中间件</a>
+          
+            <a href="/tags/proxysql/" rel="tag"># proxysql</a>
+          
+        </div>
+      
+
+      
+        
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2017/04/10/mysql-proxysql-install-config/" rel="next" title="ProxySQL之安装及配置详解">
+                <i class="fa fa-chevron-left"></i> ProxySQL之安装及配置详解
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2017/04/17/mysql-proxysql-multiplexing/" rel="prev" title="ProxySQL之连接复用（multiplexing）以及相关问题说明">
+                ProxySQL之连接复用（multiplexing）以及相关问题说明 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div id="cloud-tie-wrapper" class="cloud-tie-wrapper"></div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+           
+              <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+          
+        </div>
+        <nav class="site-state motion-element">
+
+          
+            <div class="site-state-item site-state-posts">
+              <a href="/archives">
+                <span class="site-state-item-count">100</span>
+                <span class="site-state-item-name">posts</span>
+              </a>
+            </div>
+          
+
+          
+            
+            
+            <div class="site-state-item site-state-categories">
+              <a href="/categories/index.html">
+                <span class="site-state-item-count">23</span>
+                <span class="site-state-item-name">categories</span>
+              </a>
+            </div>
+          
+
+          
+            
+            
+            <div class="site-state-item site-state-tags">
+              <a href="/tags/index.html">
+                <span class="site-state-item-count">116</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+        
+
+
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-配置后端DB"><span class="nav-text">1. 配置后端DB</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-配置用户"><span class="nav-text">2. 配置用户</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-修改全局变量"><span class="nav-text">3. 修改全局变量</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-添加路由规则"><span class="nav-text">4. 添加路由规则</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-效果演示"><span class="nav-text">5. 效果演示</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6-另一种规则写法"><span class="nav-text">6. 另一种规则写法</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2017</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+
+        
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.0"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.0"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.0"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+    
+    <script>
+      var cloudTieConfig = {
+        url: document.location.href, 
+        sourceId: "",
+        productKey: "3d000b541d9f41c0a57ee847ba7212f3",
+        target: "cloud-tie-wrapper"
+      };
+    </script>
+    <script src="https://img1.ws.126.net/f2e/tie/yun/sdk/loader.js"></script>
+  
+
+
+
+
+
+
+
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+      search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.popup').toggle();
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+      $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = $( "entry", xmlResponse ).map(function() {
+            return {
+              title: $( "title", this ).text(),
+              content: $("content",this).text(),
+              url: $( "url" , this).text()
+            };
+          }).get();
+          var $input = document.getElementById(search_id);
+          var $resultContent = document.getElementById(content_id);
+          $input.addEventListener('input', function(){
+            var matchcounts = 0;
+            var str='<ul class=\"search-result-list\">';
+            var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+            $resultContent.innerHTML = "";
+            if (this.value.trim().length > 1) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var content_index = [];
+                var data_title = data.title.trim().toLowerCase();
+                var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                var data_url = decodeURIComponent(data.url);
+                var index_title = -1;
+                var index_content = -1;
+                var first_occur = -1;
+                // only match artiles with not empty titles and contents
+                if(data_title != '') {
+                  keywords.forEach(function(keyword, i) {
+                    index_title = data_title.indexOf(keyword);
+                    index_content = data_content.indexOf(keyword);
+                    if( index_title >= 0 || index_content >= 0 ){
+                      isMatch = true;
+                      if (i == 0) {
+                        first_occur = index_content;
+                      }
+                    }
+
+                  });
+                }
+                // show search results
+                if (isMatch) {
+                  matchcounts += 1;
+                  str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                  var content = data.content.trim().replace(/<[^>]+>/g,"");
+                  if (first_occur >= 0) {
+                    // cut out 100 characters
+                    var start = first_occur - 20;
+                    var end = first_occur + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if(start == 0){
+                      end = 50;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    var match_content = content.substring(start, end);
+                    // highlight all keywords
+                    keywords.forEach(function(keyword){
+                      var regS = new RegExp(keyword, "gi");
+                      match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                    });
+
+                    str += "<p class=\"search-result\">" + match_content +"...</p>"
+                  }
+                  str += "</li>";
+                }
+              })};
+            str += "</ul>";
+            if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+            if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+            $resultContent.innerHTML = str;
+          });
+          proceedsearch();
+        }
+      });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.1.js"></script>
+  <script>AV.initialize("NliJVBn0857TMk5HYrIRt5wp-gzGzoHsz", "jB9B4QG8Rm8YP04RQqnsKy5M");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

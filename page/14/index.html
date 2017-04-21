@@ -316,6 +316,697 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/01/18/openssl-self-sign-ca/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2015/01/18/openssl-self-sign-ca/" itemprop="url">
+                  基于OpenSSL自建CA和颁发SSL证书
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-01-18T01:21:25+08:00">
+                2015-01-18
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/安全/" itemprop="url" rel="index">
+                    <span itemprop="name">安全</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2015/01/18/openssl-self-sign-ca/" class="leancloud_visitors" data-flag-title="基于OpenSSL自建CA和颁发SSL证书">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>关于SSL/TLS介绍见文章 <a href="http://seanlook.com/2015/01/07/tls-ssl">SSL/TLS原理详解</a>。<br>关于证书授权中心CA以及数字证书等概念，请移步 <a href="http://seanlook.com/2015/01/15/openssl-certificate-encryption">OpenSSL 与 SSL 数字证书概念贴</a> 。</p>
+<p>openssl是一个开源程序的套件、这个套件有三个部分组成：一是<code>libcryto</code>，这是一个具有通用功能的加密库，里面实现了众多的加密库；二是<code>libssl</code>，这个是实现ssl机制的，它是用于实现TLS/SSL的功能；三是openssl，是个多功能命令行工具，它可以实现加密解密，甚至还可以当CA来用，可以让你创建证书、吊销证书。</p>
+<p>默认情况ubuntu和CentOS上都已安装好openssl。CentOS 6.x 上有关ssl证书的目录结构：<br><figure class="highlight stylus"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">/etc/pki/CA/</div><div class="line">            newcerts    存放CA签署（颁发）过的数字证书（证书备份目录）</div><div class="line">            private     用于存放CA的私钥</div><div class="line">            crl         吊销的证书</div><div class="line"></div><div class="line">/etc/pki/tls/</div><div class="line">             cert<span class="selector-class">.pem</span>    软链接到certs/ca-bundle<span class="selector-class">.crt</span></div><div class="line">             certs/      该服务器上的证书存放目录，可以房子自己的证书和内置证书</div><div class="line">                   ca-bundle<span class="selector-class">.crt</span>    内置信任的证书</div><div class="line">             private    证书密钥存放目录</div><div class="line">             openssl<span class="selector-class">.cnf</span>    openssl的CA主配置文件</div></pre></td></tr></table></figure></p>
+<h1 id="1-颁发证书"><a href="#1-颁发证书" class="headerlink" title="1. 颁发证书"></a>1. 颁发证书</h1><h2 id="1-1-修改CA的一些配置文件"><a href="#1-1-修改CA的一些配置文件" class="headerlink" title="1.1 修改CA的一些配置文件"></a>1.1 修改CA的一些配置文件</h2><p>CA要给别人颁发证书，首先自己得有一个作为根证书，我们得在一切工作之前修改好CA的配置文件、序列号、索引等等。</p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2015/01/18/openssl-self-sign-ca/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/01/15/openssl-certificate-encryption/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2015/01/15/openssl-certificate-encryption/" itemprop="url">
+                  OpenSSL 与 SSL 数字证书概念贴
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-01-15T01:21:25+08:00">
+                2015-01-15
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/安全/" itemprop="url" rel="index">
+                    <span itemprop="name">安全</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2015/01/15/openssl-certificate-encryption/" class="leancloud_visitors" data-flag-title="OpenSSL 与 SSL 数字证书概念贴">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>SSL/TLS 介绍见文章 <a href="http://seanlook.com/2015/01/07/tls-ssl">SSL/TLS原理详解</a>。<br>如果你想快速自建CA然后签发数字证书，请移步 <a href="http://seanlook.com/2015/01/18/openssl-self-sign-ca">基于OpenSSL自建CA和颁发SSL证书 </a> 。</p>
+<p>首先简单区分一下HTTPS、SSL、OpenSSL三者的关系：</p>
+<p>SSL是在客户端和服务器之间建立一条SSL安全通道的安全协议，而OpenSSL是TLS/SSL协议的开源实现，提供开发库和命令行程序。常说的HTTPS是HTTP的加密版，底层使用的加密协议是SSL。</p>
+<h2 id="1-PKI、CA与证书"><a href="#1-PKI、CA与证书" class="headerlink" title="1. PKI、CA与证书"></a>1. PKI、CA与证书</h2><p>PKI 就是 Public Key Infrastructure 的缩写，翻译过来就是公开密钥基础设施。它是利用公开密钥技术所构建的，解决网络安全问题的，普遍适用的一种基础设施;是一种遵循既定标准的密钥管理平台,它能够为所有网络应用提供加密和数字签名等密码服务及所必需的密钥和证书管理体系。</p>
+<p>PKI既不是一个协议，也不是一个软件，它是一个标准，在这个标准之下发展出的为了实现安全基础服务目的的技术统称为PKI。可以说CA(认证中心)是PKI的核心，而数字证书是PKI的最基本元素，还有如apache等服务器、浏览器等客户端、银行等应用，都是pki的组件。这篇文章可以帮助理解：<a href="http://netsecurity.51cto.com/art/200602/21066.htm">PKI/CA 技术的介绍</a> 。</p>
+<h3 id="1-1-CA"><a href="#1-1-CA" class="headerlink" title="1.1 CA"></a>1.1 CA</h3><p>为保证用户之间在网上传递信息的安全性、真实性、可靠性、完整性和不可抵赖性</p>
+<p>CA 机构，又称为证书认证中心 (Certificate Authority) 中心，是一个负责发放和管理数字证书的第三方权威机构，它负责管理PKI结构下的所有用户(包括各种应用程序)的证书，把用户的公钥和用户的其他信息捆绑在一起，在网上验证用户的身份。CA机构的数字签名使得攻击者不能伪造和篡改证书。</p>
+<p>认证中心主要有以下5个功能：</p>
+<ol>
+<li>证书的颁发：接收、验证用户(包括下级认证中心和最终用户)的数字证书的申请。可以受理或拒绝</li>
+<li>证书的更新：认证中心可以定期更新所有用户的证书，或者根据用户的请求来更新用户的证书</li>
+<li>证书的查询：查询当前用户证书申请处理过程；查询用户证书的颁发信息，这类查询由目录服务器ldap来完成</li>
+<li>证书的作废：由于用户私钥泄密等原因，需要向认证中心提出证书作废的请求；证书已经过了有效期，认证中心自动将该证书作废。认证中心通过维护证书作废列表 (Certificate Revocation List,CRL) 来完成上述功能。 </li>
+<li>证书的归档：证书具有一定的有效期，证书过了有效期之后就将作废，但是我们不能将作废的证书简单地丢弃，因为有时我们可能需要验证以前的某个交易过程中产生的数字签名，这时我们就需要查询作废的证书。</li>
+</ol>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2015/01/15/openssl-certificate-encryption/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/01/15/openldap_introduction/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2015/01/15/openldap_introduction/" itemprop="url">
+                  LDAP服务器的概念和原理简单介绍
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-01-15T01:21:25+08:00">
+                2015-01-15
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/OpenLDAP/" itemprop="url" rel="index">
+                    <span itemprop="name">OpenLDAP</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2015/01/15/openldap_introduction/" class="leancloud_visitors" data-flag-title="LDAP服务器的概念和原理简单介绍">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h2 id="1-目录服务"><a href="#1-目录服务" class="headerlink" title="1. 目录服务"></a>1. 目录服务</h2><p>目录是一个为查询、浏览和搜索而优化的专业分布式数据库，它呈树状结构组织数据，就好象Linux/Unix系统中的文件目录一样。目录数据库和关系数据库不同，它有优异的读性能，但写性能差，并且没有事务处理、回滚等复杂功能，不适于存储修改频繁的数据。所以目录天生是用来查询的，就好象它的名字一样。</p>
+<p>目录服务是由目录数据库和一套访问协议组成的系统。类似以下的信息适合储存在目录中：</p>
+<ul>
+<li>企业员工信息，如姓名、电话、邮箱等；</li>
+<li>公用证书和安全密钥；</li>
+<li>公司的物理设备信息，如服务器，它的IP地址、存放位置、厂商、购买时间等；</li>
+</ul>
+<p><a href="http://www.openldap.org/doc/admin24/intro.html">LDAP</a>是轻量目录访问协议(Lightweight Directory Access Protocol)的缩写，LDAP是从X.500目录访问协议的基础上发展过来的，目前的版本是v3.0。与LDAP一样提供类似的目录服务软件还有<a href="http://directory.apache.org/apacheds/">ApacheDS</a>、<a href="https://technet.microsoft.com/en-us/library/dd448614.aspx">Active Directory</a>、<a href="http://www.redhat.com/en/technologies/cloud-computing/directory-server">Red Hat Directory Service</a> 。</p>
+<h2 id="2-LDAP特点"><a href="#2-LDAP特点" class="headerlink" title="2. LDAP特点"></a>2. LDAP特点</h2><ul>
+<li>LDAP的结构用树来表示，而不是用表格。正因为这样，就不能用SQL语句了</li>
+<li>LDAP可以很快地得到查询结果，不过在写方面，就慢得多</li>
+<li>LDAP提供了静态数据的快速查询方式</li>
+<li>Client/server模型，Server 用于存储数据，Client提供操作目录信息树的工具</li>
+<li>这些工具可以将数据库的内容以文本格式（LDAP 数据交换格式，LDIF）呈现在您的面前</li>
+<li>LDAP是一种开放Internet标准，LDAP协议是跨平台的Interent协议</li>
+</ul>
+<h2 id="3-LDAP组织数据的方式"><a href="#3-LDAP组织数据的方式" class="headerlink" title="3. LDAP组织数据的方式"></a>3. LDAP组织数据的方式</h2><p><img src="http://sean-images.qiniudn.com/ldap_intro_dctree.png" alt="ldap_intro_dctree"></p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2015/01/15/openldap_introduction/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/01/07/tls-ssl/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2015/01/07/tls-ssl/" itemprop="url">
+                  SSL/TLS原理详解
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-01-07T01:21:25+08:00">
+                2015-01-07
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2015/01/07/tls-ssl/" class="leancloud_visitors" data-flag-title="SSL/TLS原理详解">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>本文大部分整理自网络，相关文章请见文后参考。</p>
+<p>关于证书授权中心CA以及数字证书等概念，请移步 <a href="http://seanlook.com/2015/01/15/openssl-certificate-encryption">OpenSSL 与 SSL 数字证书概念贴</a> ，如果你想快速自建CA然后签发数字证书，请移步 <a href="http://seanlook.com/2015/01/18/openssl-self-sign-ca">基于OpenSSL自建CA和颁发SSL证书 </a> 。</p>
+<p>SSL/TLS作为一种互联网安全加密技术，原理较为复杂，枯燥而无味，我也是试图理解之后重新整理，尽量做到层次清晰。正文开始。</p>
+<h1 id="1-SSL-TLS概览"><a href="#1-SSL-TLS概览" class="headerlink" title="1. SSL/TLS概览"></a>1. SSL/TLS概览</h1><h2 id="1-1-整体结构"><a href="#1-1-整体结构" class="headerlink" title="1.1 整体结构"></a>1.1 整体结构</h2><p>SSL是一个介于HTTP协议与TCP之间的一个可选层，其位置大致如下:<br><img src="http://sean-images.qiniudn.com/tls-ssl-_tcp-ip_protocol.png" alt="tls-ssl-_tcp-ip_protocol.png"></p>
+<ul>
+<li><p><strong>SSL</strong>：（Secure Socket Layer，安全套接字层），为Netscape所研发，用以保障在Internet上数据传输之安全，利用数据加密(Encryption)技术，可确保数据在网络上之传输过程中不会被截取。当前版本为3.0。它已被广泛地用于Web浏览器与服务器之间的身份认证和加密数据传输。<br>SSL协议位于TCP/IP协议与各种应用层协议之间，为数据通讯提供安全支持。SSL协议可分为两层： SSL记录协议（SSL Record Protocol）：它建立在可靠的传输协议（如TCP）之上，为高层协议提供数据封装、压缩、加密等基本功能的支持。 SSL握手协议（SSL Handshake Protocol）：它建立在SSL记录协议之上，用于在实际的数据传输开始前，通讯双方进行身份认证、协商加密算法、交换加密密钥等。</p>
+</li>
+<li><p><strong>TLS</strong>：(Transport Layer Security，传输层安全协议)，用于两个应用程序之间提供保密性和数据完整性。<br>TLS 1.0是IETF（Internet Engineering Task Force，Internet工程任务组）制定的一种新的协议，它建立在SSL 3.0协议规范之上，是SSL 3.0的后续版本，可以理解为SSL 3.1，它是写入了  <a href="http://tools.ietf.org/html/rfc5246">RFC</a> 的。该协议由两层组成： TLS 记录协议（TLS Record）和 TLS 握手协议（TLS Handshake）。较低的层为 TLS 记录协议，位于某个可靠的传输协议（例如 TCP）上面。</p>
+</li>
+</ul>
+<p>SSL/TLS协议提供的服务主要有：</p>
+<ol>
+<li>认证用户和服务器，确保数据发送到正确的客户机和服务器；</li>
+<li>加密数据以防止数据中途被窃取；</li>
+<li>维护数据的完整性，确保数据在传输过程中不被改变。</li>
+</ol>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2015/01/07/tls-ssl/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/12/31/feel-2014-end/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -473,726 +1164,6 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/12/29/docker-shipyard-centralized-management-webui/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/12/29/docker-shipyard-centralized-management-webui/" itemprop="url">
-                  Docker集中化web界面管理平台shipyard
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-12-29T13:21:25+08:00">
-                2014-12-29
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Virtualization/" itemprop="url" rel="index">
-                    <span itemprop="name">Virtualization</span>
-                  </a>
-                </span>
-
-                
-                
-                  , 
-                
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Virtualization/Docker/" itemprop="url" rel="index">
-                    <span itemprop="name">Docker</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-          
-
-          
-          
-             <span id="/2014/12/29/docker-shipyard-centralized-management-webui/" class="leancloud_visitors" data-flag-title="Docker集中化web界面管理平台shipyard">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p><a href="http://shipyard-project.com/">Shipyard</a>（<a href="https://github.com/shipyard/shipyard">github</a>）是建立在docker集群管理工具<a href="https://github.com/citadel/citadel">Citadel</a>之上的可以管理容器、主机等资源的web图形化工具。包括<a href="https://github.com/shipyard/shipyard">core</a>和<a href="https://github.com/shipyard/shipyard-extensions">extension</a>两个版本，core即shipyard主要是把多个 Docker host上的 containers 统一管理（支持跨越多个host），extension即shipyard-extensions添加了应用路由和负载均衡、集中化日志、部署等。</p>
-<h2 id="1-几个概念"><a href="#1-几个概念" class="headerlink" title="1. 几个概念"></a>1. 几个概念</h2><h3 id="engine"><a href="#engine" class="headerlink" title="engine"></a>engine</h3><p>一个shipyard管理的docker集群可以包含一个或多个<code>engine</code>（引擎），一个engine就是监听tcp端口的docker daemon。shipyard管理docker daemon、images、containers完全基于Docker API，不需要做其他的修改。另外，shipyard可以对每个engine做资源限制，包括CPU和内存；因为TCP监听相比Unix socket方式会有一定的安全隐患，所以shipyard还支持通过SSL证书与docker后台进程安全通信。</p>
-<h3 id="rethinkdb"><a href="#rethinkdb" class="headerlink" title="rethinkdb"></a>rethinkdb</h3><p><code>RethinkDB</code>是一个shipyard项目的一个docker镜像，用来存放账号（account）、引擎（engine）、服务密钥（service key）、扩展元数据（extension metadata）等信息，但不会存储任何有关容器或镜像的内容。一般会启动一个<code>shipyard/rethinkdb</code>容器shipyard-rethinkdb-data来使用它的<code>/data</code>作为数据卷供另外rethinkdb一个挂载，专门用于数据存储。</p>
-<h2 id="2-搭建过程"><a href="#2-搭建过程" class="headerlink" title="2. 搭建过程"></a>2. 搭建过程</h2><h3 id="修改tcp监听"><a href="#修改tcp监听" class="headerlink" title="修改tcp监听"></a>修改tcp监听</h3><p>Shipyard 要管理和控制 Docker host 的话需要先修改 Docker host 上的默认配置使其监听tcp端口(可以继续保持Unix socket）。有以下2种方式</p>
-<ol>
-<li><code>sudo docker -H tcp://0.0.0.0:4243 -H unix:///var/run/docker.sock -d</code> 启动docker daemon。如果为了避免每次启动都写这么长的命令，可以直接在<code>/etc/init/docker.conf</code>中修改。</li>
-<li>修改<code>/etc/default/docker</code>的<code>DOCKER_OPTS</code><br><code>DOCKER_OPTS=&quot;-H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock&quot;</code>。这种方式在我docker version 1.4.1 in ubuntu 14.04上并没有生效。</li>
-</ol>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2014/12/29/docker-shipyard-centralized-management-webui/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/12/18/docker-core-technology-preview/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/12/18/docker-core-technology-preview/" itemprop="url">
-                  【转+改】Docker核心技术预览
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-12-18T13:21:25+08:00">
-                2014-12-18
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Virtualization/" itemprop="url" rel="index">
-                    <span itemprop="name">Virtualization</span>
-                  </a>
-                </span>
-
-                
-                
-                  , 
-                
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Virtualization/Docker/" itemprop="url" rel="index">
-                    <span itemprop="name">Docker</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-          
-
-          
-          
-             <span id="/2014/12/18/docker-core-technology-preview/" class="leancloud_visitors" data-flag-title="【转+改】Docker核心技术预览">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>本文简单介绍docker使用到的部分核心技术，但不做深入探究，因为每一个技术都是一个独立的项目，有机会再分别详细介绍。<br>来源地址：<a href="http://www.infoq.com/cn/articles/docker-core-technology-preview">http://www.infoq.com/cn/articles/docker-core-technology-preview</a></p>
-<p><img src="http://sean-images.qiniudn.com/docker-core-tech.png" alt="docker-core-tech"></p>
-<h2 id="Linux-Namespace-（实例隔离）"><a href="#Linux-Namespace-（实例隔离）" class="headerlink" title="Linux Namespace （实例隔离）"></a>Linux Namespace （实例隔离）</h2><blockquote>
-<p>The purpose of each namespace is to wrap a particular global system resource in an abstraction that makes it appear to the processes within the namespace that they have their own isolated instance of the global resource.</p>
-</blockquote>
-<p>每个用户实例之间相互隔离，互不影响。一般的硬件虚拟化方法给出的方法是VM，而LXC给出的方法是container，更细一点讲就是kernel namespace。其中pid、net、ipc、mnt、uts、user等namespace将container的进程、网络、消息、文件系统、UTS(“UNIX Time-sharing System”)和用户空间隔离开。</p>
-<ul>
-<li><strong>pid namespace</strong></li>
-</ul>
-<p>不同用户的进程就是通过pid namespace隔离开的，且不同 namespace 中可以有相同pid。所有的LXC进程在docker中的父进程为docker进程，每个lxc进程具有不同的namespace。同时由于允许嵌套，因此可以很方便的实现 Docker in Docker。</p>
-<p><img src="http://sean-images.qiniudn.com/docker-kernel-pid-namespace.png" alt="docker-kernel-pid-namespace.png"></p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2014/12/18/docker-core-technology-preview/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/12/18/docker-introduction/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/12/18/docker-introduction/" itemprop="url">
-                  Docker简介
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-12-18T11:21:25+08:00">
-                2014-12-18
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Virtualization/" itemprop="url" rel="index">
-                    <span itemprop="name">Virtualization</span>
-                  </a>
-                </span>
-
-                
-                
-                  , 
-                
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Virtualization/Docker/" itemprop="url" rel="index">
-                    <span itemprop="name">Docker</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-          
-
-          
-          
-             <span id="/2014/12/18/docker-introduction/" class="leancloud_visitors" data-flag-title="Docker简介">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <h1 id="1-docker是什么"><a href="#1-docker是什么" class="headerlink" title="1. docker是什么"></a>1. docker是什么</h1><blockquote>
-<p>Docker is an open-source engine that automates the deployment of any application as a lightweight, portable, self-sufficient container that will run virtually anywhere.</p>
-</blockquote>
-<p><a href="https://www.docker.com/">Docker</a>是 PaaS 提供商<a href="https://www.dotcloud.com/">dotCloud</a>开源的一个基于 LXC 的高级容器引擎， <a href="https://github.com/docker/docker">源代码</a>托管在 Github 上, 基于go语言并遵从Apache2.0协议开源。Docker近期非常火热，无论是从 GitHub 上的代码活跃度，还是Redhat宣布在<a href="http://server.cnw.com.cn/server-os/htm2014/20140616_303249.shtml">RHEL7中正式支持Docker</a>，都给业界一个信号，这是一项创新型的技术解决方案。就连 Google 公司的 Compute Engine 也支持 docker 在其之上运行，国内“BAT”先锋企业百度Baidu App Engine(BAE)平台也是<a href="http://blog.docker.com/2013/12/baidu-using-docker-for-its-paas/">以Docker作为其PaaS云基础</a>。</p>
-<p>Docker产生的目的就是为了解决以下问题：</p>
-<ol>
-<li>环境管理复杂：从各种OS到各种中间件再到各种App，一款产品能够成功发布，作为开发者需要关心的东西太多，且难于管理，这个问题在软件行业中普遍存在并需要直接面对。Docker可以简化部署多种应用实例工作，比如Web应用、后台应用、数据库应用、大数据应用比如Hadoop集群、消息队列等等都可以打包成一个Image部署。</li>
-<li>云计算时代的到来：AWS的成功，引导开发者将应用转移到云上, 解决了硬件管理的问题，然而软件配置和管理相关的问题依然存在 (AWS cloudformation是这个方向的业界标准, 样例模板可参考这里)。Docker的出现正好能帮助软件开发者开阔思路，尝试新的软件管理方法来解决这个问题。</li>
-<li>虚拟化手段的变化：云时代采用标配硬件来降低成本，采用虚拟化手段来满足用户按需分配的资源需求以及保证可用性和隔离性。然而无论是KVM还是Xen，在 Docker 看来都在浪费资源，因为用户需要的是高效运行环境而非OS，GuestOS既浪费资源又难于管理，更加轻量级的LXC更加灵活和快速。<br><img src="http://sean-images.qiniudn.com/docker-traditional-virtualization.png" alt="docker-traditional-virtualization"><br><img src="http://sean-images.qiniudn.com/docker-virtualization.png" alt="docker-virtualization"></li>
-<li>LXC的便携性：LXC在 Linux 2.6 的 Kernel 里就已经存在了，但是其设计之初并非为云计算考虑的，缺少标准化的描述手段和容器的可便携性，决定其构建出的环境难于分发和标准化管理(相对于KVM之类image和snapshot的概念)。Docker就在这个问题上做出了实质性的创新方法。</li>
-</ol>
-<p>Docker的主要特性如下：</p>
-<ol>
-<li>文件系统隔离：每个进程容器运行在完全独立的根文件系统里。</li>
-<li>资源隔离：可以使用cgroup为每个进程容器分配不同的系统资源，例如CPU和内存。</li>
-<li>网络隔离：每个进程容器运行在自己的网络命名空间里，拥有自己的虚拟接口和IP地址。</li>
-<li>写时复制：采用写时复制方式创建根文件系统，这让部署变得极其快捷，并且节省内存和硬盘空间。</li>
-<li>日志记录：Docker将会收集和记录每个进程容器的标准流（stdout/stderr/stdin），用于实时检索或批量检索。</li>
-<li>变更管理：容器文件系统的变更可以提交到新的映像中，并可重复使用以创建更多的容器。无需使用模板或手动配置。</li>
-<li>交互式Shell：Docker可以分配一个虚拟终端并关联到任何容器的标准输入上，例如运行一个一次性交互shell。</li>
-</ol>
-<h1 id="2-比较"><a href="#2-比较" class="headerlink" title="2. 比较"></a>2. 比较</h1><h2 id="2-1-docker-vs-传统虚拟化技术"><a href="#2-1-docker-vs-传统虚拟化技术" class="headerlink" title="2.1 docker vs 传统虚拟化技术"></a>2.1 docker vs 传统虚拟化技术</h2><p>作为一种新兴的虚拟化方式，Docker 跟传统的虚拟化方式（xen、kvm、vmware）相比具有众多的优势。</p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2014/12/18/docker-introduction/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/12/12/rsync_inotify_setup/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/12/12/rsync_inotify_setup/" itemprop="url">
-                  Linux下同步工具inotify+rsync使用详解
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-12-12T01:21:25+08:00">
-                2014-12-12
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Linux/" itemprop="url" rel="index">
-                    <span itemprop="name">Linux</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-          
-
-          
-          
-             <span id="/2014/12/12/rsync_inotify_setup/" class="leancloud_visitors" data-flag-title="Linux下同步工具inotify+rsync使用详解">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <h1 id="1-rsync"><a href="#1-rsync" class="headerlink" title="1. rsync"></a>1. rsync</h1><h2 id="1-1-什么是rsync"><a href="#1-1-什么是rsync" class="headerlink" title="1.1 什么是rsync"></a>1.1 什么是rsync</h2><p>rsync是一个远程数据同步工具，可通过LAN/WAN快速同步多台主机间的文件。它使用所谓的“Rsync演算法”来使本地和远程两个主机之间的文件达到同步，这个算法只传送两个文件的不同部分，而不是每次都整份传送，因此速度相当快。所以通常可以作为备份工具来使用。</p>
-<p>运行Rsync server的机器也叫backup server，一个Rsync server可同时备份多个client的数据；也可以多个Rsync server备份一个client的数据。Rsync可以搭配ssh甚至使用daemon模式。Rsync server会打开一个873的服务通道(port)，等待对方rsync连接。连接时，Rsync server会检查口令是否相符，若通过口令查核，则可以开始进行文件传输。第一次连通完成时，会把整份文件传输一次，下一次就只传送二个文件之间不同的部份。</p>
-<p><strong>基本特点：</strong></p>
-<ol>
-<li>可以镜像保存整个目录树和文件系统；</li>
-<li>可以很容易做到保持原来文件的权限、时间、软硬链接等；</li>
-<li>无须特殊权限即可安装；</li>
-<li>优化的流程，文件传输效率高；</li>
-<li>可以使用rcp、ssh等方式来传输文件，当然也可以通过直接的socket连接；</li>
-<li>支持匿名传输。</li>
-</ol>
-<p><strong>命令语法：</strong><br>rsync的命令格式可以为以下六种：<br>　rsync [OPTION]… SRC DEST<br>　rsync [OPTION]… SRC [USER@]HOST:DEST<br>　rsync [OPTION]… [USER@]HOST:SRC DEST<br>　rsync [OPTION]… [USER@]HOST::SRC DEST<br>　rsync [OPTION]… SRC [USER@]HOST::DEST<br>　rsync [OPTION]… rsync://[USER@]HOST[:PORT]/SRC [DEST]</p>
-<p>对应于以上六种命令格式，我们可以总结rsync有2种不同的工作模式：</p>
-<ul>
-<li>shell模式：使用远程shell程序（如ssh或rsh）进行连接。当源路径或目的路径的主机名后面包含一个冒号分隔符时使用这种模式，rsync安装完成后就可以直接使用了，无所谓启动。（目前没有尝试过这个方法）</li>
-<li>daemon模式：使用TCP直接连接rsync daemon。当源路径或目的路径的主机名后面包含两个冒号，或使用rsync://URL时使用这种模式，无需远程shell，但必须在一台机器上启动rsync daemon，默认端口873，这里可以通过<code>rsync --daemon</code>使用独立进程的方式，或者通过xinetd超级进程来管理rsync后台进程。</li>
-</ul>
-<p>当rsync作为daemon运行时，它需要一个用户身份。如果你希望启用chroot，则必须以root的身份来运行daemon，监听端口，或设定文件属主；如果不启用chroot，也可以不使用root用户来运行daemon，但该用户必须对相应的模块拥有读写数据、日志和lock file的权限。当rsync以daemon模式运行时，它还需要一个配置文件——rsyncd.conf。修改这个配置后不必重启rsync daemon，因为每一次的client连接都会去重新读取该文件。</p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2014/12/12/rsync_inotify_setup/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -1242,7 +1213,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">96</span>
+                <span class="site-state-item-count">100</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -1264,7 +1235,7 @@
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">114</span>
+                <span class="site-state-item-count">116</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>
