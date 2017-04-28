@@ -316,7 +316,7 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/06/11/mysql-advanced-query-tuning-percona/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="seanlook">
@@ -338,8 +338,8 @@
             
               
                 
-                <a class="post-title-link" href="/2016/05/27/mysql-pt-online-schema-change/" itemprop="url">
-                  pt-online-schema-change使用说明、限制与比较
+                <a class="post-title-link" href="/2016/06/11/mysql-advanced-query-tuning-percona/" itemprop="url">
+                  Advanced MySQL Query Tuning .pdf
                 </a>
               
             
@@ -355,8 +355,8 @@
               
                 <span class="post-meta-item-text">Posted on</span>
               
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-05-27T16:32:49+08:00">
-                2016-05-27
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-06-11T16:32:49+08:00">
+                2016-06-11
               </time>
             
 
@@ -395,7 +395,7 @@
 
           
           
-             <span id="/2016/05/27/mysql-pt-online-schema-change/" class="leancloud_visitors" data-flag-title="pt-online-schema-change使用说明、限制与比较">
+             <span id="/2016/06/11/mysql-advanced-query-tuning-percona/" class="leancloud_visitors" data-flag-title="Advanced MySQL Query Tuning .pdf">
                <span class="post-meta-divider">|</span>
                <span class="post-meta-item-icon">
                  <i class="fa fa-eye"></i>
@@ -425,40 +425,26 @@
 
       
         
-          <p>如果正在看这篇文章，相信你已经知道自己的需求了。</p>
-<p>在 mysql 5.5 版本以前，修改表结构如添加索引、修改列，需要锁表，期间不能写入，对于大表这简直是灾难。从5.5特别是5.6里，情况有了好转，支持Online DDL，相关介绍见 <a href="http://seanlook.com/2016/05/24/mysql-online-ddl-concept">这篇文章</a>，而我在实际alter table过程中还是会引起 data meta lock 问题。pt-online-schema-change是Percona-toolkit一员，通过改进原生ddl的方式，达到不锁表在线修改表结构。</p>
-<h2 id="1-pt-osc工作过程"><a href="#1-pt-osc工作过程" class="headerlink" title="1. pt-osc工作过程"></a>1. pt-osc工作过程</h2><ol>
-<li>创建一个和要执行 alter 操作的表一样的新的空表结构(是alter之前的结构)</li>
-<li>在新表执行alter table 语句（速度应该很快）</li>
-<li>在原表中创建触发器3个触发器分别对应insert,update,delete操作</li>
-<li>以一定块大小从原表拷贝数据到临时表，拷贝过程中通过原表上的触发器在原表进行的写操作都会更新到新建的临时表</li>
-<li>Rename 原表到old表中，在把临时表Rename为原表</li>
-<li>如果有参考该表的外键，根据alter-foreign-keys-method参数的值，检测外键相关的表，做相应设置的处理</li>
-<li>默认最后将旧原表删除</li>
-</ol>
-<h2 id="2-常用选项说明"><a href="#2-常用选项说明" class="headerlink" title="2. 常用选项说明"></a>2. 常用选项说明</h2><p>只介绍部分常用的选项</p>
-<ul>
-<li><code>--host=xxx --user=xxx --password=xxx</code><br>连接实例信息，缩写<code>-h xxx -u xxx -p xxx</code>，密码可以使用参数<code>--ask-pass</code> 手动输入。</li>
-<li><code>--alter</code><br>结构变更语句，不需要 <code>ALTER TABLE</code>关键字。与原始ddl一样可以指定多个更改，用逗号分隔。<ul>
-<li>绝大部分情况下表上需要有主键或唯一索引，因为工具在运行当中为了保证新表也是最新的，需要旧表上创建 DELETE和UPDATE 触发器，同步到新表的时候有主键会更快。个别情况是，当alter操作就是在c1列上建立主键时，DELETE触发器将基于c1列。</li>
-<li>子句不支持 rename 去给表重命名。 </li>
-<li>alter命令原表就不支持给索引重命名，需要先drop再add，在pt-osc也一样。(mysql 5.7 支持 RENAME INDEX old_index_name TO new_index_name)<br>但给字段重命名，千万不要drop-add，整列数据会丢失，使用<code>change col1 col1_new type constraint</code>（保持类型和约束一致，否则相当于修改 column type，不能online）</li>
-<li>子句如果是add column并且定义了not null，那么必须指定default值，否则会失败。</li>
-<li>如果要删除外键（名 fk_foo），使用工具的时候外键名要加下划线，比如<code>--alter &quot;DROP FOREIGN KEY _fk_foo&quot;</code></li>
-</ul>
-</li>
-</ul>
-<ul>
-<li><p><code>D=db_name,t=table_name</code><br>指定要ddl的数据库名和表名</p>
-</li>
-<li><p><code>--max-load</code><br>默认为<code>Threads_running=25</code>。每个chunk拷贝完后，会检查 <em>SHOW GLOBAL STATUS</em> 的内容，检查指标是否超过了指定的阈值。如果超过，则先暂停。这里可以用逗号分隔，指定多个条件，每个条件格式： <code>status指标=MAX_VALUE</code>或者<code>status指标:MAX_VALUE</code>。如果不指定MAX_VALUE，那么工具会这只其为当前值的120%。<br>因为拷贝行有可能会给部分行上锁，Threads_running 是判断当前数据库负载的绝佳指标。</p>
-</li>
-<li><p><code>--max-lag</code><br>默认1s。每个chunk拷贝完成后，会查看所有复制Slave的延迟情况（<code>Seconds_Behind_Master</code>）。要是延迟大于该值，则暂停复制数据，直到所有从的滞后小于这个值。<code>--check-interval</code>配合使用，指定出现从库滞后超过 max-lag，则该工具将睡眠多长时间，默认1s，再检查。如<code>--max-lag=5 --check-interval=2</code>。<br>熟悉percona-toolkit的人都知道<code>--recursion-method</code>可以用来指定从库dsn记录。另外，如果从库被停止，将会永远等待，直到从开始同步，并且延迟小于该值。</p>
-</li>
-<li><p><code>--chunk-time</code><br>默认0.5s，即拷贝数据行的时候，为了尽量保证0.5s内拷完一个chunk，动态调整chunk-size的大小，以适应服务器性能的变化。<br>也可以通过另外一个选项<code>--chunk-size</code>禁止动态调整，即每次固定拷贝 1k 行，如果指定则默认1000行，且比 chunk-time 优先生效</p>
+          
+          端午在家无聊，又不想学习。于是在Youtube随便逛，看到一个很不错的分享，来自 Percona Database Performance。下面是演示稿：
+slideshare: http://www.slideshare.net/ssuser5a0bc0/webinar-2013-advancedquerytuning 
+
+	  
+
+
+Youtube: https://www.youtube.com/watch?v=TPFibi2G_oo
+能 条件 的可以看看。
+Percona webinars上有许多类似的分享，传送门： https://www.percona.com/resources/webinars ，不少是他们CEO Peter Zaitsev 亲自上马的。
+
+原文连接地址：http://seanlook.com/2016/06/11/mysql-advanced-query-tuning-percona/
+
+
+–&gt;
+-->
+          
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2016/05/27/mysql-pt-online-schema-change/#more" rel="contents">
+            <a class="btn" href="/2016/06/11/mysql-advanced-query-tuning-percona/#more" rel="contents">
               Read more &raquo;
             </a>
           </div>
@@ -617,6 +603,194 @@
           <!--noindex-->
           <div class="post-button text-center">
             <a class="btn" href="/2016/05/27/mysql-pt-osc-add-primarykey/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2016/05/27/mysql-pt-online-schema-change/" itemprop="url">
+                  pt-online-schema-change使用说明、限制与比较
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-05-27T16:32:49+08:00">
+                2016-05-27
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2016/05/27/mysql-pt-online-schema-change/" class="leancloud_visitors" data-flag-title="pt-online-schema-change使用说明、限制与比较">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>如果正在看这篇文章，相信你已经知道自己的需求了。</p>
+<p>在 mysql 5.5 版本以前，修改表结构如添加索引、修改列，需要锁表，期间不能写入，对于大表这简直是灾难。从5.5特别是5.6里，情况有了好转，支持Online DDL，相关介绍见 <a href="http://seanlook.com/2016/05/24/mysql-online-ddl-concept">这篇文章</a>，而我在实际alter table过程中还是会引起 data meta lock 问题。pt-online-schema-change是Percona-toolkit一员，通过改进原生ddl的方式，达到不锁表在线修改表结构。</p>
+<h2 id="1-pt-osc工作过程"><a href="#1-pt-osc工作过程" class="headerlink" title="1. pt-osc工作过程"></a>1. pt-osc工作过程</h2><ol>
+<li>创建一个和要执行 alter 操作的表一样的新的空表结构(是alter之前的结构)</li>
+<li>在新表执行alter table 语句（速度应该很快）</li>
+<li>在原表中创建触发器3个触发器分别对应insert,update,delete操作</li>
+<li>以一定块大小从原表拷贝数据到临时表，拷贝过程中通过原表上的触发器在原表进行的写操作都会更新到新建的临时表</li>
+<li>Rename 原表到old表中，在把临时表Rename为原表</li>
+<li>如果有参考该表的外键，根据alter-foreign-keys-method参数的值，检测外键相关的表，做相应设置的处理</li>
+<li>默认最后将旧原表删除</li>
+</ol>
+<h2 id="2-常用选项说明"><a href="#2-常用选项说明" class="headerlink" title="2. 常用选项说明"></a>2. 常用选项说明</h2><p>只介绍部分常用的选项</p>
+<ul>
+<li><code>--host=xxx --user=xxx --password=xxx</code><br>连接实例信息，缩写<code>-h xxx -u xxx -p xxx</code>，密码可以使用参数<code>--ask-pass</code> 手动输入。</li>
+<li><code>--alter</code><br>结构变更语句，不需要 <code>ALTER TABLE</code>关键字。与原始ddl一样可以指定多个更改，用逗号分隔。<ul>
+<li>绝大部分情况下表上需要有主键或唯一索引，因为工具在运行当中为了保证新表也是最新的，需要旧表上创建 DELETE和UPDATE 触发器，同步到新表的时候有主键会更快。个别情况是，当alter操作就是在c1列上建立主键时，DELETE触发器将基于c1列。</li>
+<li>子句不支持 rename 去给表重命名。 </li>
+<li>alter命令原表就不支持给索引重命名，需要先drop再add，在pt-osc也一样。(mysql 5.7 支持 RENAME INDEX old_index_name TO new_index_name)<br>但给字段重命名，千万不要drop-add，整列数据会丢失，使用<code>change col1 col1_new type constraint</code>（保持类型和约束一致，否则相当于修改 column type，不能online）</li>
+<li>子句如果是add column并且定义了not null，那么必须指定default值，否则会失败。</li>
+<li>如果要删除外键（名 fk_foo），使用工具的时候外键名要加下划线，比如<code>--alter &quot;DROP FOREIGN KEY _fk_foo&quot;</code></li>
+</ul>
+</li>
+</ul>
+<ul>
+<li><p><code>D=db_name,t=table_name</code><br>指定要ddl的数据库名和表名</p>
+</li>
+<li><p><code>--max-load</code><br>默认为<code>Threads_running=25</code>。每个chunk拷贝完后，会检查 <em>SHOW GLOBAL STATUS</em> 的内容，检查指标是否超过了指定的阈值。如果超过，则先暂停。这里可以用逗号分隔，指定多个条件，每个条件格式： <code>status指标=MAX_VALUE</code>或者<code>status指标:MAX_VALUE</code>。如果不指定MAX_VALUE，那么工具会这只其为当前值的120%。<br>因为拷贝行有可能会给部分行上锁，Threads_running 是判断当前数据库负载的绝佳指标。</p>
+</li>
+<li><p><code>--max-lag</code><br>默认1s。每个chunk拷贝完成后，会查看所有复制Slave的延迟情况（<code>Seconds_Behind_Master</code>）。要是延迟大于该值，则暂停复制数据，直到所有从的滞后小于这个值。<code>--check-interval</code>配合使用，指定出现从库滞后超过 max-lag，则该工具将睡眠多长时间，默认1s，再检查。如<code>--max-lag=5 --check-interval=2</code>。<br>熟悉percona-toolkit的人都知道<code>--recursion-method</code>可以用来指定从库dsn记录。另外，如果从库被停止，将会永远等待，直到从开始同步，并且延迟小于该值。</p>
+</li>
+<li><p><code>--chunk-time</code><br>默认0.5s，即拷贝数据行的时候，为了尽量保证0.5s内拷完一个chunk，动态调整chunk-size的大小，以适应服务器性能的变化。<br>也可以通过另外一个选项<code>--chunk-size</code>禁止动态调整，即每次固定拷贝 1k 行，如果指定则默认1000行，且比 chunk-time 优先生效</p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2016/05/27/mysql-pt-online-schema-change/#more" rel="contents">
               Read more &raquo;
             </a>
           </div>
@@ -999,227 +1173,11 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/05/11/mysql-dev-principle-ec/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2016/05/11/mysql-dev-principle-ec/" itemprop="url">
-                  MySQL数据库开发规范-EC
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-05-11T16:32:49+08:00">
-                2016-05-11
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-          
-
-          
-          
-             <span id="/2016/05/11/mysql-dev-principle-ec/" class="leancloud_visitors" data-flag-title="MySQL数据库开发规范-EC">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <!-- 
-
-http://highdb.com/mysql%E5%BC%80%E5%8F%91%E8%A7%84%E8%8C%83/
-http://blog.csdn.net/xlgen157387/article/details/48086607
-http://www.iteye.com/topic/1141229
--->
-<p>最近一段时间一边在线上抓取SQL来优化，一边在整理这个开发规范，尽量减少新的问题SQL进入生产库。今天也是对公司的开发做了一次培训，PPT就不放上来了，里面有十来个生产SQL的案例。因为规范大部分还是具有通用性，所以也借鉴了像去哪儿和赶集的规范，但实际在撰写本文的过程中，每一条规范的背后无不是在工作中有参照的反面例子的。如果时间可以的话，会抽出一部分或分析其原理，或用案例证明。</p>
-<h2 id="1-命名规范"><a href="#1-命名规范" class="headerlink" title="1. 命名规范"></a>1. 命名规范</h2><ol>
-<li><h3 id="库名、表名、字段名必须使用小写字母，并采用下划线分割"><a href="#库名、表名、字段名必须使用小写字母，并采用下划线分割" class="headerlink" title="库名、表名、字段名必须使用小写字母，并采用下划线分割"></a>库名、表名、字段名必须使用小写字母，并采用下划线分割</h3><ul>
-<li>MySQL有配置参数lower_case_table_names=1，即库表名以小写存储，大小写不敏感。如果是0，则库表名以实际情况存储，大小写敏感；如果是2，以实际情况存储，但以小写比较。</li>
-<li>如果大小写混合使用，可能存在abc，Abc，ABC等多个表共存，容易导致混乱。</li>
-<li>字段名显示区分大小写，但实际使⽤时不区分，即不可以建立两个名字一样但大小写不一样的字段。</li>
-<li>为了统一规范， 库名、表名、字段名使用小写字母。</li>
-</ul>
-</li>
-<li><h3 id="库名以-d-开头，表名以-t-开头，字段名以-f-开头"><a href="#库名以-d-开头，表名以-t-开头，字段名以-f-开头" class="headerlink" title="库名以 d 开头，表名以 t 开头，字段名以 f_ 开头"></a>库名以 d<em> 开头，表名以 t</em> 开头，字段名以 f_ 开头</h3><ul>
-<li>比如表 <code>t_crm_relation</code>，中间的 crm 代表业务模块名</li>
-<li>视图以<code>view_</code>开头，事件以<code>event_</code>开头，触发器以<code>trig_</code>开头，存储过程以<code>proc_</code>开头，函数以<code>func_</code>开头</li>
-<li>普通索引以<code>idx_col1_col2</code>命名，唯一索引以<code>uk_col1_col2</code>命名（可去掉f_公共部分）。如 idx_companyid_corpid_contacttime(f_company_id,f_corp_id,f_contact_time)</li>
-</ul>
-</li>
-<li><h3 id="库名、表名、字段名禁止超过32个字符，需见名知意"><a href="#库名、表名、字段名禁止超过32个字符，需见名知意" class="headerlink" title="库名、表名、字段名禁止超过32个字符，需见名知意"></a>库名、表名、字段名禁止超过32个字符，需见名知意</h3><p>库名、表名、字段名支持最多64个字符，但为了统一规范、易于辨识以及减少传输量，禁止超过32个字符</p>
-</li>
-<li><h3 id="临时库、表名须以tmp加日期为后缀"><a href="#临时库、表名须以tmp加日期为后缀" class="headerlink" title="临时库、表名须以tmp加日期为后缀"></a>临时库、表名须以tmp加日期为后缀</h3><p>如 t_crm_relation_tmp0425。备份表也类似，形如 <code>_bak20160425</code> 。</p>
-</li>
-<li><h3 id="按日期时间分表须符合-YYYY-MM-DD-格式"><a href="#按日期时间分表须符合-YYYY-MM-DD-格式" class="headerlink" title="按日期时间分表须符合_YYYY[MM][DD]格式"></a>按日期时间分表须符合_YYYY[MM][DD]格式</h3><p>这也是为将来有可能分表做准备的，比如<code>t_crm_ec_record_201403</code>，但像 t_crm_contact_at201506就打破了这种规范。<br>不具有时间特性的，直接以 <code>t_tbname_001</code> 这样的方式命名。</p>
-</li>
-</ol>
-<h2 id="2-库表基础规范"><a href="#2-库表基础规范" class="headerlink" title="2. 库表基础规范"></a>2. 库表基础规范</h2><ol>
-<li><h3 id="使用Innodb存储引擎"><a href="#使用Innodb存储引擎" class="headerlink" title="使用Innodb存储引擎"></a>使用Innodb存储引擎</h3><p>5.5版本开始mysql默认存储引擎就是InnoDB，5.7版本开始，系统表都放弃MyISAM了。</p>
-</li>
-<li><h3 id="表字符集统一使用UTF8"><a href="#表字符集统一使用UTF8" class="headerlink" title="表字符集统一使用UTF8"></a>表字符集统一使用UTF8</h3><ul>
-<li>UTF8字符集存储汉字占用3个字节，存储英文字符占用一个字节</li>
-<li>校对字符集使用默认的 utf8_general_ci</li>
-<li>连接的客户端也使用utf8，建立连接时指定charset或<code>SET NAMES UTF8;</code>。（对于已经在项目中长期使用latin1的，救不了了）</li>
-<li>如果遇到EMOJ等表情符号的存储需求，可申请使用UTF8MB4字符集</li>
-</ul>
-</li>
-<li><h3 id="所有表都要添加注释"><a href="#所有表都要添加注释" class="headerlink" title="所有表都要添加注释"></a>所有表都要添加注释</h3><ul>
-<li>尽量给字段也添加注释</li>
-<li>类status型需指明主要值的含义，如”0-离线，1-在线”</li>
-</ul>
-</li>
-<li><h3 id="控制单表字段数量"><a href="#控制单表字段数量" class="headerlink" title="控制单表字段数量"></a>控制单表字段数量</h3><ul>
-<li>单表字段数上限30左右，再多的话考虑垂直分表，一是冷热数据分离，二是大字段分离，三是常在一起做条件和返回列的不分离。</li>
-<li>表字段控制少而精，可以提高IO效率，内存缓存更多有效数据，从而提高响应速度和并发能力，后续 alter table 也更快。</li>
-</ul>
-</li>
-<li><h3 id="所有表都必须要显式指定主键"><a href="#所有表都必须要显式指定主键" class="headerlink" title="所有表都必须要显式指定主键"></a>所有表都必须要显式指定主键</h3><ul>
-<li>主键尽量采用自增方式，InnoDB表实际是一棵索引组织表，顺序存储可以提高存取效率，充分利用磁盘空间。还有对一些复杂查询可能需要自连接来优化时需要用到。</li>
-<li>需要全局唯一主键时，使用外部发号器ticket server（建设中）</li>
-<li>如果没有主键或唯一索引，update/delete是通过所有字段来定位操作的行，相当于每行就是一次全表扫描</li>
-<li>少数情况可以使用联合唯一主键，需与DBA协商</li>
-</ul>
-</li>
-<li><h3 id="不强制使用外键参考"><a href="#不强制使用外键参考" class="headerlink" title="不强制使用外键参考"></a>不强制使用外键参考</h3><p>即使2个表的字段有明确的外键参考关系，也不使用 FOREIGN KEY ，因为新纪录会去主键表做校验，影响性能。</p>
-</li>
-<li><h3 id="适度使用存储过程、视图，禁止使用触发器、事件"><a href="#适度使用存储过程、视图，禁止使用触发器、事件" class="headerlink" title="适度使用存储过程、视图，禁止使用触发器、事件"></a>适度使用存储过程、视图，禁止使用触发器、事件</h3></li>
-</ol>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2016/05/11/mysql-dev-principle-ec/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/4/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/4/">4</a><span class="page-number current">5</span><a class="page-number" href="/page/6/">6</a><span class="space">&hellip;</span><a class="page-number" href="/page/20/">20</a><a class="extend next" rel="next" href="/page/6/"><i class="fa fa-angle-right"></i></a>
+    <a class="extend prev" rel="prev" href="/page/4/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/4/">4</a><span class="page-number current">5</span><a class="page-number" href="/page/6/">6</a><span class="space">&hellip;</span><a class="page-number" href="/page/21/">21</a><a class="extend next" rel="next" href="/page/6/"><i class="fa fa-angle-right"></i></a>
   </nav>
 
 
@@ -1264,7 +1222,7 @@ http://www.iteye.com/topic/1141229
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">100</span>
+                <span class="site-state-item-count">101</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
