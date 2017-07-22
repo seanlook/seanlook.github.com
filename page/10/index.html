@@ -316,6 +316,356 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/05/28/nginx-ssl/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2015/05/28/nginx-ssl/" itemprop="url">
+                  nginx配置ssl加密（单双向认证、部分https）
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-05-28T15:21:25+08:00">
+                2015-05-28
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/Nginx/" itemprop="url" rel="index">
+                    <span itemprop="name">Nginx</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2015/05/28/nginx-ssl/" class="leancloud_visitors" data-flag-title="nginx配置ssl加密（单双向认证、部分https）">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>nginx下配置ssl本来是很简单的，无论是去认证中心买SSL安全证书还是自签署证书，但最近公司OA的一个需求，得以有个机会实际折腾一番。一开始采用的是全站加密，所有访问http:80的请求强制转换（rewrite）到https，后来自动化测试结果说响应速度太慢，https比http慢慢30倍，心想怎么可能，鬼知道他们怎么测的。所以就试了一下部分页面https（不能只针对某类动态请求才加密）和双向认证。下面分节介绍。</p>
+<p>默认nginx是没有安装ssl模块的，需要编译安装nginx时加入<code>--with-http_ssl_module</code>选项。</p>
+<p>关于SSL/TLS原理请参考 <a href="http://segmentfault.com/a/1190000002554673">这里</a>，如果你只是想测试或者自签发ssl证书，参考 <a href="http://seanlook.com/2015/01/18/openssl-self-sign-ca/">这里</a> 。</p>
+<p><strong>提示</strong>：nignx到后端服务器由于一般是内网，所以不加密。</p>
+<h1 id="1-全站ssl"><a href="#1-全站ssl" class="headerlink" title="1. 全站ssl"></a>1. 全站ssl</h1><p>全站做ssl是最常见的一个使用场景，默认端口443，而且一般是单向认证。</p>
+<figure class="highlight nginx"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line"><span class="section">server</span> &#123;</div><div class="line">        <span class="attribute">listen</span> <span class="number">443</span>;</div><div class="line">        <span class="attribute">server_name</span> example.com;</div><div class="line"></div><div class="line">        <span class="attribute">root</span> /apps/www;</div><div class="line">        <span class="attribute">index</span> index.html index.htm;</div><div class="line"></div><div class="line">        <span class="attribute">ssl</span> <span class="literal">on</span>;</div><div class="line">        <span class="attribute">ssl_certificate</span> ../SSL/ittest.pem;</div><div class="line">        <span class="attribute">ssl_certificate_key</span> ../SSL/ittest.key;</div><div class="line"></div><div class="line"><span class="comment">#        ssl_protocols SSLv3 TLSv1 TLSv1.1 TLSv1.2;</span></div><div class="line"><span class="comment">#        ssl_ciphers ALL:!ADH:!EXPORT56:RC4+RSA:+HIGH:+MEDIUM:+LOW:+SSLv2:+EXP;</span></div><div class="line"><span class="comment">#        ssl_prefer_server_ciphers on;</span></div><div class="line"></div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>如果想把http的请求强制转到https的话：<br><figure class="highlight nginx"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="section">server</span> &#123;</div><div class="line">  <span class="attribute">listen</span>      <span class="number">80</span>;</div><div class="line">  <span class="attribute">server_name</span> example.me;</div><div class="line">  <span class="attribute">rewrite</span>    <span class="regexp"> ^</span>   https://<span class="variable">$server_name</span><span class="variable">$request_uri</span>? <span class="literal">permanent</span>;</div><div class="line"></div><div class="line"><span class="comment">### 使用return的效率会更高 </span></div><div class="line"><span class="comment">#  return 301 https://$server_name$request_uri;</span></div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p><code>ssl_certificate</code>证书其实是个公钥，它会被发送到连接服务器的每个客户端，<code>ssl_certificate_key</code>私钥是用来解密的，所以它的权限要得到保护但nginx的主进程能够读取。当然私钥和证书可以放在一个证书文件中，这种方式也只有公钥证书才发送到client。</p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2015/05/28/nginx-ssl/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/05/18/nginx-keepalived-ha/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2015/05/18/nginx-keepalived-ha/" itemprop="url">
+                  Nginx+Keepalived实现站点高可用
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-05-18T01:21:25+08:00">
+                2015-05-18
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/Nginx/" itemprop="url" rel="index">
+                    <span itemprop="name">Nginx</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2015/05/18/nginx-keepalived-ha/" class="leancloud_visitors" data-flag-title="Nginx+Keepalived实现站点高可用">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>公司内部 OA 系统要做线上高可用，避免单点故障，所以计划使用2台虚拟机通过 Keepalived 工具来实现 nginx 的高可用（High Avaiability），达到一台nginx入口服务器宕机，另一台备机自动接管服务的效果。（nginx做反向代理，实现后端应用服务器的负载均衡）快速搭建请直接跳至 第2节。</p>
+<h1 id="1-Keepalived介绍"><a href="#1-Keepalived介绍" class="headerlink" title="1. Keepalived介绍"></a>1. Keepalived介绍</h1><p>Keepalived是一个基于VRRP协议来实现的服务高可用方案，可以利用其来避免IP单点故障，类似的工具还有heartbeat、corosync、pacemaker。但是它一般不会单独出现，而是与其它负载均衡技术（如lvs、haproxy、nginx）一起工作来达到集群的高可用。</p>
+<h2 id="1-1-VRRP协议"><a href="#1-1-VRRP协议" class="headerlink" title="1.1 VRRP协议"></a>1.1 VRRP协议</h2><p>VRRP全称 Virtual Router Redundancy Protocol，即 <a href="http://en.wikipedia.org/wiki/VRRP">虚拟路由冗余协议</a>。可以认为它是实现路由器高可用的容错协议，即将N台提供相同功能的路由器组成一个路由器组(Router Group)，这个组里面有一个master和多个backup，但在外界看来就像一台一样，构成虚拟路由器，拥有一个虚拟IP（vip，也就是路由器所在局域网内其他机器的默认路由），占有这个IP的master实际负责ARP相应和转发IP数据包，组中的其它路由器作为备份的角色处于待命状态。master会发组播消息，当backup在超时时间内收不到vrrp包时就认为master宕掉了，这时就需要根据VRRP的优先级来选举一个backup当master，保证路由器的高可用。</p>
+<p>在VRRP协议实现里，虚拟路由器使用 00-00-5E-00-01-XX 作为<em>虚拟</em>MAC地址，XX就是唯一的 VRID （Virtual Router IDentifier），这个地址同一时间只有一个物理路由器占用。在虚拟路由器里面的物理路由器组里面通过多播IP地址 224.0.0.18 来定时发送通告消息。每个Router都有一个 1-255 之间的优先级别，级别最高的（highest priority）将成为主控（master）路由器。通过降低master的优先权可以让处于backup状态的路由器抢占（pro-empt）主路由器的状态，两个backup优先级相同的IP地址较大者为master，接管虚拟IP。</p>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/nginx-keepalived-vrrp.jpg" alt="nginx-keepalived-vrrp.jpg"></p>
+<h3 id="与heartbeat-corosync等比较"><a href="#与heartbeat-corosync等比较" class="headerlink" title="与heartbeat/corosync等比较"></a>与heartbeat/corosync等比较</h3><p>直接摘抄自 <a href="http://www.linuxidc.com/Linux/2013-08/89227.htm">http://www.linuxidc.com/Linux/2013-08/89227.htm</a> ：</p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2015/05/18/nginx-keepalived-ha/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/05/17/nginx-location-rewrite/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -833,338 +1183,6 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/05/06/lsyncd-synchronize-realtime/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/05/06/lsyncd-synchronize-realtime/" itemprop="url">
-                  lsyncd实时同步搭建指南——取代rsync+inotify
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-05-06T01:21:25+08:00">
-                2015-05-06
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Linux/" itemprop="url" rel="index">
-                    <span itemprop="name">Linux</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-          
-
-          
-          
-             <span id="/2015/05/06/lsyncd-synchronize-realtime/" class="leancloud_visitors" data-flag-title="lsyncd实时同步搭建指南——取代rsync+inotify">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <h1 id="1-几大实时同步工具比较"><a href="#1-几大实时同步工具比较" class="headerlink" title="1. 几大实时同步工具比较"></a>1. 几大实时同步工具比较</h1><h2 id="1-1-inotify-rsync"><a href="#1-1-inotify-rsync" class="headerlink" title="1.1 inotify + rsync"></a>1.1 inotify + rsync</h2><p>最近一直在寻求生产服务服务器上的同步替代方案，原先使用的是<code>inotify +  rsync</code>，但随着文件数量的增大到100W+，目录下的文件列表就达20M，在网络状况不佳或者限速的情况下，变更的文件可能10来个才几M，却因此要发送的文件列表就达20M，严重减低的带宽的使用效率以及同步效率；更为要紧的是，加入inotifywait在5s内监控到10个小文件发生变化，便会触发10个rsync同步操作，结果就是真正需要传输的才2-3M的文件，比对的文件列表就达200M。使用这两个组合的好处在于，它们都是最基本的软件，可以通过不同选项做到很精确的控制，比如排除同步的目录，同步多个模块或同步到多个主机。</p>
-<p>搭建过程参考 <a href="http://seanlook.com/2014/12/12/rsync_inotify_setup/">Linux下同步工具inotify+rsync使用详解</a> 。</p>
-<h2 id="1-2-sersync"><a href="#1-2-sersync" class="headerlink" title="1.2 sersync"></a>1.2 sersync</h2><p>后来听同事说 <a href="http://www.ccvita.com/422.html">sersync</a> 这么个工具可以提高同步的性能，也解决了同步大文件时出现异常的问题，所以就尝试了一下。sersync是国内的一个开发者开源出来的，使用c++编写，采用多线程的方式进行同步，失败后还有重传机制，对临时文件过滤，自带crontab定时同步功能。网上看到有人说性能还不错，说一下我的观点：</p>
-<ul>
-<li>国产开源，文档不是很全，在2011年之后就没更新了（googlecode都要快关闭了，其实可以转交其他人维护），网上关于它的使用和讨论都止于10年了</li>
-<li>采用xml配置文件的方式，可读性比较好，但是有些原生的有些功能没有实现就没法使用了</li>
-<li>无法实现多目录同步，只能通过多个配置文件启动多个进程</li>
-<li>文件排除功能太弱。这个要看需求，不是每个人都需要排除子目录。而对于我的环境中，这个功能很重要，而且排除的规则较多</li>
-<li>虽然提供插件的功能，但很鸡肋，因为软件本身没有持续更新，也没有看到贡献有其它插件出现（可能是我知识面不够，还用不到里面的refreshCDN plugin）。</li>
-</ul>
-<p>虽然不懂c++，但大致看了下源码 <a href="http://code.google.com/p/sersync/source/browse/FileSynchronize.cpp">FileSynchronize</a>，拼接rsync命令大概在273行左右，最后一个函数就是排除选项，简单一点可以将<code>--exclude=</code>改成<code>--eclude-from</code>来灵活控制。有机会再改吧。</p>
-<p>另外，在作者的文章 <a href="http://hi.baidu.com/johntech/item/a4a2060ecf3053c6905718e1">Sersync服务器同步程序 项目简介与设计框架</a> 评论中，说能解决上面 <code>rsync + inotify</code>中所描述的问题。阅读了下源码，这个应该是没有解决，因为在拼接rsync命令时，后面的目的地址始终是针对module的，只要执行rsync命令，就会对整个目录进行遍历，发送要比对的文件列表，然后再发送变化的文件。sersync只是减少了监听的事件，减少了rsync的次数——这已经是很大的改进，但每次rsync没办法改变。（如有其它看法可与我讨论）</p>
-<p>其实我们也不能要求每一个软件功能都十分健全，关键是看能否满足我们当下的特定的需求。所谓好的架构不是设计出来的，而是进化来的。目前使用<code>sersync2</code>没什么问题，而且看了它的设计思路应该是比较科学的，特别是过滤队列的设计。双向同步看起来也是可以实现。</p>
-<h2 id="1-3-lsyncd"><a href="#1-3-lsyncd" class="headerlink" title="1.3 lsyncd"></a>1.3 lsyncd</h2><p>废话说这么多，本文就是介绍它了。有些博客说lsyncd是谷歌开源的，实际不是了，只是托管在了googlecode上而已，幸运的是已经迁移到github了：<a href="https://github.com/axkibe/lsyncd">https://github.com/axkibe/lsyncd</a> 。</p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2015/05/06/lsyncd-synchronize-realtime/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/05/03/feel-wuyi-back/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/05/03/feel-wuyi-back/" itemprop="url">
-                  五一回来了
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-05-03T07:01:25+08:00">
-                2015-05-03
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Feel/" itemprop="url" rel="index">
-                    <span itemprop="name">Feel</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-          
-
-          
-          
-             <span id="/2015/05/03/feel-wuyi-back/" class="leancloud_visitors" data-flag-title="五一回来了">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>———————— 只是无聊，轻松的写点东西，在 LOFTER上是不需要写标题的</p>
-<p>失算了，下午四点到了汽车站，没能买到16:10的汽车，最早也要晚上六点到深圳侨社那班。这原本打算七点就可到深圳，淡定的去会展中心吃个饭啥的，说话算数太不好意思了。</p>
-<p>两个小时的等车时间真够无聊的，比在哥哥家里兼工作室要好些。这两天说过来玩，其实也是带任务来的——为哥哥的天猫手表店拍实物图片，借我的MAC一用做背景。我问他卡斯曼、卡西欧官方没给你宝贝图片吗，他说不是，是想拍出自己的特色放在介绍里。千篇一律大家都去旗舰店买了，谁来照顾我们的手表店。想想也是，现在都讲究情怀！看到房间里单反、灯光箱、360度转动盘（不晓得是个什么gui），我几百块的小叶紫檀貔貅手串都派上用场了。看到用心到连饭都没时间煮的份上，我要不要帮忙推广一下呢。</p>
-<p>本来打算是今天早点回深圳，可听他说下午还有几块手表要拍，大概要2个小时，我又怎么能无耻的坚持带走电脑呢。临走的时候，哥跟我在qq上说了一句“大老远让你从深圳跑中山来，也没弄点好吃的（也没带你去珠海玩——自己脑补的），太忙太赶了”。八月份再过来，那时候丽景名筑的房子也装修好了，开个入住仪式。昨天也去新房子看了一眼，线路已经全部埋好了，正在给洗手间做防水测试，厅中间还是一堆沙子，只有天花板刷好了乳石灰。六月份能够装修完成，八月份入住，想想那个时候过去，大飘窗、高低儿童床、乐视tv，比现在这个出租屋要好的多了去。可是，可是，这意味着一个很大的问题，哥哥收入用于装修屋子（简单八万的样子），家里在建的四层楼房怎么办？ 昨天跟家里视频，老爸正在算这一笔账，告诉我个数字，30-40万，毛坯房。现在在农村修个房子（四层可以俯瞰全村了）的成本，差不多可以在中小城市买一个90平的。老一辈人还是希望待在家里吧。鸭梨好大，只能这么形容了。</p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2015/05/03/feel-wuyi-back/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -1214,7 +1232,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">101</span>
+                <span class="site-state-item-count">103</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>

@@ -5,7 +5,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://seanlook.com/"/>
-  <updated>2017-04-28T07:32:49.000Z</updated>
+  <updated>2017-07-18T13:32:49.000Z</updated>
   <id>http://seanlook.com/</id>
   
   <author>
@@ -14,6 +14,281 @@
   </author>
   
   <generator uri="http://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>ProxySQL监控方案</title>
+    <link href="http://seanlook.com/2017/07/16/mysql-proxysql-monitor/"/>
+    <id>http://seanlook.com/2017/07/16/mysql-proxysql-monitor/</id>
+    <published>2017-07-16T13:32:49.000Z</published>
+    <updated>2017-07-18T13:32:49.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>ProxySQL能监控的信息不多，而且大部分是统计信息，不是性能数据。</p>
+<figure class="highlight asciidoc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line"><span class="section">mysql&gt; show tables from stats;</span></div><div class="line">+--------------------------------+</div><div class="line"><span class="section">| tables                         |</span></div><div class="line">+--------------------------------+</div><div class="line">| global<span class="emphasis">_variables               |</span></div><div class="line">| stats_mysql<span class="emphasis">_commands_</span>counters  |</div><div class="line">| stats<span class="emphasis">_mysql_</span>connection<span class="emphasis">_pool    |</span></div><div class="line">| stats_mysql<span class="emphasis">_global             |</span></div><div class="line">| stats_mysql<span class="emphasis">_processlist        |</span></div><div class="line">| stats_mysql<span class="emphasis">_query_</span>digest       |</div><div class="line">| stats<span class="emphasis">_mysql_</span>query<span class="emphasis">_digest_</span>reset |</div><div class="line"><span class="section">| stats_mysql_query_rules        |</span></div><div class="line">+--------------------------------+</div></pre></td></tr></table></figure>
+<p>主要关心的指标都在表 <code>stats_mysql_global</code> 里面，源代码 diamond 目录下有个 <em>proxysqlstat.py</em> 脚本，是通过<code>SHOW MYSQL STATUS</code>命令，由diamond收集进程将指标上报到Graphite。有以下几个Metrics：</p>
+<ul>
+<li>并发数<ul>
+<li>Active_Transactions</li>
+<li>Questions</li>
+</ul>
+</li>
+<li>连接相关<ul>
+<li>Client_Connections_connected</li>
+<li>Server_Connections_connected</li>
+<li>Server_Connections_aborted</li>
+</ul>
+</li>
+<li>内存相关<ul>
+<li>Query_Cache_Entries</li>
+<li>Query_Cache_Memory_bytes</li>
+<li>SQLite3_memory_bytes</li>
+<li>ConnPool_memory_bytes</li>
+</ul>
+</li>
+<li>流量相关<ul>
+<li>mysql_backend_buffers_bytes</li>
+<li>mysql_frontend_buffers_bytes</li>
+<li>mysql_session_internal_bytes</li>
+</ul>
+</li>
+<li>其它<ul>
+<li>MySQL_Monitor_Workers</li>
+<li>MySQL_Thread_Workers</li>
+</ul>
+</li>
+</ul>
+<p>但是这些远远不够，还有以下更值得关心的指标：<br>表 <code>stats_mysql_connection_pool</code>:</p>
+<ul>
+<li>对后端DB请求的网络延时 Latency</li>
+<li>对后端各个DB的请求数 Queries</li>
+<li>后端各个DB的当前活跃连接数 ConnUsed</li>
+<li>后端DB的状态 status</li>
+</ul>
+<p>表 <code>stats_mysql_processlist</code>:</p>
+<ul>
+<li>每个用户的当前的连接数</li>
+</ul>
+<p>表 <code>stats_mysql_query_digest</code>:</p>
+<ul>
+<li>各个类型的sql请求量比例、趋势</li>
+</ul>
+<p>在我们的环境下使用的是 InfluxDB + Grafana，通过telegraf收集上报。上述所有的监控脚本见gitlab仓库 <a href="http://git.workec.com/ops/proxysql_tools/tree/master/monitor" target="_blank" rel="external">http://git.workec.com/ops/proxysql_tools/tree/master/monitor</a> ：</p>
+<ul>
+<li><p><code>proxysql_stats.py</code>:</p>
+<ul>
+<li>收集 stats_mysql_global 和 stats_mysql_connection_pool 中的信息，打印出 influxdb 数据上报格式</li>
+</ul>
+</li>
+<li><p><code>proxysql_stats_digest.py</code>:</p>
+<ul>
+<li>收集 sql digest，收集的信息用于展示每类sql的执行趋势。<br>因为数据是累计值，所以这里做了增量计算，然后一方面上报给influxdb，一方面存入mysql，可以做更多用途。mysql的表结构 proxysql_stats_digest.sql 。<br>建议收集频率不要过高，比如10分钟一次。</li>
+</ul>
+</li>
+<li><p><code>grafana_proxysql_stats.json</code>:</p>
+<ul>
+<li>Grafana Dashboard，直接导入可用 。</li>
+</ul>
+</li>
+</ul>
+<p>除此外，还需要对proxysql进程的监控，如内存占用、CPU使用，这部分通过telegraf的 procstat 插件去做：<br><figure class="highlight lua"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line"><span class="string">[[inputs.procstat]]</span></div><div class="line">    exe = <span class="string">"proxysql"</span></div><div class="line"></div><div class="line"><span class="string">[[inputs.exec]]</span></div><div class="line"></div><div class="line">  # the command to run</div><div class="line">  command = <span class="string">"/etc/telegraf/telegraf.d/proxysql_stats.py"</span></div><div class="line"></div><div class="line">  ## Timeout <span class="keyword">for</span> each command to complete.</div><div class="line">  timeout = <span class="string">"10s"</span></div><div class="line"></div><div class="line">  data_format = <span class="string">"influx"</span></div></pre></td></tr></table></figure></p>
+<p>对后端DB status和proxysql端口存活，设置告警。这样就有一个相对完整的ProxySQL监控方案了。<br><a id="more"></a><br>面板示例：</p>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-monitor-1.png" alt="Geneal"><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-monitor-2.png" alt="Queries"><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-monitor-3.png" alt="Process"></p>
+<hr>
+<p>原文连接地址：<a href="http://seanlook.com/2017/07/16/mysql-proxysql-monitor/">http://seanlook.com/2017/07/16/mysql-proxysql-monitor/</a></p>
+<hr>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;ProxySQL能监控的信息不多，而且大部分是统计信息，不是性能数据。&lt;/p&gt;
+&lt;figure class=&quot;highlight asciidoc&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;2&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;3&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;4&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;5&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;6&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;7&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;8&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;9&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;10&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;11&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;12&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;13&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;section&quot;&gt;mysql&amp;gt; show tables from stats;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;+--------------------------------+&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;section&quot;&gt;| tables                         |&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;+--------------------------------+&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;| global&lt;span class=&quot;emphasis&quot;&gt;_variables               |&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;| stats_&lt;/span&gt;mysql&lt;span class=&quot;emphasis&quot;&gt;_commands_&lt;/span&gt;counters  |&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;| stats&lt;span class=&quot;emphasis&quot;&gt;_mysql_&lt;/span&gt;connection&lt;span class=&quot;emphasis&quot;&gt;_pool    |&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;| stats_&lt;/span&gt;mysql&lt;span class=&quot;emphasis&quot;&gt;_global             |&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;| stats_&lt;/span&gt;mysql&lt;span class=&quot;emphasis&quot;&gt;_processlist        |&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;| stats_&lt;/span&gt;mysql&lt;span class=&quot;emphasis&quot;&gt;_query_&lt;/span&gt;digest       |&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;| stats&lt;span class=&quot;emphasis&quot;&gt;_mysql_&lt;/span&gt;query&lt;span class=&quot;emphasis&quot;&gt;_digest_&lt;/span&gt;reset |&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;section&quot;&gt;| stats_mysql_query_rules        |&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;+--------------------------------+&lt;/span&gt;&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;
+&lt;p&gt;主要关心的指标都在表 &lt;code&gt;stats_mysql_global&lt;/code&gt; 里面，源代码 diamond 目录下有个 &lt;em&gt;proxysqlstat.py&lt;/em&gt; 脚本，是通过&lt;code&gt;SHOW MYSQL STATUS&lt;/code&gt;命令，由diamond收集进程将指标上报到Graphite。有以下几个Metrics：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;并发数&lt;ul&gt;
+&lt;li&gt;Active_Transactions&lt;/li&gt;
+&lt;li&gt;Questions&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;连接相关&lt;ul&gt;
+&lt;li&gt;Client_Connections_connected&lt;/li&gt;
+&lt;li&gt;Server_Connections_connected&lt;/li&gt;
+&lt;li&gt;Server_Connections_aborted&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;内存相关&lt;ul&gt;
+&lt;li&gt;Query_Cache_Entries&lt;/li&gt;
+&lt;li&gt;Query_Cache_Memory_bytes&lt;/li&gt;
+&lt;li&gt;SQLite3_memory_bytes&lt;/li&gt;
+&lt;li&gt;ConnPool_memory_bytes&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;流量相关&lt;ul&gt;
+&lt;li&gt;mysql_backend_buffers_bytes&lt;/li&gt;
+&lt;li&gt;mysql_frontend_buffers_bytes&lt;/li&gt;
+&lt;li&gt;mysql_session_internal_bytes&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;其它&lt;ul&gt;
+&lt;li&gt;MySQL_Monitor_Workers&lt;/li&gt;
+&lt;li&gt;MySQL_Thread_Workers&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;但是这些远远不够，还有以下更值得关心的指标：&lt;br&gt;表 &lt;code&gt;stats_mysql_connection_pool&lt;/code&gt;:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;对后端DB请求的网络延时 Latency&lt;/li&gt;
+&lt;li&gt;对后端各个DB的请求数 Queries&lt;/li&gt;
+&lt;li&gt;后端各个DB的当前活跃连接数 ConnUsed&lt;/li&gt;
+&lt;li&gt;后端DB的状态 status&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;表 &lt;code&gt;stats_mysql_processlist&lt;/code&gt;:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;每个用户的当前的连接数&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;表 &lt;code&gt;stats_mysql_query_digest&lt;/code&gt;:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;各个类型的sql请求量比例、趋势&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;在我们的环境下使用的是 InfluxDB + Grafana，通过telegraf收集上报。上述所有的监控脚本见gitlab仓库 &lt;a href=&quot;http://git.workec.com/ops/proxysql_tools/tree/master/monitor&quot;&gt;http://git.workec.com/ops/proxysql_tools/tree/master/monitor&lt;/a&gt; ：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;p&gt;&lt;code&gt;proxysql_stats.py&lt;/code&gt;:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;收集 stats_mysql_global 和 stats_mysql_connection_pool 中的信息，打印出 influxdb 数据上报格式&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;code&gt;proxysql_stats_digest.py&lt;/code&gt;:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;收集 sql digest，收集的信息用于展示每类sql的执行趋势。&lt;br&gt;因为数据是累计值，所以这里做了增量计算，然后一方面上报给influxdb，一方面存入mysql，可以做更多用途。mysql的表结构 proxysql_stats_digest.sql 。&lt;br&gt;建议收集频率不要过高，比如10分钟一次。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;code&gt;grafana_proxysql_stats.json&lt;/code&gt;:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Grafana Dashboard，直接导入可用 。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;除此外，还需要对proxysql进程的监控，如内存占用、CPU使用，这部分通过telegraf的 procstat 插件去做：&lt;br&gt;&lt;figure class=&quot;highlight lua&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;2&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;3&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;4&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;5&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;6&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;7&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;8&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;9&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;10&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;11&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;12&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;string&quot;&gt;[[inputs.procstat]]&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;    exe = &lt;span class=&quot;string&quot;&gt;&quot;proxysql&quot;&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;string&quot;&gt;[[inputs.exec]]&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  # the command to run&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  command = &lt;span class=&quot;string&quot;&gt;&quot;/etc/telegraf/telegraf.d/proxysql_stats.py&quot;&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  ## Timeout &lt;span class=&quot;keyword&quot;&gt;for&lt;/span&gt; each command to complete.&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  timeout = &lt;span class=&quot;string&quot;&gt;&quot;10s&quot;&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;  data_format = &lt;span class=&quot;string&quot;&gt;&quot;influx&quot;&lt;/span&gt;&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;&lt;/p&gt;
+&lt;p&gt;对后端DB status和proxysql端口存活，设置告警。这样就有一个相对完整的ProxySQL监控方案了。&lt;br&gt;
+    
+    </summary>
+    
+      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
+    
+    
+      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
+    
+      <category term="中间件" scheme="http://seanlook.com/tags/%E4%B8%AD%E9%97%B4%E4%BB%B6/"/>
+    
+      <category term="proxysql" scheme="http://seanlook.com/tags/proxysql/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>ProxySQL高可用方案</title>
+    <link href="http://seanlook.com/2017/07/15/mysql-proxysql-ha-consul/"/>
+    <id>http://seanlook.com/2017/07/15/mysql-proxysql-ha-consul/</id>
+    <published>2017-07-15T13:32:49.000Z</published>
+    <updated>2017-07-18T13:32:49.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>MySQL的高可用方案现在如 MHA, Galera, InnoDB Cluster，一旦在上游使用中间件之后，中间件本身可能成为单点。所以本文要介绍的是对于ProxySQL自身高可用的方案对比。<br>首先ProxySQL自身是通过Angel进程的形式运行，即proxysql如果有崩溃，主进程会自动拉起来。但如果是无响应或者网络故障，则需要另外的机制去做到服务的高可用。本文总结了四种方法。</p>
+<p>ProxySQL有关介绍，请参考： <a href="http://seanlook.com/2017/04/10/mysql-proxysql-install-config/">http://seanlook.com/2017/04/10/mysql-proxysql-install-config/</a></p>
+<h1 id="1-与应用一起部署"><a href="#1-与应用一起部署" class="headerlink" title="1. 与应用一起部署"></a>1. 与应用一起部署</h1><p>所有部署应用的地方，都会部署proxysql节点，当这个proxysql挂掉之后，只影响本机的应用。而且不需要多经过一层网络。<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-ha-1.png" alt=""><br>但带来的问题是，如果应用节点很多，proxy的数量也会增加：</p>
+<ul>
+<li>会导致proxysql的配置不容易管理</li>
+<li>proxysql对后端db健康检查的请求成倍增加</li>
+<li>限制每个用户或后端db的 max_connections 特性用不了</li>
+</ul>
+<h1 id="2-集中式部署，多ip引用"><a href="#2-集中式部署，多ip引用" class="headerlink" title="2. 集中式部署，多ip引用"></a>2. 集中式部署，多ip引用</h1><p>后端一个db集群，对应中间两个以上的 proxysql 节点，前端应用配置多个ip地址，随机挑选一个使用，完全无状态。仅需要多经过一次网络代理。<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-ha-2.png" alt=""><br>这种方式的好处是，不需要再对数据库这种基础服务，多引入一个软件来实现高可用（如下节的keepalive或consul），由应用端获取数据库连接的代码逻辑处理。</p>
+<p>但是因为proxysql访问地址是写在配置文件里面的，如果一个节点挂掉，随机挑选还是会落地这个失败的节点。所以优化方案是，ip列表里面默认取某一个，失败之后再选取下一个重试。</p>
+<p>示例代码：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line">proxysql_addr_list = [<span class="string">'192.168.1.175'</span>, <span class="string">'192.168.1.176'</span>, <span class="string">'192.168.1.177'</span>]</div><div class="line">proxysql_addr_list_len = <span class="number">3</span></div><div class="line">hostname = <span class="string">'this_hostname_for_hash_loadbalance'</span></div><div class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_dbconnection</span><span class="params">()</span>:</span></div><div class="line">    list_index = hash(hostname) % proxysql_addr_list_len</div><div class="line">    dbconn = <span class="keyword">None</span></div><div class="line">    <span class="keyword">try</span>:</div><div class="line">        dbconn = DBConnect(dbhost=proxysql_addr_list[ list_index ], dbport=<span class="number">3306</span>)  <span class="comment"># timeout 1000ms</span></div><div class="line">    <span class="keyword">except</span>:</div><div class="line">        <span class="keyword">if</span> (list_index + <span class="number">1</span>) == proxysql_addr_list_len:</div><div class="line">            list_index = <span class="number">-1</span>  <span class="comment"># like Circular Array</span></div><div class="line">        dbconn = DBConnec(dbhost=proxysql_addr_list[ list_index + <span class="number">1</span> ], dbport=<span class="number">3306</span>)  <span class="comment"># if failed again, through exception</span></div><div class="line">    </div><div class="line">    <span class="keyword">return</span> dbconn</div></pre></td></tr></table></figure>
+<p>上述并不完美，比如可以改用环形数组轮巡，允许重试其它更多的ip。<br><a id="more"></a></p>
+<h2 id="能不能不进行多IP引用呢？"><a href="#能不能不进行多IP引用呢？" class="headerlink" title="能不能不进行多IP引用呢？"></a>能不能不进行多IP引用呢？</h2><p>为了避免后端引用IP的单点，可以将上面第1种和这里的第2中结合起来，改进的部署方案：（见文后参考链接）<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-ha-1-1.png" alt=""><br>即在原来的基础上，App上的proxysql后端，挂的还是ProxySQL集群。</p>
+<p>我个人没有验证这样的方案，如果要用需要充分验证proxysql互连的时候，有没有bug。</p>
+<h1 id="3-经典-keepalived"><a href="#3-经典-keepalived" class="headerlink" title="3. 经典 keepalived"></a>3. 经典 keepalived</h1><p>引入keepalived，通过VIP访问两个以上的proxysql节点，既可以减少一次网络传输，又可以实现proxysql自身的高可用，而且甚至不用关心脑裂的问题，因为proxysql配置完全一样，是无状态的，脑裂了也无妨。<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-ha-3.png" alt=""><br>你也可能意识到，这种方式一次只能一个proxysql提供服务，另一个proxysql节点始终处于备用状态。如果配合LVS或haproxy做负载均衡，部署架构又会多出一层网络请求，而且越发复杂（VIP不在proxysql节点上漂，而是在两个lvs之间）。</p>
+<p>使用keepalived的前提是，局域网允许发组播包。这在阿里云ECS经典网络下是不允许的，如果有其它类似方式，如SLB也是可行的。目前测试环境采用是 haproxy + keepalived 的方式。</p>
+<h1 id="4-Consul服务发现"><a href="#4-Consul服务发现" class="headerlink" title="4. Consul服务发现"></a>4. Consul服务发现</h1><p>如果上面的方式都不适用，那么可以进一步考虑使用第三方的服务发现组件。</p>
+<h2 id="4-1-介绍"><a href="#4-1-介绍" class="headerlink" title="4.1 介绍"></a>4.1 介绍</h2><p>Consul用于实现分布式系统的服务发现与配置，我们将所有proxysql节点注册到consul上作为一个服务来提供，由 Consul agent Server 来判断proxysql节点的存活，每个应用节点上都安装 Consul agent Client 来供应用获取可用地址。</p>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-ha-4.png" alt=""></p>
+<p>这样部署架构的好处是：</p>
+<ol>
+<li>不需要多一层负载均衡，多一层网络链路</li>
+<li>不需要部署大量的proxysql节点</li>
+<li>App或者ProxySQL节点上的Consul故障，不影响其它节点。Consul Server集群的天生具备高可用</li>
+<li>ProxySQL故障会被Consul检查到，踢除故障节点，并通知给所有consul agent</li>
+<li>可以利用Consul的DNS接口实现简单的负载均衡</li>
+</ol>
+<p>其实consul所做的与本文第2节的类似：自动提出不可用的节点，只是一个是被动、手动，一个是主动、自动。<br>下面简单演示一下。</p>
+<h2 id="4-2-部署示例"><a href="#4-2-部署示例" class="headerlink" title="4.2 部署示例"></a>4.2 部署示例</h2><p>Consul Server节点的安装在此略过，网上有不少文章，直接进入到在ProxySQL节点安装配置Consul。</p>
+<p>Consul agent:</p>
+<ul>
+<li>apps-1: <code>10.0.201.168</code></li>
+<li>apps-2: <code>10.0.201.220</code></li>
+<li>apps-3: <code>10.0.201.156</code></li>
+</ul>
+<p>ProxySQL node:<br>每个节点上运行了两个proxysql进程 <code>7033: crm0</code>, <code>7133: crm1</code></p>
+<ul>
+<li>proxysql-1 : <code>192.168.1.170</code></li>
+<li>proxysql-2 : <code>192.168.1.171</code></li>
+</ul>
+<h3 id="配置-proxysql-节点上的Consul"><a href="#配置-proxysql-节点上的Consul" class="headerlink" title="配置 proxysql 节点上的Consul"></a>配置 proxysql 节点上的Consul</h3><p>配置 proxysql-1 节点上的Consul：<br><figure class="highlight xquery"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div></pre></td><td class="code"><pre><div class="line">$ sudo vim /etc/consul.d/config.json</div><div class="line">&#123;</div><div class="line">    <span class="string">"data_dir"</span>: <span class="string">"/opt/consul"</span>, </div><div class="line">    <span class="string">"datacenter"</span>: <span class="string">"Office_test"</span>, </div><div class="line">    <span class="string">"log_level"</span>: <span class="string">"INFO"</span>, </div><div class="line">    <span class="string">"node_name"</span>: <span class="string">"proxysql-1"</span>, </div><div class="line">    <span class="string">"retry_join"</span>: [</div><div class="line">        <span class="string">"10.0.201.168"</span>, </div><div class="line">        <span class="string">"10.0.201.220"</span>, </div><div class="line">        <span class="string">"10.0.201.156"</span></div><div class="line">    ], </div><div class="line">    <span class="string">"telemetry"</span>: &#123;</div><div class="line">        <span class="string">"statsd_address"</span>: <span class="string">"10.0.201.34:8125"</span>, </div><div class="line">        <span class="string">"statsite_prefix"</span>: <span class="string">"proxysql-1"</span></div><div class="line">    &#125;,</div><div class="line">    <span class="string">"dns_config"</span>: &#123;</div><div class="line">        <span class="string">"only_passing"</span>: true</div><div class="line">    &#125;</div><div class="line">    <span class="string">"acl_datacenter"</span>: <span class="string">"Office_test"</span>, </div><div class="line">    <span class="string">"acl_default_policy"</span>: <span class="string">"deny"</span>, </div><div class="line">    <span class="string">"encrypt"</span>: <span class="string">"XXXXxxxx=="</span></div><div class="line">&#125;</div><div class="line"></div><div class="line">$ sudo vi /etc/consul.d/proxysql.json</div><div class="line">&#123;<span class="string">"services"</span>: [</div><div class="line">    &#123;</div><div class="line">        <span class="string">"id"</span>: <span class="string">"proxysql_crm0"</span>, </div><div class="line">        <span class="string">"name"</span>: <span class="string">"proxysql"</span>, </div><div class="line">        <span class="string">"address"</span>: <span class="string">"192.168.1.170"</span>,</div><div class="line">        <span class="string">"port"</span>: <span class="number">7133</span>, </div><div class="line">        <span class="string">"tags"</span>: [<span class="string">"test"</span>, <span class="string">"crm0"</span>], </div><div class="line">        <span class="string">"check"</span>: &#123;</div><div class="line">            <span class="string">"interval"</span>: <span class="string">"5s"</span>, </div><div class="line">            <span class="string">"tcp"</span>: <span class="string">"192.168.1.170:7033"</span>, </div><div class="line">            <span class="string">"timeout"</span>: <span class="string">"1s"</span></div><div class="line">        &#125;, </div><div class="line">        <span class="string">"enableTagOverride"</span>: false, </div><div class="line">        <span class="string">"token"</span>: <span class="string">"xxxxxxxx-xxxx"</span></div><div class="line">    &#125;,</div><div class="line">    &#123;</div><div class="line">        <span class="string">"id"</span>: <span class="string">"proxysql_crm1"</span>, </div><div class="line">        <span class="string">"address"</span>: <span class="string">"192.168.1.170"</span>,</div><div class="line">        <span class="string">"name"</span>: <span class="string">"proxysql"</span>, </div><div class="line">        <span class="string">"port"</span>: <span class="number">7133</span>, </div><div class="line">        <span class="string">"tags"</span>: [<span class="string">"test"</span>, <span class="string">"crm1"</span>], </div><div class="line">        <span class="string">"check"</span>: &#123;</div><div class="line">            <span class="string">"interval"</span>: <span class="string">"5s"</span>, </div><div class="line">            <span class="string">"tcp"</span>: <span class="string">"192.168.1.170:7133"</span>, </div><div class="line">            <span class="string">"timeout"</span>: <span class="string">"1s"</span></div><div class="line">        &#125;, </div><div class="line">        <span class="string">"enableTagOverride"</span>: false, </div><div class="line">        <span class="string">"token"</span>: <span class="string">"xxxxxxxx-xxxx"</span></div><div class="line">    &#125;</div><div class="line">]&#125;</div></pre></td></tr></table></figure></p>
+<p>启动consul<br><figure class="highlight arduino"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">sudo consul agent -<span class="built_in">config</span>-dir /etc/consul &amp;</div></pre></td></tr></table></figure></p>
+<p>查看日志</p>
+<p>proxysql-2 节点上的Consul配置根据上面的内容去改。</p>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-ha-consul.png" alt=""></p>
+<h2 id="4-4-使用方式"><a href="#4-4-使用方式" class="headerlink" title="4.4 使用方式"></a>4.4 使用方式</h2><p>先来看下效果：<br><figure class="highlight css"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div></pre></td><td class="code"><pre><div class="line"><span class="selector-attr">[root@proxysql-1 ~]</span># <span class="selector-tag">dig</span> @<span class="keyword">127</span>.<span class="keyword">0</span>.<span class="keyword">0</span>.<span class="keyword">1</span> -p <span class="number">8600</span> crm0.proxysql.service.consul SRV</div><div class="line"></div><div class="line">; &lt;&lt;&gt;&gt; <span class="selector-tag">DiG</span> 9<span class="selector-class">.8</span><span class="selector-class">.2rc1-RedHat-9</span><span class="selector-class">.8</span><span class="selector-class">.2-0</span><span class="selector-class">.62</span><span class="selector-class">.rc1</span><span class="selector-class">.el6_9</span><span class="selector-class">.2</span> &lt;&lt;&gt;&gt; @<span class="keyword">127</span>.<span class="keyword">0</span>.<span class="keyword">0</span>.<span class="keyword">1</span> -p <span class="number">8600</span> crm0.proxysql.service.consul SRV</div><div class="line">; (1 <span class="selector-tag">server</span> <span class="selector-tag">found</span>)</div><div class="line">;; <span class="selector-tag">global</span> <span class="selector-tag">options</span>: +<span class="selector-tag">cmd</span></div><div class="line">;; <span class="selector-tag">Got</span> <span class="selector-tag">answer</span>:</div><div class="line">;; <span class="selector-tag">-</span>&gt;&gt;<span class="selector-tag">HEADER</span>&lt;&lt;<span class="selector-tag">-</span> <span class="selector-tag">opcode</span>: <span class="selector-tag">QUERY</span>, <span class="selector-tag">status</span>: <span class="selector-tag">NOERROR</span>, <span class="selector-tag">id</span>: 65293</div><div class="line">;; <span class="selector-tag">flags</span>: <span class="selector-tag">qr</span> <span class="selector-tag">aa</span> <span class="selector-tag">rd</span>; <span class="selector-tag">QUERY</span>: 1, <span class="selector-tag">ANSWER</span>: 2, <span class="selector-tag">AUTHORITY</span>: 0, <span class="selector-tag">ADDITIONAL</span>: 2</div><div class="line">;; <span class="selector-tag">WARNING</span>: <span class="selector-tag">recursion</span> <span class="selector-tag">requested</span> <span class="selector-tag">but</span> <span class="selector-tag">not</span> <span class="selector-tag">available</span></div><div class="line"></div><div class="line">;; <span class="selector-tag">QUESTION</span> <span class="selector-tag">SECTION</span>:</div><div class="line">;<span class="selector-tag">crm0</span><span class="selector-class">.proxysql</span><span class="selector-class">.service</span><span class="selector-class">.consul</span>.	<span class="selector-tag">IN</span>	<span class="selector-tag">SRV</span></div><div class="line"></div><div class="line">;; <span class="selector-tag">ANSWER</span> <span class="selector-tag">SECTION</span>:</div><div class="line"><span class="selector-tag">crm0</span><span class="selector-class">.proxysql</span><span class="selector-class">.service</span><span class="selector-class">.consul</span>. 0	<span class="selector-tag">IN</span>	<span class="selector-tag">SRV</span>	1 1 7033 <span class="selector-tag">proxysql-1</span><span class="selector-class">.node</span><span class="selector-class">.office_test</span><span class="selector-class">.consul</span>.</div><div class="line"><span class="selector-tag">crm0</span><span class="selector-class">.proxysql</span><span class="selector-class">.service</span><span class="selector-class">.consul</span>. 0	<span class="selector-tag">IN</span>	<span class="selector-tag">SRV</span>	1 1 7033 <span class="selector-tag">proxysql-2</span><span class="selector-class">.node</span><span class="selector-class">.office_test</span><span class="selector-class">.consul</span>.</div><div class="line"></div><div class="line">;; <span class="selector-tag">ADDITIONAL</span> <span class="selector-tag">SECTION</span>:</div><div class="line"><span class="selector-tag">proxysql-1</span><span class="selector-class">.node</span><span class="selector-class">.office_test</span><span class="selector-class">.consul</span>. 0 <span class="selector-tag">IN</span> <span class="selector-tag">A</span>	192<span class="selector-class">.168</span><span class="selector-class">.1</span><span class="selector-class">.170</span></div><div class="line"><span class="selector-tag">proxysql-2</span><span class="selector-class">.node</span><span class="selector-class">.office_test</span><span class="selector-class">.consul</span>. 0 <span class="selector-tag">IN</span> <span class="selector-tag">A</span>	192<span class="selector-class">.168</span><span class="selector-class">.1</span><span class="selector-class">.171</span></div><div class="line"></div><div class="line">;; <span class="selector-tag">Query</span> <span class="selector-tag">time</span>: 3 <span class="selector-tag">msec</span></div><div class="line">;; <span class="selector-tag">SERVER</span>: 127<span class="selector-class">.0</span><span class="selector-class">.0</span><span class="selector-class">.1</span><span class="selector-id">#8600</span>(127<span class="selector-class">.0</span><span class="selector-class">.0</span><span class="selector-class">.1</span>)</div><div class="line">;; <span class="selector-tag">WHEN</span>: <span class="selector-tag">Fri</span> <span class="selector-tag">May</span> 26 17<span class="selector-pseudo">:01</span><span class="selector-pseudo">:38</span> 2017</div><div class="line">;; <span class="selector-tag">MSG</span> <span class="selector-tag">SIZE</span>  <span class="selector-tag">rcvd</span>: 157</div></pre></td></tr></table></figure></p>
+<p>看到域名 <code>crm0.proxysql.service.consul</code> 解析出来有两个可用地址 192.168.1.170，192.168.1.171，SRV记录还带出了端口信息（其实这里的端口对每个proxysql是固定/已知的，所以可不用SRV记录搜索）。</p>
+<p>在应用端想要连接proxysql使用的方式大致有3种：</p>
+<h3 id="DNS接口"><a href="#DNS接口" class="headerlink" title="DNS接口"></a>DNS接口</h3><p>需要将各自开发语言的DNS解析库嵌入到项目，指定 127.0.0.1:8600 为dns地址来解析上面的 crm0.proxysql.service.consul 域名。这种方式会增加开发的复杂度。</p>
+<p>另一种方式是将应用服务器的默认DNS Server配置成本地consul的内置dns地址，并且consul设置 <code>recursors</code> 选项，来处理解析 consul. 以外的域名。这样对运维改动比较大。<br><figure class="highlight prolog"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="string">"recursors"</span>: [</div><div class="line">    <span class="string">"10.143.22.116"</span>,</div><div class="line">    <span class="string">"10.143.22.118"</span>,</div><div class="line">    <span class="string">"114.114.114.114"</span></div><div class="line">]</div></pre></td></tr></table></figure></p>
+<h3 id="HTTP接口"><a href="#HTTP接口" class="headerlink" title="HTTP接口"></a>HTTP接口</h3><p>通过 API 的方式获取services信息：</p>
+<figure class="highlight ada"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ curl -X GET <span class="symbol">'http</span>://<span class="number">10.0</span>.<span class="number">201.156</span>:<span class="number">8500</span>/v1/health/service/proxysql?tag=crm1&amp;passing=<span class="literal">true</span>'</div></pre></td></tr></table></figure>
+<p>可以获取到 crm1 库的proxysql所有健康的 Node 和 Service 信息，然后任取一个使用。</p>
+<p>但并不需要每一次访问proxysql都需要请求api，可以定时（如每隔10s）去请求，缓冲在本地或者变量里；在处理数据库连接的时候发现连接ProxySQL错误，则再主动触发一次向Consul请求新的地址，再重连。</p>
+<p>需要考虑的是访问API的地址如果是IP，往往也是单点。另者，java这类jvm语言修改配置后往往需要重启，也不简单。</p>
+<h3 id="consul-template直接生成数据库连接的配置文件"><a href="#consul-template直接生成数据库连接的配置文件" class="headerlink" title="consul-template直接生成数据库连接的配置文件"></a>consul-template直接生成数据库连接的配置文件</h3><p>consul-template通过事先定义好的模板，根据发现服务的健康状态，生成最新可用的配置文件，然后下发。</p>
+<p>如果大但的想一下，各个服务或者语言的配置文件并不相同，直接生成一份 hosts 文件是最简单的，然后通过配置管理工具统一下发应用。也不需要关心是否需要重启应用。</p>
+<h4 id="consul-watch"><a href="#consul-watch" class="headerlink" title="consul watch"></a>consul watch</h4><p>Consul watch 功能，可以检测到service变化之后，主动调用一个脚本，脚本可以去更新数据库配置信息，根据需要决定是否重启，后者生成hosts。与consul-template思想是相同的。</p>
+<p>因为 watch 是通过阻塞式HTTP长连接请求的方式，实时获取到service的监控状态，所以有问题时反馈还比较及时。<br><figure class="highlight actionscript"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="string">"watches"</span>:[&#123;</div><div class="line">  <span class="string">"type"</span>: <span class="string">"service"</span>,</div><div class="line">  <span class="string">"service"</span>: <span class="string">"proxysql"</span>,</div><div class="line">  <span class="string">"tag"</span>: <span class="string">"crm0"</span>,</div><div class="line">  <span class="string">"passingonly"</span>: <span class="literal">true</span>,</div><div class="line">  <span class="string">"handler"</span>: <span class="string">"sh /tmp/consul_watch_test.sh"</span></div><div class="line">&#125;]</div></pre></td></tr></table></figure></p>
+<p><code>/tmp/consul_watch_test.sh</code> 脚本里或者python，可以做一些更新数据库配置文件、发送邮件等工作。</p>
+<p><strong>参考</strong></p>
+<ol>
+<li><a href="https://www.percona.com/blog/2016/09/16/consul-proxysql-mysql-ha/" target="_blank" rel="external">https://www.percona.com/blog/2016/09/16/consul-proxysql-mysql-ha/</a></li>
+<li><a href="https://www.percona.com/blog/2017/01/19/setup-proxysql-for-high-availability-not-single-point-failure/" target="_blank" rel="external">https://www.percona.com/blog/2017/01/19/setup-proxysql-for-high-availability-not-single-point-failure/</a></li>
+<li><a href="https://www.slideshare.net/DerekDowney/proxysql-tutorial-plam-2016" target="_blank" rel="external">https://www.slideshare.net/DerekDowney/proxysql-tutorial-plam-2016</a> (本文部分图片出自该PPT)</li>
+</ol>
+<hr>
+<p>原文连接地址：<a href="http://seanlook.com/2017/07/15/mysql-proxysql-ha-consul/">http://seanlook.com/2017/07/15/mysql-proxysql-ha-consul/</a></p>
+<hr>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;MySQL的高可用方案现在如 MHA, Galera, InnoDB Cluster，一旦在上游使用中间件之后，中间件本身可能成为单点。所以本文要介绍的是对于ProxySQL自身高可用的方案对比。&lt;br&gt;首先ProxySQL自身是通过Angel进程的形式运行，即proxysql如果有崩溃，主进程会自动拉起来。但如果是无响应或者网络故障，则需要另外的机制去做到服务的高可用。本文总结了四种方法。&lt;/p&gt;
+&lt;p&gt;ProxySQL有关介绍，请参考： &lt;a href=&quot;http://seanlook.com/2017/04/10/mysql-proxysql-install-config/&quot;&gt;http://seanlook.com/2017/04/10/mysql-proxysql-install-config/&lt;/a&gt;&lt;/p&gt;
+&lt;h1 id=&quot;1-与应用一起部署&quot;&gt;&lt;a href=&quot;#1-与应用一起部署&quot; class=&quot;headerlink&quot; title=&quot;1. 与应用一起部署&quot;&gt;&lt;/a&gt;1. 与应用一起部署&lt;/h1&gt;&lt;p&gt;所有部署应用的地方，都会部署proxysql节点，当这个proxysql挂掉之后，只影响本机的应用。而且不需要多经过一层网络。&lt;br&gt;&lt;img src=&quot;http://7q5fot.com1.z0.glb.clouddn.com/proxysql-ha-1.png&quot; alt=&quot;&quot;&gt;&lt;br&gt;但带来的问题是，如果应用节点很多，proxy的数量也会增加：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;会导致proxysql的配置不容易管理&lt;/li&gt;
+&lt;li&gt;proxysql对后端db健康检查的请求成倍增加&lt;/li&gt;
+&lt;li&gt;限制每个用户或后端db的 max_connections 特性用不了&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h1 id=&quot;2-集中式部署，多ip引用&quot;&gt;&lt;a href=&quot;#2-集中式部署，多ip引用&quot; class=&quot;headerlink&quot; title=&quot;2. 集中式部署，多ip引用&quot;&gt;&lt;/a&gt;2. 集中式部署，多ip引用&lt;/h1&gt;&lt;p&gt;后端一个db集群，对应中间两个以上的 proxysql 节点，前端应用配置多个ip地址，随机挑选一个使用，完全无状态。仅需要多经过一次网络代理。&lt;br&gt;&lt;img src=&quot;http://7q5fot.com1.z0.glb.clouddn.com/proxysql-ha-2.png&quot; alt=&quot;&quot;&gt;&lt;br&gt;这种方式的好处是，不需要再对数据库这种基础服务，多引入一个软件来实现高可用（如下节的keepalive或consul），由应用端获取数据库连接的代码逻辑处理。&lt;/p&gt;
+&lt;p&gt;但是因为proxysql访问地址是写在配置文件里面的，如果一个节点挂掉，随机挑选还是会落地这个失败的节点。所以优化方案是，ip列表里面默认取某一个，失败之后再选取下一个重试。&lt;/p&gt;
+&lt;p&gt;示例代码：&lt;/p&gt;
+&lt;figure class=&quot;highlight python&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;2&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;3&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;4&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;5&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;6&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;7&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;8&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;9&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;10&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;11&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;12&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;13&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;14&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;proxysql_addr_list = [&lt;span class=&quot;string&quot;&gt;&#39;192.168.1.175&#39;&lt;/span&gt;, &lt;span class=&quot;string&quot;&gt;&#39;192.168.1.176&#39;&lt;/span&gt;, &lt;span class=&quot;string&quot;&gt;&#39;192.168.1.177&#39;&lt;/span&gt;]&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;proxysql_addr_list_len = &lt;span class=&quot;number&quot;&gt;3&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;hostname = &lt;span class=&quot;string&quot;&gt;&#39;this_hostname_for_hash_loadbalance&#39;&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;function&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;def&lt;/span&gt; &lt;span class=&quot;title&quot;&gt;get_dbconnection&lt;/span&gt;&lt;span class=&quot;params&quot;&gt;()&lt;/span&gt;:&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;    list_index = hash(hostname) % proxysql_addr_list_len&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;    dbconn = &lt;span class=&quot;keyword&quot;&gt;None&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;    &lt;span class=&quot;keyword&quot;&gt;try&lt;/span&gt;:&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;        dbconn = DBConnect(dbhost=proxysql_addr_list[ list_index ], dbport=&lt;span class=&quot;number&quot;&gt;3306&lt;/span&gt;)  &lt;span class=&quot;comment&quot;&gt;# timeout 1000ms&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;    &lt;span class=&quot;keyword&quot;&gt;except&lt;/span&gt;:&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;        &lt;span class=&quot;keyword&quot;&gt;if&lt;/span&gt; (list_index + &lt;span class=&quot;number&quot;&gt;1&lt;/span&gt;) == proxysql_addr_list_len:&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;            list_index = &lt;span class=&quot;number&quot;&gt;-1&lt;/span&gt;  &lt;span class=&quot;comment&quot;&gt;# like Circular Array&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;        dbconn = DBConnec(dbhost=proxysql_addr_list[ list_index + &lt;span class=&quot;number&quot;&gt;1&lt;/span&gt; ], dbport=&lt;span class=&quot;number&quot;&gt;3306&lt;/span&gt;)  &lt;span class=&quot;comment&quot;&gt;# if failed again, through exception&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;    &lt;/div&gt;&lt;div class=&quot;line&quot;&gt;    &lt;span class=&quot;keyword&quot;&gt;return&lt;/span&gt; dbconn&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;
+&lt;p&gt;上述并不完美，比如可以改用环形数组轮巡，允许重试其它更多的ip。&lt;br&gt;
+    
+    </summary>
+    
+      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
+    
+    
+      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
+    
+      <category term="中间件" scheme="http://seanlook.com/tags/%E4%B8%AD%E9%97%B4%E4%BB%B6/"/>
+    
+      <category term="proxysql" scheme="http://seanlook.com/tags/proxysql/"/>
+    
+  </entry>
   
   <entry>
     <title>ProxySQL之改进patch：记录查询sql完整样例与合并digest多个?</title>
@@ -28,7 +303,7 @@
 <li>修改计算指纹的模块，对 IN或者 VALUES 后面的多个 <code>?</code> 合并。这个是目前 <code>c_tokenizer.c</code> 文件里没有做的，用到底1点上可以避免重复记录。</li>
 </ol>
 <p>效果：<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-querytext-sample-digest.png" alt="proxysql-querytext-sample-digest"></p>
-<p>多个 <code>?</code> 被折叠成 <code>?,</code>，有些意外情况时 <code>??</code>，因为后面一些多余空格的缘故，没有像 <em>pt-fingerprint</em> 那样完全模糊化，像这里digest就保留了大小写、去除重复空格、保留 ``` 分隔符。但仅有的集中意外情况是可以接受的。</p>
+<p>多个 <code>?</code> 被折叠成 <code>?,</code>，有些意外情况时 <code>??</code>，因为后面一些多余空格的缘故，没有像 <em>pt-fingerprint</em> 那样完全模糊化，像这里digest就保留了大小写、去除重复空格、保留 ` 分隔符。但仅有的几种意外情况是可以接受的。</p>
 <p>后面的 query_text 列也有些未知情况，就是末尾会加上一些奇怪的字符，还在排除，但大体不影响需求。</p>
 <p>代码是基于最新 v1.3.6 稳定版修改的，查看变更 <a href="https://github.com/sysown/proxysql/compare/v1.3.6...seanlook:v1.3.7-querysample_digest" target="_blank" rel="external">https://github.com/sysown/proxysql/compare/v1.3.6...seanlook:v1.3.7-querysample_digest</a> </p>
 <p>多个 <code>?</code> 合并只涉及到 <em>c_tokenizer.c</em> 文件，分别在flag=4（处理 <code>&#39;abc&#39;,&#39;def&#39;</code> 的情况）和flag=5（处理 <code>1,2, 3</code> 的情况）加入判断：<br><figure class="highlight cpp"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// wrap two more ? to one ?,</span></div><div class="line"><span class="keyword">if</span> (*(<span class="keyword">p_r_t</span><span class="number">-2</span>) == <span class="string">'?'</span> &amp;&amp; (*(<span class="keyword">p_r_t</span><span class="number">-1</span>) ==<span class="string">' '</span> || *(<span class="keyword">p_r_t</span><span class="number">-1</span>) == <span class="string">','</span> || *(<span class="keyword">p_r_t</span><span class="number">-1</span>) == <span class="string">'?'</span>))&#123;</div><div class="line">    *(p_r<span class="number">-1</span>) = <span class="string">','</span>;</div><div class="line">&#125;</div><div class="line"><span class="keyword">else</span></div><div class="line">    *p_r++ = <span class="string">'?'</span>;</div></pre></td></tr></table></figure></p>
@@ -68,7 +343,7 @@
 &lt;li&gt;修改计算指纹的模块，对 IN或者 VALUES 后面的多个 &lt;code&gt;?&lt;/code&gt; 合并。这个是目前 &lt;code&gt;c_tokenizer.c&lt;/code&gt; 文件里没有做的，用到底1点上可以避免重复记录。&lt;/li&gt;
 &lt;/ol&gt;
 &lt;p&gt;效果：&lt;br&gt;&lt;img src=&quot;http://7q5fot.com1.z0.glb.clouddn.com/proxysql-querytext-sample-digest.png&quot; alt=&quot;proxysql-querytext-sample-digest&quot;&gt;&lt;/p&gt;
-&lt;p&gt;多个 &lt;code&gt;?&lt;/code&gt; 被折叠成 &lt;code&gt;?,&lt;/code&gt;，有些意外情况时 &lt;code&gt;??&lt;/code&gt;，因为后面一些多余空格的缘故，没有像 &lt;em&gt;pt-fingerprint&lt;/em&gt; 那样完全模糊化，像这里digest就保留了大小写、去除重复空格、保留 ``` 分隔符。但仅有的集中意外情况是可以接受的。&lt;/p&gt;
+&lt;p&gt;多个 &lt;code&gt;?&lt;/code&gt; 被折叠成 &lt;code&gt;?,&lt;/code&gt;，有些意外情况时 &lt;code&gt;??&lt;/code&gt;，因为后面一些多余空格的缘故，没有像 &lt;em&gt;pt-fingerprint&lt;/em&gt; 那样完全模糊化，像这里digest就保留了大小写、去除重复空格、保留 ` 分隔符。但仅有的几种意外情况是可以接受的。&lt;/p&gt;
 &lt;p&gt;后面的 query_text 列也有些未知情况，就是末尾会加上一些奇怪的字符，还在排除，但大体不影响需求。&lt;/p&gt;
 &lt;p&gt;代码是基于最新 v1.3.6 稳定版修改的，查看变更 &lt;a href=&quot;https://github.com/sysown/proxysql/compare/v1.3.6...seanlook:v1.3.7-querysample_digest&quot;&gt;https://github.com/sysown/proxysql/compare/v1.3.6...seanlook:v1.3.7-querysample_digest&lt;/a&gt; &lt;/p&gt;
 &lt;p&gt;多个 &lt;code&gt;?&lt;/code&gt; 合并只涉及到 &lt;em&gt;c_tokenizer.c&lt;/em&gt; 文件，分别在flag=4（处理 &lt;code&gt;&amp;#39;abc&amp;#39;,&amp;#39;def&amp;#39;&lt;/code&gt; 的情况）和flag=5（处理 &lt;code&gt;1,2, 3&lt;/code&gt; 的情况）加入判断：&lt;br&gt;&lt;figure class=&quot;highlight cpp&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;2&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;3&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;4&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;5&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;6&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;comment&quot;&gt;// wrap two more ? to one ?,&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;if&lt;/span&gt; (*(&lt;span class=&quot;keyword&quot;&gt;p_r_t&lt;/span&gt;&lt;span class=&quot;number&quot;&gt;-2&lt;/span&gt;) == &lt;span class=&quot;string&quot;&gt;&#39;?&#39;&lt;/span&gt; &amp;amp;&amp;amp; (*(&lt;span class=&quot;keyword&quot;&gt;p_r_t&lt;/span&gt;&lt;span class=&quot;number&quot;&gt;-1&lt;/span&gt;) ==&lt;span class=&quot;string&quot;&gt;&#39; &#39;&lt;/span&gt; || *(&lt;span class=&quot;keyword&quot;&gt;p_r_t&lt;/span&gt;&lt;span class=&quot;number&quot;&gt;-1&lt;/span&gt;) == &lt;span class=&quot;string&quot;&gt;&#39;,&#39;&lt;/span&gt; || *(&lt;span class=&quot;keyword&quot;&gt;p_r_t&lt;/span&gt;&lt;span class=&quot;number&quot;&gt;-1&lt;/span&gt;) == &lt;span class=&quot;string&quot;&gt;&#39;?&#39;&lt;/span&gt;))&amp;#123;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;    *(p_r&lt;span class=&quot;number&quot;&gt;-1&lt;/span&gt;) = &lt;span class=&quot;string&quot;&gt;&#39;,&#39;&lt;/span&gt;;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&amp;#125;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;else&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;    *p_r++ = &lt;span class=&quot;string&quot;&gt;&#39;?&#39;&lt;/span&gt;;&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;&lt;/p&gt;
@@ -1582,101 +1857,6 @@
       <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
     
       <category term="python" scheme="http://seanlook.com/tags/python/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同</title>
-    <link href="http://seanlook.com/2016/09/03/diffs-between-rr-and-rc-trx_isolation_level/"/>
-    <id>http://seanlook.com/2016/09/03/diffs-between-rr-and-rc-trx_isolation_level/</id>
-    <published>2016-09-03T08:32:49.000Z</published>
-    <updated>2016-09-03T08:32:49.000Z</updated>
-    
-    <content type="html"><![CDATA[<p>经常会被问到 InnoDB隔离级别中 READ-COMMITED和REPEATABLE-READ 的区别，今天就整理了一下，不再从“脏读”、“幻读”这样的名词解释一样去回答了。</p>
-<h2 id="1-行锁"><a href="#1-行锁" class="headerlink" title="1. 行锁"></a>1. 行锁</h2><p>InnoDB行锁实际锁的是索引记录，为了防止死锁的产生以及维护所需要的隔离级别，在执行sql语句的全过程中，innodb必须对所需要修改的行每条索引记录上锁。如此一来，如果你执行的 UPDATE 没有很好的索引，那么会导致锁定许多行：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">update</span> employees <span class="keyword">set</span> store_id = <span class="number">0</span> <span class="keyword">where</span> store_id = <span class="number">1</span>;</div><div class="line"><span class="comment">---TRANSACTION 1EAB04, ACTIVE 7 sec</span></div><div class="line">633 <span class="keyword">lock</span> <span class="keyword">struct</span>(s), &lt;strong&gt;<span class="keyword">heap</span> <span class="keyword">size</span> <span class="number">96696</span>&lt;/strong&gt;, <span class="number">218786</span> <span class="keyword">row</span> <span class="keyword">lock</span>(s), <span class="keyword">undo</span> <span class="keyword">log</span> entries <span class="number">1</span></div><div class="line">MySQL <span class="keyword">thread</span> <span class="keyword">id</span> <span class="number">4</span>, OS <span class="keyword">thread</span> handle <span class="number">0x7f8dfc35d700</span>, <span class="keyword">query</span> <span class="keyword">id</span> <span class="number">47</span> localhost root</div><div class="line"><span class="keyword">show</span> <span class="keyword">engine</span> <span class="keyword">innodb</span> <span class="keyword">status</span></div></pre></td></tr></table></figure></p>
-<p>上面的 <code>employees</code> 表 <code>store_id</code> 列没有索引。注意 UPDATE 已经执行完成（没有提交），但依然有 218786 个行锁没有释放，还有一个undo记录。这意味着只有一行被更改，但却持有了额外的锁。堆大小（heap size）代表了分配给锁使用的内存数量。</p>
-<p>在 REPEATABLE-READ 级别，事务持有的 <strong>每个锁</strong> 在整个事务期间一直被持有。</p>
-<p>在 READ-COMMITED 级别，事务里面特定语句结束之后，不匹配该sql语句扫描条件的锁，会被释放。</p>
-<p>下面是上述相同的 UPDATE 在 READ-COMMITED 级别下的结果：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"><span class="comment">---TRANSACTION 1EAB06, ACTIVE 11 sec</span></div><div class="line">631 <span class="keyword">lock</span> <span class="keyword">struct</span>(s), &lt;strong&gt;<span class="keyword">heap</span> <span class="keyword">size</span> <span class="number">96696</span>&lt;/strong&gt;, <span class="number">1</span> <span class="keyword">row</span> <span class="keyword">lock</span>(s), <span class="keyword">undo</span> <span class="keyword">log</span> entries <span class="number">1</span></div><div class="line">MySQL <span class="keyword">thread</span> <span class="keyword">id</span> <span class="number">4</span>, OS <span class="keyword">thread</span> handle <span class="number">0x7f8dfc35d700</span>, <span class="keyword">query</span> <span class="keyword">id</span> <span class="number">62</span> localhost root</div><div class="line"><span class="keyword">show</span> <span class="keyword">engine</span> <span class="keyword">innodb</span> <span class="keyword">status</span></div></pre></td></tr></table></figure></p>
-<p>可以看到 heap size 没有变化，但是现在我们只持有一个行锁。无论什么隔离级别下，InnoDB 会为扫描过的每条索引记录创建锁，不同的是在 RC 模式，一旦语句执行完毕（事务未必完成），不符合扫描条件的记录上的锁会被随即释放。释放这些锁后，堆内存并不会马上释放，所以heap size看到与 RR 模式是一样的，但是持有的锁数量明显小了很多。</p>
-<p>这也就意味着在 RC 级别下的事务A，只要A的UPDATE <strong>语句</strong> 完成了，其它事务可以修改A中也扫描过的行，但在 RR 级别下不允许。</p>
-<h2 id="2-Read-View"><a href="#2-Read-View" class="headerlink" title="2. Read View"></a>2. Read View</h2><h3 id="REPEATABLE-READ"><a href="#REPEATABLE-READ" class="headerlink" title="REPEATABLE-READ"></a>REPEATABLE-READ</h3><p>在 REPEATABLE-READ 级别，<em>read view</em> 对象在事务一开启就被创建，这个一致性快照在整个事务期间一直保持打开。在同一个事务里，前后间隔几个小时执行一遍相同的 SELECT，你会得到完全一样的结果，这就是所谓的 MVCC (multiple version concurrency control)，它是通过行版本号和UNDO段来实现的。</p>
-<p>在 REPEATABLE-READ 级别， InnoDB会为范围扫描创建间隙锁（gap locks）：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">select</span> * <span class="keyword">from</span> some_table <span class="keyword">where</span> <span class="keyword">id</span> &gt; <span class="number">100</span> <span class="keyword">FOR</span> <span class="keyword">UPDATE</span>;</div></pre></td></tr></table></figure></p>
-<a id="more"></a>
-<p>上面的update将会创建一个 gap lock，用来防止在 id&gt;100 范围内有新行被插入，锁会持续到事务回滚或提交。比如在同一个事务里，上午5点执行 SELECT … FOR UPDATE，下午5点执行 UPDATE some_table where id&gt;100，那么这个update只会修改上午5点 SELECT FOR UPDATE所锁定的行，因为大于100的记录的整个 <strong>间隙</strong> 被加了锁。</p>
-<h3 id="READ-COMMITED"><a href="#READ-COMMITED" class="headerlink" title="READ-COMMITED"></a>READ-COMMITED</h3><p>在 READ-COMMITED 级别，<em>read view</em> 结构在每个语句开始的时候被创建，这意味着即使在同一个事务中，上午5点执行的 SELECT与下午5点执行的SELECT可能会得到不同的结果。因为 read view 在 READ-COMMITED 级别下仅在 <strong>语句执行</strong> 期间存在。</p>
-<p>这就是所谓的 “幻读”（phantom read）。</p>
-<p>READ-COMMITED 隔离级别下是没有gap locks，所以执行上面的 SELECT FOR UPDATE where id&gt;100 并不会阻止其它事务插入新行，如果同一个事务里后面执行 UPDATE … where id&gt;100，就有可能导致实际更新的行数比前面锁定的行数要多。</p>
-<p>补充：<br>如果了解过 mysqldump 的实现原理，可知它就是充分利用InnoDB的MVCC特性，使用 REPEATABLE-READ 模式获取备份事务的一致性快照，避免锁表和幻读。</p>
-<p>本文主要参考自 percona博客上的一篇文章 <a href="https://www.percona.com/blog/2012/08/28/differences-between-read-committed-and-repeatable-read-transaction-isolation-levels/" target="_blank" rel="external">https://www.percona.com/blog/2012/08/28/differences-between-read-committed-and-repeatable-read-transaction-isolation-levels/</a> 。</p>
-<hr>
-<p>本文链接地址：<a href="http://seanlook.com/2016/09/03/diffs-between-rr-and-rc-trx_isolation_level/">http://seanlook.com/2016/09/03/diffs-between-rr-and-rc-trx_isolation_level/</a></p>
-<hr>
-]]></content>
-    
-    <summary type="html">
-    
-      &lt;p&gt;经常会被问到 InnoDB隔离级别中 READ-COMMITED和REPEATABLE-READ 的区别，今天就整理了一下，不再从“脏读”、“幻读”这样的名词解释一样去回答了。&lt;/p&gt;
-&lt;h2 id=&quot;1-行锁&quot;&gt;&lt;a href=&quot;#1-行锁&quot; class=&quot;headerlink&quot; title=&quot;1. 行锁&quot;&gt;&lt;/a&gt;1. 行锁&lt;/h2&gt;&lt;p&gt;InnoDB行锁实际锁的是索引记录，为了防止死锁的产生以及维护所需要的隔离级别，在执行sql语句的全过程中，innodb必须对所需要修改的行每条索引记录上锁。如此一来，如果你执行的 UPDATE 没有很好的索引，那么会导致锁定许多行：&lt;br&gt;&lt;figure class=&quot;highlight sql&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;2&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;3&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;4&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;5&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;update&lt;/span&gt; employees &lt;span class=&quot;keyword&quot;&gt;set&lt;/span&gt; store_id = &lt;span class=&quot;number&quot;&gt;0&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;where&lt;/span&gt; store_id = &lt;span class=&quot;number&quot;&gt;1&lt;/span&gt;;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;comment&quot;&gt;---TRANSACTION 1EAB04, ACTIVE 7 sec&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;633 &lt;span class=&quot;keyword&quot;&gt;lock&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;struct&lt;/span&gt;(s), &amp;lt;strong&amp;gt;&lt;span class=&quot;keyword&quot;&gt;heap&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;size&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;96696&lt;/span&gt;&amp;lt;/strong&amp;gt;, &lt;span class=&quot;number&quot;&gt;218786&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;row&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;lock&lt;/span&gt;(s), &lt;span class=&quot;keyword&quot;&gt;undo&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;log&lt;/span&gt; entries &lt;span class=&quot;number&quot;&gt;1&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;MySQL &lt;span class=&quot;keyword&quot;&gt;thread&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;id&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;4&lt;/span&gt;, OS &lt;span class=&quot;keyword&quot;&gt;thread&lt;/span&gt; handle &lt;span class=&quot;number&quot;&gt;0x7f8dfc35d700&lt;/span&gt;, &lt;span class=&quot;keyword&quot;&gt;query&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;id&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;47&lt;/span&gt; localhost root&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;show&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;engine&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;innodb&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;status&lt;/span&gt;&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;&lt;/p&gt;
-&lt;p&gt;上面的 &lt;code&gt;employees&lt;/code&gt; 表 &lt;code&gt;store_id&lt;/code&gt; 列没有索引。注意 UPDATE 已经执行完成（没有提交），但依然有 218786 个行锁没有释放，还有一个undo记录。这意味着只有一行被更改，但却持有了额外的锁。堆大小（heap size）代表了分配给锁使用的内存数量。&lt;/p&gt;
-&lt;p&gt;在 REPEATABLE-READ 级别，事务持有的 &lt;strong&gt;每个锁&lt;/strong&gt; 在整个事务期间一直被持有。&lt;/p&gt;
-&lt;p&gt;在 READ-COMMITED 级别，事务里面特定语句结束之后，不匹配该sql语句扫描条件的锁，会被释放。&lt;/p&gt;
-&lt;p&gt;下面是上述相同的 UPDATE 在 READ-COMMITED 级别下的结果：&lt;br&gt;&lt;figure class=&quot;highlight sql&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;2&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;3&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;4&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;comment&quot;&gt;---TRANSACTION 1EAB06, ACTIVE 11 sec&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;631 &lt;span class=&quot;keyword&quot;&gt;lock&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;struct&lt;/span&gt;(s), &amp;lt;strong&amp;gt;&lt;span class=&quot;keyword&quot;&gt;heap&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;size&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;96696&lt;/span&gt;&amp;lt;/strong&amp;gt;, &lt;span class=&quot;number&quot;&gt;1&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;row&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;lock&lt;/span&gt;(s), &lt;span class=&quot;keyword&quot;&gt;undo&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;log&lt;/span&gt; entries &lt;span class=&quot;number&quot;&gt;1&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;MySQL &lt;span class=&quot;keyword&quot;&gt;thread&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;id&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;4&lt;/span&gt;, OS &lt;span class=&quot;keyword&quot;&gt;thread&lt;/span&gt; handle &lt;span class=&quot;number&quot;&gt;0x7f8dfc35d700&lt;/span&gt;, &lt;span class=&quot;keyword&quot;&gt;query&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;id&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;62&lt;/span&gt; localhost root&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;show&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;engine&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;innodb&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;status&lt;/span&gt;&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;&lt;/p&gt;
-&lt;p&gt;可以看到 heap size 没有变化，但是现在我们只持有一个行锁。无论什么隔离级别下，InnoDB 会为扫描过的每条索引记录创建锁，不同的是在 RC 模式，一旦语句执行完毕（事务未必完成），不符合扫描条件的记录上的锁会被随即释放。释放这些锁后，堆内存并不会马上释放，所以heap size看到与 RR 模式是一样的，但是持有的锁数量明显小了很多。&lt;/p&gt;
-&lt;p&gt;这也就意味着在 RC 级别下的事务A，只要A的UPDATE &lt;strong&gt;语句&lt;/strong&gt; 完成了，其它事务可以修改A中也扫描过的行，但在 RR 级别下不允许。&lt;/p&gt;
-&lt;h2 id=&quot;2-Read-View&quot;&gt;&lt;a href=&quot;#2-Read-View&quot; class=&quot;headerlink&quot; title=&quot;2. Read View&quot;&gt;&lt;/a&gt;2. Read View&lt;/h2&gt;&lt;h3 id=&quot;REPEATABLE-READ&quot;&gt;&lt;a href=&quot;#REPEATABLE-READ&quot; class=&quot;headerlink&quot; title=&quot;REPEATABLE-READ&quot;&gt;&lt;/a&gt;REPEATABLE-READ&lt;/h3&gt;&lt;p&gt;在 REPEATABLE-READ 级别，&lt;em&gt;read view&lt;/em&gt; 对象在事务一开启就被创建，这个一致性快照在整个事务期间一直保持打开。在同一个事务里，前后间隔几个小时执行一遍相同的 SELECT，你会得到完全一样的结果，这就是所谓的 MVCC (multiple version concurrency control)，它是通过行版本号和UNDO段来实现的。&lt;/p&gt;
-&lt;p&gt;在 REPEATABLE-READ 级别， InnoDB会为范围扫描创建间隙锁（gap locks）：&lt;br&gt;&lt;figure class=&quot;highlight sql&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;select&lt;/span&gt; * &lt;span class=&quot;keyword&quot;&gt;from&lt;/span&gt; some_table &lt;span class=&quot;keyword&quot;&gt;where&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;id&lt;/span&gt; &amp;gt; &lt;span class=&quot;number&quot;&gt;100&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;FOR&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;UPDATE&lt;/span&gt;;&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;&lt;/p&gt;
-    
-    </summary>
-    
-      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
-    
-    
-      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
-    
-      <category term="事务" scheme="http://seanlook.com/tags/%E4%BA%8B%E5%8A%A1/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>浅析MySQL事务隔离级别与锁 分享</title>
-    <link href="http://seanlook.com/2016/08/30/mysql-ppt-trx_isolation-lock/"/>
-    <id>http://seanlook.com/2016/08/30/mysql-ppt-trx_isolation-lock/</id>
-    <published>2016-08-30T13:32:49.000Z</published>
-    <updated>2016-08-30T13:32:49.000Z</updated>
-    
-    <content type="html"><![CDATA[<p>这段时间在公司内部准备了一个分享，主题是关于 MySQL事务与锁，准备过程内容很多，也深入弄清楚了一些以前比较迷糊的地方，加上后面的讨论也就一个半小时。</p>
-<p>主要涉及的是乐观锁与悲观锁，InnoDB多版本并发控制的实现，以及隔离级别与各种情况加锁分析，因为涉及的主要还是开发人员，所以不是很深奥。也算花了不少心血，分享一下。</p>
-<p>slideshare: <a href="http://www.slideshare.net/ssuser5a0bc0/my-sql-seanlook" target="_blank" rel="external">http://www.slideshare.net/ssuser5a0bc0/my-sql-seanlook</a></p>
-
-
-	<div class="row">
-	  <iframe src="http://nagland.github.io/viewer/web/viewer.html?val=http://7q5fot.com1.z0.glb.clouddn.com/mysql-ppt-trx_isolation-lock-seanlook.pdf" style="width:100%; height:550px"></iframe>
-	</div>
-
-
-
-<hr>
-<p>原文连接地址：<a href="http://seanlook.com/2016/08/30/mysql-ppt-trx_isolation-lock/">http://seanlook.com/2016/08/30/mysql-ppt-trx_isolation-lock/</a></p>
-<hr>
-<!--
-<iframe src="https://www.slideshare.net/slideshow/embed_code/key/3HLJJcJmM9KLGT" width="900" height="512" frameborder="0" allowfullscreen></iframe>
-<p>–&gt;</p>
--->]]></content>
-    
-    <summary type="html">
-    
-      &lt;p&gt;这段时间在公司内部准备了一个分享，主题是关于 MySQL事务与锁，准备过程内容很多，也深入弄清楚了一些以前比较迷糊的地方，加上后面的讨论也就一个半小时。&lt;/p&gt;
-&lt;p&gt;主要涉及的是乐观锁与悲观锁，InnoDB多版本并发控制的实现，以及隔离级别与各种情况加锁分析，因为涉及的主
-    
-    </summary>
-    
-      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
-    
-    
-      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
-    
-      <category term="事务" scheme="http://seanlook.com/tags/%E4%BA%8B%E5%8A%A1/"/>
     
   </entry>
   
