@@ -316,185 +316,6 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/03/11/mysql-index_merge-deadlock/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2017/03/11/mysql-index_merge-deadlock/" itemprop="url">
-                  index merge 引起的死锁分析
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-03-11T16:32:49+08:00">
-                2017-03-11
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2017/03/11/mysql-index_merge-deadlock/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2017/03/11/mysql-index_merge-deadlock/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2017/03/11/mysql-index_merge-deadlock/" class="leancloud_visitors" data-flag-title="index merge 引起的死锁分析">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>在看线上一个 MySQL innodb status 时，发现有死锁信息，而且出现的频率还不低。于是分析了一下，把过程记录下来。</p>
-<h2 id="1-概要"><a href="#1-概要" class="headerlink" title="1. 概要"></a>1. 概要</h2><p>表结构脱敏处理：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> t_mytb1 (</div><div class="line">  f_id <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">unsigned</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> AUTO_INCREMENT,</div><div class="line">  f_fid <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">unsigned</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">'0'</span>,</div><div class="line">  f_sid <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">unsigned</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">'0'</span>,</div><div class="line">  f_mode <span class="built_in">varchar</span>(<span class="number">32</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">''</span>,</div><div class="line">  f_read <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">unsigned</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">'0'</span>,</div><div class="line">  f_xxx1 <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">unsigned</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">'0'</span>,</div><div class="line">  f_xxx2 <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">unsigned</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">'0'</span>,</div><div class="line">  f_wx_zone <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">unsigned</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">'0'</span>,</div><div class="line">  PRIMARY <span class="keyword">KEY</span> (f_id),</div><div class="line">  <span class="keyword">KEY</span> idx_sid (f_sid),</div><div class="line">  <span class="keyword">KEY</span> idx_fid (f_fid)</div><div class="line">) <span class="keyword">ENGINE</span>=<span class="keyword">InnoDB</span> <span class="keyword">DEFAULT</span> <span class="keyword">CHARSET</span>=utf8mb4;</div></pre></td></tr></table></figure></p>
-<p>死锁信息：<br><figure class="highlight vbscript"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div></pre></td><td class="code"><pre><div class="line">LATEST DETECTED DEADLOCK</div><div class="line">------------------------</div><div class="line"><span class="number">2017</span><span class="number">-02</span><span class="number">-28</span> <span class="number">13</span>:<span class="number">58</span>:<span class="number">29</span> <span class="number">7</span>f25a3efd700</div><div class="line">*** (<span class="number">1</span>) TRANSACTION:</div><div class="line">TRANSACTION <span class="number">4907718431</span>, ACTIVE <span class="number">0.010</span> sec fetching rows</div><div class="line">mysql tables <span class="keyword">in</span> use <span class="number">3</span>, locked <span class="number">3</span></div><div class="line">LOCK WAIT <span class="number">154</span> lock struct(s), heap size <span class="number">30248</span>, <span class="number">10</span> row lock(s)</div><div class="line">LOCK BLOCKING MySQL thread id: <span class="number">13589250</span> block <span class="number">13589247</span></div><div class="line">MySQL thread id <span class="number">13589247</span>, OS thread handle <span class="number">0x7f25a17e3700</span>, query id <span class="number">27061926722</span> <span class="number">11.</span>xx<span class="number">.52</span>.xx ecweb Searching rows <span class="keyword">for</span> update</div><div class="line">UPDATE `d_db1`.`t_mytb1` <span class="keyword">SET</span> `f_read` = f_read+<span class="number">1</span> WHERE (f_fid=<span class="number">91243</span>) <span class="keyword">AND</span> (f_sid=<span class="number">100</span>) <span class="keyword">AND</span> (f_mode=<span class="comment">'浏览器')</span></div><div class="line">*** (<span class="number">1</span>) WAITING <span class="keyword">FOR</span> THIS LOCK <span class="keyword">TO</span> BE GRANTED:</div><div class="line">RECORD LOCKS <span class="built_in">space</span> id <span class="number">13288</span> page no <span class="number">375</span> n bits <span class="number">352</span> index `PRIMARY` of table `d_db1`.`t_mytb1` trx id <span class="number">4907718431</span> lock_mode X locks rec but <span class="keyword">not</span> gap waiting</div><div class="line">Record lock, heap no <span class="number">245</span> PHYSICAL RECORD: n_fields <span class="number">10</span>; compact format; info bits <span class="number">0</span></div><div class="line"> <span class="number">0</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">0000</span>a63b; <span class="built_in">asc</span>    ;;;</div><div class="line"> <span class="number">1</span>: <span class="built_in">len</span> <span class="number">6</span>; <span class="built_in">hex</span> <span class="number">0001246304</span>a7; <span class="built_in">asc</span>   $c  ;;</div><div class="line"> <span class="number">2</span>: <span class="built_in">len</span> <span class="number">7</span>; <span class="built_in">hex</span> <span class="number">7</span>f000ac0162428; <span class="built_in">asc</span>      $(;;</div><div class="line"> <span class="number">3</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">00016470</span>; <span class="built_in">asc</span>   dp;;</div><div class="line"> <span class="number">4</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">00000064</span>; <span class="built_in">asc</span>    d;;</div><div class="line"> <span class="number">5</span>: <span class="built_in">len</span> <span class="number">9</span>; <span class="built_in">hex</span> e6b58fe8a788e599a8; <span class="built_in">asc</span>          ;;</div><div class="line"> <span class="number">6</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">0000244</span>f; <span class="built_in">asc</span>   $O;;</div><div class="line"> <span class="number">7</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">0000007</span>c; <span class="built_in">asc</span>    |;;</div><div class="line"> <span class="number">8</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">00000000</span>; <span class="built_in">asc</span>     ;;</div><div class="line"> <span class="number">9</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">00000000</span>; <span class="built_in">asc</span>     ;;</div><div class="line"></div><div class="line">*** (<span class="number">2</span>) TRANSACTION:</div><div class="line">TRANSACTION <span class="number">4907718435</span>, ACTIVE <span class="number">0.007</span> sec fetching rows</div><div class="line">mysql tables <span class="keyword">in</span> use <span class="number">3</span>, locked <span class="number">3</span></div><div class="line"><span class="number">154</span> lock struct(s), heap size <span class="number">30248</span>, <span class="number">3</span> row lock(s)</div><div class="line">MySQL thread id <span class="number">13589250</span>, OS thread handle <span class="number">0x7f25a3efd700</span>, query id <span class="number">27061926757</span> <span class="number">11.</span>xx<span class="number">.104</span>.xxx ecweb Searching rows <span class="keyword">for</span> update</div><div class="line">UPDATE `d_db1`.`t_mytb1` <span class="keyword">SET</span> `f_read` = f_read+<span class="number">1</span> WHERE (f_fid=<span class="number">91248</span>) <span class="keyword">AND</span> (f_sid=<span class="number">100</span>) <span class="keyword">AND</span> (f_mode=<span class="comment">'浏览器')</span></div><div class="line">*** (<span class="number">2</span>) HOLDS THE LOCK(S):</div><div class="line">RECORD LOCKS <span class="built_in">space</span> id <span class="number">13288</span> page no <span class="number">375</span> n bits <span class="number">352</span> index `PRIMARY` of table `d_db1`.`t_mytb1` trx id <span class="number">4907718435</span> lock_mode X locks rec but <span class="keyword">not</span> gap</div><div class="line">Record lock, heap no <span class="number">245</span> PHYSICAL RECORD: n_fields <span class="number">10</span>; compact format; info bits <span class="number">0</span></div><div class="line"> <span class="number">0</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">0000</span>a63b; <span class="built_in">asc</span>    ;;;  -- <span class="number">42555</span></div><div class="line"> <span class="number">1</span>: <span class="built_in">len</span> <span class="number">6</span>; <span class="built_in">hex</span> <span class="number">0001246304</span>a7; <span class="built_in">asc</span>   $c  ;;  -- <span class="number">4905436327</span></div><div class="line"> <span class="number">2</span>: <span class="built_in">len</span> <span class="number">7</span>; <span class="built_in">hex</span> <span class="number">7</span>f000ac0162428; <span class="built_in">asc</span>      $(;;</div><div class="line"> <span class="number">3</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">00016470</span>; <span class="built_in">asc</span>   dp;;  -- <span class="number">91248</span></div><div class="line"> <span class="number">4</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">00000064</span>; <span class="built_in">asc</span>    d;;  -- <span class="number">100</span></div><div class="line"> <span class="number">5</span>: <span class="built_in">len</span> <span class="number">9</span>; <span class="built_in">hex</span> e6b58fe8a788e599a8; <span class="built_in">asc</span>          ;;</div><div class="line"> <span class="number">6</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">0000244</span>f; <span class="built_in">asc</span>   $O;;  -- <span class="number">9295</span></div><div class="line"> <span class="number">7</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">0000007</span>c; <span class="built_in">asc</span>    |;;  -- <span class="number">124</span></div><div class="line"> <span class="number">8</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">00000000</span>; <span class="built_in">asc</span>     ;;</div><div class="line"> <span class="number">9</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">00000000</span>; <span class="built_in">asc</span>     ;;</div><div class="line"></div><div class="line">*** (<span class="number">2</span>) WAITING <span class="keyword">FOR</span> THIS LOCK <span class="keyword">TO</span> BE GRANTED:</div><div class="line">RECORD LOCKS <span class="built_in">space</span> id <span class="number">13288</span> page no <span class="number">202</span> n bits <span class="number">1272</span> index `idx_sid` of table `d_db1`.`t_mytb1` trx id <span class="number">4907718435</span> lock_mode X locks rec but <span class="keyword">not</span> gap waiting</div><div class="line">Record lock, heap no <span class="number">705</span> PHYSICAL RECORD: n_fields <span class="number">2</span>; compact format; info bits <span class="number">0</span></div><div class="line"> <span class="number">0</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">00000064</span>; <span class="built_in">asc</span>    d;;  -- <span class="number">100</span></div><div class="line"> <span class="number">1</span>: <span class="built_in">len</span> <span class="number">4</span>; <span class="built_in">hex</span> <span class="number">0000</span>a633; <span class="built_in">asc</span>    <span class="number">3</span>;;  -- <span class="number">42547</span></div><div class="line"></div><div class="line">*** WE ROLL BACK TRANSACTION (<span class="number">2</span>)</div></pre></td></tr></table></figure></p>
-<p>乍一看很奇怪，tx1和tx2 两个 UPDATE 各自以 f_fid 为条件更新的记录互不影响才对，即使 91243，91248 两个值有可能出现在同一条数据上（因为f_fid上是二级索引），那顶多也就是个更新锁等待，谁后来谁等待，怎么会出现互相争用对方已持有的锁，被死锁检测机制捕获？</p>
-<p>当然,把 update 语句拿到数据库中 EXPLAIN 一下就可以看出端倪。这里不妨先分析一下输出的锁情况：</p>
-<p><strong>先看 Tx2 (对应trx id 4907718435)</strong> :  </p>
-<ol>
-<li><p><code>RECORD LOCKS space id 13288 page no 375 n bits 352</code> 告诉我们是表空间id 13288 (可从 <code>information_schema.INNODB_SYS_DATAFILES</code> 查到对应ibd文件) 即 t_mytb1 表，第 375 号页面的 245 位置的记录被锁，并且是 idx PRIMARY 上的记录锁（注：本实例隔离级别为RC）。 Tx2正持有这把记录锁。<br>因为是聚集索引，显示了完整记录</p>
-<figure class="highlight ldif"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="attribute">0</span>: 主键f_id=42555</div><div class="line"><span class="attribute">1</span>: DB_TRX_ID = 4905436327</div><div class="line"><span class="attribute">2</span>: DB_ROLL_PTR指向undo记录的地址</div><div class="line"><span class="attribute">3</span>: f_fid=91248</div><div class="line"><span class="attribute">4</span>: f_sid=100</div><div class="line">   ...</div></pre></td></tr></table></figure>
-</li>
-<li><p>然而Tx2还在等待一个记录锁（lock_mode X locks rec but not gap waiting），但这把锁来自二级索引 <code>idx_sid</code> 索引上的记录锁。在 RC 级别下没有GAP lock，行锁除了加在符合条件的二级索引 f_sid=100 上外，还会对主键加record lock。<br>二级索引值：</p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2017/03/11/mysql-index_merge-deadlock/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/03/03/mysql-flashback_use_purged-binlog/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1228,6 +1049,183 @@
 
 
     
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/11/28/mysql-schema-gather-structure/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2016/11/28/mysql-schema-gather-structure/" itemprop="url">
+                  一种直观记录表结构变更历史的方法
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-11-28T16:32:49+08:00">
+                2016-11-28
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2016/11/28/mysql-schema-gather-structure/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2016/11/28/mysql-schema-gather-structure/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2016/11/28/mysql-schema-gather-structure/" class="leancloud_visitors" data-flag-title="一种直观记录表结构变更历史的方法">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h2 id="1-Story"><a href="#1-Story" class="headerlink" title="1. Story"></a>1. Story</h2><p>在没有形成自己的数据库管理平台以前，数据库实例一多（包括生产和测试环境），许多表要执行DDL会变得异常繁杂。</p>
+<p>说个自己的经历，需要改现网的一个索引来看优化的效果，因为存在风险，不会一次全改，先只改1个库，然后逐步放开。前后验证效果可能花上一两周的时间，除非实现完整的记录了当时的ddl语句和对应的库，否则根本难以记得。这就完全依赖于个人的习惯及能力。</p>
+<p>又比如现网出了个问题，开发追查到一个时间点，想确认那个时候有没有对库表进行过更改操作，如果没有记录表结构变更的历史，也就难以提供需要的信息。</p>
+<p>记录差异，很早就思考过能不能用git来做。终于花了一天时间来实现，并验证、修改达到预期的效果，还算满意。</p>
+<p>github项目地址在文后。</p>
+<h2 id="2-Concept"><a href="#2-Concept" class="headerlink" title="2. Concept"></a>2. Concept</h2><p>思路很简单，就是利用 <code>mydumper</code> 导出表时会把各表（结构）单独导成一个文件的特性，每天低峰期导出所有对象元数据：表、视图、存储过程、事件、触发器。需要过滤掉 <code>AUTO_INCREMENT</code> 值。</p>
+<p>结构内容存放在一个git仓库下，通过shell脚本提交到 gitlab。所有DDL更改由原来依赖于DBA的主动记录，变成被动采集。</p>
+<p>测试环境和生产环境表结构总会有些差异，为了兼顾同时收集两个环境的数据，设置了 <code>environment</code> 选项，根据当前所在运行的机器，自动判断采集哪些实例信息。</p>
+<h2 id="3-Usage"><a href="#3-Usage" class="headerlink" title="3. Usage"></a>3. Usage</h2><p>首先你需要能够存放表结构信息的git仓库，如gitlab，而且建议设置为私有。<br>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2016/11/28/mysql-schema-gather-structure/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
   </section>
 
   
@@ -1277,7 +1275,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">104</span>
+                <span class="site-state-item-count">103</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>

@@ -4,21 +4,6 @@
   
     
     <entry>
-      <title></title>
-      <url>http://seanlook.com/2017/07/22/mysql-primarykey-update-timeout/</url>
-      <content type="html"><![CDATA[<p>主键更新出现timeout 一例</p>
-<p>在一个业务里，update个人信息（假设表名t_user_info）出现等待60秒没完成而失败，在模拟复现时看到，t_user_info表根据主键f_id update花费1.2s：</p>
-<p>语句：<br><figure class="highlight nix"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">UPDATE mydb.t_user_info SET  <span class="attr">f_type</span> = ?, <span class="attr">f_account</span> = ?, <span class="attr">f_create_time</span> = ? , <span class="attr">f_modify_time</span> = ? , <span class="attr">f_logintime</span> = ? </div><div class="line">WHERE  <span class="attr">f_id</span> = ?</div></pre></td></tr></table></figure></p>
-<p> f_id： 5487923 为单条主键更新。</p>
-<p>主键更新需要1.2s，不可思议，第一反应是有其它事务也在更新这一条数据，而那个事务执行比较长。可是查边RDS当时的慢查询，都没有看到与 t_user_info 或 t_user_custom_xx 相关的。<br>所以开始怀疑是否是一个事务里面，做了除与数据库操作以外的事情。比如之前web出现过在一个事务里，多个update之间去请求了thrift接口，如果thrift接口没有返回，导致事务长时间不提交，但里面单个update都很迅速，没有慢sql。除非看代码，难以定位。<br>这里看到在事务里有访问redis，这个地方确实可以优化。但上面的 UPDATE 在访问redis之前执行的，可以排除上面的情况。那么UPDATE到底在等谁呢？<br>上面听云的监控里看到，UPDATE执行1258ms，下面还有个接口执行2s多，整个事务完成需要4s。得知，在新的更新自定义组织架构接口里面，是1000多个insert。<br>UPDATE既然在等，那肯定有写锁在这条记录上，应该有更新记录。于是用阿里云的dms数据追踪功能，查看下午14:20-15:00 之间这条记录binlog里面的变化：<br>运维组 &gt; 用户中心主键更新wait timeout分析 &gt; 7494b479831846d09e9b273cd42bb500.png<br>云昭从这里的得到启发，操作一次，却有两条更新。最终查到原因：<br>web请求用户中心的接口，2s超时，进行了重试。</p>
-<ol>
-<li>实际上在事务中，第一次UPDATE根据主键确实不慢，但后面几百上千的insert需要反复请求数据库执行</li>
-<li>执行超过了2s没有返回给web，web自动重试，再次发起UPDATE，但由于上一次t_user_info同一条记录还没有提交，所以一直等待<br>早上9:11那次，超过60s lock wait timeout; 下午复现时看到的UPDATE需要1.2s是第二次请求的，等待锁释耗时放1s多。<br>当前优化这个问题是，把1000多个insert拼成1条来执行，因为大部分时间花在请求和响应数据库的网络链路开销上。<br>当然这里的web重试也是有问题的，设计的初衷是好的，但是在web层重试，可能会导致业务逻辑混乱，产生冗余或错误数据。比如java服务从全局id获取id来插入数据库，如果哪一步超时，web重复请求，会导致插入两条记录。（云昭已确认有这类数据）<br>重试机制放在底层。<br>曾云昭</li>
-</ol>
-]]></content>
-    </entry>
-    
-    <entry>
       <title><![CDATA[ProxySQL监控方案]]></title>
       <url>http://seanlook.com/2017/07/16/mysql-proxysql-monitor/</url>
       <content type="html"><![CDATA[<p>ProxySQL能监控的信息不多，而且大部分是统计信息，不是性能数据。</p>
@@ -1308,6 +1293,36 @@
     </entry>
     
     <entry>
+      <title><![CDATA[使用pt-osc修改主键时注意]]></title>
+      <url>http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/</url>
+      <content type="html"><![CDATA[<p>使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：<br><figure class="highlight applescript"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">原表上有个复合主键，现在要添加一个自增<span class="built_in">id</span>作为主键，如何进行</div></pre></td></tr></table></figure></p>
+<a id="more"></a>
+<p>会涉及到以下修改动作：</p>
+<ol>
+<li>删除复合主键定义</li>
+<li>添加新的自增主键</li>
+<li>原复合主键字段，修改成唯一索引</li>
+</ol>
+<p>如果你够聪明，应该会把这三个操作放在同一个 alter table 命令执行。percona手册里有两个地方对修改主键进行了特殊注解：</p>
+<blockquote>
+<p>–alter<br>A notable exception is when a PRIMARY KEY or UNIQUE INDEX is being created from existing columns as part of the ALTER clause; in that case it will use these column(s) for the DELETE trigger.</p>
+<p>–[no]check-alter</p>
+<ul>
+<li>DROP PRIMARY KEY<br>If –alter contain DROP PRIMARY KEY (case- and space-insensitive), a warning is printed and the tool exits unless –dry-run is specified. Altering the primary key can be dangerous, but the tool can handle it. The tool’s triggers, particularly the DELETE trigger, are most affected by altering the primary key because the tool prefers to use the primary key for its triggers. You should first run the tool with –dry-run and –print and verify that the triggers are correct.</li>
+</ul>
+</blockquote>
+<p>由上一篇文章 <a href="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/">pt-online-schema-change使用说明、限制与比较</a> 可知，pt-osc会在原表t1上创建 AFTER DELETE/UPDATE/INSERT 三个触发器，修改主键影响最大的就是 DELETE 触发器：新表t2上的主键字段在旧表t1上不存在，无法根据主键条件触发删除新表t2数据。<code>but the tool can handle it</code>，原因是pt-osc把触发器改成了下面的形式：<br><figure class="highlight autohotkey"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">CREATE TRIGGER `pt_osc_confluence_sbtest3_del` AFTER DELETE ON `confluence`.`sbtest3` FOR EACH ROW DELETE IGNORE FROM `confluence`.`_sbtest3_new` </div><div class="line">WHERE `confluence`.`_sbtest3_new`.`id` &lt;=&gt; OLD.`id` <span class="literal">AND</span> `confluence`.`_sbtest3_new`.`k` &lt;=&gt; OLD.`k`</div><div class="line"></div><div class="line">注：sbtest3表上以(id,k)作为复合主键</div></pre></td></tr></table></figure></p>
+<p>但是如果id或k列上没有索引，这个删除的代价非常高，所以一定要同时添加复合（唯一）索引 <code>(id,k)</code> .</p>
+<p>而对于INSERT,UPDATE的触发器，依然是 <code>REPLACE INTO</code>语法，因为它采用的是先插入，如果违反主键或唯一约束，则根据主键或意义约束删除这条数据，再执行插入。（但是注意你不能依赖于新表的主键递增，因为如果原表有update，新表就会先插入这一条，导致id与原表记录所在顺序不一样）</p>
+<p>所以如果使用pt-osc去修改删除主键，务必同时添加原主键为 UNIQUE KEY，否则很有可能导致性能问题：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line">$ pt-online-schema-<span class="keyword">change</span> <span class="comment">--user=ecuser --password=ecuser --host=10.0.201.34  \</span></div><div class="line"><span class="comment">--alter "DROP PRIMARY KEY,add column pk int auto_increment primary key,add unique key uk_id_k(id,k)" \</span></div><div class="line">D=confluence,t=sbtest3 <span class="comment">--print --dry-run</span></div><div class="line"></div><div class="line"><span class="comment">--alter contains 'DROP PRIMARY KEY'.  Dropping and altering the primary key can be dangerous, </span></div><div class="line">especially <span class="keyword">if</span> the original <span class="keyword">table</span> does <span class="keyword">not</span> have other <span class="keyword">unique</span> indexes.  ==&gt;注意 dry-run的输出</div><div class="line"></div><div class="line"><span class="keyword">ALTER</span> <span class="keyword">TABLE</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> <span class="keyword">DROP</span> PRIMARY <span class="keyword">KEY</span>,<span class="keyword">add</span> <span class="keyword">column</span> pk <span class="built_in">int</span> auto_increment primary <span class="keyword">key</span>,<span class="keyword">add</span> <span class="keyword">unique</span> <span class="keyword">key</span> uk_id_k(<span class="keyword">id</span>,k)</div><div class="line">Altered <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> OK.</div><div class="line"><span class="keyword">Using</span> original <span class="keyword">table</span> <span class="keyword">index</span> PRIMARY <span class="keyword">for</span> the <span class="keyword">DELETE</span> <span class="keyword">trigger</span> instead <span class="keyword">of</span> <span class="keyword">new</span> <span class="keyword">table</span> <span class="keyword">index</span> PRIMARY because ==&gt; 使用原表主键值判断</div><div class="line">the <span class="keyword">new</span> <span class="keyword">table</span> <span class="keyword">index</span> uses <span class="keyword">column</span> pk which does <span class="keyword">not</span> exist <span class="keyword">in</span> the original table.</div><div class="line"></div><div class="line"><span class="keyword">CREATE</span> <span class="keyword">TRIGGER</span> <span class="string">`pt_osc_confluence_sbtest3_del`</span> <span class="keyword">AFTER</span> <span class="keyword">DELETE</span> <span class="keyword">ON</span> <span class="string">`confluence`</span>.<span class="string">`sbtest3`</span> <span class="keyword">FOR</span> <span class="keyword">EACH</span> <span class="keyword">ROW</span> <span class="keyword">DELETE</span> <span class="keyword">IGNORE</span> <span class="keyword">FROM</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> </div><div class="line"><span class="keyword">WHERE</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span>.<span class="string">`id`</span> &lt;=&gt; OLD.<span class="string">`id`</span> <span class="keyword">AND</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span>.<span class="string">`k`</span> &lt;=&gt; OLD.<span class="string">`k`</span></div></pre></td></tr></table></figure>
+<hr>
+<p>原文链接地址：<a href="http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/">http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/</a></p>
+<hr>
+]]></content>
+    </entry>
+    
+    <entry>
       <title><![CDATA[pt-online-schema-change使用说明、限制与比较]]></title>
       <url>http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/</url>
       <content type="html"><![CDATA[<p>如果正在看这篇文章，相信你已经知道自己的需求了。</p>
@@ -1406,36 +1421,6 @@
 </ul>
 <hr>
 <p>原文链接地址：<a href="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/">http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/</a></p>
-<hr>
-]]></content>
-    </entry>
-    
-    <entry>
-      <title><![CDATA[使用pt-osc修改主键时注意]]></title>
-      <url>http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/</url>
-      <content type="html"><![CDATA[<p>使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：<br><figure class="highlight applescript"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">原表上有个复合主键，现在要添加一个自增<span class="built_in">id</span>作为主键，如何进行</div></pre></td></tr></table></figure></p>
-<a id="more"></a>
-<p>会涉及到以下修改动作：</p>
-<ol>
-<li>删除复合主键定义</li>
-<li>添加新的自增主键</li>
-<li>原复合主键字段，修改成唯一索引</li>
-</ol>
-<p>如果你够聪明，应该会把这三个操作放在同一个 alter table 命令执行。percona手册里有两个地方对修改主键进行了特殊注解：</p>
-<blockquote>
-<p>–alter<br>A notable exception is when a PRIMARY KEY or UNIQUE INDEX is being created from existing columns as part of the ALTER clause; in that case it will use these column(s) for the DELETE trigger.</p>
-<p>–[no]check-alter</p>
-<ul>
-<li>DROP PRIMARY KEY<br>If –alter contain DROP PRIMARY KEY (case- and space-insensitive), a warning is printed and the tool exits unless –dry-run is specified. Altering the primary key can be dangerous, but the tool can handle it. The tool’s triggers, particularly the DELETE trigger, are most affected by altering the primary key because the tool prefers to use the primary key for its triggers. You should first run the tool with –dry-run and –print and verify that the triggers are correct.</li>
-</ul>
-</blockquote>
-<p>由上一篇文章 <a href="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/">pt-online-schema-change使用说明、限制与比较</a> 可知，pt-osc会在原表t1上创建 AFTER DELETE/UPDATE/INSERT 三个触发器，修改主键影响最大的就是 DELETE 触发器：新表t2上的主键字段在旧表t1上不存在，无法根据主键条件触发删除新表t2数据。<code>but the tool can handle it</code>，原因是pt-osc把触发器改成了下面的形式：<br><figure class="highlight autohotkey"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">CREATE TRIGGER `pt_osc_confluence_sbtest3_del` AFTER DELETE ON `confluence`.`sbtest3` FOR EACH ROW DELETE IGNORE FROM `confluence`.`_sbtest3_new` </div><div class="line">WHERE `confluence`.`_sbtest3_new`.`id` &lt;=&gt; OLD.`id` <span class="literal">AND</span> `confluence`.`_sbtest3_new`.`k` &lt;=&gt; OLD.`k`</div><div class="line"></div><div class="line">注：sbtest3表上以(id,k)作为复合主键</div></pre></td></tr></table></figure></p>
-<p>但是如果id或k列上没有索引，这个删除的代价非常高，所以一定要同时添加复合（唯一）索引 <code>(id,k)</code> .</p>
-<p>而对于INSERT,UPDATE的触发器，依然是 <code>REPLACE INTO</code>语法，因为它采用的是先插入，如果违反主键或唯一约束，则根据主键或意义约束删除这条数据，再执行插入。（但是注意你不能依赖于新表的主键递增，因为如果原表有update，新表就会先插入这一条，导致id与原表记录所在顺序不一样）</p>
-<p>所以如果使用pt-osc去修改删除主键，务必同时添加原主键为 UNIQUE KEY，否则很有可能导致性能问题：</p>
-<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line">$ pt-online-schema-<span class="keyword">change</span> <span class="comment">--user=ecuser --password=ecuser --host=10.0.201.34  \</span></div><div class="line"><span class="comment">--alter "DROP PRIMARY KEY,add column pk int auto_increment primary key,add unique key uk_id_k(id,k)" \</span></div><div class="line">D=confluence,t=sbtest3 <span class="comment">--print --dry-run</span></div><div class="line"></div><div class="line"><span class="comment">--alter contains 'DROP PRIMARY KEY'.  Dropping and altering the primary key can be dangerous, </span></div><div class="line">especially <span class="keyword">if</span> the original <span class="keyword">table</span> does <span class="keyword">not</span> have other <span class="keyword">unique</span> indexes.  ==&gt;注意 dry-run的输出</div><div class="line"></div><div class="line"><span class="keyword">ALTER</span> <span class="keyword">TABLE</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> <span class="keyword">DROP</span> PRIMARY <span class="keyword">KEY</span>,<span class="keyword">add</span> <span class="keyword">column</span> pk <span class="built_in">int</span> auto_increment primary <span class="keyword">key</span>,<span class="keyword">add</span> <span class="keyword">unique</span> <span class="keyword">key</span> uk_id_k(<span class="keyword">id</span>,k)</div><div class="line">Altered <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> OK.</div><div class="line"><span class="keyword">Using</span> original <span class="keyword">table</span> <span class="keyword">index</span> PRIMARY <span class="keyword">for</span> the <span class="keyword">DELETE</span> <span class="keyword">trigger</span> instead <span class="keyword">of</span> <span class="keyword">new</span> <span class="keyword">table</span> <span class="keyword">index</span> PRIMARY because ==&gt; 使用原表主键值判断</div><div class="line">the <span class="keyword">new</span> <span class="keyword">table</span> <span class="keyword">index</span> uses <span class="keyword">column</span> pk which does <span class="keyword">not</span> exist <span class="keyword">in</span> the original table.</div><div class="line"></div><div class="line"><span class="keyword">CREATE</span> <span class="keyword">TRIGGER</span> <span class="string">`pt_osc_confluence_sbtest3_del`</span> <span class="keyword">AFTER</span> <span class="keyword">DELETE</span> <span class="keyword">ON</span> <span class="string">`confluence`</span>.<span class="string">`sbtest3`</span> <span class="keyword">FOR</span> <span class="keyword">EACH</span> <span class="keyword">ROW</span> <span class="keyword">DELETE</span> <span class="keyword">IGNORE</span> <span class="keyword">FROM</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> </div><div class="line"><span class="keyword">WHERE</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span>.<span class="string">`id`</span> &lt;=&gt; OLD.<span class="string">`id`</span> <span class="keyword">AND</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span>.<span class="string">`k`</span> &lt;=&gt; OLD.<span class="string">`k`</span></div></pre></td></tr></table></figure>
-<hr>
-<p>原文链接地址：<a href="http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/">http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey/</a></p>
 <hr>
 ]]></content>
     </entry>

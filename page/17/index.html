@@ -316,185 +316,6 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/12/05/mysql_incremental_backup_example/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/12/05/mysql_incremental_backup_example/" itemprop="url">
-                  MySQL增量备份与恢复实例
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-12-05T09:21:25+08:00">
-                2014-12-05
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2014/12/05/mysql_incremental_backup_example/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2014/12/05/mysql_incremental_backup_example/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2014/12/05/mysql_incremental_backup_example/" class="leancloud_visitors" data-flag-title="MySQL增量备份与恢复实例">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>小量的数据库可以每天进行完整备份，因为这也用不了多少时间，但当数据库很大时，就不太可能每天进行一次完整备份了，这时候就可以使用增量备份。增量备份的原理就是使用了mysql的binlog日志。<br>本次操作的MySQL版本为<code>5.5.40 for Linux (x86_64)</code>。</p>
-<p>增量备份要确保打开了二进制日志，参考<a href="http://seanlook.com/2014/12/04/mysql_log_binlog/">mysql的日志系统</a>：<br><figure class="highlight gams"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">mysql&gt; show <span class="keyword">variables</span> like <span class="comment">'%log_bin%'</span>;</div></pre></td></tr></table></figure></p>
-<p>首先对pak数据库做一个完整备份：<br><figure class="highlight brainfuck"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"><span class="comment">$</span> <span class="comment">mysqldump</span> <span class="literal">-</span><span class="comment">h</span> <span class="comment">localhost</span> <span class="literal">-</span><span class="comment">upak</span> <span class="literal">-</span><span class="comment">ppwd</span> <span class="literal">-</span><span class="comment">P3306</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">master</span><span class="literal">-</span><span class="comment">data=2</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">single</span><span class="literal">-</span><span class="comment">transaction</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">opt</span> <span class="comment">pak</span> &gt; <span class="comment">pak_bak_full</span><span class="string">.</span><span class="comment">sql</span></div></pre></td></tr></table></figure></p>
-<p>这时候就会得到一个全备文件pak_bak_full.sql。mysqldump操作会导致滚动一次log，假设新的binlog文件是mysql-bin.000002。</p>
-<h3 id="1-模拟插入数据和误操作"><a href="#1-模拟插入数据和误操作" class="headerlink" title="1. 模拟插入数据和误操作"></a>1. 模拟插入数据和误操作</h3><p>a. 在pak库的某个表插入一些数据，然后执行<code>flush logs</code>命令。这时将会产生一个新的二进制日志文件mysql-bin.000003，mysql-bin.000002则保存了全备过后的所有更改，既增加记录的操作也保存在了mysql-bin.00002中。</p>
-<p>b. 再在pak库中的t_user表中增加两条记录，然后误删除t_user表。t_user中增加记录的操作和删除表的操作都记录在mysql-bin.000003中。</p>
-<h3 id="2-开始恢复"><a href="#2-开始恢复" class="headerlink" title="2. 开始恢复"></a>2. 开始恢复</h3><p>恢复过程不要记录日志：<br><figure class="highlight gams"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">mysql &gt; <span class="keyword">set</span> global <span class="comment">sql_log_bin=0</span>;</div></pre></td></tr></table></figure></p>
-<h3 id="3-首先导入全备数据"><a href="#3-首先导入全备数据" class="headerlink" title="3. 首先导入全备数据"></a>3. 首先导入全备数据</h3><figure class="highlight dts"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">$ mysql -h localhost -upak -ppwd <span class="params">&lt; pak_bak_full.sql</div><div class="line">或</div><div class="line">mysql&gt;</span> source <span class="meta-keyword">/path/</span>backup/pak_bak_full.sql</div></pre></td></tr></table></figure>
-<p>我们也可以看到全备时的binlog位置：<br><figure class="highlight crmsh"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">head -<span class="number">50</span> backup-file.sql |grep 'CHANGE <span class="literal">MASTER</span>'</div><div class="line">-- CHANGE <span class="keyword">MASTER</span> <span class="title">TO</span> <span class="attr">MASTER_LOG_FILE=</span>'mysql-bin.<span class="number">000001</span>', <span class="attr">MASTER_LOG_POS=</span><span class="number">4321</span>;</div></pre></td></tr></table></figure></p>
-<p>查看当前所在二进制日志中的位置：<br><figure class="highlight crmsh"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">mysql&gt; show <span class="keyword">master</span> <span class="title">status</span>;</div></pre></td></tr></table></figure></p>
-<p>根据上面两个position能大概确定需要完整恢复哪几个binlog文件。</p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2014/12/05/mysql_incremental_backup_example/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/12/02/oracle11gr2_installation_precheck_scripts/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1221,6 +1042,190 @@
 
 
     
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/11/08/github-mail-warning-dns/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2014/11/08/github-mail-warning-dns/" itemprop="url">
+                  完全解决Github Pages邮件两次warning（DNS解析问题）
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-11-08T01:21:25+08:00">
+                2014-11-08
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Github/" itemprop="url" rel="index">
+                    <span itemprop="name">Github</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2014/11/08/github-mail-warning-dns/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2014/11/08/github-mail-warning-dns/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2014/11/08/github-mail-warning-dns/" class="leancloud_visitors" data-flag-title="完全解决Github Pages邮件两次warning（DNS解析问题）">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>之所以有本文是由于Github前后两次发了2封不同的警告邮件，都是关于DNS配置的。因为<code>seanlook.com</code>刚申请下来时我也是参考其他博客，在<code>seanlook.github.com</code>仓库下面建立了一个<code>CNAME</code>文件，内容：<code>seanlook.com</code>，然后去DNSPod绑定域名和IP（207.97.227.245）访问也就没事了。然而几天之后每次deploy博客的时候都会受到一封<code>build warning</code>邮件（见本文最后），后来参考下面的文章：</p>
+<ul>
+<li><a href="http://mayecn.com/blog/2014/05/17/githubpages-accelerating/">解决GitHub Pages Warning邮件提醒</a></li>
+<li><a href="http://www.pchou.info/web-build/2014/07/04/build-github-blog-page-08.html">一步步在GitHub上创建博客主页-最新版 — 自定义域名的新玩法</a></li>
+<li><a href="https://github.com/blog/1715-faster-more-awesome-github-pages">Faster, More Awesome GitHub Pages</a> 和 <a href="https://github.com/blog/1917-github-pages-legacy-ip-deprecation">GitHub Pages Legacy IP Deprecation</a></li>
+</ul>
+<p>但显然第一篇有点拆东墙补西墙，只是换了个离自己最近的服务器，CDN根本就没用上，也是因为我<code>dig seanlook.github.io +nostats +nocomments +nocmd</code>之后把IP改成了103.245.222.133，才有了第二封邮件的warning（见本文最后）。第二篇倒是跟官方（第三条）是同一个意思，但是博主放弃了原本的顶级域名而是用www子域名。<br>首先根据邮件提示，明确一下最终目的：</p>
+<ul>
+<li>使用顶级域名<code>seanlook.com</code>来访问站点</li>
+<li>子域名<code>www.seanlook.com</code>跳转到<code>seanlook.com</code></li>
+<li>充分Github Pages提供的cdn加速功能</li>
+</ul>
+<p>两份邮件大概是同一个意思，说Github Pages正在进行重大的升级来提供更快的访问速度，所以我们指定的域名解析的IP在不就的将来将要废弃，需要指向一个合法的IP，第二封邮件说的更明确了，为了使用CDN加速功能，需要增加<code>CNAME</code>的子域名解析记录。</p>
+<blockquote>
+<p>如果你正在使用顶级域名（example.com）而不是子域名（如www.example.com），并且你的DNS解析服务提供商不支持<code>ALIAS</code>记录，那么唯一的选择就是使用<code>A</code>记录，但这种配置没有办法利用CDN加速了（依然可以应对DoS攻击）。如果切换成子域名或使用支持<code>ALIAS</code>的DNS解析上，都可以利用CDN和应对DoS。</p>
+</blockquote>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2014/11/08/github-mail-warning-dns/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
   </section>
 
   
@@ -1270,7 +1275,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">104</span>
+                <span class="site-state-item-count">103</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
