@@ -402,8 +402,9 @@ ProxyS">
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a class="cloud-tie-join-count" href="/2017/07/15/mysql-proxysql-ha-consul/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count join-count" itemprop="commentCount"></span>
+                <a href="/2017/07/15/mysql-proxysql-ha-consul/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2017/07/15/mysql-proxysql-ha-consul/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -455,8 +456,7 @@ ProxyS">
 <p>上述并不完美，比如可以改用环形数组轮巡，允许重试其它更多的ip。<br><a id="more"></a></p>
 <h2 id="能不能不进行多IP引用呢？"><a href="#能不能不进行多IP引用呢？" class="headerlink" title="能不能不进行多IP引用呢？"></a>能不能不进行多IP引用呢？</h2><p>为了避免后端引用IP的单点，可以将上面第1种和这里的第2中结合起来，改进的部署方案：（见文后参考链接）<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-ha-1-1.png" alt=""><br>即在原来的基础上，App上的proxysql后端，挂的还是ProxySQL集群。</p>
 <p>我个人没有验证这样的方案，如果要用需要充分验证proxysql互连的时候，有没有bug。</p>
-<h1 id="3-经典-keepalived"><a href="#3-经典-keepalived" class="headerlink" title="3. 经典 keepalived"></a>3. 经典 keepalived</h1><p>引入keepalived，通过VIP访问两个以上的proxysql节点，既可以减少一次网络传输，又可以实现proxysql自身的高可用，而且甚至不用关心脑裂的问题，因为proxysql配置完全一样，是无状态的，脑裂了也无妨。<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-ha-3.png" alt=""><br>你也可能意识到，这种方式一次只能一个proxysql提供服务，另一个proxysql节点始终处于备用状态。如果配合LVS或haproxy做负载均衡，部署架构又会多出一层网络请求，而且越发复杂（VIP不在proxysql节点上漂，而是在两个lvs之间）。</p>
-<p>使用keepalived的前提是，局域网允许发组播包。这在阿里云ECS经典网络下是不允许的，如果有其它类似方式，如SLB也是可行的。目前测试环境采用是 haproxy + keepalived 的方式。</p>
+<h1 id="3-经典-keepalived"><a href="#3-经典-keepalived" class="headerlink" title="3. 经典 keepalived"></a>3. 经典 keepalived</h1><p>引入keepalived，通过VIP访问两个以上的proxysql节点，既可以减少一次网络传输，又可以实现proxysql自身的高可用，而且甚至不用关心脑裂的问题，因为proxysql配置完全一样，是无状态的，脑裂了也无妨。<br>你也可能意识到，这种方式一次只能一个proxysql提供服务，另一个proxysql节点始终处于备用状态。如果配合LVS或haproxy做负载均衡，部署架构又会多出一层网络请求，而且越发复杂（VIP不在proxysql节点上漂，而是在两个lvs之间）。<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-ha-3.png" alt=""><br>使用keepalived的前提是，局域网允许发组播包。这在阿里云ECS经典网络下是不允许的，如果有其它类似方式，如SLB也是可行的。目前测试环境采用是 haproxy + keepalived 的方式。</p>
 <h1 id="4-Consul服务发现"><a href="#4-Consul服务发现" class="headerlink" title="4. Consul服务发现"></a>4. Consul服务发现</h1><p>如果上面的方式都不适用，那么可以进一步考虑使用第三方的服务发现组件。</p>
 <h2 id="4-1-介绍"><a href="#4-1-介绍" class="headerlink" title="4.1 介绍"></a>4.1 介绍</h2><p>Consul用于实现分布式系统的服务发现与配置，我们将所有proxysql节点注册到consul上作为一个服务来提供，由 Consul agent Server 来判断proxysql节点的存活，每个应用节点上都安装 Consul agent Client 来供应用获取可用地址。</p>
 <p><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-ha-4.png" alt=""></p>
@@ -610,7 +610,12 @@ ProxyS">
           
   <div class="comments" id="comments">
     
-      <div id="cloud-tie-wrapper" class="cloud-tie-wrapper"></div>
+      <div id="disqus_thread">
+        <noscript>
+          Please enable JavaScript to view the
+          <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a>
+        </noscript>
+      </div>
     
   </div>
 
@@ -658,7 +663,7 @@ ProxyS">
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">103</span>
+                <span class="site-state-item-count">104</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -872,6 +877,26 @@ ProxyS">
 
   
 
+    
+      <script id="dsq-count-scr" src="https://seanlook.disqus.com/count.js" async></script>
+    
+
+    
+      <script type="text/javascript">
+        var disqus_config = function () {
+          this.page.url = 'http://seanlook.com/2017/07/15/mysql-proxysql-ha-consul/';
+          this.page.identifier = '2017/07/15/mysql-proxysql-ha-consul/';
+          this.page.title = 'ProxySQL高可用方案';
+        };
+        var d = document, s = d.createElement('script');
+        s.src = 'https://seanlook.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', '' + +new Date());
+        (d.head || d.body).appendChild(s);
+      </script>
+    
+
+  
+
 
 
 
@@ -882,21 +907,18 @@ ProxyS">
 
 
   
-    
-    <script>
-      var cloudTieConfig = {
-        url: document.location.href, 
-        sourceId: "",
-        productKey: "3d000b541d9f41c0a57ee847ba7212f3",
-        target: "cloud-tie-wrapper"
-      };
-    </script>
-    <script src="https://img1.ws.126.net/f2e/tie/yun/sdk/loader.js"></script>
+
+
+
+
+
   
 
 
 
 
+
+  
 
 
 

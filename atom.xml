@@ -5,7 +5,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://seanlook.com/"/>
-  <updated>2017-07-18T13:32:49.000Z</updated>
+  <updated>2017-07-24T06:24:00.000Z</updated>
   <id>http://seanlook.com/</id>
   
   <author>
@@ -14,6 +14,35 @@
   </author>
   
   <generator uri="http://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title></title>
+    <link href="http://seanlook.com/2017/07/22/mysql-primarykey-update-timeout/"/>
+    <id>http://seanlook.com/2017/07/22/mysql-primarykey-update-timeout/</id>
+    <published>2017-07-22T09:22:30.583Z</published>
+    <updated>2017-07-24T06:24:00.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>主键更新出现timeout 一例</p>
+<p>在一个业务里，update个人信息（假设表名t_user_info）出现等待60秒没完成而失败，在模拟复现时看到，t_user_info表根据主键f_id update花费1.2s：</p>
+<p>语句：<br><figure class="highlight nix"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">UPDATE mydb.t_user_info SET  <span class="attr">f_type</span> = ?, <span class="attr">f_account</span> = ?, <span class="attr">f_create_time</span> = ? , <span class="attr">f_modify_time</span> = ? , <span class="attr">f_logintime</span> = ? </div><div class="line">WHERE  <span class="attr">f_id</span> = ?</div></pre></td></tr></table></figure></p>
+<p> f_id： 5487923 为单条主键更新。</p>
+<p>主键更新需要1.2s，不可思议，第一反应是有其它事务也在更新这一条数据，而那个事务执行比较长。可是查边RDS当时的慢查询，都没有看到与 t_user_info 或 t_user_custom_xx 相关的。<br>所以开始怀疑是否是一个事务里面，做了除与数据库操作以外的事情。比如之前web出现过在一个事务里，多个update之间去请求了thrift接口，如果thrift接口没有返回，导致事务长时间不提交，但里面单个update都很迅速，没有慢sql。除非看代码，难以定位。<br>这里看到在事务里有访问redis，这个地方确实可以优化。但上面的 UPDATE 在访问redis之前执行的，可以排除上面的情况。那么UPDATE到底在等谁呢？<br>上面听云的监控里看到，UPDATE执行1258ms，下面还有个接口执行2s多，整个事务完成需要4s。得知，在新的更新自定义组织架构接口里面，是1000多个insert。<br>UPDATE既然在等，那肯定有写锁在这条记录上，应该有更新记录。于是用阿里云的dms数据追踪功能，查看下午14:20-15:00 之间这条记录binlog里面的变化：<br>运维组 &gt; 用户中心主键更新wait timeout分析 &gt; 7494b479831846d09e9b273cd42bb500.png<br>云昭从这里的得到启发，操作一次，却有两条更新。最终查到原因：<br>web请求用户中心的接口，2s超时，进行了重试。</p>
+<ol>
+<li>实际上在事务中，第一次UPDATE根据主键确实不慢，但后面几百上千的insert需要反复请求数据库执行</li>
+<li>执行超过了2s没有返回给web，web自动重试，再次发起UPDATE，但由于上一次t_user_info同一条记录还没有提交，所以一直等待<br>早上9:11那次，超过60s lock wait timeout; 下午复现时看到的UPDATE需要1.2s是第二次请求的，等待锁释耗时放1s多。<br>当前优化这个问题是，把1000多个insert拼成1条来执行，因为大部分时间花在请求和响应数据库的网络链路开销上。<br>当然这里的web重试也是有问题的，设计的初衷是好的，但是在web层重试，可能会导致业务逻辑混乱，产生冗余或错误数据。比如java服务从全局id获取id来插入数据库，如果哪一步超时，web重复请求，会导致插入两条记录。（云昭已确认有这类数据）<br>重试机制放在底层。<br>曾云昭</li>
+</ol>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;主键更新出现timeout 一例&lt;/p&gt;
+&lt;p&gt;在一个业务里，update个人信息（假设表名t_user_info）出现等待60秒没完成而失败，在模拟复现时看到，t_user_info表根据主键f_id update花费1.2s：&lt;/p&gt;
+&lt;p&gt;语句：&lt;br&gt;&lt;figure
+    
+    </summary>
+    
+    
+  </entry>
   
   <entry>
     <title>ProxySQL监控方案</title>
@@ -71,7 +100,7 @@
 <ul>
 <li>各个类型的sql请求量比例、趋势</li>
 </ul>
-<p>在我们的环境下使用的是 InfluxDB + Grafana，通过telegraf收集上报。上述所有的监控脚本见gitlab仓库 <a href="http://git.workec.com/ops/proxysql_tools/tree/master/monitor" target="_blank" rel="external">http://git.workec.com/ops/proxysql_tools/tree/master/monitor</a> ：</p>
+<p>在我们的环境下使用的是 InfluxDB + Grafana，通过telegraf收集上报。上述所有的监控脚本见仓库 <a href="https://github.com/seanlook/proxysql_tools" target="_blank" rel="external">https://github.com/seanlook/proxysql_tools</a> ：</p>
 <ul>
 <li><p><code>proxysql_stats.py</code>:</p>
 <ul>
@@ -148,7 +177,7 @@
 &lt;ul&gt;
 &lt;li&gt;各个类型的sql请求量比例、趋势&lt;/li&gt;
 &lt;/ul&gt;
-&lt;p&gt;在我们的环境下使用的是 InfluxDB + Grafana，通过telegraf收集上报。上述所有的监控脚本见gitlab仓库 &lt;a href=&quot;http://git.workec.com/ops/proxysql_tools/tree/master/monitor&quot;&gt;http://git.workec.com/ops/proxysql_tools/tree/master/monitor&lt;/a&gt; ：&lt;/p&gt;
+&lt;p&gt;在我们的环境下使用的是 InfluxDB + Grafana，通过telegraf收集上报。上述所有的监控脚本见仓库 &lt;a href=&quot;https://github.com/seanlook/proxysql_tools&quot;&gt;https://github.com/seanlook/proxysql_tools&lt;/a&gt; ：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;p&gt;&lt;code&gt;proxysql_stats.py&lt;/code&gt;:&lt;/p&gt;
 &lt;ul&gt;
@@ -204,8 +233,7 @@
 <p>上述并不完美，比如可以改用环形数组轮巡，允许重试其它更多的ip。<br><a id="more"></a></p>
 <h2 id="能不能不进行多IP引用呢？"><a href="#能不能不进行多IP引用呢？" class="headerlink" title="能不能不进行多IP引用呢？"></a>能不能不进行多IP引用呢？</h2><p>为了避免后端引用IP的单点，可以将上面第1种和这里的第2中结合起来，改进的部署方案：（见文后参考链接）<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-ha-1-1.png" alt=""><br>即在原来的基础上，App上的proxysql后端，挂的还是ProxySQL集群。</p>
 <p>我个人没有验证这样的方案，如果要用需要充分验证proxysql互连的时候，有没有bug。</p>
-<h1 id="3-经典-keepalived"><a href="#3-经典-keepalived" class="headerlink" title="3. 经典 keepalived"></a>3. 经典 keepalived</h1><p>引入keepalived，通过VIP访问两个以上的proxysql节点，既可以减少一次网络传输，又可以实现proxysql自身的高可用，而且甚至不用关心脑裂的问题，因为proxysql配置完全一样，是无状态的，脑裂了也无妨。<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-ha-3.png" alt=""><br>你也可能意识到，这种方式一次只能一个proxysql提供服务，另一个proxysql节点始终处于备用状态。如果配合LVS或haproxy做负载均衡，部署架构又会多出一层网络请求，而且越发复杂（VIP不在proxysql节点上漂，而是在两个lvs之间）。</p>
-<p>使用keepalived的前提是，局域网允许发组播包。这在阿里云ECS经典网络下是不允许的，如果有其它类似方式，如SLB也是可行的。目前测试环境采用是 haproxy + keepalived 的方式。</p>
+<h1 id="3-经典-keepalived"><a href="#3-经典-keepalived" class="headerlink" title="3. 经典 keepalived"></a>3. 经典 keepalived</h1><p>引入keepalived，通过VIP访问两个以上的proxysql节点，既可以减少一次网络传输，又可以实现proxysql自身的高可用，而且甚至不用关心脑裂的问题，因为proxysql配置完全一样，是无状态的，脑裂了也无妨。<br>你也可能意识到，这种方式一次只能一个proxysql提供服务，另一个proxysql节点始终处于备用状态。如果配合LVS或haproxy做负载均衡，部署架构又会多出一层网络请求，而且越发复杂（VIP不在proxysql节点上漂，而是在两个lvs之间）。<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-ha-3.png" alt=""><br>使用keepalived的前提是，局域网允许发组播包。这在阿里云ECS经典网络下是不允许的，如果有其它类似方式，如SLB也是可行的。目前测试环境采用是 haproxy + keepalived 的方式。</p>
 <h1 id="4-Consul服务发现"><a href="#4-Consul服务发现" class="headerlink" title="4. Consul服务发现"></a>4. Consul服务发现</h1><p>如果上面的方式都不适用，那么可以进一步考虑使用第三方的服务发现组件。</p>
 <h2 id="4-1-介绍"><a href="#4-1-介绍" class="headerlink" title="4.1 介绍"></a>4.1 介绍</h2><p>Consul用于实现分布式系统的服务发现与配置，我们将所有proxysql节点注册到consul上作为一个服务来提供，由 Consul agent Server 来判断proxysql节点的存活，每个应用节点上都安装 Consul agent Client 来供应用获取可用地址。</p>
 <p><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-ha-4.png" alt=""></p>
@@ -1735,128 +1763,6 @@
       <category term="腾讯云" scheme="http://seanlook.com/tags/%E8%85%BE%E8%AE%AF%E4%BA%91/"/>
     
       <category term="字符集" scheme="http://seanlook.com/tags/%E5%AD%97%E7%AC%A6%E9%9B%86/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>你可能需要一个实时抓取MySQL慢查询现场的程序</title>
-    <link href="http://seanlook.com/2016/09/27/python-mysql-querykill/"/>
-    <id>http://seanlook.com/2016/09/27/python-mysql-querykill/</id>
-    <published>2016-09-27T08:32:49.000Z</published>
-    <updated>2016-09-27T08:32:49.000Z</updated>
-    
-    <content type="html"><![CDATA[<p>Python完成的一个小程序，初衷用于杀掉 MySQL 上的异常线程，如慢查询、处于Sleep状态的，但上线运行以后，以另一种模式运行来实时发现现网的慢查询特别有用，挖掘了许多潜在问题。<br><strong>项目地址</strong>：<a href="https://github.com/seanlook/myquerykill" target="_blank" rel="external">https://github.com/seanlook/myquerykill</a>  </p>
-<p>在使用阿里云RDS的过程中，数据库出现异常，需要快速恢复。网上有许多类似的kill脚本，都是通过 mysqladmin 实现的。然而 Ali-RDS 环境有以下限制：</p>
-<ul>
-<li>不提供 SUPER 权限的用户，也就是用户只能 kill 自己的线程</li>
-<li>当连接数暴增时，外部用户无法登陆，包括控制台</li>
-</ul>
-<p>为了解决上面两大问题，该 python 脚本通过在db实例上，使用多线程的方式，为每个用户保留一个连接，并<strong>实时</strong>读取指令配置文件 <code>mysqk.ini</code>，发现有 kill 需求时，利用对应用户已有连接找到 <code>information_schema.processlist</code> 中符合条件的线程，并 kill 。</p>
-<p>说明：该脚本在9月份做过一次重写，7月份的版本（分支 old_0.5.0）是每实例每用户，对应一个线程，db实例一多线程数也太多，看得始终不太优雅，于是改成了一个db实例一个线程，维护同时维护多个用户的会话。同时新版也加入了更多的功能，如按时间窗口检查，包含或排除特定连接，邮件通知，配置项覆盖。</p>
-<h1 id="1-特性"><a href="#1-特性" class="headerlink" title="1. 特性"></a>1. 特性</h1><ol>
-<li>始终通过 mysql ping 维持一个长连接，并有断开自动重来机制，解决没有连接可用的尴尬</li>
-<li>每个db实例有自己的线程，避免需要单独登陆个别用户去kill的繁复操作。<br>如果你具有 SUPER 权限，也可以简化配置做到兼容</li>
-<li>能够分开应对需要杀死线程的场景：<ul>
-<li>长时间运行超过 N 秒的</li>
-<li>Sleep 状态的事务 （一般不建议，但有时候kill它，可以快速释放连接给管理员使用）</li>
-<li>排除一些线程不能kill，如 Binlog dump。可配置</li>
-<li>包含特定关键字的线程要kill</li>
-</ul>
-</li>
-<li>出现符合条件的线程时，会对当时的processlist, engine status，lock_wait 做一个快照，并邮件发出。妈妈再也不愁没有事故现场了。</li>
-<li>有试运行dry_run模式，即执行所有的检查过程但不真正kill<br>这便是开头所讲的，实时关注生产环境慢查询，而不是等出现问题被动去看slow log，严重的情况连接数可能已经爆了</li>
-<li>支持只在时间窗口内运行，考虑到晚上一些长任务不检查</li>
-<li>密码加密</li>
-</ol>
-<a id="more"></a>
-<h1 id="2-快速上手"><a href="#2-快速上手" class="headerlink" title="2. 快速上手"></a>2. 快速上手</h1><p>需要pip安装<code>MySQL-python</code>和<code>pycrypto</code>两个库，只在python 2.7上有测试。</p>
-<p>在 <em>settings.py</em> 里面设置连接的用户名和密码信息。这里假设同一批db的要check的认证信息是一样的，指定的用户既用于登录认证，也用于告知脚本哪些用户需要被检查。<br>密码要通过 <code>prpcryptec.py</code> 加密，加密的密钥需写入脚本本身的 <code>KEY_DB_AUTH</code>变量。（担心泄露的话，把mysqk.py编译成 pyc 来跑）</p>
-<p>在 <em>mysqk.ini</em> 主配置文件里面  </p>
-<ul>
-<li><code>db_info</code> 节设置需要被检查的数据库地址，如 <code>db01=10.0.200.100:3306</code></li>
-<li>可分别 <code>db01</code>等指定需要kill thread的选项。<code>[id_db01]</code> 则默认复用 <code>[db_commkill]</code> 的选项</li>
-<li><code>db_comconfig</code> 节设置 <code>db_puser</code> 为能查看到所有processlist的权限用户，且在 <em>settings.py</em> 的DB_AUTH中已指定</li>
-<li><p>只想执行检查，并不想真正kill异常线程，确认 dry_run不等于0</p>
-<p>Here we go!</p>
-</li>
-</ul>
-<h1 id="3-配置项说明"><a href="#3-配置项说明" class="headerlink" title="3. 配置项说明"></a>3. 配置项说明</h1><p><strong><code>mysqk.ini</code></strong>：</p>
-<h2 id="3-1-mail-config"><a href="#3-1-mail-config" class="headerlink" title="3.1 mail_config"></a>3.1 mail_config</h2><p>邮件通知相关设置，smtp服务地址和认证信息。<br><code>mail_receiver=</code> 设置空，表示不发邮件</p>
-<h2 id="3-2-db-info"><a href="#3-2-db-info" class="headerlink" title="3.2 db_info"></a>3.2 db_info</h2><p>设置要检查kill哪些数据库实例.<br>格式：<code>&lt;dbid&gt;=&lt;host&gt;:&lt;port&gt;</code>，dbid是唯一表示db实例的，后面设置各db需要被kill的选项，小节配置名就是 <code>id_&lt;dbid&gt;</code>；端口必需指定。</p>
-<p>在这里出现的db实例都会被执行检查，可用 ; 注释，但需要重启脚本。</p>
-<h2 id="3-3-db-comconfig"><a href="#3-3-db-comconfig" class="headerlink" title="3.3 db_comconfig"></a>3.3 db_comconfig</h2><p>检查用公共配置，实时生效。</p>
-<ul>
-<li><code>db_puser</code>：指定一个用户名用于 show processlist，需要的权限：PROCESS、information_schema库查看。可以认为是一个代表用户，检查异常thread，把结果提供给有该thread杀掉权限用户。</li>
-<li><code>run_max_count</code>：执行检查的次数，是一个全局控制开关。每次修改这个值都会重新开始检查，即一个 clean start，让刚修改的配置生效。<ul>
-<li>为 0 表示脚本不进行任何检查，只简单维护与数据库的连接存活。存活检查频率在 <em>settings.py</em> 由 <code>CHECK_CONFIG_INTERVAL × CHECK_PING_MULTI</code>决定</li>
-<li>为 999 表示会在后台一致检查连接线程（但不一定有符合kill条件的），检查的频率在 <em>settings.py</em> 里面 <code>CHECK_CONFIG_INTERVAL</code> 指定</li>
-<li>为其它值时，表示检查次数满后停止检查</li>
-</ul>
-</li>
-<li><code>dry_run</code>：是否开启试运行模式，为0表示真实kill，为1或其它值表示试运行。试运行模式可用于监控慢查询并告警。注意同一会话线程ID只告警一次</li>
-<li><code>run_time_window</code>：运行的检查的时间窗口，格式如 <code>08:00-22:00</code>，在这个时间以外不执行检查，留空表示不限制。主要考虑晚上一些统计任务可能出现“异常”线程。</li>
-</ul>
-<h2 id="3-4-db-commkill"><a href="#3-4-db-commkill" class="headerlink" title="3.4 db_commkill"></a>3.4 db_commkill</h2><p>kill用公共配置，实时生效，会被 <code>id_&lt;dbid&gt;</code> 节的选项覆盖。</p>
-<ul>
-<li><p><code>k_user</code>：很关键的一个选项，表示你要检查并kill哪些数据库用户，多个用逗号分隔（不要带引号）。<br>为 <code>all</code> 时，表示要检查 <em>settings.py</em> 里 DB_AUTH 指定的所有用户<br>为 <code>none</code> 时，表示不kill任何异常线程，效果与设置了 dry_run 模式相当  </p>
-</li>
-<li><p><code>k_longtime</code>：执行超过设定值的sql则认为异常。一般大于 CHECK_CONFIG_INTERVAL</p>
-</li>
-<li><code>k_sleep</code>：Sleep超过设定秒的sql则认为异常，为 0 表示不杀掉sleep状态的线程</li>
-<li><code>k_exclude</code>：排除掉那些特定关键字的线程，比如复制线程、管理员的连接等</li>
-<li><code>k_include</code>：包含这些特定关键字的线程，需要被kill。注意，它作用在满足 k_user 和 k_exclude 的前提之下。<br>k_exclude与k_include 的值是支持python re模块正则的格式，不要带引号</li>
-</ul>
-<h2 id="3-5-id-dbid"><a href="#3-5-id-dbid" class="headerlink" title="3.5 id_dbid"></a>3.5 id_dbid</h2><p>这部分区域的配置项与 db_commconfig 相同，用于针对个别db的kill选项。</p>
-<h1 id="4-使用建议"><a href="#4-使用建议" class="headerlink" title="4. 使用建议"></a>4. 使用建议</h1><p>两种组合模式：</p>
-<ol>
-<li>设置 <code>dry_run=0</code>，默认 <code>k_user=none</code>，当数据库出现异常时，主动修改对应db的k_user值，动态kill</li>
-<li>设置 <code>dry_run=1</code>，默认 <code>k_user=all</code>，相当于运行在daemon模式，有慢查询则邮件通知，并且记录下当时的信息。<strong>建议此模式</strong></li>
-</ol>
-<p>当然你也可以<code>dry_run=0</code>，<code>k_user=all</code>，让程序一直在后台跑并kill，但生产环境极不推荐。</p>
-<p>有日志和快照文件可以查看。</p>
-<h1 id="5-配置文件示例"><a href="#5-配置文件示例" class="headerlink" title="5. 配置文件示例"></a>5. 配置文件示例</h1><p>mysqlk.ini :</p>
-<figure class="highlight ini"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div></pre></td><td class="code"><pre><div class="line"><span class="section">[mail_config]</span></div><div class="line"><span class="attr">mail_host</span>=smtp.exmail.qq.com</div><div class="line"><span class="attr">mail_user</span>=xxx@ecqun.com</div><div class="line"><span class="attr">mail_pass</span>=xxxxxx</div><div class="line"></div><div class="line"><span class="attr">mail_receiver</span>=</div><div class="line"><span class="section"></span></div><div class="line">[db_info]</div><div class="line"><span class="attr">crm0</span>=<span class="number">192.168</span>.<span class="number">1.125</span>:<span class="number">3306</span></div><div class="line"><span class="attr">crm1</span>=<span class="number">192.168</span>.<span class="number">1.126</span>:<span class="number">3306</span></div><div class="line"><span class="attr">crm2</span>=<span class="number">192.168</span>.<span class="number">1.127</span>:<span class="number">3306</span></div><div class="line"><span class="attr">crm3</span>=<span class="number">192.168</span>.<span class="number">1.128</span>:<span class="number">3306</span></div><div class="line"><span class="attr">base</span>=<span class="number">10.0</span>.<span class="number">200.142</span>:<span class="number">3306</span></div><div class="line"><span class="section"></span></div><div class="line">[db_commconfig]</div><div class="line"><span class="attr">db_puser</span>=ecuser</div><div class="line"></div><div class="line"><span class="comment">; how many kill times once this config file changed</span></div><div class="line"><span class="comment">; 0: DISABLE all kill</span></div><div class="line"><span class="comment">; 999: always kill threads that meet kill conditions</span></div><div class="line"><span class="comment">; default: 1</span></div><div class="line"><span class="comment">; can not be inherit</span></div><div class="line"><span class="attr">run_max_count</span>=<span class="number">999</span></div><div class="line"><span class="attr">dry_run</span>=<span class="number">1</span></div><div class="line"><span class="attr">run_time_window</span>=<span class="number">08</span>:<span class="number">00</span>-<span class="number">22</span>:<span class="number">00</span></div><div class="line"><span class="section"></span></div><div class="line"></div><div class="line">[db_commkill]</div><div class="line"><span class="attr">k_user</span>=all</div><div class="line"><span class="attr">k_longtime</span>=<span class="number">10</span></div><div class="line"><span class="attr">k_lock</span>=<span class="number">1</span></div><div class="line"><span class="attr">k_sleep</span>=<span class="number">0</span></div><div class="line"></div><div class="line"><span class="attr">k_exclude</span>=Binlog|ecdba|Daemon</div><div class="line"><span class="attr">k_include</span>=select sleep\(<span class="number">17</span>\)</div><div class="line"><span class="section"></span></div><div class="line"></div><div class="line">[id_crm0]</div><div class="line"><span class="comment">; k_user: who's threads to be killed. use comma to separate</span></div><div class="line"><span class="comment">;         none: do not kill anyone's threads</span></div><div class="line"><span class="comment">;         all: kill all user's threads (with other where conditions)</span></div><div class="line"><span class="comment">; default: none</span></div><div class="line"><span class="attr">k_user</span>=all</div><div class="line"></div><div class="line"><span class="comment">; k_longtime: filter the threads who's running time is longer than this</span></div><div class="line"><span class="comment">;             0: ignore the time &gt; x  condition</span></div><div class="line"><span class="comment">; default: 10</span></div><div class="line"><span class="attr">k_longtime</span>=<span class="number">10</span></div><div class="line"></div><div class="line"><span class="comment">; k_sleep: whether kill sleepd threads or not</span></div><div class="line"><span class="comment">;          0: do not kill command='Sleep' threads from processlist</span></div><div class="line"><span class="comment">;          when it set to 1, usually it's subset of k_longtime condition</span></div><div class="line"><span class="comment">; default: 0</span></div><div class="line"><span class="attr">k_sleep</span>=<span class="number">0</span></div><div class="line"><span class="section"></span></div><div class="line">[id_crm1]</div><div class="line"><span class="attr">k_user</span>=ecuser</div><div class="line"><span class="attr">k_longtime</span>=<span class="number">10</span></div><div class="line"><span class="attr">k_sleep</span>=<span class="number">0</span></div><div class="line"><span class="section"></span></div><div class="line">[id_crm2]</div><div class="line"><span class="attr">k_user</span>=all</div><div class="line"><span class="attr">k_longtime</span>=<span class="number">10</span></div><div class="line"><span class="attr">k_sleep</span>=<span class="number">0</span></div><div class="line"><span class="section"></span></div><div class="line">[id_crm3]</div></pre></td></tr></table></figure>
-<h1 id="6-运行示例"><a href="#6-运行示例" class="headerlink" title="6. 运行示例"></a>6. 运行示例</h1><p><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-myquery-shot.png" alt="run-demo"></p>
-<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/python-mysql-slowquery-discover.png" alt="slowquery-discover"></p>
-<hr>
-<p>原文链接地址：<a href="http://seanlook.com/2016/09/27/python-mysql-querykill/">http://seanlook.com/2016/09/27/python-mysql-querykill/</a></p>
-<hr>
-]]></content>
-    
-    <summary type="html">
-    
-      &lt;p&gt;Python完成的一个小程序，初衷用于杀掉 MySQL 上的异常线程，如慢查询、处于Sleep状态的，但上线运行以后，以另一种模式运行来实时发现现网的慢查询特别有用，挖掘了许多潜在问题。&lt;br&gt;&lt;strong&gt;项目地址&lt;/strong&gt;：&lt;a href=&quot;https://github.com/seanlook/myquerykill&quot;&gt;https://github.com/seanlook/myquerykill&lt;/a&gt;  &lt;/p&gt;
-&lt;p&gt;在使用阿里云RDS的过程中，数据库出现异常，需要快速恢复。网上有许多类似的kill脚本，都是通过 mysqladmin 实现的。然而 Ali-RDS 环境有以下限制：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;不提供 SUPER 权限的用户，也就是用户只能 kill 自己的线程&lt;/li&gt;
-&lt;li&gt;当连接数暴增时，外部用户无法登陆，包括控制台&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;为了解决上面两大问题，该 python 脚本通过在db实例上，使用多线程的方式，为每个用户保留一个连接，并&lt;strong&gt;实时&lt;/strong&gt;读取指令配置文件 &lt;code&gt;mysqk.ini&lt;/code&gt;，发现有 kill 需求时，利用对应用户已有连接找到 &lt;code&gt;information_schema.processlist&lt;/code&gt; 中符合条件的线程，并 kill 。&lt;/p&gt;
-&lt;p&gt;说明：该脚本在9月份做过一次重写，7月份的版本（分支 old_0.5.0）是每实例每用户，对应一个线程，db实例一多线程数也太多，看得始终不太优雅，于是改成了一个db实例一个线程，维护同时维护多个用户的会话。同时新版也加入了更多的功能，如按时间窗口检查，包含或排除特定连接，邮件通知，配置项覆盖。&lt;/p&gt;
-&lt;h1 id=&quot;1-特性&quot;&gt;&lt;a href=&quot;#1-特性&quot; class=&quot;headerlink&quot; title=&quot;1. 特性&quot;&gt;&lt;/a&gt;1. 特性&lt;/h1&gt;&lt;ol&gt;
-&lt;li&gt;始终通过 mysql ping 维持一个长连接，并有断开自动重来机制，解决没有连接可用的尴尬&lt;/li&gt;
-&lt;li&gt;每个db实例有自己的线程，避免需要单独登陆个别用户去kill的繁复操作。&lt;br&gt;如果你具有 SUPER 权限，也可以简化配置做到兼容&lt;/li&gt;
-&lt;li&gt;能够分开应对需要杀死线程的场景：&lt;ul&gt;
-&lt;li&gt;长时间运行超过 N 秒的&lt;/li&gt;
-&lt;li&gt;Sleep 状态的事务 （一般不建议，但有时候kill它，可以快速释放连接给管理员使用）&lt;/li&gt;
-&lt;li&gt;排除一些线程不能kill，如 Binlog dump。可配置&lt;/li&gt;
-&lt;li&gt;包含特定关键字的线程要kill&lt;/li&gt;
-&lt;/ul&gt;
-&lt;/li&gt;
-&lt;li&gt;出现符合条件的线程时，会对当时的processlist, engine status，lock_wait 做一个快照，并邮件发出。妈妈再也不愁没有事故现场了。&lt;/li&gt;
-&lt;li&gt;有试运行dry_run模式，即执行所有的检查过程但不真正kill&lt;br&gt;这便是开头所讲的，实时关注生产环境慢查询，而不是等出现问题被动去看slow log，严重的情况连接数可能已经爆了&lt;/li&gt;
-&lt;li&gt;支持只在时间窗口内运行，考虑到晚上一些长任务不检查&lt;/li&gt;
-&lt;li&gt;密码加密&lt;/li&gt;
-&lt;/ol&gt;
-    
-    </summary>
-    
-      <category term="Python" scheme="http://seanlook.com/categories/Python/"/>
-    
-    
-      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
-    
-      <category term="python" scheme="http://seanlook.com/tags/python/"/>
     
   </entry>
   
