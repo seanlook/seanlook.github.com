@@ -433,7 +433,7 @@
       
         <p>ProxySQL在连接池(<em>persistent connection poll</em>)的基础上，还有一个连接复用的概念 <em>multiplexing connection</em>，官方的wiki里没有很明确的说明，但在作者的一些 blog post 和 issue 里能找到解答： <a href="https://github.com/sysown/proxysql/issues/939#issuecomment-287489317" target="_blank" rel="external">https://github.com/sysown/proxysql/issues/939#issuecomment-287489317</a> </p>
 <p>由于SQL可以路由，一个客户端连接上来，可能会到多个 hostgroup 发起连接。复用的意思是，一个后端DB的连接，可以“同时”被多个客户端使用。</p>
-<p>传统的连接池，会在客户端断开连接（会话）后，把连接放回到池里。在ProxySQL中，由于连接复用，连接会在 sql语句 执行结束后，便将连接放回到池里（客户端会话可能并没有断开），这样便可大大提高后端连接的使用效率，而避免前段请求过大导致后端连接数疯长。</p>
+<p>传统的连接池，会在客户端<strong>断开连接</strong>（会话）后，把连接放回到池里。在ProxySQL中，由于连接复用，连接会在<strong>sql语句</strong>执行结束后，便将连接放回到池里（客户端会话可能并没有断开），这样便可大大提高后端连接的使用效率，而避免前段请求过大导致后端连接数疯长。</p>
 <p>但这样做有时候并不安全，比如应用端连接时指定了 <code>set NAMES xxx</code>，然后执行查询，那么由于multiplexing可能导致两个语句发到不同的DB上执行，继而没有按照预期的字符集执行。proxysql考虑到了这种情况：</p>
 <ol>
 <li>连接会话里创建了临时表，<code>CREATE TEMPORARY table xxxx...</code></li>
@@ -466,6 +466,8 @@
 <p>如果sql_mode确实对应用使用造成困扰，1.4版本里会修复，在此前估计只好将连接复用的特性全局禁用：<br><figure class="highlight gams"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">SET</span> mysql-multiplexing=<span class="string">'false'</span>;</div><div class="line">LOAD MYSQL <span class="keyword">VARIABLES</span> TO <span class="comment">RUNTIME</span>;</div><div class="line">SAVE MYSQL <span class="keyword">VARIABLES</span> TO <span class="comment">DISK</span>;</div></pre></td></tr></table></figure></p>
 <p>参考 <a href="https://github.com/sysown/proxysql/issues/916" target="_blank" rel="external">issue #916</a>。禁用 multiplexing 后，就像一般的中间件连接池一样，维持或者释放连接。</p>
 <p>最后，关于 multiplexing 向作者提了一个特性 <a href="https://github.com/sysown/proxysql/issues/594#issuecomment-294703577" target="_blank" rel="external">594#issuecomment-294703577</a> ：前端连接执行完一个查询，后端不马上把它返回连接池（复用），而是等待几秒，如果这个连接后续又有sql进来，就不需要重新从池里获取连接，还有检查一堆变量。renecannao 的回复非常及时，也确认 v1.4 会加上这个功能。</p>
+<p>updated at 2017-07-27:<br>关于连接复用与连接池的差别，在后一次与作者的沟通中，更加明确了，见 <a href="https://github.com/sysown/proxysql/issues/1107" target="_blank" rel="external">#issue 1107</a>:<br>问题始于发现环境中的connection pool没有起作用（禁用了multiplexing），因为一开始只是认为禁用了multiplexing，connection pool不会受影响。但实际不是的，在1.3.x版本里，禁用multiplexing，就相当于连接复用和连接池都没有了，前段应用在释放连接后，proxysql也把后端的连接释放了；在1.4.x版本里表现不同，禁用multiplexing后，前端连接释放，proxysql对后端的连接继续保持，并对连接重置以便重复利用。</p>
+<p>所以如果测试上没啥问题，建议开启连接复用，或者升级到 1.4.x 版本。</p>
 <hr>
 <p>原文连接地址：<a href="http://seanlook.com/2017/04/17/mysql-proxysql-multiplexing/">http://seanlook.com/2017/04/17/mysql-proxysql-multiplexing/</a></p>
 <hr>
