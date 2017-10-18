@@ -316,6 +316,549 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/10/17/rds_disk_io_troubleshooting/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2017/10/17/rds_disk_io_troubleshooting/" itemprop="url">
+                  MySQL实例阻塞分析一例(线程statistics状态)
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-10-17T16:32:49+08:00">
+                2017-10-17
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2017/10/17/rds_disk_io_troubleshooting/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2017/10/17/rds_disk_io_troubleshooting/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2017/10/17/rds_disk_io_troubleshooting/" class="leancloud_visitors" data-flag-title="MySQL实例阻塞分析一例(线程statistics状态)">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h1 id="1-现象"><a href="#1-现象" class="headerlink" title="1. 现象"></a>1. 现象</h1><p>某日下午下班后低峰期，现网MySQL一个库突然报出大量慢sql，状态是 <code>statistics</code>，但是过后拿这些sql去执行的时候，实际很快。处于 statistics 状态的线程有个特征：查询的都是视图，但看监控那个时间段并没有明显的update/detele/insert。通过我们的快照程序，去分析当时的 innodb status，发现如下信息：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div></pre></td><td class="code"><pre><div class="line">SEMAPHORES</div><div class="line"><span class="comment">----------</span></div><div class="line">OS WAIT ARRAY INFO: reservation count 17208994</div><div class="line"><span class="comment">--Thread 139964610234112 has waited at srv0srv.cc line 2132 for 14.00 seconds the semaphore:</span></div><div class="line">X-<span class="keyword">lock</span> (wait_ex) <span class="keyword">on</span> RW-latch <span class="keyword">at</span> <span class="number">0x1635a00</span> created <span class="keyword">in</span> <span class="keyword">file</span> dict0dict.cc line <span class="number">900</span></div><div class="line">a writer (<span class="keyword">thread</span> <span class="keyword">id</span> <span class="number">139964610234112</span>) has reserved it <span class="keyword">in</span> <span class="keyword">mode</span> <span class="keyword">wait</span> exclusive</div><div class="line"><span class="built_in">number</span> <span class="keyword">of</span> readers <span class="number">1</span>, waiters flag <span class="number">0</span>, lock_word: ffffffffffffffff</div><div class="line"><span class="keyword">Last</span> <span class="keyword">time</span> <span class="keyword">read</span> <span class="keyword">locked</span> <span class="keyword">in</span> <span class="keyword">file</span> row0purge.cc line <span class="number">720</span></div><div class="line"><span class="keyword">Last</span> <span class="keyword">time</span> write <span class="keyword">locked</span> <span class="keyword">in</span> <span class="keyword">file</span> /home/<span class="keyword">admin</span>/<span class="number">146</span>_20161018140650857_13830810_code/rpm_workspace/<span class="keyword">storage</span>/innobase/srv/srv0srv.cc line <span class="number">2132</span></div><div class="line">OS <span class="keyword">WAIT</span> <span class="built_in">ARRAY</span> INFO: signal <span class="keyword">count</span> <span class="number">256984450</span></div><div class="line"><span class="keyword">Mutex</span> spin waits <span class="number">626367674</span>, rounds <span class="number">2776951802</span>, OS waits <span class="number">1973672</span></div><div class="line">RW-<span class="keyword">shared</span> spins <span class="number">149944457</span>, rounds <span class="number">1650148561</span>, OS waits <span class="number">3972058</span></div><div class="line">RW-excl spins <span class="number">72090467</span>, rounds <span class="number">2017802579</span>, OS waits <span class="number">11148264</span></div><div class="line">Spin rounds per <span class="keyword">wait</span>: <span class="number">4.43</span> <span class="keyword">mutex</span>, <span class="number">11.01</span> RW-<span class="keyword">shared</span>, <span class="number">27.99</span> RW-excl</div><div class="line">...</div><div class="line"><span class="keyword">FILE</span> I/O</div><div class="line"><span class="comment">--------</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">0</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">insert</span> buffer <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">1</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">log</span> <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">2</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">read</span> <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">3</span> state: doing <span class="keyword">file</span> i/o (<span class="keyword">read</span> <span class="keyword">thread</span>) ev <span class="keyword">set</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">4</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">read</span> <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">5</span> state: doing <span class="keyword">file</span> i/o (<span class="keyword">read</span> <span class="keyword">thread</span>) ev <span class="keyword">set</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">6</span> state: doing <span class="keyword">file</span> i/o (write <span class="keyword">thread</span>) ev <span class="keyword">set</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">7</span> state: waiting <span class="keyword">for</span> i/o request (write <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">8</span> state: waiting <span class="keyword">for</span> i/o request (write <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">9</span> state: waiting <span class="keyword">for</span> i/o request (write <span class="keyword">thread</span>)</div><div class="line">Pending <span class="keyword">normal</span> aio <span class="keyword">reads</span>: <span class="number">18</span> [<span class="number">0</span>, <span class="number">12</span>, <span class="number">0</span>, <span class="number">6</span>] , aio writes: <span class="number">1</span> [<span class="number">1</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>] ,</div><div class="line">ibuf aio <span class="keyword">reads</span>: <span class="number">0</span>, <span class="keyword">log</span> i/o<span class="string">'s: 0, sync i/o'</span>s: <span class="number">0</span></div><div class="line">Pending flushes (fsync) <span class="keyword">log</span>: <span class="number">0</span>; buffer pool: 0</div><div class="line">1346747614 OS file reads, 2869418806 OS file writes, 524616747 OS fsyncs</div><div class="line">22 pending preads, 1 pending pwrites</div><div class="line">6.00 reads/s, 16384 avg bytes/read, 0.00 writes/s, 0.00 fsyncs/s</div><div class="line">...</div><div class="line">ROW OPERATIONS</div><div class="line"><span class="comment">--------------</span></div><div class="line">0 queries inside InnoDB, 0 queries in queue</div><div class="line">38 read views open inside InnoDB</div><div class="line">Main thread process no. 34414, id 139964610234112, state: enforcing dict <span class="keyword">cache</span> <span class="keyword">limit</span></div><div class="line"><span class="built_in">Number</span> <span class="keyword">of</span> <span class="keyword">rows</span> inserted <span class="number">2546811699</span>, <span class="keyword">updated</span> <span class="number">1708150459</span>, deleted <span class="number">1004154696</span>, <span class="keyword">read</span> <span class="number">413168628410</span></div><div class="line"><span class="number">0.00</span> inserts/s, <span class="number">0.00</span> updates/s, <span class="number">0.00</span> deletes/s, <span class="number">54.19</span> <span class="keyword">reads</span>/s</div></pre></td></tr></table></figure></p>
+<h1 id="2-分析"><a href="#2-分析" class="headerlink" title="2. 分析"></a>2. 分析</h1><p>从上面的信息知道 Thread 139964610234112 是主线程，在源码 srv0srv.cc:2132 行的地方等待信号14s，这个信号是在 dict0dict.cc:900 地方创建的 RW-latch 排它锁。那么奇怪了，主线程自己在等待自己的互斥锁。<br>由于环境是阿里云的RDS(基于MySQL 5.6.16-log 版本)，拿不到他们的代码，找来 5.6.35 的来看，行号对不上。但好在上段信息的最后面有一个 Main thread state: <code>enforcing dict cache limit</code>，发现在 srv0srv.cc 函数 srv_master_do_active_tasks() 约2137行的位置：<br><figure class="highlight mipsasm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">if (cur_time % SRV_MASTER_DICT_LRU_INTERVAL == <span class="number">0</span>) &#123;</div><div class="line">4srv_main_thread_op_info = <span class="string">"enforcing dict cache limit"</span><span class="comment">;</span></div><div class="line">4srv_master_evict_from_table_cache(<span class="number">50</span>)<span class="comment">;</span></div><div class="line">4MONITOR_INC_TIME_IN_MICRO_SECS(</div><div class="line">44MONITOR_SRV_DICT_LRU_MICROSECOND, counter_time)<span class="comment">;</span></div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2017/10/17/rds_disk_io_troubleshooting/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/10/13/mysql-table_open_cache_file_limits/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2017/10/13/mysql-table_open_cache_file_limits/" itemprop="url">
+                  table_open_cache 与 table_definition_cache 对MySQL的影响
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-10-13T16:32:49+08:00">
+                2017-10-13
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2017/10/13/mysql-table_open_cache_file_limits/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2017/10/13/mysql-table_open_cache_file_limits/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2017/10/13/mysql-table_open_cache_file_limits/" class="leancloud_visitors" data-flag-title="table_open_cache 与 table_definition_cache 对MySQL的影响">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h1 id="1-现象，内存使用大"><a href="#1-现象，内存使用大" class="headerlink" title="1. 现象，内存使用大"></a>1. 现象，内存使用大</h1><p>首先说一下最近遇到的一个现象，因为分库的缘故，单实例里面的表的数量增加了20倍，总数将近达到10000个。在开发环境明显感觉到执行简单查询都很慢，在processlist里面看到状态 opening table 达到好几秒但数据库并没有什么负载。本能的想到应该要加大 <code>table_open_cache</code>，可是加大后发现MySQL刚启动 RES 就占用了2.5G内存，之前才500-600M的样子。</p>
+<p>只是将 <code>table_open_cache</code> 从默认的2000，增加到10000（先不论这个值合不合理），就独占了2G的内存，这对于生产环境内存浪费是不可接受的。还好，关于这个问题的讨论有不少，感兴趣的话可以阅读 <a href="https://bugs.mysql.com/bug.php?id=68287">#bug 68287</a>, <a href="https://bugs.mysql.com/bug.php?id=68514">#bug 68514</a>, <a href="https://www.percona.com/forums/questions-discussions/mysql-and-percona-server/percona-server-5-6/12015-percona-5-6-14-56-very-high-memory-usage">12015-percona-5-6-14-56-very-high-memory-usage</a>。</p>
+<p>Oracle官方工程师并不认为这是个bug，导致初始化分配这么多内存的原因是，<strong>开启了 Performance_Schema</strong> 。P_S测量数据库的性能指标，需要提前一次性分配内存，而不是随着数据库运行逐渐申请内存。</p>
+<p>下表是不同参数组合下内存占用的测试结果：<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql_table_cache_1.png" alt=""></p>
+<p>（注：可以通过这个来查看PFS里面哪些占内存比较多，<code>mysql -hxxxx -Pxxx -uxx -pxx -e &quot;show engine performance_schema status&quot;|grep memory|sort -nr -k3 |head</code> ）</p>
+<p>对于 table_open_cache 设置的非常大的情况下，即使还有许多cache多余，但P_S都需要分配这个数量的内存。解决这个内存大的问题有3个方向：</p>
+<ol>
+<li>table_open_cache, table_definition_cache, max_connections 设置合理</li>
+<li>关闭 performance_schema</li>
+<li>保持 PFS 开启，关闭测量 max_table_instances和max_table_handles  <ul>
+<li>performance_schema_max_table_instances: 最大测量多少个表对象<br>对应 (pfs_table_share).memory，我的环境里固定 277600000 bytes</li>
+<li>performance_schema_max_table_handles: 最大打开表的总数<br>对应(pfs_table).memory，随着 table_open_cache 的增大而增大</li>
+</ul>
+</li>
+</ol>
+<p>关闭的方法是在my.cnf里面设置以上变量为 0 。默认是 -1 ，表示 autosize，即根据 table_open_cache/table_def_cache/max_connections 的值自动设置，相关代码 <code>pfs_autosize.cc</code>：<br><figure class="highlight php"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line">PFS_sizing_data *estimate_hints(PFS_global_param *param)</div><div class="line">&#123;</div><div class="line">  <span class="keyword">if</span> ((param-&gt;m_hints.m_max_connections &lt;= MAX_CONNECTIONS_DEFAULT) &amp;&amp;</div><div class="line">      (param-&gt;m_hints.m_table_definition_cache &lt;= TABLE_DEF_CACHE_DEFAULT) &amp;&amp;</div><div class="line">      (param-&gt;m_hints.m_table_open_cache &lt;= TABLE_OPEN_CACHE_DEFAULT))</div><div class="line">  &#123;</div><div class="line">    <span class="comment">/* The my.cnf used is either unchanged, or lower than factory defaults. */</span></div><div class="line">    <span class="keyword">return</span> &amp; small_data;</div><div class="line">  &#125;</div><div class="line"></div><div class="line">  <span class="keyword">if</span> ((param-&gt;m_hints.m_max_connections &lt;= MAX_CONNECTIONS_DEFAULT * <span class="number">2</span>) &amp;&amp;</div><div class="line">      (param-&gt;m_hints.m_table_definition_cache &lt;= TABLE_DEF_CACHE_DEFAULT * <span class="number">2</span>) &amp;&amp;</div><div class="line">      (param-&gt;m_hints.m_table_open_cache &lt;= TABLE_OPEN_CACHE_DEFAULT * <span class="number">2</span>))</div><div class="line">  &#123;</div><div class="line">    <span class="comment">/* Some defaults have been increased, to "moderate" values. */</span></div><div class="line">    <span class="keyword">return</span> &amp; medium_data;</div><div class="line">  &#125;</div><div class="line"></div><div class="line">  <span class="comment">/* Looks like a server in production. */</span></div><div class="line">  <span class="keyword">return</span> &amp; large_data;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>在阿里RDS中，performance_schema_max<em>*</em>系列变量不能单独disable，只能全局关闭PFS。这里我们尝试寻求一个合理table_cache的范围。<br>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2017/10/13/mysql-table_open_cache_file_limits/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/09/23/mysql-big-trx-lock-case/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2017/09/23/mysql-big-trx-lock-case/" itemprop="url">
+                  “大”事务引起的锁等待分析案例
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-09-23T16:32:49+08:00">
+                2017-09-23
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2017/09/23/mysql-big-trx-lock-case/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2017/09/23/mysql-big-trx-lock-case/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2017/09/23/mysql-big-trx-lock-case/" class="leancloud_visitors" data-flag-title="“大”事务引起的锁等待分析案例">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h1 id="1-现象"><a href="#1-现象" class="headerlink" title="1. 现象"></a>1. 现象</h1><p>生产环境数据库在某一刻突然发现大量活跃连接，而且大部分状态是 <code>updating</code> 。问题出现在周六上午，持续了大概三四分钟，得益于我们自己的快照程序，拿到了当时现场的的processlist, 锁等待关系，innodb status 信息：(经过过滤处理)</p>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-bigtrx-lockinfo.png" alt="mysql-bigtrx-lockinfo.png"><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-bigtrx-processlist.png" alt="mysql-bigtrx-processlist.png"></p>
+<p>innodb_status.txt片段：<br><a href="https://gist.coding.net/u/seanlook/d6ad649f81c64e23a25f3a980c44a1fe">var_mydb_snapshot.html</a></p>
+<p>首先在 Lock Waits Info 一节，看到每行的trx_id(事务)的role分为 Blocker(引起阻塞的线程) 与 Blockee（被阻塞者）；最后一列 blocking_trx_id 在role是Blockee时才有值，代表谁阻塞了当前事务。<br>根据上面的关系，可以得出以下结论：</p>
+<ol>
+<li>事务 <strong>19705811640</strong> 运行了231s，阻塞了19706118937、19706124453、19706124752，而这些事务都在做同一个UPDATE语句</li>
+<li>被锁定的记录是 mydb.mytable1表的主键索引值为 5317885 行</li>
+<li>事务 19706124752 既被阻塞，也阻塞了别人19706125253</li>
+<li>不难发现 <strong>19705811640</strong> 应该最先运行的事务，且对其它事务产生了链式阻塞，它的thread_id是 9898630，来源IP</li>
+</ol>
+<p>但是当你兴冲冲的找到引起阻塞的事务 19705811640 在做什么事情时，发现它没有任何sql的信息，lock info以及processlist里面都是None。那么有哪些情况会导致在会话是活跃的，但sql的内容为空：</p>
+<ol>
+<li>执行show processlist的时候，刚好在事务里面两个sql的中间</li>
+<li>sql已经执行完成，但长时间没有提交</li>
+</ol>
+<h1 id="2-初步分析"><a href="#2-初步分析" class="headerlink" title="2. 初步分析"></a>2. 初步分析</h1><p>其实这个现象已经遇到过很多次了，第1个原因常发生在 大量单条记录更新 的情况，一个sql在一个事务里循环执行10000次，即使每条都很快，但大部分时间都在网络传输上，（可以改成批量的形式）。在本案例基本上能确定的是第2个原因：事务开启之后，sql也执行了，但中间又做别的事情去了。那么怎样才能知道这个事务是什么内容呢？两个方向去找：</p>
+<ol>
+<li>从来源ip上的应用程序的日志里分析</li>
+<li>binlog里面分析</li>
+</ol>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2017/09/23/mysql-big-trx-lock-case/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/07/16/mysql-proxysql-monitor/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -725,537 +1268,11 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/04/27/mysql-proxysql-patch-querytext-sample/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2017/04/27/mysql-proxysql-patch-querytext-sample/" itemprop="url">
-                  ProxySQL之改进patch：记录查询sql完整样例与合并digest多个?
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-04-27T15:32:49+08:00">
-                2017-04-27
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2017/04/27/mysql-proxysql-patch-querytext-sample/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2017/04/27/mysql-proxysql-patch-querytext-sample/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2017/04/27/mysql-proxysql-patch-querytext-sample/" class="leancloud_visitors" data-flag-title="ProxySQL之改进patch：记录查询sql完整样例与合并digest多个?">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>近期一直在思考sql上线审核该怎么做，刚好接触到 ProxySQL 这个中间件，内置了一个计算sql指纹的功能，但是没有记录原始的sql语句。当前正有个紧急的拆库项目也希望知道库上所有的查询。于是把ProxySQL的代码下了回来研究了几天，改了把，加入了两个功能：</p>
-<ol>
-<li>在 <code>stats_mysql_query_digest</code> 表上增加 <code>query_text</code> 字段，当第一次出现这个digest_text时，把原始sql记录下来。</li>
-<li>修改计算指纹的模块，对 IN或者 VALUES 后面的多个 <code>?</code> 合并。这个是目前 <code>c_tokenizer.c</code> 文件里没有做的，用到底1点上可以避免重复记录。</li>
-</ol>
-<p>效果：<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-querytext-sample-digest.png" alt="proxysql-querytext-sample-digest"></p>
-<p>多个 <code>?</code> 被折叠成 <code>?,</code>，有些意外情况时 <code>??</code>，因为后面一些多余空格的缘故，没有像 <em>pt-fingerprint</em> 那样完全模糊化，像这里digest就保留了大小写、去除重复空格、保留 ` 分隔符。但仅有的几种意外情况是可以接受的。</p>
-<p>后面的 query_text 列也有些未知情况，就是末尾会加上一些奇怪的字符，还在排除，但大体不影响需求。</p>
-<p>代码是基于最新 v1.3.6 稳定版修改的，查看变更 <a href="https://github.com/sysown/proxysql/compare/v1.3.6...seanlook:v1.3.7-querysample_digest">https://github.com/sysown/proxysql/compare/v1.3.6...seanlook:v1.3.7-querysample_digest</a> </p>
-<p>多个 <code>?</code> 合并只涉及到 <em>c_tokenizer.c</em> 文件，分别在flag=4（处理 <code>&#39;abc&#39;,&#39;def&#39;</code> 的情况）和flag=5（处理 <code>1,2, 3</code> 的情况）加入判断：<br><figure class="highlight cpp"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// wrap two more ? to one ?,</span></div><div class="line"><span class="keyword">if</span> (*(<span class="keyword">p_r_t</span><span class="number">-2</span>) == <span class="string">'?'</span> &amp;&amp; (*(<span class="keyword">p_r_t</span><span class="number">-1</span>) ==<span class="string">' '</span> || *(<span class="keyword">p_r_t</span><span class="number">-1</span>) == <span class="string">','</span> || *(<span class="keyword">p_r_t</span><span class="number">-1</span>) == <span class="string">'?'</span>))&#123;</div><div class="line">    *(p_r<span class="number">-1</span>) = <span class="string">','</span>;</div><div class="line">&#125;</div><div class="line"><span class="keyword">else</span></div><div class="line">    *p_r++ = <span class="string">'?'</span>;</div></pre></td></tr></table></figure></p>
-<p>然后在 line:450 左右 COPY CHAR 的时候进行一次过滤：<br><figure class="highlight cpp"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// COPY CHAR</span></div><div class="line"><span class="comment">// =================================================</span></div><div class="line"><span class="comment">// wrap two more ? to ?,</span></div><div class="line"><span class="keyword">if</span> ((*s == <span class="string">' '</span> || *s == <span class="string">','</span>) &amp;&amp; (*(<span class="keyword">p_r_t</span><span class="number">-1</span>) == <span class="string">'?'</span> || *(<span class="keyword">p_r_t</span><span class="number">-1</span>) == <span class="string">','</span> || *(<span class="keyword">p_r_t</span><span class="number">-1</span>) == <span class="string">' '</span>)) &#123;</div><div class="line">    <span class="keyword">if</span> (*(<span class="keyword">p_r_t</span><span class="number">-1</span>) == <span class="string">' '</span> &amp;&amp; *(<span class="keyword">p_r_t</span><span class="number">-2</span>) == <span class="string">'?'</span>)</div><div class="line">        *(p_r<span class="number">-1</span>) = <span class="string">','</span>;  <span class="comment">// p_r may be changed in line:435:is_digit_string</span></div><div class="line">&#125;</div><div class="line"><span class="keyword">else</span> &#123;</div></pre></td></tr></table></figure></p>
-<p>这部分代码调试花了不少功夫，一是理清逻辑，而是意外情况处理。变量的用途注释不清晰，几年没写C，不得不动用 gdb 来跟踪调试，怀念大学时用IDE的日子。</p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2017/04/27/mysql-proxysql-patch-querytext-sample/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/04/20/mysql-proxysql-performance-test/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2017/04/20/mysql-proxysql-performance-test/" itemprop="url">
-                  ProxySQL之性能测试对比
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-04-20T21:32:49+08:00">
-                2017-04-20
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2017/04/20/mysql-proxysql-performance-test/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2017/04/20/mysql-proxysql-performance-test/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2017/04/20/mysql-proxysql-performance-test/" class="leancloud_visitors" data-flag-title="ProxySQL之性能测试对比">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          本文会通过sysbench对ProxySQL进行基准测试，并与直连的性能进行对比。与此同时也对 Maxscale 和 Qihu360 Atlas 放在一起参考。提示：压测前确保把query cache完全关掉。
-1. proxysql vs 直连1.1 select nontrx12345./bin/sysbench --test=/root/sysbench2/sysbench/tests/db/oltp.lua --mysql-host=10.0.100.36 --mysql-port=6033 --mysql-user=myuser --mysql-password=mypass \--mysql-db=db15 --oltp-tables-count=20 --oltp-table-size=5000000 --report-interval=20 --oltp-dist-type=uniform --rand-init=on --max-requests=0 --oltp-test-mode=nontrx --oltp-nontrx-mode=select \--oltp-r
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2017/04/20/mysql-proxysql-performance-test/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/04/17/mysql-proxysql-multiplexing/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2017/04/17/mysql-proxysql-multiplexing/" itemprop="url">
-                  ProxySQL之连接复用（multiplexing）以及相关问题说明
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-04-17T21:32:49+08:00">
-                2017-04-17
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2017/04/17/mysql-proxysql-multiplexing/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2017/04/17/mysql-proxysql-multiplexing/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2017/04/17/mysql-proxysql-multiplexing/" class="leancloud_visitors" data-flag-title="ProxySQL之连接复用（multiplexing）以及相关问题说明">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          ProxySQL在连接池(persistent connection poll)的基础上，还有一个连接复用的概念 multiplexing connection，官方的wiki里没有很明确的说明，但在作者的一些 blog post 和 issue 里能找到解答： https://github.com/sysown/proxysql/issues/939#issuecomment-287489317 
-由于SQL可以路由，一个客户端连接上来，可能会到多个 hostgroup 发起连接。复用的意思是，一个后端DB的连接，可以“同时”被多个客户端使用。
-传统的连接池，会在客户端断开连接（会话）后，把连接放回到池里。在ProxySQL中，由于连接复用，连接会在sql语句执行结束后，便将连接放回到池里（客户端会话可能并没有断开），这样便可大大提高后端连接的使用效率，而避免前段请求过大导致后端连接数疯长。
-但这样做有时候并不安全，比如应用端连接时指定了 set NAMES xxx，然后执行查询，那么由于multiplexing可能导致两个语句发到不同的DB上执行，继而没有按照预期的字符集执行。pr
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2017/04/17/mysql-proxysql-multiplexing/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
   <nav class="pagination">
-    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><span class="space">&hellip;</span><a class="page-number" href="/page/21/">21</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right"></i></a>
+    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><span class="space">&hellip;</span><a class="page-number" href="/page/22/">22</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right"></i></a>
   </nav>
 
 
@@ -1300,7 +1317,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">103</span>
+                <span class="site-state-item-count">106</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -1322,7 +1339,7 @@
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">116</span>
+                <span class="site-state-item-count">118</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>

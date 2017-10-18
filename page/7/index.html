@@ -316,6 +316,661 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/05/11/mysql-dev-principle-ec/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2016/05/11/mysql-dev-principle-ec/" itemprop="url">
+                  MySQL数据库开发规范-EC
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-05-11T16:32:49+08:00">
+                2016-05-11
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2016/05/11/mysql-dev-principle-ec/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2016/05/11/mysql-dev-principle-ec/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2016/05/11/mysql-dev-principle-ec/" class="leancloud_visitors" data-flag-title="MySQL数据库开发规范-EC">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <!-- 
+
+http://highdb.com/mysql%E5%BC%80%E5%8F%91%E8%A7%84%E8%8C%83/
+http://blog.csdn.net/xlgen157387/article/details/48086607
+http://www.iteye.com/topic/1141229
+-->
+<p>最近一段时间一边在线上抓取SQL来优化，一边在整理这个开发规范，尽量减少新的问题SQL进入生产库。今天也是对公司的开发做了一次培训，PPT就不放上来了，里面有十来个生产SQL的案例。因为规范大部分还是具有通用性，所以也借鉴了像去哪儿和赶集的规范，但实际在撰写本文的过程中，每一条规范的背后无不是在工作中有参照的反面例子的。如果时间可以的话，会抽出一部分或分析其原理，或用案例证明。</p>
+<h2 id="1-命名规范"><a href="#1-命名规范" class="headerlink" title="1. 命名规范"></a>1. 命名规范</h2><ol>
+<li><h3 id="库名、表名、字段名必须使用小写字母，并采用下划线分割"><a href="#库名、表名、字段名必须使用小写字母，并采用下划线分割" class="headerlink" title="库名、表名、字段名必须使用小写字母，并采用下划线分割"></a>库名、表名、字段名必须使用小写字母，并采用下划线分割</h3><ul>
+<li>MySQL有配置参数lower_case_table_names=1，即库表名以小写存储，大小写不敏感。如果是0，则库表名以实际情况存储，大小写敏感；如果是2，以实际情况存储，但以小写比较。</li>
+<li>如果大小写混合使用，可能存在abc，Abc，ABC等多个表共存，容易导致混乱。</li>
+<li>字段名显示区分大小写，但实际使⽤时不区分，即不可以建立两个名字一样但大小写不一样的字段。</li>
+<li>为了统一规范， 库名、表名、字段名使用小写字母。</li>
+</ul>
+</li>
+<li><h3 id="库名以-d-开头，表名以-t-开头，字段名以-f-开头"><a href="#库名以-d-开头，表名以-t-开头，字段名以-f-开头" class="headerlink" title="库名以 d 开头，表名以 t 开头，字段名以 f_ 开头"></a>库名以 d<em> 开头，表名以 t</em> 开头，字段名以 f_ 开头</h3><ul>
+<li>比如表 <code>t_crm_relation</code>，中间的 crm 代表业务模块名</li>
+<li>视图以<code>view_</code>开头，事件以<code>event_</code>开头，触发器以<code>trig_</code>开头，存储过程以<code>proc_</code>开头，函数以<code>func_</code>开头</li>
+<li>普通索引以<code>idx_col1_col2</code>命名，唯一索引以<code>uk_col1_col2</code>命名（可去掉f_公共部分）。如 idx_companyid_corpid_contacttime(f_company_id,f_corp_id,f_contact_time)</li>
+</ul>
+</li>
+<li><h3 id="库名、表名、字段名禁止超过32个字符，需见名知意"><a href="#库名、表名、字段名禁止超过32个字符，需见名知意" class="headerlink" title="库名、表名、字段名禁止超过32个字符，需见名知意"></a>库名、表名、字段名禁止超过32个字符，需见名知意</h3><p>库名、表名、字段名支持最多64个字符，但为了统一规范、易于辨识以及减少传输量，禁止超过32个字符</p>
+</li>
+<li><h3 id="临时库、表名须以tmp加日期为后缀"><a href="#临时库、表名须以tmp加日期为后缀" class="headerlink" title="临时库、表名须以tmp加日期为后缀"></a>临时库、表名须以tmp加日期为后缀</h3><p>如 t_crm_relation_tmp0425。备份表也类似，形如 <code>_bak20160425</code> 。</p>
+</li>
+<li><h3 id="按日期时间分表须符合-YYYY-MM-DD-格式"><a href="#按日期时间分表须符合-YYYY-MM-DD-格式" class="headerlink" title="按日期时间分表须符合_YYYY[MM][DD]格式"></a>按日期时间分表须符合_YYYY[MM][DD]格式</h3><p>这也是为将来有可能分表做准备的，比如<code>t_crm_ec_record_201403</code>，但像 t_crm_contact_at201506就打破了这种规范。<br>不具有时间特性的，直接以 <code>t_tbname_001</code> 这样的方式命名。</p>
+</li>
+</ol>
+<h2 id="2-库表基础规范"><a href="#2-库表基础规范" class="headerlink" title="2. 库表基础规范"></a>2. 库表基础规范</h2><ol>
+<li><h3 id="使用Innodb存储引擎"><a href="#使用Innodb存储引擎" class="headerlink" title="使用Innodb存储引擎"></a>使用Innodb存储引擎</h3><p>5.5版本开始mysql默认存储引擎就是InnoDB，5.7版本开始，系统表都放弃MyISAM了。</p>
+</li>
+<li><h3 id="表字符集统一使用UTF8"><a href="#表字符集统一使用UTF8" class="headerlink" title="表字符集统一使用UTF8"></a>表字符集统一使用UTF8</h3><ul>
+<li>UTF8字符集存储汉字占用3个字节，存储英文字符占用一个字节</li>
+<li>校对字符集使用默认的 utf8_general_ci</li>
+<li>连接的客户端也使用utf8，建立连接时指定charset或<code>SET NAMES UTF8;</code>。（对于已经在项目中长期使用latin1的，救不了了）</li>
+<li>如果遇到EMOJ等表情符号的存储需求，可申请使用UTF8MB4字符集</li>
+</ul>
+</li>
+<li><h3 id="所有表都要添加注释"><a href="#所有表都要添加注释" class="headerlink" title="所有表都要添加注释"></a>所有表都要添加注释</h3><ul>
+<li>尽量给字段也添加注释</li>
+<li>类status型需指明主要值的含义，如”0-离线，1-在线”</li>
+</ul>
+</li>
+<li><h3 id="控制单表字段数量"><a href="#控制单表字段数量" class="headerlink" title="控制单表字段数量"></a>控制单表字段数量</h3><ul>
+<li>单表字段数上限30左右，再多的话考虑垂直分表，一是冷热数据分离，二是大字段分离，三是常在一起做条件和返回列的不分离。</li>
+<li>表字段控制少而精，可以提高IO效率，内存缓存更多有效数据，从而提高响应速度和并发能力，后续 alter table 也更快。</li>
+</ul>
+</li>
+<li><h3 id="所有表都必须要显式指定主键"><a href="#所有表都必须要显式指定主键" class="headerlink" title="所有表都必须要显式指定主键"></a>所有表都必须要显式指定主键</h3><ul>
+<li>主键尽量采用自增方式，InnoDB表实际是一棵索引组织表，顺序存储可以提高存取效率，充分利用磁盘空间。还有对一些复杂查询可能需要自连接来优化时需要用到。</li>
+<li>需要全局唯一主键时，使用外部发号器ticket server（建设中）</li>
+<li>如果没有主键或唯一索引，update/delete是通过所有字段来定位操作的行，相当于每行就是一次全表扫描</li>
+<li>少数情况可以使用联合唯一主键，需与DBA协商</li>
+</ul>
+</li>
+<li><h3 id="不强制使用外键参考"><a href="#不强制使用外键参考" class="headerlink" title="不强制使用外键参考"></a>不强制使用外键参考</h3><p>即使2个表的字段有明确的外键参考关系，也不使用 FOREIGN KEY ，因为新纪录会去主键表做校验，影响性能。</p>
+</li>
+<li><h3 id="适度使用存储过程、视图，禁止使用触发器、事件"><a href="#适度使用存储过程、视图，禁止使用触发器、事件" class="headerlink" title="适度使用存储过程、视图，禁止使用触发器、事件"></a>适度使用存储过程、视图，禁止使用触发器、事件</h3></li>
+</ol>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2016/05/11/mysql-dev-principle-ec/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/05/05/mysql-type-conversion/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2016/05/05/mysql-type-conversion/" itemprop="url">
+                  小心MySQL的隐式类型转换陷阱
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-05-05T16:32:49+08:00">
+                2016-05-05
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2016/05/05/mysql-type-conversion/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2016/05/05/mysql-type-conversion/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2016/05/05/mysql-type-conversion/" class="leancloud_visitors" data-flag-title="小心MySQL的隐式类型转换陷阱">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h2 id="1-隐式类型转换实例"><a href="#1-隐式类型转换实例" class="headerlink" title="1. 隐式类型转换实例"></a>1. 隐式类型转换实例</h2><p>今天生产库上突然出现MySQL线程数告警，IOPS很高，实例会话里面出现许多类似下面的sql：(修改了相关字段和值)</p>
+<figure class="highlight lsl"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=<span class="number">1226391</span> and f_col2_id=<span class="number">1244378</span> and </div><div class="line">f_qq1_id in (<span class="number">12345</span>,<span class="number">23456</span>,<span class="number">34567</span>,<span class="number">45678</span>,<span class="number">56789</span>,<span class="number">67890</span>,<span class="number">78901</span>,<span class="number">89012</span>,<span class="number">90123</span>,<span class="number">901231</span>,<span class="number">901232</span>,<span class="number">901233</span>)</div></pre></td></tr></table></figure>
+<p>用 explain 看了下扫描行数和索引选择情况： </p>
+<figure class="highlight asciidoc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">mysql&gt;explain SELECT f<span class="emphasis">_col3_</span>id,f<span class="emphasis">_qq1_</span>id FROM d<span class="emphasis">_dbname.t_</span>tb1 WHERE f<span class="emphasis">_col1_</span>id=1226391 </div><div class="line"><span class="section">and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233);</div><div class="line">+------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+</span></div><div class="line"><span class="section">| id   | select_type   | table   | type   | possible_keys                  | key           | key_len    | ref    | rows   | Extra                              |</div><div class="line">+------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+</span></div><div class="line"><span class="section">| 1    | SIMPLE        | t_tb1   | ref    | uid_type_frid,idx_corpid_qq1id | uid_type_frid | 8          | const  | 1386   | Using index condition; Using where |</div><div class="line">+------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+</span></div><div class="line">共返回 1 行记录,花费 11.52 ms.</div></pre></td></tr></table></figure>
+<p>t_tb1 表上有个索引<code>uid_type_frid(f_col2_id,f_type)</code>、<code>idx_corp_id_qq1id(f_col1_id,f_qq1_id)</code>，而且如果选择后者时，f_qq1_id的过滤效果应该很佳，但却选择了前者。当使用 hint <code>use index(idx_corp_id_qq1id)</code>时：<br>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2016/05/05/mysql-type-conversion/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/04/29/mysql-numeric-int-float/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2016/04/29/mysql-numeric-int-float/" itemprop="url">
+                  MySQL数字类型int与tinyint、float与decimal如何选择
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-04-29T16:32:49+08:00">
+                2016-04-29
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2016/04/29/mysql-numeric-int-float/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2016/04/29/mysql-numeric-int-float/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2016/04/29/mysql-numeric-int-float/" class="leancloud_visitors" data-flag-title="MySQL数字类型int与tinyint、float与decimal如何选择">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>最近在准备给开发做一个mysql数据库开发规范方面培训，一步一步来，结合在生产环境发现的数据库方面的问题，从几个常用的数据类型说起。</p>
+<h2 id="int、tinyint与bigint"><a href="#int、tinyint与bigint" class="headerlink" title="int、tinyint与bigint"></a>int、tinyint与bigint</h2><p>它们都是（精确）整型数据类型，但是占用字节数和表达的范围不同。首先没有这个表就说不过去了：</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Storage</th>
+<th>Minimum Value</th>
+<th>Maximum Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td>(Bytes)</td>
+<td>(Signed/Unsigned)</td>
+<td>(Signed/Unsigned)</td>
+</tr>
+<tr>
+<td>TINYINT</td>
+<td>1</td>
+<td>-128</td>
+<td>127</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>0</td>
+<td>255</td>
+</tr>
+<tr>
+<td>SMALLINT</td>
+<td>2</td>
+<td>-32768</td>
+<td>32767</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>0</td>
+<td>65535</td>
+</tr>
+<tr>
+<td>MEDIUMINT</td>
+<td>3</td>
+<td>-8388608</td>
+<td>8388607</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>0</td>
+<td>16777215</td>
+</tr>
+<tr>
+<td>INT</td>
+<td>4</td>
+<td>-2147483648</td>
+<td>2147483647</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>0</td>
+<td>4294967295</td>
+</tr>
+<tr>
+<td>BIGINT</td>
+<td>8</td>
+<td>-9223372036854775808</td>
+<td>9223372036854775807</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>0</td>
+<td>18446744073709551615</td>
+</tr>
+</tbody>
+</table>
+<p>只需要知道对应类型占多少字节就能推算出范围了，比如int占 4 bytes,即4*8=32bits，大约10位数字，也能理解为什么int默认显示位数是11。</p>
+<p>遇到比较多的是tinyint和bigint，tinyint一般用于存放status,type这种数值小的数据，不够用时可能会用smallint。bigint一般用于自增主键。</p>
+<p>为了避免数据库被过度设计，布尔、枚举类型也采用tinyint。</p>
+<p>还有一点也是经常被提到的关于 int(M) 中M的理解，int型数据无论是int(4)还是int(11)，都已经占用了 4 bytes 存储空间，M表示的只是显示宽度(display width, max value 255)，并不是定义int的长度。</p>
+<p>例如：</p>
+<figure class="highlight gherkin"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div></pre></td><td class="code"><pre><div class="line">mysql&gt; CREATE TABLE `tc_integer` (</div><div class="line">  `f_id` bigint(20) PRIMARY KEY AUTO_INCREMENT,</div><div class="line">  `f_type` tinyint,</div><div class="line">  `f_flag` tinyint(1),</div><div class="line">  `f_num` smallint(5) unsigned ZEROFILL</div><div class="line">) ENGINE=InnoDB DEFAULT CHARSET=utf8;</div><div class="line"></div><div class="line">mysql&gt; desc tc_integer;</div><div class="line">+----------------+-------------------------------+------+-----+---------+----------------+</div><div class="line">|<span class="string"> Field          </span>|<span class="string"> Type                          </span>|<span class="string"> Null </span>|<span class="string"> Key </span>|<span class="string"> Default </span>|<span class="string"> Extra          </span>|</div><div class="line">+----------------+-------------------------------+------+-----+---------+----------------+</div><div class="line">|<span class="string"> f_id           </span>|<span class="string"> bigint(20)                    </span>|<span class="string"> NO   </span>|<span class="string"> PRI </span>|<span class="string"> NULL    </span>|<span class="string"> auto_increment </span>|</div><div class="line">|<span class="string"> f_type         </span>|<span class="string"> tinyint(4)                    </span>|<span class="string"> YES  </span>|<span class="string">     </span>|<span class="string"> NULL    </span>|<span class="string">                </span>|</div><div class="line">|<span class="string"> f_flag         </span>|<span class="string"> tinyint(1)                    </span>|<span class="string"> YES  </span>|<span class="string">     </span>|<span class="string"> NULL    </span>|<span class="string">                </span>|</div><div class="line">|<span class="string"> f_num          </span>|<span class="string"> smallint(5) unsigned zerofill </span>|<span class="string"> YES  </span>|<span class="string">     </span>|<span class="string"> NULL    </span>|<span class="string">                </span>|</div><div class="line">+----------------+-------------------------------+------+-----+---------+----------------+</div><div class="line">4 rows in set (0.01 sec)</div></pre></td></tr></table></figure>
+<p>插入几条数据看一下：<br>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2016/04/29/mysql-numeric-int-float/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/04/28/mysql-char-varchar-set/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -708,548 +1363,11 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/04/05/mysql-avoid-or-query/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2016/04/05/mysql-avoid-or-query/" itemprop="url">
-                  MySQL避免索引列使用 OR 条件
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-04-05T16:32:49+08:00">
-                2016-04-05
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2016/04/05/mysql-avoid-or-query/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2016/04/05/mysql-avoid-or-query/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2016/04/05/mysql-avoid-or-query/" class="leancloud_visitors" data-flag-title="MySQL避免索引列使用 OR 条件">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>这个亏已经吃过很多次了，在开发以前的sql代码里面，许多以 or 作为where条件的查询，甚至更新。这里举例来说明使用 or 的弊端，以及改进办法。</p>
-<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">select</span> f_crm_id <span class="keyword">from</span> d_dbname1.t_tbname1 <span class="keyword">where</span>  f_xxx_id = <span class="number">926067</span>  </div><div class="line"><span class="keyword">and</span> (f_mobile =<span class="string">'1234567891'</span> <span class="keyword">or</span> f_phone =<span class="string">'1234567891'</span> ) <span class="keyword">limit</span> <span class="number">1</span></div></pre></td></tr></table></figure>
-<p>从查询语句很容易看出，f_mobile和f_phone两个字段都有可能存电话号码，一般思路都是用 or 去一条sql解决，但表数据量一大简直是灾难：<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-avoid-or-1.png" alt=""></p>
-<p>t_tbanme1上有索引<code>idx_id_mobile(f_xxx_id,f_mobile)</code>, <code>idx_phone(f_phone)</code>,<code>idx_id_email(f_id,f_email)</code>，explain 的结果却使用了 idx_id_email 索引，有时候运气好可能走 idx_id_mobile f_xxx_id</p>
-<p><strong>因为mysql的每条查询，每个表上只能选择一个索引</strong>。如果使用了 idx_id_mobile 索引，恰好有一条数据，因为有 limit 1 ，那么恭喜很快得到结果；但如果 f_mobile 没有数据，那 f_phone 字段只能在f_id条件下挨个查找，扫描12w行。 or 跟 and 不一样，甚至有开发认为添加 <code>(f_xxx_id,f_mobile,f_phone)</code>不就完美了吗，要吐血了~<br>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2016/04/05/mysql-avoid-or-query/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/03/28/mysql-sysbench/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2016/03/28/mysql-sysbench/" itemprop="url">
-                  使用sysbench对mysql压力测试
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-03-28T16:32:49+08:00">
-                2016-03-28
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2016/03/28/mysql-sysbench/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2016/03/28/mysql-sysbench/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2016/03/28/mysql-sysbench/" class="leancloud_visitors" data-flag-title="使用sysbench对mysql压力测试">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>sysbench是一个模块化的、跨平台、多线程基准测试工具，主要用于评估测试各种不同系统参数下的数据库负载情况。关于这个项目的详细介绍请看：<a href="https://github.com/akopytov/sysbench">https://github.com/akopytov/sysbench</a> 。<br>它主要包括以下几种方式的测试：</p>
-<ol>
-<li>cpu性能</li>
-<li>磁盘io性能</li>
-<li>调度程序性能</li>
-<li>内存分配及传输速度</li>
-<li>POSIX线程性能</li>
-<li>数据库性能(OLTP基准测试)</li>
-</ol>
-<p>sysbench的数据库OLTP测试支持MySQL、PostgreSQL、Oracle，目前主要用于Linux操作系统，开源社区已经将sysbench移植到了Windows，并支持SQL Server的基准测试。</p>
-<p>废话不多说，开始。</p>
-<h2 id="1-sysbench安装"><a href="#1-sysbench安装" class="headerlink" title="1. sysbench安装"></a>1. sysbench安装</h2><ul>
-<li>mysql版本: mysql-community-server-5.6.29   </li>
-<li>OS: CentOS 6.7 X86_64</li>
-<li>sysbench 0.5相比0.4版本有一些变化，包括oltp测试结合了lua脚本，还多了一些隐藏选项，本文会涉及得到一部分。</li>
-</ul>
-<p>目前许多仓库里已编译好的二进制sysbench还是0.4.x版本，不过现在主流也还是github上的0.5，可以从 <a href="http://www.lefred.be/node/154">这里</a>下载0.5版本的rpm包直接安装，不过我选择自己编译，因为只有这个办法是通用的。</p>
-<figure class="highlight groovy"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// 先安装编译依赖环境</span></div><div class="line">$ sudo yum install gcc gcc-c++ automake make  libtool mysql-community-devel</div><div class="line"></div><div class="line">$ cd <span class="regexp">/tmp &amp;&amp; git clone https:/</span><span class="regexp">/github.com/</span>akopytov/sysbench.git</div><div class="line"></div><div class="line">$ cd <span class="regexp">/tmp/</span>sysbench &amp;&amp; ./autogen.sh</div><div class="line">$ .<span class="regexp">/configure --prefix=/</span>usr<span class="regexp">/local/</span>sysbench<span class="number">-0.5</span></div><div class="line">$ ./make &amp;&amp; sudo make install</div><div class="line"></div><div class="line"><span class="comment">// 0.5版本需要oltp.lua测试脚本</span></div><div class="line"><span class="comment">// 如果是rpm包方式安装的，在 /usr/share/doc/sysbench/tests/db/ 下可找到</span></div><div class="line">$ cd <span class="regexp">/usr/</span>local<span class="regexp">/sysbench &amp;&amp; sudo mkdir -p share/</span>tests/db</div><div class="line">$ cp <span class="regexp">/tmp/</span>sysbench<span class="regexp">/sysbench/</span>tests<span class="regexp">/db/</span>*.lua share<span class="regexp">/tests/</span>db/</div><div class="line">$ .<span class="regexp">/bin/</span>sysbench --version</div><div class="line">sysbench <span class="number">0.5</span></div></pre></td></tr></table></figure>
-<p>如果需要测试PostgreSQL、Oracle，则在configure时需要加上 –with-oracle 或者 –with-pgsql 参数</p>
-<h2 id="2-使用sysbench对mysql压测"><a href="#2-使用sysbench对mysql压测" class="headerlink" title="2. 使用sysbench对mysql压测"></a>2. 使用sysbench对mysql压测</h2><h3 id="2-1-只读示例"><a href="#2-1-只读示例" class="headerlink" title="2.1 只读示例"></a>2.1 只读示例</h3><figure class="highlight brainfuck"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="string">.</span><span class="comment">/bin/sysbench</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">test=</span><span class="string">.</span><span class="comment">/share/tests/db/oltp</span><span class="string">.</span><span class="comment">lua</span> <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">mysql</span><span class="literal">-</span><span class="comment">host=10</span><span class="string">.</span><span class="comment">0</span><span class="string">.</span><span class="comment">201</span><span class="string">.</span><span class="comment">36</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">mysql</span><span class="literal">-</span><span class="comment">port=8066</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">mysql</span><span class="literal">-</span><span class="comment">user=ecuser</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">mysql</span><span class="literal">-</span><span class="comment">password=ecuser</span> <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">mysql</span><span class="literal">-</span><span class="comment">db=dbtest1a</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">tables</span><span class="literal">-</span><span class="comment">count=10</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">table</span><span class="literal">-</span><span class="comment">size=500000</span> <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">report</span><span class="literal">-</span><span class="comment">interval=10</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">dist</span><span class="literal">-</span><span class="comment">type=uniform</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">rand</span><span class="literal">-</span><span class="comment">init=on</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">max</span><span class="literal">-</span><span class="comment">requests=0</span> <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">test</span><span class="literal">-</span><span class="comment">mode=nontrx</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">nontrx</span><span class="literal">-</span><span class="comment">mode=select</span> <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">read</span><span class="literal">-</span><span class="comment">only=on</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">skip</span><span class="literal">-</span><span class="comment">trx=on</span> <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">max</span><span class="literal">-</span><span class="comment">time=120</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">num</span><span class="literal">-</span><span class="comment">threads=12</span> <span class="comment">\</span></div><div class="line"><span class="title">[</span><span class="comment">prepare|run|cleanup</span><span class="title">]</span></div></pre></td></tr></table></figure>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2016/03/28/mysql-sysbench/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/01/18/mac-mini-zturn/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2016/01/18/mac-mini-zturn/" itemprop="url">
-                  记一次Mac mini折腾过程（鼠键共享，更换SSD）
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-01-18T16:32:49+08:00">
-                2016-01-18
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Mac-OSX/" itemprop="url" rel="index">
-                    <span itemprop="name">Mac OSX</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2016/01/18/mac-mini-zturn/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2016/01/18/mac-mini-zturn/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2016/01/18/mac-mini-zturn/" class="leancloud_visitors" data-flag-title="记一次Mac mini折腾过程（鼠键共享，更换SSD）">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>从公司网管那捣鼓来一个“遗弃” Mac mini，说其它人觉得用起来太卡，正好我的工作PC( CPU 4×i3，MEM 8G, HDD 500G)软件开多了也觉得有些卡，特别是我使用浏览器的习惯不太好，每次搜索统一结果都要打开好多标签页对比，文章性质的觉得有用想将来记录下来就没关闭页面，一两个星期下来只Chrome使用的内存就达到4G多。不用也浪费，于是就拿Mac mini分摊一下压力。</p>
-<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/macmini-a1347.jpg" alt="macmini-a1347.jpg"></p>
-<p>刚拿到手时心想得有多不堪配置才使得的Mac mini卡到嫌弃的地步，看了下底面的型号，A1347——这是2014年底出的新款，没有我想象的那么旧，还好。于是找来显示器、鼠键准备开用了（在某宝上买根八字电源线）。</p>
-<p>但是开机密码没有啊！虽然简单重装是个办法，但我还是想看看里面现在是什么样的，杀鸡焉用牛刀。直接Crack root…</p>
-<hr>
-<h1 id="1-破解Mac-root密码"><a href="#1-破解Mac-root密码" class="headerlink" title="1. 破解Mac root密码"></a>1. 破解Mac root密码</h1><p>找到这篇文章 <a href="http://wowking.blog.51cto.com/1638252/753774">http://wowking.blog.51cto.com/1638252/753774</a> 。我们平头百姓手头哪会有刻录的Mac OS光盘，而且也没移动光驱，所以方法一就不考虑了。方法二是单用户模式，毕竟 OS X 也是*nix血统，命令行几个命令倒难不到我。</p>
-<p>可是众所周知，Mac的键盘跟普通键盘是不一样的，开机启动的时候<code>command + S</code>在一般美式键盘下到底能不能进入单用户模式呢？嗯，行的，按下mini的开机按钮之后不断 <code>win + S</code>。进入Single user model之后提示符#root&gt;，逐步输入以下命令：</p>
-<figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># 执行硬盘检测（只读）, 这一步可以省略</span></div><div class="line">/sbin/fsck -y</div><div class="line"></div><div class="line"><span class="meta"># 加载文件系统（读/写）</span></div><div class="line">/sbin/mount -uaw</div><div class="line"></div><div class="line"><span class="meta"># 删除初始化设置时的OSX生成的隐藏文件”.applesetupdone”</span></div><div class="line">rm /<span class="keyword">var</span>/db/.AppleSetupDone</div><div class="line"></div><div class="line"><span class="meta"># 重启</span></div><div class="line">reboot</div></pre></td></tr></table></figure>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2016/01/18/mac-mini-zturn/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/6/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/6/">6</a><span class="page-number current">7</span><a class="page-number" href="/page/8/">8</a><span class="space">&hellip;</span><a class="page-number" href="/page/21/">21</a><a class="extend next" rel="next" href="/page/8/"><i class="fa fa-angle-right"></i></a>
+    <a class="extend prev" rel="prev" href="/page/6/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/6/">6</a><span class="page-number current">7</span><a class="page-number" href="/page/8/">8</a><span class="space">&hellip;</span><a class="page-number" href="/page/22/">22</a><a class="extend next" rel="next" href="/page/8/"><i class="fa fa-angle-right"></i></a>
   </nav>
 
 
@@ -1294,7 +1412,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">103</span>
+                <span class="site-state-item-count">106</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -1316,7 +1434,7 @@
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">116</span>
+                <span class="site-state-item-count">118</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>

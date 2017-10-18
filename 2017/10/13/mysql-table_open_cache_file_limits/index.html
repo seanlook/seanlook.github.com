@@ -1,0 +1,1200 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="en">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="mysql,table_cache," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0" />
+
+
+
+
+
+
+<meta name="description" content="1. 现象，内存使用大首先说一下最近遇到的一个现象，因为分库的缘故，单实例里面的表的数量增加了20倍，总数将近达到10000个。在开发环境明显感觉到执行简单查询都很慢，在processlist里面看到状态 opening table 达到好几秒但数据库并没有什么负载。本能的想到应该要加大 table_open_cache，可是加大后发现MySQL刚启动 RES 就占用了2.5G内存，之前才500-">
+<meta property="og:type" content="article">
+<meta property="og:title" content="table_open_cache 与 table_definition_cache 对MySQL的影响">
+<meta property="og:url" content="http://seanlook.com/2017/10/13/mysql-table_open_cache_file_limits/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="1. 现象，内存使用大首先说一下最近遇到的一个现象，因为分库的缘故，单实例里面的表的数量增加了20倍，总数将近达到10000个。在开发环境明显感觉到执行简单查询都很慢，在processlist里面看到状态 opening table 达到好几秒但数据库并没有什么负载。本能的想到应该要加大 table_open_cache，可是加大后发现MySQL刚启动 RES 就占用了2.5G内存，之前才500-">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/mysql_table_cache_1.png">
+<meta property="og:updated_time" content="2017-10-13T08:32:49.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="table_open_cache 与 table_definition_cache 对MySQL的影响">
+<meta name="twitter:description" content="1. 现象，内存使用大首先说一下最近遇到的一个现象，因为分库的缘故，单实例里面的表的数量增加了20倍，总数将近达到10000个。在开发环境明显感觉到执行简单查询都很慢，在processlist里面看到状态 opening table 达到好几秒但数据库并没有什么负载。本能的想到应该要加大 table_open_cache，可是加大后发现MySQL刚启动 RES 就占用了2.5G内存，之前才500-">
+<meta name="twitter:image" content="http://7q5fot.com1.z0.glb.clouddn.com/mysql_table_cache_1.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post","offset":12,"offset_float":0,"b2t":false,"scrollpercent":false},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: 'WNWHBKUL26',
+      apiKey: 'cec5cc7d455c77d448433aa60f989766',
+      indexName: 'seanlook',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://seanlook.com/2017/10/13/mysql-table_open_cache_file_limits/"/>
+
+
+
+
+
+  <title> table_open_cache 与 table_definition_cache 对MySQL的影响 | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s95.cnzz.com/z_stat.php?id=1253513173&web_id=1253513173" language="JavaScript"></script>
+  </div>
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Sean's Notes</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">Stay hungry, stay foolish.</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            About
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocapitalize="off" autocomplete="off" autocorrect="off"
+             placeholder="Searching..." spellcheck="false"
+             type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/10/13/mysql-table_open_cache_file_limits/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                table_open_cache 与 table_definition_cache 对MySQL的影响
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-10-13T16:32:49+08:00">
+                2017-10-13
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2017/10/13/mysql-table_open_cache_file_limits/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2017/10/13/mysql-table_open_cache_file_limits/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2017/10/13/mysql-table_open_cache_file_limits/" class="leancloud_visitors" data-flag-title="table_open_cache 与 table_definition_cache 对MySQL的影响">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h1 id="1-现象，内存使用大"><a href="#1-现象，内存使用大" class="headerlink" title="1. 现象，内存使用大"></a>1. 现象，内存使用大</h1><p>首先说一下最近遇到的一个现象，因为分库的缘故，单实例里面的表的数量增加了20倍，总数将近达到10000个。在开发环境明显感觉到执行简单查询都很慢，在processlist里面看到状态 opening table 达到好几秒但数据库并没有什么负载。本能的想到应该要加大 <code>table_open_cache</code>，可是加大后发现MySQL刚启动 RES 就占用了2.5G内存，之前才500-600M的样子。</p>
+<p>只是将 <code>table_open_cache</code> 从默认的2000，增加到10000（先不论这个值合不合理），就独占了2G的内存，这对于生产环境内存浪费是不可接受的。还好，关于这个问题的讨论有不少，感兴趣的话可以阅读 <a href="https://bugs.mysql.com/bug.php?id=68287" target="_blank" rel="external">#bug 68287</a>, <a href="https://bugs.mysql.com/bug.php?id=68514" target="_blank" rel="external">#bug 68514</a>, <a href="https://www.percona.com/forums/questions-discussions/mysql-and-percona-server/percona-server-5-6/12015-percona-5-6-14-56-very-high-memory-usage" target="_blank" rel="external">12015-percona-5-6-14-56-very-high-memory-usage</a>。</p>
+<p>Oracle官方工程师并不认为这是个bug，导致初始化分配这么多内存的原因是，<strong>开启了 Performance_Schema</strong> 。P_S测量数据库的性能指标，需要提前一次性分配内存，而不是随着数据库运行逐渐申请内存。</p>
+<p>下表是不同参数组合下内存占用的测试结果：<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql_table_cache_1.png" alt=""></p>
+<p>（注：可以通过这个来查看PFS里面哪些占内存比较多，<code>mysql -hxxxx -Pxxx -uxx -pxx -e &quot;show engine performance_schema status&quot;|grep memory|sort -nr -k3 |head</code> ）</p>
+<p>对于 table_open_cache 设置的非常大的情况下，即使还有许多cache多余，但P_S都需要分配这个数量的内存。解决这个内存大的问题有3个方向：</p>
+<ol>
+<li>table_open_cache, table_definition_cache, max_connections 设置合理</li>
+<li>关闭 performance_schema</li>
+<li>保持 PFS 开启，关闭测量 max_table_instances和max_table_handles  <ul>
+<li>performance_schema_max_table_instances: 最大测量多少个表对象<br>对应 (pfs_table_share).memory，我的环境里固定 277600000 bytes</li>
+<li>performance_schema_max_table_handles: 最大打开表的总数<br>对应(pfs_table).memory，随着 table_open_cache 的增大而增大</li>
+</ul>
+</li>
+</ol>
+<p>关闭的方法是在my.cnf里面设置以上变量为 0 。默认是 -1 ，表示 autosize，即根据 table_open_cache/table_def_cache/max_connections 的值自动设置，相关代码 <code>pfs_autosize.cc</code>：<br><figure class="highlight php"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line">PFS_sizing_data *estimate_hints(PFS_global_param *param)</div><div class="line">&#123;</div><div class="line">  <span class="keyword">if</span> ((param-&gt;m_hints.m_max_connections &lt;= MAX_CONNECTIONS_DEFAULT) &amp;&amp;</div><div class="line">      (param-&gt;m_hints.m_table_definition_cache &lt;= TABLE_DEF_CACHE_DEFAULT) &amp;&amp;</div><div class="line">      (param-&gt;m_hints.m_table_open_cache &lt;= TABLE_OPEN_CACHE_DEFAULT))</div><div class="line">  &#123;</div><div class="line">    <span class="comment">/* The my.cnf used is either unchanged, or lower than factory defaults. */</span></div><div class="line">    <span class="keyword">return</span> &amp; small_data;</div><div class="line">  &#125;</div><div class="line"></div><div class="line">  <span class="keyword">if</span> ((param-&gt;m_hints.m_max_connections &lt;= MAX_CONNECTIONS_DEFAULT * <span class="number">2</span>) &amp;&amp;</div><div class="line">      (param-&gt;m_hints.m_table_definition_cache &lt;= TABLE_DEF_CACHE_DEFAULT * <span class="number">2</span>) &amp;&amp;</div><div class="line">      (param-&gt;m_hints.m_table_open_cache &lt;= TABLE_OPEN_CACHE_DEFAULT * <span class="number">2</span>))</div><div class="line">  &#123;</div><div class="line">    <span class="comment">/* Some defaults have been increased, to "moderate" values. */</span></div><div class="line">    <span class="keyword">return</span> &amp; medium_data;</div><div class="line">  &#125;</div><div class="line"></div><div class="line">  <span class="comment">/* Looks like a server in production. */</span></div><div class="line">  <span class="keyword">return</span> &amp; large_data;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>在阿里RDS中，performance_schema_max<em>*</em>系列变量不能单独disable，只能全局关闭PFS。这里我们尝试寻求一个合理table_cache的范围。<br><a id="more"></a><br>那么 <code>table_open_cache</code> 与 <code>table_definition_cache</code> 设置一个什么值才算合理呢？</p>
+<h1 id="2-理解-table-open-cache-与-table-definition-cache"><a href="#2-理解-table-open-cache-与-table-definition-cache" class="headerlink" title="2. 理解 table_open_cache 与 table_definition_cache"></a>2. 理解 table_open_cache 与 table_definition_cache</h1><p>来理解一下 <code>table_open_cache</code> 到底是来干嘛的，文档里或者网上的文章，通通解释是“用于控制MySQL Server能同时打开表的最大个数”。如果继续问这个个数怎么算呢？</p>
+<p>我来尝试解答一下。MySQL是多线程的，多个会话上有可能会同时访问同一个表，mysql是允许这些会话各自独立的打开这个表，而表最终都是磁盘上的数据文件。(默认假设innodb_file_per_table=1)，打开文件需要获取文件描述符(File Descriptor)，为了加快这个open table的速度，MySQL在Server层设计了这个cache：</p>
+<blockquote>
+<p>The idea behind this cache is that most statements don’t need to go to a central table definition cache to get a TABLE object and therefore don’t need to lock LOCK_open mutex. Instead they only need to go to one Table_cache instance (the specific instance is determined by thread id) and only lock the mutex protecting this cache. DDL statements that need to remove all TABLE objects from all caches need to lock mutexes for all Table_cache instances, but they are rare.</p>
+</blockquote>
+<p>table_cache 减少了表级别 LOCK_open 这个互斥量的获取，改用获取 表对象缓存实例 列表的mutex。简化成如下过程：</p>
+<ol>
+<li>假设当前并发200个连接，table_open_cache=200，其中有50连接都在访问同一张表</li>
+<li>mysql内部维护了一个 unused_table_list，在a表上的请求结束后，会把这个thread刚才用过的 table object 放入unused_table_list</li>
+<li>每个表有个key，可以通过hash快速定位到表a的所有可用object，如果后面一下子100个连接上来访问表a，内部会先从 unused_table_list 去找这个表已经缓存过的对象(get_table)，比如前50个可以直接拿来用(unlink_unused_table)</li>
+<li>后50个则需要调用系统内核，拿到文件描述符。</li>
+<li>用完之后会，放回到unused_table_list，并将这个表的key放到hash表的前面。</li>
+<li>如果缓存的对象个数超过了 table_open_cache，则会通过LRU算法，把认为不用的表对象逐出。</li>
+</ol>
+<p>从上面的过程应该很容易理解 table_open_cache 与 table_definition_cache 的区别。</p>
+<ul>
+<li><code>table_def_cache</code> 也是一个key/value形式的hash表，但每个表只有一个值，值/对象的内容就是表的元数据信息(Data Dictionay，frm文件里面的信息)，如表结构、字段、索引，它是一个全局的结构，并且不占用文件描述符。</li>
+<li>而<code>table_open_cache</code>的key/value的值是一个列表，表示这个表的多个 Table_cache_element，他们共用这个表的 definition (代码层定义为TABLE_SHARE对象)。</li>
+</ul>
+<p>(注：我们在row格式的binlog里面看到的 table_map_id 就是在 TABLE_SHARE 里面定义的，表结构变更、缓存被逐出，都会导致 table_map_id 递增。)</p>
+<h2 id="2-1-源码说明"><a href="#2-1-源码说明" class="headerlink" title="2.1 源码说明"></a>2.1 源码说明</h2><p>源代码里面关键函数</p>
+<ul>
+<li><p>sql_base.cc:</p>
+<ul>
+<li><code>open_table()</code> 打开表的入口<br>打开之前会判断mdl锁条件满不满足，再调用 get_table() 尝试从cache里面获取<br>如果找到，还要判断版本信息，goto table_found<br>如果没找到，注意get_table()接收了一个 table_share 参数，即使没找到table cache，也努力获取table definition，如果拿到table_share则要获取一次LOCK_open互斥量，增加表的引用计数。<br>make a new table: 调用 open_table_from_share() 从磁盘上打开表<br>调用 add_used_table() 将表对象放入缓存，table_open_cache_misses++</li>
+<li><code>get_table_share()</code> 从 table definition cache 获取表定义信息<br>如果cache中没有，则调用 table.cc:open_table_def() 从文件系统上读取</li>
+</ul>
+</li>
+<li><p>table_cache.h:Table_cache::  </p>
+<ul>
+<li><code>m_unused_tables</code><br>该列表内容是table cache中没有被其它线程使用的table object。最近使用过的table object会被添加到列表的尾部，头部就成为最近没被使用的(LRU)</li>
+<li><code>m_table_count</code><br>table objects个数，包括正在使用中，以及unused<br>所有table cache instances中这个count加起来，就是 Open_tables 的结果</li>
+<li><code>get_table()</code> 根据key(表名)从cache hash里面获取 unused table object<br>得到之后，将这个object从列表unlink掉，并且放入used table list</li>
+<li><code>add_used_table()</code> 将新创建的 table object 放入table cache<br>这是说明当前连接要打开的表在cache里面没有，所以要自己打开，并且放入used table list</li>
+<li><code>release_table()</code> 用完后将表对象放回table cache的unused列表<br>如果table_share版本比较旧，则直接remove掉</li>
+<li><code>remove_table()</code>  </li>
+<li><code>free_unused_tables_if_necessary()</code><br>每次 add_used_table() 都会调用，判断是否需要从 table cache object list清除多余的cache，需要锁定LOCK_open。调用remove_table()<br>清除条件：m_table_count &gt; table_cache_size / table_cache_instances  </li>
+</ul>
+</li>
+<li><p>table.cc:</p>
+<ul>
+<li><code>open_table_from_share()</code><br>根据 table_share 信息来打开表。调用 outparam-&gt;file-&gt;ha_open()，<em>too many files opened</em> 错误在这里抛出</li>
+<li><code>open_table_def()</code><br>从 frm 中读取表定义</li>
+</ul>
+</li>
+</ul>
+<p>以上过程没有考虑视图、临时表、分区表。table_cache虽然会有额外的内存开销，但简化了对表状态的维护，打开表这个动作因为省去了获取 LOCK_open mutex 以及直接操作打开数据文件，而变得高效。<br>这部分参考taobao数据库内核月报的2篇文章，会比较清晰：</p>
+<ol>
+<li>open file limits： <a href="http://mysql.taobao.org/monthly/2015/08/07/" target="_blank" rel="external">http://mysql.taobao.org/monthly/2015/08/07/</a></li>
+<li>MySQL表定义缓存：<a href="http://mysql.taobao.org/monthly/2015/08/10/" target="_blank" rel="external">http://mysql.taobao.org/monthly/2015/08/10/</a></li>
+</ol>
+<h1 id="3-设置参考因素"><a href="#3-设置参考因素" class="headerlink" title="3 设置参考因素"></a>3 设置参考因素</h1><h2 id="3-1-table-open-cache"><a href="#3-1-table-open-cache" class="headerlink" title="3.1 table_open_cache"></a>3.1 table_open_cache</h2><p><code>table_open_cache</code> 默认值 Version&lt;=5.6.7: 400, Version&gt;=5.6.8: 2000，设定它的值有3个因素：</p>
+<ol>
+<li><p><strong>最大并发连接数</strong><br>这是最重要的考量。假设业务高峰期 <strong>活跃并发</strong> 连接是200，60%是单表查询，30%是两个表join，5%是三个表join，5%会创建临时表。那么table_open_cache可以是：<br>200 × (60% × 1 + 30% × 2 + 5% × 3 + 5%  × 2) = 290<br>当然这里不是要如何精确的计算，只是说明有哪些需要考虑的。网上有大部分文章都讲设置 max_connections * N，N是sql里面表的最大个数，我个人觉得如果max_connections值超过2000的话，就不要这样算，因为max_connection一般是不允许达到的，高峰期活跃并发连接数才是比较好的基准。</p>
+</li>
+<li><p><strong>存储引擎</strong></p>
+<ul>
+<li><p>MyISAM引擎<br>因为myisam数据文件和索引是分开存放的，所以<strong>第一次</strong>打开表时需要2个描述符，后续如果并发2个会话访问该表，另一个会话只需要多开一个数据文件的描述符。索引文件描述符可被线程共享。因此它所需要的 table_cache 的值并不是简单上面的值的2倍，而是跟表的访问分布有关。当然现在已经几乎不用MyISAM引擎了。<br>Merge引擎也类似，因为Merge表可以有多个底层表，需要多个文件描述符。</p>
+</li>
+<li><p>InnoDB引擎<br><code>table_open_cache</code>对InnoDB引擎其实作用不大，它是Server层的机制，而InnoDB不依赖server层去管理表空间，它使用自己的内部函数去打开ibd，创建handler来操作表。（handler只是内存对象，不牵涉文件操作。从实验结果看来，innodb每个表最多只有一个File Descriptor打开，myisam表如果并发访问一个表，会打开多个FD并cache起来） </p>
+<p>注： <code>flush tables</code> 命令会关闭所有当前打开的表对象缓存/handler，所以状态变量 <code>open_tables</code> 会置0，但<code>opened_tables(_definition)</code>、<code>Table_open_cache_misses(_hits)</code>只会在实例重启后置0。对MyISAM引擎来说，它还会释放MYI/MYD文件描述符，而InnoDB引擎则不会释放ibd文件描述符。</p>
+<figure class="highlight gherkin"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div></pre></td><td class="code"><pre><div class="line">mysql&gt; show variables like <span class="string">"table_%"</span>;</div><div class="line">+----------------------------+-------+</div><div class="line">|<span class="string"> Variable_name              </span>|<span class="string"> Value </span>|</div><div class="line">+----------------------------+-------+</div><div class="line">|<span class="string"> table_definition_cache     </span>|<span class="string"> 1400  </span>|</div><div class="line">|<span class="string"> table_open_cache           </span>|<span class="string"> 2000  </span>|</div><div class="line">|<span class="string"> table_open_cache_instances </span>|<span class="string"> 1     </span>|</div><div class="line">+----------------------------+-------+</div><div class="line">3 rows in set</div><div class="line"></div><div class="line">mysql&gt; show global status like <span class="string">"%open%"</span>;</div><div class="line">+----------------------------+-----------+</div><div class="line">|<span class="string"> Variable_name              </span>|<span class="string"> Value     </span>|</div><div class="line">+----------------------------+-----------+</div><div class="line">|<span class="string"> Com_ha_open                </span>|<span class="string"> 0         </span>|</div><div class="line">|<span class="string"> Com_show_open_tables       </span>|<span class="string"> 0         </span>|</div><div class="line">|<span class="string"> Innodb_num_open_files      </span>|<span class="string"> 364       </span>|<span class="string">  -- 打开的ibd文件的数量，打开后一般不会关闭，除非超过了 innodb_open_files 的设定</span></div><div class="line">|<span class="string"> Open_files                 </span>|<span class="string"> 52        </span>|<span class="string">  -- 打开的常规文件数量，如slow_log,error_log等，不包含socket和具体存储引擎有关的文件，所以一般都无需关注这个，它与innodb_open_files也没关系</span></div><div class="line">|<span class="string"> Open_streams               </span>|<span class="string"> 0         </span>|</div><div class="line">|<span class="string"> Open_table_definitions     </span>|<span class="string"> 470       </span>|<span class="string">  -- 当前缓存了多少.frm文件</span></div><div class="line">|<span class="string"> Open_tables                </span>|<span class="string"> 448       </span>|<span class="string">  -- 当前table_cache里面缓存的table object数量</span></div><div class="line">|<span class="string"> Opened_files               </span>|<span class="string"> 35617170  </span>|</div><div class="line">|<span class="string"> Opened_table_definitions   </span>|<span class="string"> 117134    </span>|</div><div class="line">|<span class="string"> Opened_tables              </span>|<span class="string"> 117409    </span>|<span class="string">  -- 自总MySQL启动以来打开表的总次数，如果在缓存中找到直接使用，不会增加这个值</span></div><div class="line">|<span class="string"> Slave_open_temp_tables     </span>|<span class="string"> 0         </span>|</div><div class="line">|<span class="string"> Table_open_cache_hits      </span>|<span class="string"> 130148442 </span>|</div><div class="line">|<span class="string"> Table_open_cache_misses    </span>|<span class="string"> 117404    </span>|</div><div class="line">|<span class="string"> Table_open_cache_overflows </span>|<span class="string"> 0         </span>|</div><div class="line">+----------------------------+-----------+</div><div class="line">14 rows in set</div><div class="line"></div><div class="line">mysql&gt; flush tables;</div><div class="line">Query OK, 0 rows affected</div><div class="line"></div><div class="line">mysql&gt; show global status like <span class="string">"%open%"</span>;</div><div class="line">+----------------------------+-----------+</div><div class="line">|<span class="string"> Variable_name              </span>|<span class="string"> Value     </span>|</div><div class="line">+----------------------------+-----------+</div><div class="line">|<span class="string"> Com_ha_open                </span>|<span class="string"> 0         </span>|</div><div class="line">|<span class="string"> Com_show_open_tables       </span>|<span class="string"> 0         </span>|</div><div class="line">|<span class="string"> Innodb_num_open_files      </span>|<span class="string"> 364       </span>|</div><div class="line">|<span class="string"> Open_files                 </span>|<span class="string"> 4         </span>|</div><div class="line">|<span class="string"> Open_streams               </span>|<span class="string"> 0         </span>|</div><div class="line">|<span class="string"> Open_table_definitions     </span>|<span class="string"> 6         </span>|</div><div class="line">|<span class="string"> Open_tables                </span>|<span class="string"> 6         </span>|</div><div class="line">|<span class="string"> Opened_files               </span>|<span class="string"> 35617220  </span>|</div><div class="line">|<span class="string"> Opened_table_definitions   </span>|<span class="string"> 117140    </span>|</div><div class="line">|<span class="string"> Opened_tables              </span>|<span class="string"> 117415    </span>|</div><div class="line">|<span class="string"> Slave_open_temp_tables     </span>|<span class="string"> 0         </span>|</div><div class="line">|<span class="string"> Table_open_cache_hits      </span>|<span class="string"> 130148523 </span>|</div><div class="line">|<span class="string"> Table_open_cache_misses    </span>|<span class="string"> 117410    </span>|</div><div class="line">|<span class="string"> Table_open_cache_overflows </span>|<span class="string"> 0         </span>|</div><div class="line">+----------------------------+-----------+</div><div class="line">14 rows in set</div></pre></td></tr></table></figure>
+</li>
+</ul>
+</li>
+<li><p><strong>opened_tables</strong><br>根据第一步的最大并发数设定的值不一定准确，在MySQL运行一段时间后，可以观察 opened_tables 增加的速度，决定是否需要扩大 table_open_cache。如果查询里面有许多要用到temporary table，这个值也会增加的很快，此时也可以比较 Table_open_cache_hits 与 Table_open_cache_misses 的值，正常的话 hits/(hits+misses ) 应该在99.9%以上。</p>
+</li>
+</ol>
+<p>还有一个标准，<code>Open_tanles</code>的值如果与 <code>table_open_cache</code>很接近，那么也要考虑增大 table_open_cache 。</p>
+<p>但不要设置的太大，大部分情况不要超过10000，原因一是如第一部分看到，performance_schema会分配过多内存；二是cache的查找速度会因为越来越多而变慢；三是某些情况不缓存也许更好，比如几万张表，他们都很均匀的被使用，如果不全部缓存起来，那么缓存始终会被不断的逐出更新，效率反而更低。</p>
+<h1 id="3-2-table-definition-cache-与-innodb-open-files"><a href="#3-2-table-definition-cache-与-innodb-open-files" class="headerlink" title="3.2 table_definition_cache 与 innodb_open_files"></a>3.2 table_definition_cache 与 innodb_open_files</h1><p>至于 table_definition_cache，默认值是 <em>400 + (table_open_cache / 2)</em>，默认最大2000。如果实际表的数据量比较多，最好是能够把元数据全部cache起来，设置与表的总数量差不多大就行。</p>
+<p>InnoDB engine层有自己参数 <code>innodb_open_files</code>，限制同时打开 ibd 文件的句柄数，作用与 table_definition_cache 相同，逐出策略也是一样采用LRU算法。innodb读取INNODB_SYS_TABLES,INNODB_SYS_COLUMNS,INNODB_SYS_FIELDS,INNODB_SYS_INDEXES等数据字典，放入 table_dict 。当需要访问这个表的时候，创建 handler 对象。<br>这两个变量本身没啥关系，但是设置不合理的时候mysql会改变它的值：</p>
+<p>innodb_open_files的值如果设置大于 open_files_limit，且大于table_open_cache，那么会自动设置为table_def_cache大小。<code>innobase\handler\ha_innodb.cc</code>：<br><figure class="highlight cpp"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">if</span> (innobase_open_files &lt; <span class="number">10</span>) &#123;</div><div class="line">  innobase_open_files = <span class="number">300</span>;</div><div class="line">  <span class="keyword">if</span> (srv_file_per_table &amp;&amp; table_cache_size &gt; <span class="number">300</span>) &#123;</div><div class="line">    innobase_open_files = table_cache_size;</div><div class="line">  &#125;</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="keyword">if</span> (innobase_open_files &gt; (<span class="keyword">long</span>) open_files_limit) &#123;</div><div class="line">  <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>,</div><div class="line">                    <span class="string">"innodb_open_files should not be greater"</span></div><div class="line">                    <span class="string">" than the open_files_limit.\n"</span>);</div><div class="line">  <span class="keyword">if</span> (innobase_open_files &gt; (<span class="keyword">long</span>) table_cache_size) &#123;</div><div class="line">    innobase_open_files = table_cache_size;</div><div class="line">  &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<hr>
+<p>这里顺便提一下 <code>open_file_limit</code>, 它限制的是mysqld进程总共能够打开文件描述符的个数，是个Server层的参数，它的值应该要小于服务器的最大限制，否则OS层报错会比mysql error log报错更惨。<br>关于它的计算公式，网上有很多，不属本文的内容，感兴趣可以参考 <a href="http://www.cnblogs.com/zhoujinyi/archive/2013/01/31/2883433.html" target="_blank" rel="external">http://www.cnblogs.com/zhoujinyi/archive/2013/01/31/2883433.html</a> </p>
+<p>参考</p>
+<ul>
+<li><a href="http://hidba.org/?p=170" target="_blank" rel="external">http://hidba.org/?p=170</a></li>
+<li><a href="https://dev.mysql.com/doc/refman/5.6/en/table-cache.html" target="_blank" rel="external">https://dev.mysql.com/doc/refman/5.6/en/table-cache.html</a></li>
+<li><a href="http://mysql.taobao.org/monthly/2015/08/07/" target="_blank" rel="external">http://mysql.taobao.org/monthly/2015/08/07/</a></li>
+<li><a href="https://dev.mysql.com/doc/dev/mysql-server/8.0.0/classTable__cache.html" target="_blank" rel="external">https://dev.mysql.com/doc/dev/mysql-server/8.0.0/classTable__cache.html</a></li>
+<li><a href="http://www.orczhou.com/index.php/2010/10/mysql-open-file-limit/" target="_blank" rel="external">http://www.orczhou.com/index.php/2010/10/mysql-open-file-limit/</a></li>
+</ul>
+<hr>
+<p>本文链接地址：<a href="http://seanlook.com/2017/10/13/mysql-table_open_cache_file_limits/">http://seanlook.com/2017/10/13/mysql-table_open_cache_file_limits/</a></p>
+<hr>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+  <div style="padding: 10px 0; margin: 20px auto; width: 90%; text-align: center;">
+    <div>支持可请我喝杯茶 ^_- (上限10个铜板)</div>
+    <button id="rewardButton" disable="enable" onclick="var qr = document.getElementById('QR'); if (qr.style.display === 'none') {qr.style.display='block';} else {qr.style.display='none'}">
+      <span>赏</span>
+    </button>
+    <div id="QR" style="display: none;">
+      
+      
+        <div id="alipay" style="display: inline-block">
+          <img id="alipay_qr" src="/images/reward_alipay_seanlook.jpg" alt="seanlook Alipay"/>
+          <p>支付宝打赏</p>
+        </div>
+      
+    </div>
+  </div>
+
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/mysql/" rel="tag"># mysql</a>
+          
+            <a href="/tags/table-cache/" rel="tag"># table_cache</a>
+          
+        </div>
+      
+
+      
+        
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2017/09/23/mysql-big-trx-lock-case/" rel="next" title="“大”事务引起的锁等待分析案例">
+                <i class="fa fa-chevron-left"></i> “大”事务引起的锁等待分析案例
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2017/10/17/rds_disk_io_troubleshooting/" rel="prev" title="MySQL实例阻塞分析一例(线程statistics状态)">
+                MySQL实例阻塞分析一例(线程statistics状态) <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div id="disqus_thread">
+        <noscript>
+          Please enable JavaScript to view the
+          <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a>
+        </noscript>
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+           
+              <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+          
+        </div>
+        <nav class="site-state motion-element">
+
+          
+            <div class="site-state-item site-state-posts">
+              <a href="/archives">
+                <span class="site-state-item-count">106</span>
+                <span class="site-state-item-name">posts</span>
+              </a>
+            </div>
+          
+
+          
+            
+            
+            <div class="site-state-item site-state-categories">
+              <a href="/categories/index.html">
+                <span class="site-state-item-count">23</span>
+                <span class="site-state-item-name">categories</span>
+              </a>
+            </div>
+          
+
+          
+            
+            
+            <div class="site-state-item site-state-tags">
+              <a href="/tags/index.html">
+                <span class="site-state-item-count">118</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+        
+
+
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-现象，内存使用大"><span class="nav-text">1. 现象，内存使用大</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-理解-table-open-cache-与-table-definition-cache"><span class="nav-text">2. 理解 table_open_cache 与 table_definition_cache</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-源码说明"><span class="nav-text">2.1 源码说明</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-设置参考因素"><span class="nav-text">3 设置参考因素</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-table-open-cache"><span class="nav-text">3.1 table_open_cache</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-2-table-definition-cache-与-innodb-open-files"><span class="nav-text">3.2 table_definition_cache 与 innodb_open_files</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2017</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+
+        
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.0"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.0"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.0"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  
+
+    
+      <script id="dsq-count-scr" src="https://seanlook.disqus.com/count.js" async></script>
+    
+
+    
+      <script type="text/javascript">
+        var disqus_config = function () {
+          this.page.url = 'http://seanlook.com/2017/10/13/mysql-table_open_cache_file_limits/';
+          this.page.identifier = '2017/10/13/mysql-table_open_cache_file_limits/';
+          this.page.title = 'table_open_cache 与 table_definition_cache 对MySQL的影响';
+        };
+        var d = document, s = d.createElement('script');
+        s.src = 'https://seanlook.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', '' + +new Date());
+        (d.head || d.body).appendChild(s);
+      </script>
+    
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+      search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.popup').toggle();
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+      $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = $( "entry", xmlResponse ).map(function() {
+            return {
+              title: $( "title", this ).text(),
+              content: $("content",this).text(),
+              url: $( "url" , this).text()
+            };
+          }).get();
+          var $input = document.getElementById(search_id);
+          var $resultContent = document.getElementById(content_id);
+          $input.addEventListener('input', function(){
+            var matchcounts = 0;
+            var str='<ul class=\"search-result-list\">';
+            var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+            $resultContent.innerHTML = "";
+            if (this.value.trim().length > 1) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var content_index = [];
+                var data_title = data.title.trim().toLowerCase();
+                var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                var data_url = decodeURIComponent(data.url);
+                var index_title = -1;
+                var index_content = -1;
+                var first_occur = -1;
+                // only match artiles with not empty titles and contents
+                if(data_title != '') {
+                  keywords.forEach(function(keyword, i) {
+                    index_title = data_title.indexOf(keyword);
+                    index_content = data_content.indexOf(keyword);
+                    if( index_title >= 0 || index_content >= 0 ){
+                      isMatch = true;
+                      if (i == 0) {
+                        first_occur = index_content;
+                      }
+                    }
+
+                  });
+                }
+                // show search results
+                if (isMatch) {
+                  matchcounts += 1;
+                  str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                  var content = data.content.trim().replace(/<[^>]+>/g,"");
+                  if (first_occur >= 0) {
+                    // cut out 100 characters
+                    var start = first_occur - 20;
+                    var end = first_occur + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if(start == 0){
+                      end = 50;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    var match_content = content.substring(start, end);
+                    // highlight all keywords
+                    keywords.forEach(function(keyword){
+                      var regS = new RegExp(keyword, "gi");
+                      match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                    });
+
+                    str += "<p class=\"search-result\">" + match_content +"...</p>"
+                  }
+                  str += "</li>";
+                }
+              })};
+            str += "</ul>";
+            if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+            if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+            $resultContent.innerHTML = str;
+          });
+          proceedsearch();
+        }
+      });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.1.js"></script>
+  <script>AV.initialize("NliJVBn0857TMk5HYrIRt5wp-gzGzoHsz", "jB9B4QG8Rm8YP04RQqnsKy5M");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

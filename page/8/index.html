@@ -316,6 +316,543 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/04/05/mysql-avoid-or-query/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2016/04/05/mysql-avoid-or-query/" itemprop="url">
+                  MySQL避免索引列使用 OR 条件
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-04-05T16:32:49+08:00">
+                2016-04-05
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2016/04/05/mysql-avoid-or-query/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2016/04/05/mysql-avoid-or-query/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2016/04/05/mysql-avoid-or-query/" class="leancloud_visitors" data-flag-title="MySQL避免索引列使用 OR 条件">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>这个亏已经吃过很多次了，在开发以前的sql代码里面，许多以 or 作为where条件的查询，甚至更新。这里举例来说明使用 or 的弊端，以及改进办法。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">select</span> f_crm_id <span class="keyword">from</span> d_dbname1.t_tbname1 <span class="keyword">where</span>  f_xxx_id = <span class="number">926067</span>  </div><div class="line"><span class="keyword">and</span> (f_mobile =<span class="string">'1234567891'</span> <span class="keyword">or</span> f_phone =<span class="string">'1234567891'</span> ) <span class="keyword">limit</span> <span class="number">1</span></div></pre></td></tr></table></figure>
+<p>从查询语句很容易看出，f_mobile和f_phone两个字段都有可能存电话号码，一般思路都是用 or 去一条sql解决，但表数据量一大简直是灾难：<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-avoid-or-1.png" alt=""></p>
+<p>t_tbanme1上有索引<code>idx_id_mobile(f_xxx_id,f_mobile)</code>, <code>idx_phone(f_phone)</code>,<code>idx_id_email(f_id,f_email)</code>，explain 的结果却使用了 idx_id_email 索引，有时候运气好可能走 idx_id_mobile f_xxx_id</p>
+<p><strong>因为mysql的每条查询，每个表上只能选择一个索引</strong>。如果使用了 idx_id_mobile 索引，恰好有一条数据，因为有 limit 1 ，那么恭喜很快得到结果；但如果 f_mobile 没有数据，那 f_phone 字段只能在f_id条件下挨个查找，扫描12w行。 or 跟 and 不一样，甚至有开发认为添加 <code>(f_xxx_id,f_mobile,f_phone)</code>不就完美了吗，要吐血了~<br>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2016/04/05/mysql-avoid-or-query/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/03/28/mysql-sysbench/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2016/03/28/mysql-sysbench/" itemprop="url">
+                  使用sysbench对mysql压力测试
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-03-28T16:32:49+08:00">
+                2016-03-28
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2016/03/28/mysql-sysbench/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2016/03/28/mysql-sysbench/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2016/03/28/mysql-sysbench/" class="leancloud_visitors" data-flag-title="使用sysbench对mysql压力测试">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>sysbench是一个模块化的、跨平台、多线程基准测试工具，主要用于评估测试各种不同系统参数下的数据库负载情况。关于这个项目的详细介绍请看：<a href="https://github.com/akopytov/sysbench">https://github.com/akopytov/sysbench</a> 。<br>它主要包括以下几种方式的测试：</p>
+<ol>
+<li>cpu性能</li>
+<li>磁盘io性能</li>
+<li>调度程序性能</li>
+<li>内存分配及传输速度</li>
+<li>POSIX线程性能</li>
+<li>数据库性能(OLTP基准测试)</li>
+</ol>
+<p>sysbench的数据库OLTP测试支持MySQL、PostgreSQL、Oracle，目前主要用于Linux操作系统，开源社区已经将sysbench移植到了Windows，并支持SQL Server的基准测试。</p>
+<p>废话不多说，开始。</p>
+<h2 id="1-sysbench安装"><a href="#1-sysbench安装" class="headerlink" title="1. sysbench安装"></a>1. sysbench安装</h2><ul>
+<li>mysql版本: mysql-community-server-5.6.29   </li>
+<li>OS: CentOS 6.7 X86_64</li>
+<li>sysbench 0.5相比0.4版本有一些变化，包括oltp测试结合了lua脚本，还多了一些隐藏选项，本文会涉及得到一部分。</li>
+</ul>
+<p>目前许多仓库里已编译好的二进制sysbench还是0.4.x版本，不过现在主流也还是github上的0.5，可以从 <a href="http://www.lefred.be/node/154">这里</a>下载0.5版本的rpm包直接安装，不过我选择自己编译，因为只有这个办法是通用的。</p>
+<figure class="highlight groovy"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// 先安装编译依赖环境</span></div><div class="line">$ sudo yum install gcc gcc-c++ automake make  libtool mysql-community-devel</div><div class="line"></div><div class="line">$ cd <span class="regexp">/tmp &amp;&amp; git clone https:/</span><span class="regexp">/github.com/</span>akopytov/sysbench.git</div><div class="line"></div><div class="line">$ cd <span class="regexp">/tmp/</span>sysbench &amp;&amp; ./autogen.sh</div><div class="line">$ .<span class="regexp">/configure --prefix=/</span>usr<span class="regexp">/local/</span>sysbench<span class="number">-0.5</span></div><div class="line">$ ./make &amp;&amp; sudo make install</div><div class="line"></div><div class="line"><span class="comment">// 0.5版本需要oltp.lua测试脚本</span></div><div class="line"><span class="comment">// 如果是rpm包方式安装的，在 /usr/share/doc/sysbench/tests/db/ 下可找到</span></div><div class="line">$ cd <span class="regexp">/usr/</span>local<span class="regexp">/sysbench &amp;&amp; sudo mkdir -p share/</span>tests/db</div><div class="line">$ cp <span class="regexp">/tmp/</span>sysbench<span class="regexp">/sysbench/</span>tests<span class="regexp">/db/</span>*.lua share<span class="regexp">/tests/</span>db/</div><div class="line">$ .<span class="regexp">/bin/</span>sysbench --version</div><div class="line">sysbench <span class="number">0.5</span></div></pre></td></tr></table></figure>
+<p>如果需要测试PostgreSQL、Oracle，则在configure时需要加上 –with-oracle 或者 –with-pgsql 参数</p>
+<h2 id="2-使用sysbench对mysql压测"><a href="#2-使用sysbench对mysql压测" class="headerlink" title="2. 使用sysbench对mysql压测"></a>2. 使用sysbench对mysql压测</h2><h3 id="2-1-只读示例"><a href="#2-1-只读示例" class="headerlink" title="2.1 只读示例"></a>2.1 只读示例</h3><figure class="highlight brainfuck"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="string">.</span><span class="comment">/bin/sysbench</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">test=</span><span class="string">.</span><span class="comment">/share/tests/db/oltp</span><span class="string">.</span><span class="comment">lua</span> <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">mysql</span><span class="literal">-</span><span class="comment">host=10</span><span class="string">.</span><span class="comment">0</span><span class="string">.</span><span class="comment">201</span><span class="string">.</span><span class="comment">36</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">mysql</span><span class="literal">-</span><span class="comment">port=8066</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">mysql</span><span class="literal">-</span><span class="comment">user=ecuser</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">mysql</span><span class="literal">-</span><span class="comment">password=ecuser</span> <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">mysql</span><span class="literal">-</span><span class="comment">db=dbtest1a</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">tables</span><span class="literal">-</span><span class="comment">count=10</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">table</span><span class="literal">-</span><span class="comment">size=500000</span> <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">report</span><span class="literal">-</span><span class="comment">interval=10</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">dist</span><span class="literal">-</span><span class="comment">type=uniform</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">rand</span><span class="literal">-</span><span class="comment">init=on</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">max</span><span class="literal">-</span><span class="comment">requests=0</span> <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">test</span><span class="literal">-</span><span class="comment">mode=nontrx</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">nontrx</span><span class="literal">-</span><span class="comment">mode=select</span> <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">read</span><span class="literal">-</span><span class="comment">only=on</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">oltp</span><span class="literal">-</span><span class="comment">skip</span><span class="literal">-</span><span class="comment">trx=on</span> <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">max</span><span class="literal">-</span><span class="comment">time=120</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">num</span><span class="literal">-</span><span class="comment">threads=12</span> <span class="comment">\</span></div><div class="line"><span class="title">[</span><span class="comment">prepare|run|cleanup</span><span class="title">]</span></div></pre></td></tr></table></figure>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2016/03/28/mysql-sysbench/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/01/18/mac-mini-zturn/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2016/01/18/mac-mini-zturn/" itemprop="url">
+                  记一次Mac mini折腾过程（鼠键共享，更换SSD）
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-01-18T16:32:49+08:00">
+                2016-01-18
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Mac-OSX/" itemprop="url" rel="index">
+                    <span itemprop="name">Mac OSX</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2016/01/18/mac-mini-zturn/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2016/01/18/mac-mini-zturn/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2016/01/18/mac-mini-zturn/" class="leancloud_visitors" data-flag-title="记一次Mac mini折腾过程（鼠键共享，更换SSD）">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>从公司网管那捣鼓来一个“遗弃” Mac mini，说其它人觉得用起来太卡，正好我的工作PC( CPU 4×i3，MEM 8G, HDD 500G)软件开多了也觉得有些卡，特别是我使用浏览器的习惯不太好，每次搜索统一结果都要打开好多标签页对比，文章性质的觉得有用想将来记录下来就没关闭页面，一两个星期下来只Chrome使用的内存就达到4G多。不用也浪费，于是就拿Mac mini分摊一下压力。</p>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/macmini-a1347.jpg" alt="macmini-a1347.jpg"></p>
+<p>刚拿到手时心想得有多不堪配置才使得的Mac mini卡到嫌弃的地步，看了下底面的型号，A1347——这是2014年底出的新款，没有我想象的那么旧，还好。于是找来显示器、鼠键准备开用了（在某宝上买根八字电源线）。</p>
+<p>但是开机密码没有啊！虽然简单重装是个办法，但我还是想看看里面现在是什么样的，杀鸡焉用牛刀。直接Crack root…</p>
+<hr>
+<h1 id="1-破解Mac-root密码"><a href="#1-破解Mac-root密码" class="headerlink" title="1. 破解Mac root密码"></a>1. 破解Mac root密码</h1><p>找到这篇文章 <a href="http://wowking.blog.51cto.com/1638252/753774">http://wowking.blog.51cto.com/1638252/753774</a> 。我们平头百姓手头哪会有刻录的Mac OS光盘，而且也没移动光驱，所以方法一就不考虑了。方法二是单用户模式，毕竟 OS X 也是*nix血统，命令行几个命令倒难不到我。</p>
+<p>可是众所周知，Mac的键盘跟普通键盘是不一样的，开机启动的时候<code>command + S</code>在一般美式键盘下到底能不能进入单用户模式呢？嗯，行的，按下mini的开机按钮之后不断 <code>win + S</code>。进入Single user model之后提示符#root&gt;，逐步输入以下命令：</p>
+<figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># 执行硬盘检测（只读）, 这一步可以省略</span></div><div class="line">/sbin/fsck -y</div><div class="line"></div><div class="line"><span class="meta"># 加载文件系统（读/写）</span></div><div class="line">/sbin/mount -uaw</div><div class="line"></div><div class="line"><span class="meta"># 删除初始化设置时的OSX生成的隐藏文件”.applesetupdone”</span></div><div class="line">rm /<span class="keyword">var</span>/db/.AppleSetupDone</div><div class="line"></div><div class="line"><span class="meta"># 重启</span></div><div class="line">reboot</div></pre></td></tr></table></figure>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2016/01/18/mac-mini-zturn/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/12/29/mysql_replica_pt-table-checksum/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -674,552 +1211,11 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/11/01/nan-shan-hike/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/11/01/nan-shan-hike/" itemprop="url">
-                  南山南
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-11-01T11:59:31+08:00">
-                2015-11-01
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/生活/" itemprop="url" rel="index">
-                    <span itemprop="name">生活</span>
-                  </a>
-                </span>
-
-                
-                
-                  , 
-                
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/生活/随记/" itemprop="url" rel="index">
-                    <span itemprop="name">随记</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2015/11/01/nan-shan-hike/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2015/11/01/nan-shan-hike/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2015/11/01/nan-shan-hike/" class="leancloud_visitors" data-flag-title="南山南">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>今天11月1号，深圳的天气正好从这一天凉了起来，傍晚回住处的公交车上给家里打了个电话，是爸爸接的，说家里已经有点冷了。</p>
-<p>现在对冷没什么概念了，深圳是一个没有冬天的城市，一件外套就能过冬。也就是今天起风了出门才稍稍感觉到凉，昨天还热的不行呢——那是因为去爬山了。</p>
-<p>南山，2年前来这里的第一个月就听说过，但两次上过梧桐山，上半年爬过凤凰山，就偏偏离自己最近的南山未曾到访。山虽然不高，但一直放着不去还能再找到人陪我去不成，于是就响应党组织号召，登山去。</p>
-<p>周六下午，小明从公司过去，而我从家里坐公交过去，照计划的时间应该2点半可以集合，无奈在深大转车多等了20分钟，结果是小明跟其他人一起先从海关登山口上山，先到山顶者有奖，我晚十分钟到出发点，去追他们。出乎意料，迈进登山口就一直上台阶，上啊上啊上，T恤已经全湿了，我竟然还穿着紧身牛仔裤！（其实主要考虑到晚上吃饭方便）。由于平时也打打球，体力不算太差，20分钟上到了全程海拔一半的样子，还没追上，双腿力量也下降了，正好碰到没跟上大部队的两个人，就一起走了。后半程坡也小了很多，吹来一丝微风能感觉到背上一阵凉意。此时群里已经有人到观景台发图了，但奇怪的是那么一大波上去怎么才有2个人发图，原来拼的不仅仅是体力，还有手机信号……</p>
-<p>三点半时基本上都到顶了，风景还不错，能看到深圳湾大桥（据说晚上很美），和对面的香港。</p>
-<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/nan-hilltop.jpg" alt="nan-hilltop.jpg"></p>
-<p>团体里大部分我是认识的，有我以前的同事，和球场上认识的伙伴。虽然我已离职近4个月，但我党组织关系还在TP，也交了党费，这才有机会和他们一起出来。还有经费，号召大家买书，于是买了《摄影的艺术》《皮囊》等，小明也为他单反买了本，我看中的是他那本室内装饰和川菜食谱，嘿嘿。</p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2015/11/01/nan-shan-hike/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/10/25/weekends-badminton-ktv/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/10/25/weekends-badminton-ktv/" itemprop="url">
-                  周末腐败地
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-10-25T15:44:31+08:00">
-                2015-10-25
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/生活/" itemprop="url" rel="index">
-                    <span itemprop="name">生活</span>
-                  </a>
-                </span>
-
-                
-                
-                  , 
-                
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/生活/随记/" itemprop="url" rel="index">
-                    <span itemprop="name">随记</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2015/10/25/weekends-badminton-ktv/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2015/10/25/weekends-badminton-ktv/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2015/10/25/weekends-badminton-ktv/" class="leancloud_visitors" data-flag-title="周末腐败地">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>下午一点钟才起来，今天本来也没什么安排，算不上睡懒觉，毕竟昨晚四点钟才睡。</p>
-<p>昨天（周六）公司写字楼的物业举办了一届羽毛球赛，七点钟就起来坐地铁来到侨城东，看来公司包的场地是华侨城锦绣花园的一个社区羽毛球馆，果然住着一群有钱人。我八点35到场，热个身，大概9点钟开始抽签，抽了个7号，也就是其他谁也抽到7号那就与我对打。运气太背了，一个估计有170斤的对手笑呵呵的站在我面前。人家力气大，专打我后场球，我手臂疼痛感还没恢复，被秒了。</p>
-<p>剩下没事只给我司的人拍照了。哎，虽然我手机拍照效果一般，但也不差，pp拍出来噪点严重，不清晰。然后觉得反正现在也没事，物业方也没找到合适的裁判，我就顺口应了句“我来吧”，裁女单。额，场面有多和谐我就不讲了，双方是挽着手上场的。本以为完事了，结果，又要裁男单，裁复赛，最后决赛。当时我想现在空下这么多场地，好好练几个球，可大家都不愿意顶替我去裁。最后前三甲决赛，就我一个喊着，“13比11，这一局比赛结束”——决赛果然精彩，双方咬着分不放。因为是循环赛，按最后每人赢的局数定名次，三人打了七局。这还是我第一次当裁判呢。</p>
-<p>回来时都12点多了，又困又累，一同事顺路就开车送我到了西乡。本以为可以冲个澡，睡四五个小时，结果，公司客户在投诉网站使用很慢，远程到公司找了一个小时原因没结果，还趴在桌上睡着了。（程序员节还出事情呢？）</p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2015/10/25/weekends-badminton-ktv/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/10/21/what-do-women-think-of-men-who-can-cook/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/10/21/what-do-women-think-of-men-who-can-cook/" itemprop="url">
-                  在女性眼里，男人会做饭是种什么体验？
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-10-21T23:56:25+08:00">
-                2015-10-21
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/生活/" itemprop="url" rel="index">
-                    <span itemprop="name">生活</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2015/10/21/what-do-women-think-of-men-who-can-cook/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2015/10/21/what-do-women-think-of-men-who-can-cook/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2015/10/21/what-do-women-think-of-men-who-can-cook/" class="leancloud_visitors" data-flag-title="在女性眼里，男人会做饭是种什么体验？">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>原文地址：<a href="https://www.quora.com/What-do-women-think-of-men-who-can-cook">https://www.quora.com/What-do-women-think-of-men-who-can-cook</a><br>作者：<a href="https://www.quora.com/Shambhavi-Tripathi">Shambhavi Tripathi</a><br>翻译：<a href="http://seanlook.com">Seanlook</a></p>
-<h1 id="What-do-women-think-of-men-who-can-cook"><a href="#What-do-women-think-of-men-who-can-cook" class="headerlink" title="What do women think of men who can cook?"></a>What do women think of men who can cook?</h1><p>这个问题很有意思，我想我可以很好的回答这个问题，因为我有幸认识这些人。</p>
-<p>我的弟弟和我的两个好朋友都很擅长做饭，所以我将以他们为原型来回答。</p>
-<p>在我回答之前呢，我想提一下我自己算得上是一个极度偏执的人，因为我很爱吃。我就是个吃货（素食），我的味蕾从未被满足过，并且7×24小时不间断的寻找美食。然而，我自己对下厨一无所知，甚至麦琪面都下不好。好了，接下来让我来开始回答，在我看来男人会做饭是怎样的。<br>   <img src="https://qph.is.quoracdn.net/main-qimg-add9126874364a433c43fef58eca6ea9?convert_to_webp=true" alt=""><br>   (Image Credits: <a href="http://blog.sembrodesigns.com/tag/fathers-day/">Fathers day Archives | Kitchen Remodeling</a>)</p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2015/10/21/what-do-women-think-of-men-who-can-cook/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/7/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/7/">7</a><span class="page-number current">8</span><a class="page-number" href="/page/9/">9</a><span class="space">&hellip;</span><a class="page-number" href="/page/21/">21</a><a class="extend next" rel="next" href="/page/9/"><i class="fa fa-angle-right"></i></a>
+    <a class="extend prev" rel="prev" href="/page/7/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/7/">7</a><span class="page-number current">8</span><a class="page-number" href="/page/9/">9</a><span class="space">&hellip;</span><a class="page-number" href="/page/22/">22</a><a class="extend next" rel="next" href="/page/9/"><i class="fa fa-angle-right"></i></a>
   </nav>
 
 
@@ -1264,7 +1260,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">103</span>
+                <span class="site-state-item-count">106</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -1286,7 +1282,7 @@
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">116</span>
+                <span class="site-state-item-count">118</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>

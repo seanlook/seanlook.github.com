@@ -1,0 +1,1117 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="en">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="mysql,table_cache," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0" />
+
+
+
+
+
+
+<meta name="description" content="1. 现象某日下午下班后低峰期，现网MySQL一个库突然报出大量慢sql，状态是 statistics，但是过后拿这些sql去执行的时候，实际很快。处于 statistics 状态的线程有个特征：查询的都是视图，但看监控那个时间段并没有明显的update/detele/insert。通过我们的快照程序，去分析当时的 innodb status，发现如下信息：12345678910111213141">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MySQL实例阻塞分析一例(线程statistics状态)">
+<meta property="og:url" content="http://seanlook.com/2017/10/17/rds_disk_io_troubleshooting/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="1. 现象某日下午下班后低峰期，现网MySQL一个库突然报出大量慢sql，状态是 statistics，但是过后拿这些sql去执行的时候，实际很快。处于 statistics 状态的线程有个特征：查询的都是视图，但看监控那个时间段并没有明显的update/detele/insert。通过我们的快照程序，去分析当时的 innodb status，发现如下信息：12345678910111213141">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/rds_diskio_slave_lag.png">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/rds_diskio_bufferpool_flushed.png">
+<meta property="og:updated_time" content="2017-10-17T08:32:49.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="MySQL实例阻塞分析一例(线程statistics状态)">
+<meta name="twitter:description" content="1. 现象某日下午下班后低峰期，现网MySQL一个库突然报出大量慢sql，状态是 statistics，但是过后拿这些sql去执行的时候，实际很快。处于 statistics 状态的线程有个特征：查询的都是视图，但看监控那个时间段并没有明显的update/detele/insert。通过我们的快照程序，去分析当时的 innodb status，发现如下信息：12345678910111213141">
+<meta name="twitter:image" content="http://7q5fot.com1.z0.glb.clouddn.com/rds_diskio_slave_lag.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post","offset":12,"offset_float":0,"b2t":false,"scrollpercent":false},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: 'WNWHBKUL26',
+      apiKey: 'cec5cc7d455c77d448433aa60f989766',
+      indexName: 'seanlook',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://seanlook.com/2017/10/17/rds_disk_io_troubleshooting/"/>
+
+
+
+
+
+  <title> MySQL实例阻塞分析一例(线程statistics状态) | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s95.cnzz.com/z_stat.php?id=1253513173&web_id=1253513173" language="JavaScript"></script>
+  </div>
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Sean's Notes</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">Stay hungry, stay foolish.</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            About
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocapitalize="off" autocomplete="off" autocorrect="off"
+             placeholder="Searching..." spellcheck="false"
+             type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/10/17/rds_disk_io_troubleshooting/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                MySQL实例阻塞分析一例(线程statistics状态)
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-10-17T16:32:49+08:00">
+                2017-10-17
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2017/10/17/rds_disk_io_troubleshooting/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2017/10/17/rds_disk_io_troubleshooting/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2017/10/17/rds_disk_io_troubleshooting/" class="leancloud_visitors" data-flag-title="MySQL实例阻塞分析一例(线程statistics状态)">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h1 id="1-现象"><a href="#1-现象" class="headerlink" title="1. 现象"></a>1. 现象</h1><p>某日下午下班后低峰期，现网MySQL一个库突然报出大量慢sql，状态是 <code>statistics</code>，但是过后拿这些sql去执行的时候，实际很快。处于 statistics 状态的线程有个特征：查询的都是视图，但看监控那个时间段并没有明显的update/detele/insert。通过我们的快照程序，去分析当时的 innodb status，发现如下信息：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div></pre></td><td class="code"><pre><div class="line">SEMAPHORES</div><div class="line"><span class="comment">----------</span></div><div class="line">OS WAIT ARRAY INFO: reservation count 17208994</div><div class="line"><span class="comment">--Thread 139964610234112 has waited at srv0srv.cc line 2132 for 14.00 seconds the semaphore:</span></div><div class="line">X-<span class="keyword">lock</span> (wait_ex) <span class="keyword">on</span> RW-latch <span class="keyword">at</span> <span class="number">0x1635a00</span> created <span class="keyword">in</span> <span class="keyword">file</span> dict0dict.cc line <span class="number">900</span></div><div class="line">a writer (<span class="keyword">thread</span> <span class="keyword">id</span> <span class="number">139964610234112</span>) has reserved it <span class="keyword">in</span> <span class="keyword">mode</span> <span class="keyword">wait</span> exclusive</div><div class="line"><span class="built_in">number</span> <span class="keyword">of</span> readers <span class="number">1</span>, waiters flag <span class="number">0</span>, lock_word: ffffffffffffffff</div><div class="line"><span class="keyword">Last</span> <span class="keyword">time</span> <span class="keyword">read</span> <span class="keyword">locked</span> <span class="keyword">in</span> <span class="keyword">file</span> row0purge.cc line <span class="number">720</span></div><div class="line"><span class="keyword">Last</span> <span class="keyword">time</span> write <span class="keyword">locked</span> <span class="keyword">in</span> <span class="keyword">file</span> /home/<span class="keyword">admin</span>/<span class="number">146</span>_20161018140650857_13830810_code/rpm_workspace/<span class="keyword">storage</span>/innobase/srv/srv0srv.cc line <span class="number">2132</span></div><div class="line">OS <span class="keyword">WAIT</span> <span class="built_in">ARRAY</span> INFO: signal <span class="keyword">count</span> <span class="number">256984450</span></div><div class="line"><span class="keyword">Mutex</span> spin waits <span class="number">626367674</span>, rounds <span class="number">2776951802</span>, OS waits <span class="number">1973672</span></div><div class="line">RW-<span class="keyword">shared</span> spins <span class="number">149944457</span>, rounds <span class="number">1650148561</span>, OS waits <span class="number">3972058</span></div><div class="line">RW-excl spins <span class="number">72090467</span>, rounds <span class="number">2017802579</span>, OS waits <span class="number">11148264</span></div><div class="line">Spin rounds per <span class="keyword">wait</span>: <span class="number">4.43</span> <span class="keyword">mutex</span>, <span class="number">11.01</span> RW-<span class="keyword">shared</span>, <span class="number">27.99</span> RW-excl</div><div class="line">...</div><div class="line"><span class="keyword">FILE</span> I/O</div><div class="line"><span class="comment">--------</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">0</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">insert</span> buffer <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">1</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">log</span> <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">2</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">read</span> <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">3</span> state: doing <span class="keyword">file</span> i/o (<span class="keyword">read</span> <span class="keyword">thread</span>) ev <span class="keyword">set</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">4</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">read</span> <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">5</span> state: doing <span class="keyword">file</span> i/o (<span class="keyword">read</span> <span class="keyword">thread</span>) ev <span class="keyword">set</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">6</span> state: doing <span class="keyword">file</span> i/o (write <span class="keyword">thread</span>) ev <span class="keyword">set</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">7</span> state: waiting <span class="keyword">for</span> i/o request (write <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">8</span> state: waiting <span class="keyword">for</span> i/o request (write <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">9</span> state: waiting <span class="keyword">for</span> i/o request (write <span class="keyword">thread</span>)</div><div class="line">Pending <span class="keyword">normal</span> aio <span class="keyword">reads</span>: <span class="number">18</span> [<span class="number">0</span>, <span class="number">12</span>, <span class="number">0</span>, <span class="number">6</span>] , aio writes: <span class="number">1</span> [<span class="number">1</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>] ,</div><div class="line">ibuf aio <span class="keyword">reads</span>: <span class="number">0</span>, <span class="keyword">log</span> i/o<span class="string">'s: 0, sync i/o'</span>s: <span class="number">0</span></div><div class="line">Pending flushes (fsync) <span class="keyword">log</span>: <span class="number">0</span>; buffer pool: 0</div><div class="line">1346747614 OS file reads, 2869418806 OS file writes, 524616747 OS fsyncs</div><div class="line">22 pending preads, 1 pending pwrites</div><div class="line">6.00 reads/s, 16384 avg bytes/read, 0.00 writes/s, 0.00 fsyncs/s</div><div class="line">...</div><div class="line">ROW OPERATIONS</div><div class="line"><span class="comment">--------------</span></div><div class="line">0 queries inside InnoDB, 0 queries in queue</div><div class="line">38 read views open inside InnoDB</div><div class="line">Main thread process no. 34414, id 139964610234112, state: enforcing dict <span class="keyword">cache</span> <span class="keyword">limit</span></div><div class="line"><span class="built_in">Number</span> <span class="keyword">of</span> <span class="keyword">rows</span> inserted <span class="number">2546811699</span>, <span class="keyword">updated</span> <span class="number">1708150459</span>, deleted <span class="number">1004154696</span>, <span class="keyword">read</span> <span class="number">413168628410</span></div><div class="line"><span class="number">0.00</span> inserts/s, <span class="number">0.00</span> updates/s, <span class="number">0.00</span> deletes/s, <span class="number">54.19</span> <span class="keyword">reads</span>/s</div></pre></td></tr></table></figure></p>
+<h1 id="2-分析"><a href="#2-分析" class="headerlink" title="2. 分析"></a>2. 分析</h1><p>从上面的信息知道 Thread 139964610234112 是主线程，在源码 srv0srv.cc:2132 行的地方等待信号14s，这个信号是在 dict0dict.cc:900 地方创建的 RW-latch 排它锁。那么奇怪了，主线程自己在等待自己的互斥锁。<br>由于环境是阿里云的RDS(基于MySQL 5.6.16-log 版本)，拿不到他们的代码，找来 5.6.35 的来看，行号对不上。但好在上段信息的最后面有一个 Main thread state: <code>enforcing dict cache limit</code>，发现在 srv0srv.cc 函数 srv_master_do_active_tasks() 约2137行的位置：<br><figure class="highlight mipsasm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">if (cur_time % SRV_MASTER_DICT_LRU_INTERVAL == <span class="number">0</span>) &#123;</div><div class="line">4srv_main_thread_op_info = <span class="string">"enforcing dict cache limit"</span><span class="comment">;</span></div><div class="line">4srv_master_evict_from_table_cache(<span class="number">50</span>)<span class="comment">;</span></div><div class="line">4MONITOR_INC_TIME_IN_MICRO_SECS(</div><div class="line">44MONITOR_SRV_DICT_LRU_MICROSECOND, counter_time)<span class="comment">;</span></div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<a id="more"></a>
+<p>应该是在调用 srv_master_evict_from_table_cache() 从innodb table cache里面清理缓存的地方waiting（这里不是一定会清理，而是先判断空间够不够用，参数50表示只扫描 unused_table list的50%）。<br>srv_master_evict_from_table_cache()：<br><figure class="highlight mipsasm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line">srv_master_evict_from_table_cache(</div><div class="line"><span class="comment">/*==============================*/</span></div><div class="line">4ulint	pct_check)	<span class="comment">/*!&lt; in: max percent to check */</span></div><div class="line">&#123;</div><div class="line">4ulint	n_tables_evicted = <span class="number">0</span><span class="comment">;</span></div><div class="line"></div><div class="line">4rw_lock_x_lock(&amp;<span class="keyword">dict_operation_lock);</span></div><div class="line"></div><div class="line">4<span class="keyword">dict_mutex_enter_for_mysql();</span></div><div class="line"></div><div class="line">4n_tables_evicted = <span class="keyword">dict_make_room_in_cache( </span> <span class="comment">/** 在dict0dict.cc里面 **/</span></div><div class="line">44innobase_get_table_cache_size(), pct_check)<span class="comment">;</span></div><div class="line"></div><div class="line">4<span class="keyword">dict_mutex_exit_for_mysql();</span></div><div class="line"></div><div class="line">4rw_lock_x_unlock(&amp;<span class="keyword">dict_operation_lock);</span></div><div class="line"></div><div class="line">4return(n_tables_evicted)<span class="comment">;</span></div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>就是在 <em>rw_lock_x_lock(&amp;dict_operation_lock)</em> 这个地方获取Latch的时候等待了14s，这个锁就是在数据字典模块 dict0dict.cc:dict_init() 约1065行的地方创建的，与innodb status输出基本一致。<br>关于 <code>dict_operation_lock</code> 直接看注释吧：<br><figure class="highlight mizar"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">/** @brief the data dictionary rw-latch protecting dict_sys</div><div class="line"></div><div class="line">table create, drop, etc. <span class="keyword">reserve</span> this <span class="keyword">in</span> X-<span class="keyword">mode</span>; implicit <span class="keyword">or</span></div><div class="line">backround operations purge, rollback, foreign key checks <span class="keyword">reserve</span> this</div><div class="line"><span class="keyword">in</span> S-<span class="keyword">mode</span>; we cannot trust <span class="keyword">that</span> MySQL protects implicit <span class="keyword">or</span> background</div><div class="line">operations a table drop since MySQL does <span class="keyword">not</span> know <span class="keyword">of</span> them; therefore</div><div class="line">we need this; NOTE: a transaction which reserves this must keep book</div><div class="line">on the <span class="keyword">mode</span> <span class="keyword">in</span> trx_t<span class="comment">::dict_operation_lock_mode */</span></div></pre></td></tr></table></figure></p>
+<p>在尝试把表定义逐出缓存时获取的是 dict_operation_lock X-mode lock，可是从已有的信息里看不到另一个数据字典锁是什么。<br>之前是怀疑是不是 table_definition_cache, table_open_cache, innodb_open_files 设置小了，视图一般是多表join，更容易消耗打开表的数量，导致不断的逐出cache而导致锁征用。但是检查一番并没发现什么问题，更何况是14s的等待。关于它们的设置和关系，可以参考我的文章 <a href="http://seanlook/2017/10/13/mysql-table_open_cache_file_limits" target="_blank" rel="external">table_open_cache 与 table_definition_cache 对MySQL的影响</a> 。</p>
+<p>那么得换个思路了，processlist里面有13个长时间处于 statistics 状态的线程，表示正在计算统计数据，以制定一个查询执行计划。 如果一个线程处于这种状态很长一段时间，可能是磁盘IO性能很差，或者磁盘在执行其他工作。</p>
+<p>此时注意到最上面的信息里有 <em>Pending normal aio reads: 18 [0, 12, 0, 6]</em> ，有18个读IO被挂起(实际从监控图 innodb_data_pending_reads看来，有达到过50)，四个read thread有三个处于忙碌状态。再有 innodb_buffer_pool_pages_flushed 在出异常前10s没有任何变化，也就是没有成功的将脏数据刷盘动作。当然这是一个从库，出异常前10s有出现过瞬间20多秒延迟：<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/rds_diskio_slave_lag.png" alt=""><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/rds_diskio_bufferpool_flushed.png" alt=""></p>
+<p>(这一切关注的都是 18:59:05 之前的数据，之后的时间，一般恢复了都会有瞬间的读行数上涨，这个时候别把它们反当做起因)</p>
+<h1 id="3-结论"><a href="#3-结论" class="headerlink" title="3. 结论"></a>3. 结论</h1><p>结合上面的 enforcing dict cache limit 和 statistics IO pending，找到两个有关的bug report:</p>
+<ul>
+<li><a href="https://bugs.launchpad.net/percona-server/+bug/1500176" target="_blank" rel="external">https://bugs.launchpad.net/percona-server/+bug/1500176</a></li>
+<li><a href="https://bugs.mysql.com/bug.php?id=84424" target="_blank" rel="external">https://bugs.mysql.com/bug.php?id=84424</a></li>
+</ul>
+<p>第一个是使用 pt-online-schema-change 去更改分区表的结构，可能会出现，但目前bug状态是Undecided，我们的环境没有分区表，没外键，也没有改表动作。<br>第二个其实 Not a bug：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line">Thank you for your bug report. This is, however, not a bug, but a very well known issue.</div><div class="line"></div><div class="line">You have to <span class="keyword">do</span> several things <span class="keyword">in</span> <span class="keyword">order</span> <span class="keyword">to</span> alleviate the problem:</div><div class="line"></div><div class="line">* increase the additional <span class="keyword">memory</span> pool</div><div class="line">（注：这里我认为不应该是additional <span class="keyword">memory</span> pool，而是 <span class="keyword">buffer_pool</span>，因为现在<span class="keyword">innodb</span>内存管理基本是调用系统malloc，即innodb_use_sys_malloc=<span class="keyword">ON</span>，参考https://dev.mysql.com/doc/refman/<span class="number">5.7</span>/en/<span class="keyword">innodb</span>-<span class="keyword">performance</span>-use_sys_malloc.html）</div><div class="line">* increase total <span class="built_in">number</span> <span class="keyword">of</span> <span class="keyword">file</span> handles available <span class="keyword">to</span> MySQL</div><div class="line">* increase <span class="built_in">number</span> <span class="keyword">of</span> <span class="keyword">file</span> handles <span class="keyword">for</span> <span class="keyword">InnoDB</span></div><div class="line">* improve <span class="keyword">performance</span> <span class="keyword">of</span> the I/O <span class="keyword">on</span> your operating <span class="keyword">system</span></div></pre></td></tr></table></figure></p>
+<p>说到底就是数据库服务器IO遇到问题了，可以通过增加 buffer_pool 来缓存更多的数据，或者提高服务器IO能力，这个范围就广了： <a href="https://dev.mysql.com/doc/refman/5.6/en/optimizing-innodb-diskio.html" target="_blank" rel="external">https://dev.mysql.com/doc/refman/5.6/en/optimizing-innodb-diskio.html</a> 。<br>然而生产服务器都运行了1年之久，高峰期都没出现过IO问题，现在何况低峰期，也没有认为数据操作。那这个锅只能交给阿里RDS了：怀疑是实例所在物理机磁盘有抖动。</p>
+<p>分析这么久得出这个结论，却不能做什么，因为我们没办法看到服务器级别的IO stats。其实想到去年也有实例出现过类似 statistics 问题，向阿里云提工单确认物理机状态，得到的结论都是：“是的，物理机有抖动。需要申请迁移实例吗”，但是从来拿不到依据。如果自己能看到OS级别的监控，其实都不需要本文这么冗长的分析。</p>
+<p><strong>参考</strong></p>
+<ul>
+<li><a href="https://dba.stackexchange.com/questions/55969/statistics-state-in-mysql-processlist" target="_blank" rel="external">https://dba.stackexchange.com/questions/55969/statistics-state-in-mysql-processlist</a></li>
+<li><a href="http://imysql.com/2015/06/10/mysql-faq-processlist-thread-states.shtml" target="_blank" rel="external">http://imysql.com/2015/06/10/mysql-faq-processlist-thread-states.shtml</a></li>
+<li><a href="http://imysql.com/2016/11/20/mysql-faq-what-cause-diskio-so-high.shtml" target="_blank" rel="external">http://imysql.com/2016/11/20/mysql-faq-what-cause-diskio-so-high.shtml</a></li>
+</ul>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+  <div style="padding: 10px 0; margin: 20px auto; width: 90%; text-align: center;">
+    <div>支持可请我喝杯茶 ^_- (上限10个铜板)</div>
+    <button id="rewardButton" disable="enable" onclick="var qr = document.getElementById('QR'); if (qr.style.display === 'none') {qr.style.display='block';} else {qr.style.display='none'}">
+      <span>赏</span>
+    </button>
+    <div id="QR" style="display: none;">
+      
+      
+        <div id="alipay" style="display: inline-block">
+          <img id="alipay_qr" src="/images/reward_alipay_seanlook.jpg" alt="seanlook Alipay"/>
+          <p>支付宝打赏</p>
+        </div>
+      
+    </div>
+  </div>
+
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/mysql/" rel="tag"># mysql</a>
+          
+            <a href="/tags/table-cache/" rel="tag"># table_cache</a>
+          
+        </div>
+      
+
+      
+        
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2017/10/13/mysql-table_open_cache_file_limits/" rel="next" title="table_open_cache 与 table_definition_cache 对MySQL的影响">
+                <i class="fa fa-chevron-left"></i> table_open_cache 与 table_definition_cache 对MySQL的影响
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div id="disqus_thread">
+        <noscript>
+          Please enable JavaScript to view the
+          <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a>
+        </noscript>
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+           
+              <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+          
+        </div>
+        <nav class="site-state motion-element">
+
+          
+            <div class="site-state-item site-state-posts">
+              <a href="/archives">
+                <span class="site-state-item-count">106</span>
+                <span class="site-state-item-name">posts</span>
+              </a>
+            </div>
+          
+
+          
+            
+            
+            <div class="site-state-item site-state-categories">
+              <a href="/categories/index.html">
+                <span class="site-state-item-count">23</span>
+                <span class="site-state-item-name">categories</span>
+              </a>
+            </div>
+          
+
+          
+            
+            
+            <div class="site-state-item site-state-tags">
+              <a href="/tags/index.html">
+                <span class="site-state-item-count">118</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+        
+
+
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-现象"><span class="nav-text">1. 现象</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-分析"><span class="nav-text">2. 分析</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-结论"><span class="nav-text">3. 结论</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2017</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+
+        
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.0"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.0"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.0"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  
+
+    
+      <script id="dsq-count-scr" src="https://seanlook.disqus.com/count.js" async></script>
+    
+
+    
+      <script type="text/javascript">
+        var disqus_config = function () {
+          this.page.url = 'http://seanlook.com/2017/10/17/rds_disk_io_troubleshooting/';
+          this.page.identifier = '2017/10/17/rds_disk_io_troubleshooting/';
+          this.page.title = 'MySQL实例阻塞分析一例(线程statistics状态)';
+        };
+        var d = document, s = d.createElement('script');
+        s.src = 'https://seanlook.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', '' + +new Date());
+        (d.head || d.body).appendChild(s);
+      </script>
+    
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+      search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.popup').toggle();
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+      $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = $( "entry", xmlResponse ).map(function() {
+            return {
+              title: $( "title", this ).text(),
+              content: $("content",this).text(),
+              url: $( "url" , this).text()
+            };
+          }).get();
+          var $input = document.getElementById(search_id);
+          var $resultContent = document.getElementById(content_id);
+          $input.addEventListener('input', function(){
+            var matchcounts = 0;
+            var str='<ul class=\"search-result-list\">';
+            var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+            $resultContent.innerHTML = "";
+            if (this.value.trim().length > 1) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var content_index = [];
+                var data_title = data.title.trim().toLowerCase();
+                var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                var data_url = decodeURIComponent(data.url);
+                var index_title = -1;
+                var index_content = -1;
+                var first_occur = -1;
+                // only match artiles with not empty titles and contents
+                if(data_title != '') {
+                  keywords.forEach(function(keyword, i) {
+                    index_title = data_title.indexOf(keyword);
+                    index_content = data_content.indexOf(keyword);
+                    if( index_title >= 0 || index_content >= 0 ){
+                      isMatch = true;
+                      if (i == 0) {
+                        first_occur = index_content;
+                      }
+                    }
+
+                  });
+                }
+                // show search results
+                if (isMatch) {
+                  matchcounts += 1;
+                  str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                  var content = data.content.trim().replace(/<[^>]+>/g,"");
+                  if (first_occur >= 0) {
+                    // cut out 100 characters
+                    var start = first_occur - 20;
+                    var end = first_occur + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if(start == 0){
+                      end = 50;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    var match_content = content.substring(start, end);
+                    // highlight all keywords
+                    keywords.forEach(function(keyword){
+                      var regS = new RegExp(keyword, "gi");
+                      match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                    });
+
+                    str += "<p class=\"search-result\">" + match_content +"...</p>"
+                  }
+                  str += "</li>";
+                }
+              })};
+            str += "</ul>";
+            if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+            if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+            $resultContent.innerHTML = str;
+          });
+          proceedsearch();
+        }
+      });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.1.js"></script>
+  <script>AV.initialize("NliJVBn0857TMk5HYrIRt5wp-gzGzoHsz", "jB9B4QG8Rm8YP04RQqnsKy5M");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
