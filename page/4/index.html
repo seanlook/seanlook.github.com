@@ -316,6 +316,379 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/03/03/mysql-flashback_use_purged-binlog/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2017/03/03/mysql-flashback_use_purged-binlog/" itemprop="url">
+                  MySQL根据离线binlog快速“闪回”
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-03-03T16:32:49+08:00">
+                2017-03-03
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2017/03/03/mysql-flashback_use_purged-binlog/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2017/03/03/mysql-flashback_use_purged-binlog/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2017/03/03/mysql-flashback_use_purged-binlog/" class="leancloud_visitors" data-flag-title="MySQL根据离线binlog快速“闪回”">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>昨天突然有个客户说误操作，自己删除了大量数据，CTO直接将我拉到一个讨论组里，说要帮他们恢复数据。他们自己挖的坑，打算让开发那边根据业务日志去恢复，被告知只记录的删除主键这样的信息，物理删除，无能为力。</p>
+<p>上服务器看了下记录的日志，发现好几台上面都有被误删的记录输出。阿里RDS虽然可以克隆一个恢复到删除时间点前的实例，但这散落的几万个id找起来费力，还有就是几个表之间关联的数据也要恢复，觉得麻烦。</p>
+<p>想到 MySQL 的闪回方案。以前看过好几篇相关文章，甚至差点自己用python撸一个来解析binlog，反转得到回滚sql，实在没空，这下要急用了。赶紧找了下网上“现成的方案”。</p>
+<p>正文开始</p>
+<hr>
+<p>MySQL（含阿里RDS）快速闪回可以说是对数据库误操作的后悔药，flashback功能可以将数据库返回到误操作之前。但是即使oracle数据库也只支持短时间内的闪回。</p>
+<p>网上现有开源的MySQL闪回实现，原理都是解析binlog，生成反向sql: (必须为row模式)</p>
+<ol>
+<li>对于 delete 操作，生成insert （DELETE_ROWS_EVENT）</li>
+<li>对于 update 操作，交换binlog里面值的顺序 （UPDATE_ROWS_EVENT）</li>
+<li>对于 insert 操作，反向生成delete （WRITE_ROWS_EVENT）</li>
+<li>对于多个event，要逆向生成sql</li>
+</ol>
+<p>开源实现：</p>
+<ul>
+<li><a href="https://github.com/58daojia-dba/mysqlbinlog_flashback">https://github.com/58daojia-dba/mysqlbinlog_flashback</a></li>
+<li><a href="https://github.com/danfengcao/binlog2sql/">https://github.com/danfengcao/binlog2sql/</a></li>
+</ul>
+<p>上面两种实现方式，都是通过 python-mysql-replication 包，模拟出原库的一个从库，然后 <code>show binary logs</code> 来获取binlog，发起同步binlog的请求，再解析EVENT。但是阿里云 RDS 的binlog在同步给从库之后，<strong> 很快就被 purge 掉了 </strong>。如果要恢复 <strong> 昨天</strong> 的 <strong> 部分数据 </strong>，两种方案都是拿不到binlog的。也就是闪回的时间有限。</p>
+<p>还有一些比较简单的实现，就是解析 binlog 物理文件，实现回滚，如 <code>binlog-rollback.pl</code> ，试过，但是速度太慢。</p>
+<p>为了不影响速度，又想使用比较成熟的闪回方案，我们可以这样做：</p>
+<ol>
+<li>借助一个自建的 mysqld 实例，将已purge掉的binlog拷贝到该实例的目录下</li>
+<li>在自建实例里，提前创建好需要恢复的表（结构），因为工具需要连接上来从 <code>information_schema.columns</code> 获取元数据信息</li>
+<li>拷贝的时候，可以替换掉mysql实例自己的binlog文件名，保持连续</li>
+<li>可能要修改 <code>mysql-bin.index</code>，确保文件名还能被mysqld识别到</li>
+<li>重启mysql实例，<code>show binary logs</code> 看一下是否在列表里面</li>
+<li>接下来就可以使用上面任何一种工具，模拟从库，指定一个binlog文件，开始时间，结束时间，得到回滚SQL</li>
+<li>再根据业务逻辑，筛选出需要的sql</li>
+</ol>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2017/03/03/mysql-flashback_use_purged-binlog/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/02/17/mysql-autoincrement_2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2017/02/17/mysql-autoincrement_2/" itemprop="url">
+                  关于MySQL自增主键的几点问题（下）
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-02-17T16:32:49+08:00">
+                2017-02-17
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2017/02/17/mysql-autoincrement_2/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2017/02/17/mysql-autoincrement_2/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2017/02/17/mysql-autoincrement_2/" class="leancloud_visitors" data-flag-title="关于MySQL自增主键的几点问题（下）">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h3 id="AUTO-INC-waiting-锁等待"><a href="#AUTO-INC-waiting-锁等待" class="headerlink" title="AUTO-INC waiting 锁等待"></a>AUTO-INC waiting 锁等待</h3><p>这是生产环境出现的现象，某日下午5点业务高峰期，我们的 <a href="http://seanlook.com/2016/09/27/python-mysql-querykill/">慢查询快照抓取程序</a> 报出大量线程阻塞，但是1分钟以后就好了。于是分析了当时的 processlist 和 innodb status 现场记录，发现有大量的 <code>AUTO-INC waiting</code>：</p>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-autoinc-1.png" alt="auto-inc-lock-wait"></p>
+<p>当时想这是得多大的并发量，才会导致 AUTO_INCREMENT 列的自增id分配出现性能问题，不太愿意相信这个事实（后面就再也没出现过）。了解一番之后（见 <a href="http://seanlook.com/2017/02/16/mysql-autoincrement/">关于MySQLz自增主键问题（上篇）</a>），发现这个表级别的 AUTO-INC lock 就不应该在业务中存在，因为 <code>innodb_autoinc_lock_mode</code>为1，普通业务都是 simple inserts，获取自增id是靠内存里维护的一个互斥量（mutex counter）。</p>
+<p>问题拿到知数堂优化班上课群里讨论过，也只是猜测是不是慢查询多了导致负载高，或者当时磁盘遇到什么物理故障阿里云那边自动恢复了。再后来怀疑是不是因为插入时带了 auto_increment 列的值（我们有个redis incr实现的自增id服务，虽然这一列有 AAUTO_INCREMENT 定义，但实际已经从发号器取id了），会导致锁的性质会变？</p>
+<p>为了弄清这个疑问，特意去看了下mysql源码，发现如果插入的自增值比表当前AUTOINC值要大，是直接update mutex counter：</p>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-autoinc-mutex-update.png" alt=""></p>
+<p>看源码的时候也打消了另一个疑虑：<code>show engine innodb status</code> 看到的 <code>AUTO-INC</code> 有没有可能不区分 表级自增锁和互斥量计数器 两种自增方案，只是告诉你自增id获取忙不过来？ 实际不是的，代码里面有明确的定义是 <code>autoinc_lock</code>还是<code>autoinc_mutex</code>：<br><figure class="highlight dart"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// dict0dict.cc :</span></div><div class="line">#ifndef UNIV_HOTBACKUP</div><div class="line"><span class="comment"><span class="markdown">/<span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="emphasis">***</span>/</span></span><span class="comment"><span class="markdown">/**</div><div class="line">Acquire </span>the<span class="markdown"> autoinc lock. */</span></span></div><div class="line">UNIV_INTERN</div><div class="line"><span class="keyword">void</span></div><div class="line">dict_table_autoinc_lock(</div><div class="line"><span class="comment">/*====================*/</span></div><div class="line">4dict_table_t*	table)	<span class="comment">/*!&lt; in/out: table */</span></div><div class="line">&#123;</div><div class="line">4mutex_enter(&amp;table-&gt;autoinc_mutex);</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="comment"><span class="markdown">/<span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="emphasis">***</span>/</span></span><span class="comment"><span class="markdown">/**</div><div class="line">Unconditionally set </span>the<span class="markdown"> autoinc counter. */</span></span></div><div class="line">UNIV_INTERN</div><div class="line"><span class="keyword">void</span></div><div class="line">dict_table_autoinc_initialize(</div><div class="line"><span class="comment">/*==========================*/</span></div><div class="line">4dict_table_t*	table,	<span class="comment">/*!&lt; in/out: table */</span></div><div class="line">4ib_uint64_t	value)	<span class="comment">/*!&lt; in: next value to assign to a row */</span></div><div class="line">&#123;</div><div class="line">4ut_ad(mutex_own(&amp;table-&gt;autoinc_mutex));</div><div class="line"></div><div class="line">4table-&gt;autoinc = value;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2017/02/17/mysql-autoincrement_2/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/02/16/mysql-autoincrement/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -853,370 +1226,6 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/11/20/py-mysql-table-checksum-non-replicas/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2016/11/20/py-mysql-table-checksum-non-replicas/" itemprop="url">
-                  MySQL非主从环境下数据一致性校验及修复程序
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-11-20T16:32:49+08:00">
-                2016-11-20
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Python/" itemprop="url" rel="index">
-                    <span itemprop="name">Python</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2016/11/20/py-mysql-table-checksum-non-replicas/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2016/11/20/py-mysql-table-checksum-non-replicas/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2016/11/20/py-mysql-table-checksum-non-replicas/" class="leancloud_visitors" data-flag-title="MySQL非主从环境下数据一致性校验及修复程序">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <h2 id="1-简介"><a href="#1-简介" class="headerlink" title="1. 简介"></a>1. 简介</h2><p>项目地址：<a href="https://github.com/seanlook/px-table-checksum">https://github.com/seanlook/px-table-checksum</a></p>
-<p>主从环境下数据一致性校验经常会用 pt-table-checksum 工具，它的原理及实施过程之前写过一篇文章：<a href="http://seanlook.com/2015/12/29/mysql_replica_pt-table-checksum/">生产环境使用 pt-table-checksum 检查MySQL数据一致性</a>。但是DBA工作中还会有些针对两个表检查是否一致，而这两个表之间并没有主从关系，pt工具是基于binlog把在主库进行的检查动作，在从库重放一遍，此时就不适用了。</p>
-<p>总会有这样特殊的需求，比如从阿里云RDS实例迁移到自建mysql实例，它的数据传输服务实现方式是基于表的批量数据提取，加上binlog订阅，但强制row模式会导致pt-table-checksum没有权限把会话临时改成statement。另一种需求是，整库进行字符集转换：库表定义都是utf8，但应用连接使用了默认的 latin1，要将连接字符集和表字符集统一起来，只能以latin1导出数据，再以utf8导入，这种情况数据一致性校验，且不说binlog解析程序不支持statement（如canal），新旧库本身内容不同，pt-table-checksum 算出的校验值也会不一样，失效。</p>
-<p>所以才萌生了参考 pt-table-checksum 自己写了一个：px-table-checksum 。</p>
-<h2 id="2-实现方法"><a href="#2-实现方法" class="headerlink" title="2. 实现方法"></a>2. 实现方法</h2><p>整体思路是借鉴pt-table-checksum，从源库批量（即chunk）取出一块数据如1000行，计算CRC32值，同样的语句在目标库运行一遍，结果都存入另一个库，最后检查对应编号的chunk crc值是否一致。知道不一致还不行，得能否快速方便的修复差异，所以继续根据那些不一致的chunk，去目标库和源库找到不一致的行，是缺失，还是多余，还是被修改了，然后生成修复sql，根据指示是否自动修复。</p>
-<p>那么问题就在于：</p>
-<ol>
-<li><p>如何确定批次，也就是下一个chunk该怎么取？<br>我还没想做到pt-table-checksum那样，可以根据负载动态调整chunk大小，甚至活跃线程数超过阀值就暂停检查，上来工作量就太大了。目前每次计算的chunk的行数是固定的，可以配置1000或2000等。<br>所以就要用到分页查询，根据（自增或联合）主键、唯一索引，每次limit 1000后升序取最后一条，作为下一批的起始。所以要分析表上的键情况，组合查询条件。目前仅能检查有主键或唯一所以的表。</p>
-</li>
-<li><p>如何保证源库和目标库，运行的sql一样？<br>之前一版是目标库和源库，以多线程各自计算chunk，入库，后来才意识到严重的bug：比如同样是取1000行，如果目标库少数据，那么下一个chunk起始就不一样，比较的结果简直一塌糊涂。<br>所以必须保证相同编号的chunk，起点必须相同，所以想到用队列，存放在源库跑过的所有校验sql，模拟pt工具在目标库重放。考虑到要多线程同时比较多个表，队列可能吃内存过大，于是使用了redis队列。</p>
-</li>
-<li><p>直接在数据库中计算crc32，还是取出数据在内存里计算？<br>翻了pt-table-checksum的源码，它是在数据库里计算的。但是第一节里说过，如果目标库和源库要使用不同的字符集才能读出正确的数据，只能查询出来之后再比较。所以 px-table-checksum 两种都支持，只需指定一个配置项。</p>
-</li>
-<li><p>同时检查多个表，源库sql挤在队列，目标库拿出来执行时过了1s，此时源库那条数据又被修改了一次同步到了目标库，会导致计算结果不一致，实则一致，怎么处理<br>无法处理，是px-table-checksum相比pt-table-checksum最大的缺陷。<br>但为了尽可能减少此类问题（比如主从延迟也可能会），特意设计了多个redis队列，目标库多个检查线程，即比如同时指定检查8个表，源库检查会有8个线程对应，但可以根据表的写入情况，配置4个redis队列（目前是随机入列），10个目标库检查线程，来减少不准确因素。<br>但站在我的角度往往来说，不一致的数据会被记录下来，如果不多，人工核对一下；如果较多，就再跑一遍检查，如果两次都有同一条数据不一致，那就有情况了。</p>
-</li>
-</ol>
-<h2 id="3-限制"><a href="#3-限制" class="headerlink" title="3. 限制"></a>3. 限制</h2><ol>
-<li>如果检查期间源表数据，变化频繁，有可能检查的结果不准确<br>也就是上面第4点的问题。很明显，这个程序每个检查的事务是分开的，不像pt工具能严格保证每条检查sql的事务顺序。但有不一致的数据再排查一下就ok了。实际在我线上使用过程中，99.9%是准确的。
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2016/11/20/py-mysql-table-checksum-non-replicas/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/11/17/python-mysqldump-out-in-concurrency-magic/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2016/11/17/python-mysqldump-out-in-concurrency-magic/" itemprop="url">
-                  让mysqldump变成并发导出导入的魔法
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-11-17T16:32:49+08:00">
-                2016-11-17
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Python/" itemprop="url" rel="index">
-                    <span itemprop="name">Python</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2016/11/17/python-mysqldump-out-in-concurrency-magic/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2016/11/17/python-mysqldump-out-in-concurrency-magic/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2016/11/17/python-mysqldump-out-in-concurrency-magic/" class="leancloud_visitors" data-flag-title="让mysqldump变成并发导出导入的魔法">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <h2 id="1-简介"><a href="#1-简介" class="headerlink" title="1. 简介"></a>1. 简介</h2><p>取名mypumpkin，是python封装的一个让mysqldump以多线程的方式导出库表，再以mysql命令多线程导入新库，用于成倍加快导出，特别是导入的速度。这一切只需要在 mysqldump 或 mysql 命令前面加上 <code>mypumpkin.py</code> 即可，所以称作魔法。</p>
-<p><strong>项目地址</strong>：<a href="https://github.com/seanlook/mypumpkin">https://github.com/seanlook/mypumpkin</a>  </p>
-<p>该程序源于需要对现网单库几百G的数据进行转移到新库，并对中间进行一些特殊操作（如字符集转换），无法容忍mysqldump导入速度。有人可能会提到为什么不用 mydumper，其实也尝试过它但还是放弃了，原因有：</p>
-<ol>
-<li>不能设置字符集<br>mydumper强制使用 binary 方式来连接库以达到不关心备份恢复时的字符集问题，然而我的场景下需要特意以不同的字符集导出、再导入。写这个程序的时候正好在公众号看到网易有推送的一篇文章 (<a href="http://mp.weixin.qq.com/s?__biz=MzI4NTA1MDEwNg==&amp;mid=2650756926&amp;idx=1&amp;sn=b8081a8ae9456a6051d1ba519febee54&amp;chksm=f3f9e2abc48e6bbd5912edb4e6207ff6ec5bf7123fedbf10b5c65a43146af22845dbf0787b39&amp;scene=0#wechat_redirect">解密网易MySQL实例迁移高效完成背后的黑科技</a>)，提到他们对mydumper的改进已支持字符集设置，可是在0.9.1版本的patch里还是没找到。</li>
-<li>没有像 mysqldump 那样灵活控制过滤选项（导哪些表、忽略哪些表）<br>因为数据量之巨大，而且将近70%是不变更的历史表数据，这些表是可以提前导出转换的；又有少量单表大于50G的，最好是分库导出转换。mydumper 不具备 mysqldump 这样的灵活性</li>
-<li>对忽略导出gtid信息、触发器等其它支持<br>阿里云rds 5.6 导出必须要设置 set-gtid-purged=OFF</li>
-</ol>
-<p>另外有人还可能提到 mysqlpump —— 它才是我认为mysqldump应该具有的模样，语法兼容，基于表的并发导出。但是只有 mysql服务端 5.7.9 以上才支持，这就是现实和理想的距离。。。</p>
-<h2 id="2-实现方法"><a href="#2-实现方法" class="headerlink" title="2. 实现方法"></a>2. 实现方法</h2><p>首先说明，mysqldump的导出速度并不慢，经测试能达到50M/s的速度，10G数据花费3分钟的样子，可以看到瓶颈在于网络和磁盘IO，再怎样的导出工具也快不了多少，但是导入却花了60分钟，磁盘和网络大概只用到了20%，瓶颈在目标库写入速度（而一般顺序写入达不到IOPS限制），所以mypumpkin就诞生了 —— 兼顾myloader的导入速度和mysqldump导出的灵活性。</p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2016/11/17/python-mysqldump-out-in-concurrency-magic/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -1266,7 +1275,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">106</span>
+                <span class="site-state-item-count">108</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>

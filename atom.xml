@@ -42,9 +42,13 @@
 <p><strong>参考</strong></p>
 <ul>
 <li><a href="https://dba.stackexchange.com/questions/55969/statistics-state-in-mysql-processlist" target="_blank" rel="external">https://dba.stackexchange.com/questions/55969/statistics-state-in-mysql-processlist</a></li>
+<li><a href="http://mysqlinternals.blogspot.com/2015/05/list-of-background-operations-performed.html" target="_blank" rel="external">http://mysqlinternals.blogspot.com/2015/05/list-of-background-operations-performed.html</a></li>
 <li><a href="http://imysql.com/2015/06/10/mysql-faq-processlist-thread-states.shtml" target="_blank" rel="external">http://imysql.com/2015/06/10/mysql-faq-processlist-thread-states.shtml</a></li>
 <li><a href="http://imysql.com/2016/11/20/mysql-faq-what-cause-diskio-so-high.shtml" target="_blank" rel="external">http://imysql.com/2016/11/20/mysql-faq-what-cause-diskio-so-high.shtml</a></li>
 </ul>
+<hr>
+<p>本文链接地址：<a href="http://seanlook.com/2017/10/17/rds_disk_io_troubleshooting/">http://seanlook.com/2017/10/17/rds_disk_io_troubleshooting/</a></p>
+<hr>
 ]]></content>
     
     <summary type="html">
@@ -64,7 +68,7 @@
   </entry>
   
   <entry>
-    <title>table_open_cache 与 table_definition_cache 对MySQL的影响</title>
+    <title>table_open_cache 与 table_definition_cache 对MySQL(内存)的影响</title>
     <link href="http://seanlook.com/2017/10/13/mysql-table_open_cache_file_limits/"/>
     <id>http://seanlook.com/2017/10/13/mysql-table_open_cache_file_limits/</id>
     <published>2017-10-13T08:32:49.000Z</published>
@@ -287,6 +291,110 @@
       <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
     
       <category term="lock" scheme="http://seanlook.com/tags/lock/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>一个简单的数据订阅程序(for DBA)</title>
+    <link href="http://seanlook.com/2017/09/05/mysql-binlog-subscribe-simple-for-dba/"/>
+    <id>http://seanlook.com/2017/09/05/mysql-binlog-subscribe-simple-for-dba/</id>
+    <published>2017-09-05T08:32:49.000Z</published>
+    <updated>2017-09-05T08:32:49.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>本程序基于大众点评github项目binlog2sql二次开发而来，可以实现对源库的binlog实时接收，并组装成增量sql。</p>
+<p>原项目默认是把sql输出到控制台，二次开发后的版本把sql放入redis队列，根据需要由另一个程序消费到目标库，模拟了一个“从库”。<br>在测试时–stop-never在qa环境没有作用，添加了在 BinLogStreamReader 实例里面加入blocking=True来保证源源不断的接受binlog而不中断。</p>
+<p>另外也加入了更改目标库名的功能，比如原库叫d_ec_crm，生成的sql目标库名是 d_ec_contact 。</p>
+<p>项目地址：<a href="https://github.com/seanlook/binlog2sql" target="_blank" rel="external">https://github.com/seanlook/binlog2sql</a></p>
+<h1 id="应用场景"><a href="#应用场景" class="headerlink" title="应用场景"></a>应用场景</h1><p>目前想到以下应用场景：</p>
+<ul>
+<li><p>实时同步部分表到另外一个数据库实例<br>比如在数据库迁库时，将当天表的数据同步到新库，模拟阿里云dms数据传输的功能，相当于在测试环境演练，减少失误。<br>另外还可以从新库反向同步增量数据到老库，解决测试环境多项目测试引起数据库冲突的问题。</p>
+</li>
+<li><p>正式切库时的回滚措施<br>比如数据库迁移项目，切换期间数据写向新库，但如果切换失败需要回滚到老库，就需要把这段时间新增的数据同步回老库（启动消费程序），这就不需要程序段再考虑复杂的回滚设计。</p>
+</li>
+<li><p>数据库闪回<br>关于数据库误操作的闪回方案，见 <a href="http://seanlook.com/2017/03/03/mysql-flashback_use_purged-binlog/">文章MySQL根据离线binlog快速闪回</a> 。<code>binlog2sql</code>的 <code>-B</code> 选项可以将sql反向组装，生产回滚sql。如果需要完善的闪回功能，要进一步开发，提高易用性。</p>
+</li>
+<li><p>binlog搜索功能<br>目前组内一版的binlog搜索功能，是离线任务处理的方式，好处是不会占用太大空间，缺点是处理时间较长。通过实时binlog解析过滤的方式，入ES可以快速搜索。需要进一步开发完善。</p>
+<a id="more"></a>
+<h1 id="使用方法"><a href="#使用方法" class="headerlink" title="使用方法"></a>使用方法</h1><p>安装好python2.7虚拟环境，安装必要模块：pymysql, mysql-replication, redis, rq</p>
+<figure class="highlight cmake"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">pip <span class="keyword">install</span> -r requirements.txt</div></pre></td></tr></table></figure>
+</li>
+</ul>
+<p>注意：<code>pymysqlreplication</code> 库在处理 ‘0000-00-00 00:00:00’ 时有些不尽人意，可能会导致生产的sql在目标库执行失败，还有对<code>datetime(6)</code>类型有个bug，也对它进行了修复，地址：<a href="https://github.com/seanlook/python-mysql-replication" target="_blank" rel="external">https://github.com/seanlook/python-mysql-replication</a> 。</p>
+<p>准备一个redis用于存放sql队列，在环境变量里面设置redis地址<br><figure class="highlight arduino"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">export</span> REDIS_URL=<span class="string">'redis://localhost:6379'</span></div></pre></td></tr></table></figure></p>
+<p>在主库执行 <code>show master status</code> 得到binlog开始的文件名和postion，然后开始订阅：<br><figure class="highlight haml"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line">binlog2sql原版使用时：</div><div class="line">$ ~/.pyenv/versions/2.7.10/envs/py2_binlog/bin/python binlog2sql.py -h192.168.1.185 -P3306 -uecuser -pecuser \</div><div class="line">-<span class="ruby">d d_ec_contact --tables t_crm_contact_at \</span></div><div class="line">-<span class="ruby">-start-file=<span class="string">'mysql-bin.000001'</span> --start-datetime=<span class="string">'2017-08-30 12:30:00'</span> --start-position=<span class="number">6529058</span> \</span></div><div class="line">-<span class="ruby">-stop-never &gt; contact<span class="number">0</span>.sql</span></div><div class="line"></div><div class="line">加入订阅功能后：</div><div class="line">$ ~/.pyenv/versions/2.7.10/envs/py2_binlog/bin/python binlog2sql.py -h192.168.1.185 -P3306 -uecuser -pecuser \</div><div class="line">-<span class="ruby">d <span class="symbol">d_ec_contact:</span>d_ec_crm --tables t_crm_contact_at t_crm_remark_today \</span></div><div class="line">-<span class="ruby">-start-file=<span class="string">'mysql-bin.000001'</span> --start-datetime=<span class="string">'2017-08-30 12:30:00'</span> --start-position=<span class="number">6529058</span> \</span></div><div class="line">-<span class="ruby">-dest-dsn h=<span class="number">10.0</span>.<span class="number">200.195</span>,P=<span class="number">3307</span>,u=ecuser,p=ecuser</span></div><div class="line">-<span class="ruby">-stop-never &gt; contact<span class="number">0</span>.sql</span></div></pre></td></tr></table></figure></p>
+<p><code>-d d_ec_contact:d_ec_crm</code> 表上生成目标sql映射关系，如果不改变库名，就不需要 <code>:</code> 指定，与原版兼容。<br><code>--dest-dsn</code>: 表示目标库的地址和认证信息。</p>
+<p>这时在redis里面可以看到sql信息。如果需要在目标库重放，则启动消费程序：（在代码目录下面）<br><figure class="highlight awk"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">~<span class="regexp">/.pyenv/</span>versions<span class="regexp">/2.7.10/</span>envs<span class="regexp">/py2_binlog/</span>bin<span class="regexp">/rq worker</span></div></pre></td></tr></table></figure></p>
+<p>待数据追上之后，可以看到几乎是实时同步的。</p>
+<hr>
+<p>本文链接地址：<a href="http://seanlook.com/2017/09/05/mysql-binlog-subscribe-simple-for-dba/">http://seanlook.com/2017/09/05/mysql-binlog-subscribe-simple-for-dba/</a></p>
+<hr>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;本程序基于大众点评github项目binlog2sql二次开发而来，可以实现对源库的binlog实时接收，并组装成增量sql。&lt;/p&gt;
+&lt;p&gt;原项目默认是把sql输出到控制台，二次开发后的版本把sql放入redis队列，根据需要由另一个程序消费到目标库，模拟了一个“从库”。&lt;br&gt;在测试时–stop-never在qa环境没有作用，添加了在 BinLogStreamReader 实例里面加入blocking=True来保证源源不断的接受binlog而不中断。&lt;/p&gt;
+&lt;p&gt;另外也加入了更改目标库名的功能，比如原库叫d_ec_crm，生成的sql目标库名是 d_ec_contact 。&lt;/p&gt;
+&lt;p&gt;项目地址：&lt;a href=&quot;https://github.com/seanlook/binlog2sql&quot;&gt;https://github.com/seanlook/binlog2sql&lt;/a&gt;&lt;/p&gt;
+&lt;h1 id=&quot;应用场景&quot;&gt;&lt;a href=&quot;#应用场景&quot; class=&quot;headerlink&quot; title=&quot;应用场景&quot;&gt;&lt;/a&gt;应用场景&lt;/h1&gt;&lt;p&gt;目前想到以下应用场景：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;p&gt;实时同步部分表到另外一个数据库实例&lt;br&gt;比如在数据库迁库时，将当天表的数据同步到新库，模拟阿里云dms数据传输的功能，相当于在测试环境演练，减少失误。&lt;br&gt;另外还可以从新库反向同步增量数据到老库，解决测试环境多项目测试引起数据库冲突的问题。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;正式切库时的回滚措施&lt;br&gt;比如数据库迁移项目，切换期间数据写向新库，但如果切换失败需要回滚到老库，就需要把这段时间新增的数据同步回老库（启动消费程序），这就不需要程序段再考虑复杂的回滚设计。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;数据库闪回&lt;br&gt;关于数据库误操作的闪回方案，见 &lt;a href=&quot;http://seanlook.com/2017/03/03/mysql-flashback_use_purged-binlog/&quot;&gt;文章MySQL根据离线binlog快速闪回&lt;/a&gt; 。&lt;code&gt;binlog2sql&lt;/code&gt;的 &lt;code&gt;-B&lt;/code&gt; 选项可以将sql反向组装，生产回滚sql。如果需要完善的闪回功能，要进一步开发，提高易用性。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;binlog搜索功能&lt;br&gt;目前组内一版的binlog搜索功能，是离线任务处理的方式，好处是不会占用太大空间，缺点是处理时间较长。通过实时binlog解析过滤的方式，入ES可以快速搜索。需要进一步开发完善。&lt;/p&gt;
+    
+    </summary>
+    
+      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
+    
+    
+      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
+    
+      <category term="table_cache" scheme="http://seanlook.com/tags/table-cache/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>ProxySQL PPT分享</title>
+    <link href="http://seanlook.com/2017/07/19/proxysql-tutorials-ec/"/>
+    <id>http://seanlook.com/2017/07/19/proxysql-tutorials-ec/</id>
+    <published>2017-07-19T13:32:49.000Z</published>
+    <updated>2017-07-19T13:32:49.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>前些天在公司内部进行了一次 ProxySQL主题的介绍 《ProxySQL数据库中间件使用实践》，因为proxysql是我调研并引入公司的，有必要跟本组开发同学，进行一个正式的介绍和使用说明，以及我们当前的应用情况。</p>
+<p>分享比较偷懒，直接拿来proxysql作者renecannao在 Percona Live Europe 2016 上的PPT，是一个非常全面又具有点睛作用的演示稿了。</p>
+
+
+	<div class="row">
+	  <iframe src="http://nagland.github.io/viewer/web/viewer.html?val=http://7q5fot.com1.z0.glb.clouddn.com/ProxySQL-Tutorials-PerconaLive.pdf" style="width:100%; height:550px"></iframe>
+	</div>
+
+
+
+<p>PPT来源：<a href="https://www.percona.com/live/17/sessions/proxysql-tutorial" target="_blank" rel="external">https://www.percona.com/live/17/sessions/proxysql-tutorial</a></p>
+<p>另外一个觉得也还不错：<a href="https://www.slideshare.net/MyDBOPS/proxysql-for-mysql" target="_blank" rel="external">https://www.slideshare.net/MyDBOPS/proxysql-for-mysql</a></p>
+<p>– 我只是ppt的搬运工</p>
+<hr>
+<p>原文连接地址：<a href="http://seanlook.com/2017/07/19/proxysql-tutorials-ec/">http://seanlook.com/2017/07/19/proxysql-tutorials-ec/</a></p>
+<hr>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;前些天在公司内部进行了一次 ProxySQL主题的介绍 《ProxySQL数据库中间件使用实践》，因为proxysql是我调研并引入公司的，有必要跟本组开发同学，进行一个正式的介绍和使用说明，以及我们当前的应用情况。&lt;/p&gt;
+&lt;p&gt;分享比较偷懒，直接拿来proxysql作者
+    
+    </summary>
+    
+      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
+    
+    
+      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
+    
+      <category term="分享" scheme="http://seanlook.com/tags/%E5%88%86%E4%BA%AB/"/>
     
   </entry>
   
@@ -1685,189 +1793,6 @@
       <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
     
       <category term="监控" scheme="http://seanlook.com/tags/%E7%9B%91%E6%8E%A7/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>MySQL非主从环境下数据一致性校验及修复程序</title>
-    <link href="http://seanlook.com/2016/11/20/py-mysql-table-checksum-non-replicas/"/>
-    <id>http://seanlook.com/2016/11/20/py-mysql-table-checksum-non-replicas/</id>
-    <published>2016-11-20T08:32:49.000Z</published>
-    <updated>2016-11-20T08:32:49.000Z</updated>
-    
-    <content type="html"><![CDATA[<h2 id="1-简介"><a href="#1-简介" class="headerlink" title="1. 简介"></a>1. 简介</h2><p>项目地址：<a href="https://github.com/seanlook/px-table-checksum" target="_blank" rel="external">https://github.com/seanlook/px-table-checksum</a></p>
-<p>主从环境下数据一致性校验经常会用 pt-table-checksum 工具，它的原理及实施过程之前写过一篇文章：<a href="http://seanlook.com/2015/12/29/mysql_replica_pt-table-checksum/">生产环境使用 pt-table-checksum 检查MySQL数据一致性</a>。但是DBA工作中还会有些针对两个表检查是否一致，而这两个表之间并没有主从关系，pt工具是基于binlog把在主库进行的检查动作，在从库重放一遍，此时就不适用了。</p>
-<p>总会有这样特殊的需求，比如从阿里云RDS实例迁移到自建mysql实例，它的数据传输服务实现方式是基于表的批量数据提取，加上binlog订阅，但强制row模式会导致pt-table-checksum没有权限把会话临时改成statement。另一种需求是，整库进行字符集转换：库表定义都是utf8，但应用连接使用了默认的 latin1，要将连接字符集和表字符集统一起来，只能以latin1导出数据，再以utf8导入，这种情况数据一致性校验，且不说binlog解析程序不支持statement（如canal），新旧库本身内容不同，pt-table-checksum 算出的校验值也会不一样，失效。</p>
-<p>所以才萌生了参考 pt-table-checksum 自己写了一个：px-table-checksum 。</p>
-<h2 id="2-实现方法"><a href="#2-实现方法" class="headerlink" title="2. 实现方法"></a>2. 实现方法</h2><p>整体思路是借鉴pt-table-checksum，从源库批量（即chunk）取出一块数据如1000行，计算CRC32值，同样的语句在目标库运行一遍，结果都存入另一个库，最后检查对应编号的chunk crc值是否一致。知道不一致还不行，得能否快速方便的修复差异，所以继续根据那些不一致的chunk，去目标库和源库找到不一致的行，是缺失，还是多余，还是被修改了，然后生成修复sql，根据指示是否自动修复。</p>
-<p>那么问题就在于：</p>
-<ol>
-<li><p>如何确定批次，也就是下一个chunk该怎么取？<br>我还没想做到pt-table-checksum那样，可以根据负载动态调整chunk大小，甚至活跃线程数超过阀值就暂停检查，上来工作量就太大了。目前每次计算的chunk的行数是固定的，可以配置1000或2000等。<br>所以就要用到分页查询，根据（自增或联合）主键、唯一索引，每次limit 1000后升序取最后一条，作为下一批的起始。所以要分析表上的键情况，组合查询条件。目前仅能检查有主键或唯一所以的表。</p>
-</li>
-<li><p>如何保证源库和目标库，运行的sql一样？<br>之前一版是目标库和源库，以多线程各自计算chunk，入库，后来才意识到严重的bug：比如同样是取1000行，如果目标库少数据，那么下一个chunk起始就不一样，比较的结果简直一塌糊涂。<br>所以必须保证相同编号的chunk，起点必须相同，所以想到用队列，存放在源库跑过的所有校验sql，模拟pt工具在目标库重放。考虑到要多线程同时比较多个表，队列可能吃内存过大，于是使用了redis队列。</p>
-</li>
-<li><p>直接在数据库中计算crc32，还是取出数据在内存里计算？<br>翻了pt-table-checksum的源码，它是在数据库里计算的。但是第一节里说过，如果目标库和源库要使用不同的字符集才能读出正确的数据，只能查询出来之后再比较。所以 px-table-checksum 两种都支持，只需指定一个配置项。</p>
-</li>
-<li><p>同时检查多个表，源库sql挤在队列，目标库拿出来执行时过了1s，此时源库那条数据又被修改了一次同步到了目标库，会导致计算结果不一致，实则一致，怎么处理<br>无法处理，是px-table-checksum相比pt-table-checksum最大的缺陷。<br>但为了尽可能减少此类问题（比如主从延迟也可能会），特意设计了多个redis队列，目标库多个检查线程，即比如同时指定检查8个表，源库检查会有8个线程对应，但可以根据表的写入情况，配置4个redis队列（目前是随机入列），10个目标库检查线程，来减少不准确因素。<br>但站在我的角度往往来说，不一致的数据会被记录下来，如果不多，人工核对一下；如果较多，就再跑一遍检查，如果两次都有同一条数据不一致，那就有情况了。</p>
-</li>
-</ol>
-<h2 id="3-限制"><a href="#3-限制" class="headerlink" title="3. 限制"></a>3. 限制</h2><ol>
-<li>如果检查期间源表数据，变化频繁，有可能检查的结果不准确<br>也就是上面第4点的问题。很明显，这个程序每个检查的事务是分开的，不像pt工具能严格保证每条检查sql的事务顺序。但有不一致的数据再排查一下就ok了。实际在我线上使用过程中，99.9%是准确的。<a id="more"></a></li>
-<li><p>表上必须有主键或唯一索引<br>程序会检查，如果没有会退出。</p>
-</li>
-<li><p>varbinay,blob等二进制字段不支持修复<br>其实也不是完全不支持，要看怎么用的。开发如果有把字符先转成字节，再存入mysql，这种就不支持修复。是有办法可以处理，那就是从源库查时用 <code>hex()</code>函数，修复sql里面<code>unhex()</code>写回去。</p>
-</li>
-</ol>
-<h2 id="4-使用说明"><a href="#4-使用说明" class="headerlink" title="4. 使用说明"></a>4. 使用说明</h2><p>该python程序基于2.7开发，2.6、3.x上没有测试。使用前需要安装 <code>MySQLdb</code>和<code>hotqueue</code>：<br><figure class="highlight cmake"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo pip <span class="keyword">install</span> MySQL-python hotqueue</div></pre></td></tr></table></figure></p>
-<p>要比较的表和选项，使用全配置化，即不通过命令行的方式指定（原谅命令行参数使用方式会额外增加代码量）。</p>
-<h3 id="4-1-px-table-checksum-py"><a href="#4-1-px-table-checksum-py" class="headerlink" title="4.1 px-table-checksum.py"></a>4.1 <code>px-table-checksum.py</code></h3><p>主程序，运行<code>python px-table-checksum.py</code> 执行一致性检查，但一定了解下面的配置文件选项。</p>
-<h3 id="4-2-settings-checksum-py"><a href="#4-2-settings-checksum-py" class="headerlink" title="4.2 settings_checksum.py"></a>4.2 <code>settings_checksum.py</code></h3><p>配置选项</p>
-<ul>
-<li><code>CHUNK_SIZE</code>: 每次提取的chunk行数</li>
-<li><code>REDIS_INFO</code>: 指定使用redis队列地址</li>
-<li><code>REDIS_QUEUE_CNT</code>: redis队列数量，消费者（目标库）有一一对应的线程守着队列</li>
-<li><code>REDIS_POOL_CNT</code>: 生产者（源库）redis客户端连接池。这个设计是为了缓解GIL带来的问题，把入列端与出列端分开，因为如果表多可能短时间有大量sql入队列，避免hotqueue争用</li>
-<li><p><code>CALC_CRC32_DB</code>: True 表示在db里面计算checksum值，False表示取出chunk数据在python里面计算。默认给的值是根据连接字符集定的。</p>
-</li>
-<li><p><code>DO_COMPARE</code>: 运行模式</p>
-<ul>
-<li>0: 只提取数据计算，不比较是否一致。可以在之后在模式2下只比较</li>
-<li>1: 计算，并比较。常用，每次计算之前会删除上一次这个待检查表的结果，比较的结果只告诉哪些chunk号不一致。</li>
-<li>2: 不计算，只从t_checkum结果比较。常用，计算是消耗数据库资源的，可以只对已有的checksum计算结果比较不一致的地方。类似pt工具的<code>--replicate-check-only</code>选项。</li>
-</ul>
-</li>
-<li><code>GEN_DATAFIX</code>:<br>与<code>DO_COMPARE</code>结合使用，为 True 表示对不一致的chunk找到具体不一致行，并生成修复sql；为 False 则什么都不做。</li>
-<li><p><code>RUN_DATAFIX</code>:<br>与<code>GEN_DATAFIX</code>结合使用，为 True 表示对生成的修复sql，在目标库执行。需要谨慎，如果哪一次设置了修复，记得完成后改回False，不然下次检查另一个表就出意外了，所以特意对这个选项再加了一个确认提示。</p>
-</li>
-<li><p><code>DB_CHECKSUM</code>: 一个字典，指定checksum的结果存到哪里<br>配置文件有示例，必须指定 <code>db_name</code>，表会自动创建。</p>
-</li>
-</ul>
-<h3 id="4-3-settings-cs-tables-py"><a href="#4-3-settings-cs-tables-py" class="headerlink" title="4.3 settings_cs_tables.py"></a>4.3 <code>settings_cs_tables.py</code></h3><p>上面的配置文件可以认为是用于控制程序的，这个配置文件是指定要校验的源库和目标库信息，以及要检验哪些表。</p>
-<ul>
-<li><code>TABLES_CHECK</code>: 字典，指定要检查哪些表的一致性，db名为key，多个table名组成列表为value。暂不支持对整个db做检查，同时比较的表数量不建议超过8个</li>
-<li><code>DB_SOURCE</code>: 字典，指定源库的连接信息</li>
-<li><code>DB_SOURCE</code>: 字典，指定目标库的连接信息</li>
-</ul>
-<h2 id="5-示例："><a href="#5-示例：" class="headerlink" title="5. 示例："></a>5. 示例：</h2><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div></pre></td><td class="code"><pre><div class="line">Starting <span class="keyword">checksum</span> <span class="keyword">thread</span> <span class="keyword">for</span> <span class="keyword">table</span>: db1.t_test_201308 (<span class="number">192.168</span><span class="number">.1</span><span class="number">.122</span>:<span class="number">3306</span>)</div><div class="line"><span class="keyword">Before</span> <span class="keyword">checksum</span>: <span class="keyword">create</span> <span class="keyword">table</span> <span class="keyword">if</span> <span class="keyword">not</span> <span class="keyword">exists</span> t_checksum</div><div class="line"><span class="keyword">Before</span> <span class="keyword">checksum</span>: delele <span class="keyword">old</span> <span class="keyword">data</span> <span class="keyword">from</span> t_checksum <span class="keyword">if</span> <span class="keyword">exists</span> <span class="keyword">for</span> <span class="keyword">table</span>:  db1.t_test_201308</div><div class="line">Caculate <span class="keyword">crc32</span> <span class="keyword">in</span> program instead <span class="keyword">of</span> db.(this program need more <span class="keyword">memory</span> <span class="keyword">and</span> more db net traffic, but <span class="keyword">convert</span> <span class="keyword">charset</span>)</div><div class="line">Caculating checksums:  <span class="number">192.168</span><span class="number">.1</span><span class="number">.122</span>:<span class="number">3306</span> db1.t_test_201308</div><div class="line">TARGET: (<span class="string">'192.168.1.121:3306'</span>, <span class="string">'t_test_201308'</span>, <span class="number">1</span>, <span class="string">'db1'</span>, <span class="string">'0'</span>, u<span class="string">'1495969'</span>, <span class="number">451060506</span>)</div><div class="line">TARGET: (<span class="string">'192.168.1.121:3306'</span>, <span class="string">'t_test_201308'</span>, <span class="number">2</span>, <span class="string">'db1'</span>, u<span class="string">'1495969'</span>, u<span class="string">'1502593'</span>, <span class="number">-678155635</span>)</div><div class="line">...</div><div class="line"><span class="keyword">Starting</span> <span class="keyword">checksum</span> <span class="keyword">thread</span> <span class="keyword">for</span> <span class="keyword">table</span>: db1.t_test_201408 (<span class="number">192.168</span><span class="number">.1</span><span class="number">.122</span>:<span class="number">3306</span>)</div><div class="line"><span class="keyword">Before</span> <span class="keyword">checksum</span>: delele <span class="keyword">old</span> <span class="keyword">data</span> <span class="keyword">from</span> t_checksum <span class="keyword">if</span> <span class="keyword">exists</span> <span class="keyword">for</span> <span class="keyword">table</span>:  db1.t_test_201408</div><div class="line">Caculate <span class="keyword">crc32</span> <span class="keyword">in</span> program instead <span class="keyword">of</span> db.(this program need more <span class="keyword">memory</span> <span class="keyword">and</span> more db net traffic, but <span class="keyword">convert</span> <span class="keyword">charset</span>)</div><div class="line">Caculating checksums:  <span class="number">192.168</span><span class="number">.1</span><span class="number">.122</span>:<span class="number">3306</span> db1.t_test_201408</div><div class="line">TARGET: (<span class="string">'192.168.1.121:3306'</span>, <span class="string">'t_test_201408'</span>TARGET: (<span class="string">'192.168.1.121:3306'</span>, <span class="string">'t_test_201408'</span>, <span class="number">9</span>, <span class="number">8</span>, <span class="string">'db1'</span>, u<span class="string">'3836877'</span>, u<span class="string">'3845812'</span>, , <span class="string">'db1'</span>, u<span class="string">'3845812'</span><span class="number">373759054</span>)</div><div class="line">...</div><div class="line">源实例 <span class="number">192.168</span><span class="number">.1</span><span class="number">.122</span>:<span class="number">3306</span> db1.t_test_201308  计算<span class="keyword">checksum</span>结束！</div><div class="line">db conection closed.</div><div class="line"><span class="keyword">Checksum</span> <span class="keyword">thread</span> ended <span class="keyword">for</span> <span class="keyword">table</span>: db1.t_test_201308 (<span class="number">192.168</span><span class="number">.1</span><span class="number">.122</span>:<span class="number">3306</span>)</div><div class="line">...</div><div class="line">源实例 <span class="number">192.168</span><span class="number">.1</span><span class="number">.122</span>:<span class="number">3306</span> db1.t_test_201408  计算<span class="keyword">checksum</span>结束！</div><div class="line">消费<span class="keyword">sql</span> <span class="number">0</span> 退出！！</div><div class="line">消费<span class="keyword">sql</span> <span class="number">-1</span> 退出！！</div><div class="line"></div><div class="line">################################################################################</div><div class="line"><span class="keyword">Start</span> compare <span class="keyword">chunk</span><span class="string">'s crc32 for table: [ db1.t_test_201308 ]</span></div><div class="line">表 db1.t_test_201308 数据一致</div><div class="line"></div><div class="line">################################################################################</div><div class="line">################################################################################</div><div class="line">Start compare chunk's <span class="keyword">crc32</span> <span class="keyword">for</span> <span class="keyword">table</span>: [ db1.t_test_201408 ]</div><div class="line">表 db1.t_test_201408 数据不一致<span class="keyword">chunk</span>数：<span class="number">10</span></div><div class="line"><span class="comment">--------------------------------------------------------------------------------</span></div><div class="line"></div><div class="line">该<span class="keyword">chunk</span> [<span class="number">1</span>] 存在行内容不一致, <span class="keyword">CRC32</span>: src(<span class="number">828649697</span>) rgt(<span class="number">-1396224393</span>)</div><div class="line">去源库和目标库获取<span class="keyword">chunk</span>[<span class="number">1</span>]不一致行：</div><div class="line">  <span class="keyword">TO</span> <span class="keyword">insert</span> <span class="keyword">or</span> <span class="keyword">update</span>:  [u<span class="string">'3761994'</span>]</div><div class="line">  <span class="keyword">TO</span> <span class="keyword">delete</span>:  []</div><div class="line"></div><div class="line">该<span class="keyword">chunk</span> [<span class="number">5</span>] 存在行内容不一致, <span class="keyword">CRC32</span>: src(<span class="number">1513453680</span>) rgt(<span class="number">-1614463460</span>)</div><div class="line">去源库和目标库获取<span class="keyword">chunk</span>[<span class="number">5</span>]不一致行：</div><div class="line">  <span class="keyword">TO</span> <span class="keyword">insert</span> <span class="keyword">or</span> <span class="keyword">update</span>:  [u<span class="string">'3806841'</span>]</div><div class="line">  <span class="keyword">TO</span> <span class="keyword">delete</span>:  []</div></pre></td></tr></table></figure>
-<hr>
-<p>原文链接地址：<a href="http://seanlook.com/2016/11/20/py-mysql-table-checksum-non-replicas/">http://seanlook.com/2016/11/20/py-mysql-table-checksum-non-replicas/</a></p>
-<hr>
-]]></content>
-    
-    <summary type="html">
-    
-      &lt;h2 id=&quot;1-简介&quot;&gt;&lt;a href=&quot;#1-简介&quot; class=&quot;headerlink&quot; title=&quot;1. 简介&quot;&gt;&lt;/a&gt;1. 简介&lt;/h2&gt;&lt;p&gt;项目地址：&lt;a href=&quot;https://github.com/seanlook/px-table-checksum&quot;&gt;https://github.com/seanlook/px-table-checksum&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;主从环境下数据一致性校验经常会用 pt-table-checksum 工具，它的原理及实施过程之前写过一篇文章：&lt;a href=&quot;http://seanlook.com/2015/12/29/mysql_replica_pt-table-checksum/&quot;&gt;生产环境使用 pt-table-checksum 检查MySQL数据一致性&lt;/a&gt;。但是DBA工作中还会有些针对两个表检查是否一致，而这两个表之间并没有主从关系，pt工具是基于binlog把在主库进行的检查动作，在从库重放一遍，此时就不适用了。&lt;/p&gt;
-&lt;p&gt;总会有这样特殊的需求，比如从阿里云RDS实例迁移到自建mysql实例，它的数据传输服务实现方式是基于表的批量数据提取，加上binlog订阅，但强制row模式会导致pt-table-checksum没有权限把会话临时改成statement。另一种需求是，整库进行字符集转换：库表定义都是utf8，但应用连接使用了默认的 latin1，要将连接字符集和表字符集统一起来，只能以latin1导出数据，再以utf8导入，这种情况数据一致性校验，且不说binlog解析程序不支持statement（如canal），新旧库本身内容不同，pt-table-checksum 算出的校验值也会不一样，失效。&lt;/p&gt;
-&lt;p&gt;所以才萌生了参考 pt-table-checksum 自己写了一个：px-table-checksum 。&lt;/p&gt;
-&lt;h2 id=&quot;2-实现方法&quot;&gt;&lt;a href=&quot;#2-实现方法&quot; class=&quot;headerlink&quot; title=&quot;2. 实现方法&quot;&gt;&lt;/a&gt;2. 实现方法&lt;/h2&gt;&lt;p&gt;整体思路是借鉴pt-table-checksum，从源库批量（即chunk）取出一块数据如1000行，计算CRC32值，同样的语句在目标库运行一遍，结果都存入另一个库，最后检查对应编号的chunk crc值是否一致。知道不一致还不行，得能否快速方便的修复差异，所以继续根据那些不一致的chunk，去目标库和源库找到不一致的行，是缺失，还是多余，还是被修改了，然后生成修复sql，根据指示是否自动修复。&lt;/p&gt;
-&lt;p&gt;那么问题就在于：&lt;/p&gt;
-&lt;ol&gt;
-&lt;li&gt;&lt;p&gt;如何确定批次，也就是下一个chunk该怎么取？&lt;br&gt;我还没想做到pt-table-checksum那样，可以根据负载动态调整chunk大小，甚至活跃线程数超过阀值就暂停检查，上来工作量就太大了。目前每次计算的chunk的行数是固定的，可以配置1000或2000等。&lt;br&gt;所以就要用到分页查询，根据（自增或联合）主键、唯一索引，每次limit 1000后升序取最后一条，作为下一批的起始。所以要分析表上的键情况，组合查询条件。目前仅能检查有主键或唯一所以的表。&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;&lt;p&gt;如何保证源库和目标库，运行的sql一样？&lt;br&gt;之前一版是目标库和源库，以多线程各自计算chunk，入库，后来才意识到严重的bug：比如同样是取1000行，如果目标库少数据，那么下一个chunk起始就不一样，比较的结果简直一塌糊涂。&lt;br&gt;所以必须保证相同编号的chunk，起点必须相同，所以想到用队列，存放在源库跑过的所有校验sql，模拟pt工具在目标库重放。考虑到要多线程同时比较多个表，队列可能吃内存过大，于是使用了redis队列。&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;&lt;p&gt;直接在数据库中计算crc32，还是取出数据在内存里计算？&lt;br&gt;翻了pt-table-checksum的源码，它是在数据库里计算的。但是第一节里说过，如果目标库和源库要使用不同的字符集才能读出正确的数据，只能查询出来之后再比较。所以 px-table-checksum 两种都支持，只需指定一个配置项。&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;&lt;p&gt;同时检查多个表，源库sql挤在队列，目标库拿出来执行时过了1s，此时源库那条数据又被修改了一次同步到了目标库，会导致计算结果不一致，实则一致，怎么处理&lt;br&gt;无法处理，是px-table-checksum相比pt-table-checksum最大的缺陷。&lt;br&gt;但为了尽可能减少此类问题（比如主从延迟也可能会），特意设计了多个redis队列，目标库多个检查线程，即比如同时指定检查8个表，源库检查会有8个线程对应，但可以根据表的写入情况，配置4个redis队列（目前是随机入列），10个目标库检查线程，来减少不准确因素。&lt;br&gt;但站在我的角度往往来说，不一致的数据会被记录下来，如果不多，人工核对一下；如果较多，就再跑一遍检查，如果两次都有同一条数据不一致，那就有情况了。&lt;/p&gt;
-&lt;/li&gt;
-&lt;/ol&gt;
-&lt;h2 id=&quot;3-限制&quot;&gt;&lt;a href=&quot;#3-限制&quot; class=&quot;headerlink&quot; title=&quot;3. 限制&quot;&gt;&lt;/a&gt;3. 限制&lt;/h2&gt;&lt;ol&gt;
-&lt;li&gt;如果检查期间源表数据，变化频繁，有可能检查的结果不准确&lt;br&gt;也就是上面第4点的问题。很明显，这个程序每个检查的事务是分开的，不像pt工具能严格保证每条检查sql的事务顺序。但有不一致的数据再排查一下就ok了。实际在我线上使用过程中，99.9%是准确的。
-    
-    </summary>
-    
-      <category term="Python" scheme="http://seanlook.com/categories/Python/"/>
-    
-    
-      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
-    
-      <category term="python" scheme="http://seanlook.com/tags/python/"/>
-    
-      <category term="pt-table-checksum" scheme="http://seanlook.com/tags/pt-table-checksum/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>让mysqldump变成并发导出导入的魔法</title>
-    <link href="http://seanlook.com/2016/11/17/python-mysqldump-out-in-concurrency-magic/"/>
-    <id>http://seanlook.com/2016/11/17/python-mysqldump-out-in-concurrency-magic/</id>
-    <published>2016-11-17T08:32:49.000Z</published>
-    <updated>2016-11-17T08:32:49.000Z</updated>
-    
-    <content type="html"><![CDATA[<h2 id="1-简介"><a href="#1-简介" class="headerlink" title="1. 简介"></a>1. 简介</h2><p>取名mypumpkin，是python封装的一个让mysqldump以多线程的方式导出库表，再以mysql命令多线程导入新库，用于成倍加快导出，特别是导入的速度。这一切只需要在 mysqldump 或 mysql 命令前面加上 <code>mypumpkin.py</code> 即可，所以称作魔法。</p>
-<p><strong>项目地址</strong>：<a href="https://github.com/seanlook/mypumpkin" target="_blank" rel="external">https://github.com/seanlook/mypumpkin</a>  </p>
-<p>该程序源于需要对现网单库几百G的数据进行转移到新库，并对中间进行一些特殊操作（如字符集转换），无法容忍mysqldump导入速度。有人可能会提到为什么不用 mydumper，其实也尝试过它但还是放弃了，原因有：</p>
-<ol>
-<li>不能设置字符集<br>mydumper强制使用 binary 方式来连接库以达到不关心备份恢复时的字符集问题，然而我的场景下需要特意以不同的字符集导出、再导入。写这个程序的时候正好在公众号看到网易有推送的一篇文章 (<a href="http://mp.weixin.qq.com/s?__biz=MzI4NTA1MDEwNg==&amp;mid=2650756926&amp;idx=1&amp;sn=b8081a8ae9456a6051d1ba519febee54&amp;chksm=f3f9e2abc48e6bbd5912edb4e6207ff6ec5bf7123fedbf10b5c65a43146af22845dbf0787b39&amp;scene=0#wechat_redirect" target="_blank" rel="external">解密网易MySQL实例迁移高效完成背后的黑科技</a>)，提到他们对mydumper的改进已支持字符集设置，可是在0.9.1版本的patch里还是没找到。</li>
-<li>没有像 mysqldump 那样灵活控制过滤选项（导哪些表、忽略哪些表）<br>因为数据量之巨大，而且将近70%是不变更的历史表数据，这些表是可以提前导出转换的；又有少量单表大于50G的，最好是分库导出转换。mydumper 不具备 mysqldump 这样的灵活性</li>
-<li>对忽略导出gtid信息、触发器等其它支持<br>阿里云rds 5.6 导出必须要设置 set-gtid-purged=OFF</li>
-</ol>
-<p>另外有人还可能提到 mysqlpump —— 它才是我认为mysqldump应该具有的模样，语法兼容，基于表的并发导出。但是只有 mysql服务端 5.7.9 以上才支持，这就是现实和理想的距离。。。</p>
-<h2 id="2-实现方法"><a href="#2-实现方法" class="headerlink" title="2. 实现方法"></a>2. 实现方法</h2><p>首先说明，mysqldump的导出速度并不慢，经测试能达到50M/s的速度，10G数据花费3分钟的样子，可以看到瓶颈在于网络和磁盘IO，再怎样的导出工具也快不了多少，但是导入却花了60分钟，磁盘和网络大概只用到了20%，瓶颈在目标库写入速度（而一般顺序写入达不到IOPS限制），所以mypumpkin就诞生了 —— 兼顾myloader的导入速度和mysqldump导出的灵活性。</p>
-<a id="more"></a>
-<p>用python构造1个队列，将需要导出的所有表一次放到队列中，同时启动N个python线程，各自从这个Queue里取出表名，subprocess调用操作系统的mysqldump命令，导出数据到以 dbname.tablename.sql 命名的文件中。load in 与 dump out 类似，根据指定的库名或表名，从dump_dir目录找到所有sql文件，压进队列，N个线程同时调用mysql构造新的命令，模拟 <code>&lt;</code> 操作。</p>
-<p>参数解析从原来自己解析，到改用argparse模块，几乎做了一次重构。<br>对于没有指定<code>--tables</code>的情况，程序会主动去库里查询一下所有表名，然后过滤进队列。</p>
-<p>load in目标库，选项做到与dump out一样丰富，可以指定导入哪些db、哪些表、忽略哪些表。</p>
-<p>其中的重点是做到与原mysqldump兼容，因为需要对与表有关的选项（<code>-B</code>, <code>-A</code>, <code>--tables</code>, <code>--ignore=</code>），进行分析并组合成新的执行命令，考虑的异常情况非常多。</p>
-<h2 id="3-限制"><a href="#3-限制" class="headerlink" title="3. 限制"></a>3. 限制</h2><ol>
-<li><strong>重要</strong>：导出的数据不保证库级别的一致性<ol>
-<li>对历史不变表，是不影响的</li>
-<li>具体到一个表能保证一致性，这是mysqldump本身采用哪些选项决定的</li>
-<li>不同表导出动作在不同的mysqldump命令中，无法保证事务。<br>在我的案例场景下，是有开发同学辅助使用一套binlog解析程序，等完成后重放所有变更，来保证最终一致性。<br>另，许多情况下我们导数据，并不需要完整的或者一致的数据，只是用于离线分析或临时导出，重点是快速拿数据给到开发。</li>
-</ol>
-</li>
-<li>不寻常选项识别<br>程序已经尽力做到与mysqldump命令兼容，只需要加上 mypumpkin.py、指定dump-dir，就完成并发魔法，但有些情况的参数不方便解析，暂不支持格式：<figure class="highlight nginx"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="attribute">db1</span> table1 table2</div><div class="line">db2 db3</div></pre></td></tr></table></figure>
-</li>
-</ol>
-<p>即以上无法在命令行下判断 db1、table1 是库名还是表面，用的时候只需记住“[-A|-B], [–tables], [–ignore-table]”三组，必须出现一个：<code>db1 table1 table2</code>改成<code>db1 --tables table1 table2</code>，<code>db2</code>改成<code>-B db2 db3</code>。</p>
-<ol>
-<li>密码暂只能显式输入</li>
-</ol>
-<h2 id="4-使用说明"><a href="#4-使用说明" class="headerlink" title="4. 使用说明"></a>4. 使用说明</h2><p>安装基于python 2.7 开发，其它版本没测。需要按 MySQLdb 库。</p>
-<h3 id="4-1-help"><a href="#4-1-help" class="headerlink" title="4.1 help"></a>4.1 help</h3><figure class="highlight stata"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div></pre></td><td class="code"><pre><div class="line">./mypumpkin.py --<span class="keyword">help</span></div><div class="line">Only mysqldump or mysql allowed after mypumpkin.py</div><div class="line"></div><div class="line">usage: mypumpkin.py &#123;mysqldump|mysqls&#125; [--<span class="keyword">help</span>]</div><div class="line"></div><div class="line">This's a <span class="keyword">program</span> that wrap mysqldump/mysql to make them dump-<span class="keyword">out</span>/load-<span class="keyword">in</span></div><div class="line">concurrently. Attention: it can not <span class="keyword">keep</span> consistent <span class="keyword">for</span> whole database(s).</div><div class="line"></div><div class="line">optional arguments:</div><div class="line">  --<span class="keyword">help</span>                show this <span class="keyword">help</span> message and <span class="keyword">exit</span></div><div class="line">  -B db1 [db1 ...], --databases db1 [db1 ...]</div><div class="line">                        Dump <span class="keyword">one</span> or <span class="keyword">more</span> databases</div><div class="line">  -A, --all-databases   Dump all databases</div><div class="line">  --tables t1 [t1 ...]  Specifiy tables to dump. Override --databases (-B)</div><div class="line">  --ignore-<span class="keyword">table</span> db1.table1 [db1.table1 ...]</div><div class="line">                        <span class="keyword">Do</span> not dump the specified <span class="keyword">table</span>. (<span class="keyword">format</span> like</div><div class="line">                        --ignore-<span class="keyword">table</span>=dbname.tablename). <span class="keyword">Use</span> the directive</div><div class="line">                        multiple times <span class="keyword">for</span> <span class="keyword">more</span> than <span class="keyword">one</span> <span class="keyword">table</span> to ignore.</div><div class="line">  --threads =<span class="keyword">N</span>          Threads to dump <span class="keyword">out</span> [2], or load <span class="keyword">in</span> [CPUs*2].</div><div class="line">  --dump-<span class="keyword">dir</span> DUMP_DIR   Required. Directory to dump <span class="keyword">out</span> (create <span class="keyword">if</span> not exist),</div><div class="line">                        Or Where to load <span class="keyword">in</span> sqlfile</div><div class="line"></div><div class="line">At least <span class="keyword">one</span> of these 3 group options given: [-A,-B] [--tables] [--ignore-<span class="keyword">table</span>]</div></pre></td></tr></table></figure>
-<ul>
-<li><code>--dump-dir</code>，必选项，原来用的shell标准输入输出 <code>&gt; or &lt;</code> 不允许使用。dump-dir指定目录不存在时会尝试自动创建。</li>
-<li><code>--threads=N</code>，N指定并发导出或导入线程数。dump out 默认线程数2， mypumpkin load in 默认线程数是 cpu个数 * 2。<br>注：线程数不是越大越好，这里主要的衡量指标是网络带宽、磁盘IO、目标库IOPS，最好用 dstat 观察一下。</li>
-<li><code>-B</code>, <code>--tables</code>，<code>--ignore-table</code>，使用与mysqldump相同，如：  <ol>
-<li>在mysqldump里面，<code>--tables</code>会覆盖<code>--databases/-B</code>选项</li>
-<li>在mysqldump里面，<code>--tables</code>与<code>--ignore-table</code>不能同时出现</li>
-<li>在mysqldump里面，如果没有指定<code>-B</code>，则<code>--tables</code>或<code>--ignore-table</code>必须紧跟db名之后</li>
-</ol>
-</li>
-<li>其它选项，mypumpkin会原封不动的保留下来，放到shell去执行。所以如果其它选项有错误，检查是交给原生mysqldump去做的，执行过程遇到一个失败则会退出线程。</li>
-</ul>
-<h3 id="4-2-example"><a href="#4-2-example" class="headerlink" title="4.2 example"></a>4.2 example</h3><p>导出：<br><figure class="highlight dsconfig"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div></pre></td><td class="code"><pre><div class="line"><span class="comment">## 导出源库所有db到visit_dumpdir2目录 （不包括information_schema和performance_schema）</span></div><div class="line">$ ./<span class="string">mypumpkin.</span><span class="string">py </span><span class="string">mysqldump </span>-h <span class="string">dbhost_name </span>-<span class="string">utest_user </span>-<span class="string">pyourpassword </span>-<span class="string">P3306 </span>\</div><div class="line"> <span class="built_in">--single-transaction</span> <span class="built_in">--opt</span> -A <span class="built_in">--dump-dir</span> <span class="string">visit_dumpdir2</span></div><div class="line"></div><div class="line"><span class="comment">## 导出源库db1,db2，会从原库查询所有表名来过滤</span></div><div class="line">$ ./<span class="string">mypumpkin.</span><span class="string">py </span><span class="string">mysqldump </span>-h <span class="string">dbhost_name </span>-<span class="string">utest_user </span>-<span class="string">pyourpassword </span>-<span class="string">P3306 </span>\</div><div class="line"> <span class="built_in">--single-transaction</span> <span class="built_in">--opt</span> -B <span class="string">db1 </span><span class="string">db2 </span><span class="built_in">--dump-dir</span> <span class="string">visit_dumpdir2</span></div><div class="line"></div><div class="line"><span class="comment">## 只导出db1库的t1,t2表，如果指定表不存在则有提示</span></div><div class="line">$ ./<span class="string">mypumpkin.</span><span class="string">py </span><span class="string">mysqldump </span>-h <span class="string">dbhost_name </span>-<span class="string">utest_user </span>-<span class="string">pyourpassword </span>-<span class="string">P3306 </span>\</div><div class="line"> <span class="built_in">--single-transaction</span> <span class="built_in">--opt</span> -B <span class="string">db1 </span><span class="built_in">--tables</span> <span class="string">t1 </span><span class="string">t2 </span><span class="built_in">--dump-dir</span> <span class="string">visit_dumpdir2</span></div><div class="line"></div><div class="line"><span class="comment">## 导出db1,db2库，但忽略 db1.t1, db2.t2, db2.t3表</span></div><div class="line"><span class="comment">## mysqldump只支持--ignore-table=db1.t1这种，使用多个重复指令来指定多表。这里做了兼容扩展</span></div><div class="line">$ ./<span class="string">mypumpkin.</span><span class="string">py </span><span class="string">mysqldump </span>-h <span class="string">dbhost_name </span>-<span class="string">utest_user </span>-<span class="string">pyourpassword </span><span class="built_in">--single-transaction</span> \</div><div class="line"> <span class="built_in">--opt</span> -B <span class="string">db1 </span><span class="string">db2 </span><span class="built_in">--ignore-table=db1.t1</span> <span class="built_in">--ignore-table</span> <span class="string">db2.</span><span class="string">t2 </span><span class="string">db2.</span><span class="string">t3 </span><span class="built_in">--dump-dir</span> <span class="string">visit_dumpdir2 </span>(如果-A表示全部<span class="string">db)</span></div><div class="line"></div><div class="line"><span class="comment">## 不带 -A/-B</span></div><div class="line">$ ./<span class="string">mypumpkin.</span><span class="string">py </span><span class="string">mysqldump </span>-h <span class="string">dbhost_name </span>-<span class="string">utest_user </span>-<span class="string">pyourpassword </span>-<span class="string">P3306 </span>\</div><div class="line"> <span class="built_in">--single-transaction</span> <span class="built_in">--opt</span> <span class="string">db1 </span><span class="built_in">--ignore-table=db1.t1</span> <span class="built_in">--dump-dir=visit_dumpdir2</span></div><div class="line"></div><div class="line"><span class="comment">## 其它选项不做处理</span></div><div class="line">$ ./<span class="string">mypumpkin.</span><span class="string">py </span><span class="string">mysqldump </span>-h <span class="string">dbhost_name </span>-<span class="string">utest_user </span>-<span class="string">pyourpassword </span>-<span class="string">P3306 </span>\</div><div class="line"> <span class="built_in">--single-transaction</span> <span class="built_in">--set-gtid-purged=OFF</span> <span class="built_in">--no-set-names</span> <span class="built_in">--skip-add-locks</span> -e -q -t -n <span class="built_in">--skip-triggers</span> \</div><div class="line"> <span class="built_in">--max-allowed-packet=134217728</span> <span class="built_in">--net-buffer-length=1638400</span> <span class="built_in">--default-character-set=latin1</span> \</div><div class="line"> <span class="built_in">--insert-ignore</span> <span class="built_in">--hex-blob</span> <span class="built_in">--no-autocommit</span> \</div><div class="line"> <span class="string">db1 </span><span class="built_in">--tables</span> <span class="string">t1 </span><span class="built_in">--dump-dir</span> <span class="string">visit_dumpdir2</span></div></pre></td></tr></table></figure></p>
-<p>导入：<br><code>-A</code>, <code>-B</code>, <code>--tables</code>, <code>--ignore-table</code>, <code>--threads</code>, <code>--dump-dir</code>用法与作用与上面完全相同，举部分例子：</p>
-<figure class="highlight dsconfig"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line"><span class="comment">## 导入dump-dir目录下所有表</span></div><div class="line">$ ./<span class="string">mypumpkin.</span><span class="string">py </span><span class="string">mysql </span>-h <span class="string">dbhost_name </span>-<span class="string">utest_user </span>-<span class="string">pyourpassword </span><span class="built_in">--port</span> <span class="string">3307 </span>-A \</div><div class="line"> <span class="built_in">--dump-dir=visit_dumpdir2</span></div><div class="line"></div><div class="line"><span class="comment">## 导入db1库（所有表）</span></div><div class="line">$ ./<span class="string">mypumpkin.</span><span class="string">py </span><span class="string">mysql </span>-h <span class="string">dbhost_name </span>-<span class="string">utest_user </span>-<span class="string">pyourpassword </span><span class="built_in">--port</span> <span class="string">3307 </span>-B <span class="string">db1 </span>\</div><div class="line"> <span class="built_in">--dump-dir=visit_dumpdir2</span></div><div class="line"></div><div class="line"><span class="comment">## 只导入db.t1表</span></div><div class="line">$ ./<span class="string">mypumpkin.</span><span class="string">py </span><span class="string">mysql </span>-h <span class="string">dbhost_name </span>-<span class="string">utest_user </span>-<span class="string">pyourpassword </span><span class="built_in">--port</span> <span class="string">3307 </span>\</div><div class="line"> <span class="built_in">--default-character-set=utf8mb4</span> <span class="built_in">--max-allowed-packet=134217728</span> <span class="built_in">--net-buffer-length=1638400</span> \</div><div class="line"> -B <span class="string">db1 </span><span class="built_in">--tables</span> <span class="string">t1 </span><span class="built_in">--dump-dir=visit_dumpdir2</span></div><div class="line"></div><div class="line"><span class="comment">## 导入db1,db2库，但忽略db1.t1表（会到dump-dir目录检查db1,db2有无对应的表存在，不在目标库检查）</span></div><div class="line">$ ./<span class="string">mypumpkin.</span><span class="string">py </span><span class="string">mysql </span>-h <span class="string">dbhost_name </span>-<span class="string">utest_user </span>-<span class="string">pyourpassword </span><span class="built_in">--port</span> <span class="string">3307 </span>\</div><div class="line"> -B <span class="string">db1 </span><span class="string">db2 </span><span class="built_in">--ignore-table=db1.t1</span> <span class="built_in">--dump-dir=visit_dumpdir2</span></div></pre></td></tr></table></figure>
-<h2 id="5-速度对比"><a href="#5-速度对比" class="headerlink" title="5.速度对比"></a>5.速度对比</h2><hr>
-<p>原文链接地址：<a href="http://seanlook.com/2016/11/17/python-mysqldump-out-in-concurrency-magic/">http://seanlook.com/2016/11/17/python-mysqldump-out-in-concurrency-magic/</a></p>
-<hr>
-]]></content>
-    
-    <summary type="html">
-    
-      &lt;h2 id=&quot;1-简介&quot;&gt;&lt;a href=&quot;#1-简介&quot; class=&quot;headerlink&quot; title=&quot;1. 简介&quot;&gt;&lt;/a&gt;1. 简介&lt;/h2&gt;&lt;p&gt;取名mypumpkin，是python封装的一个让mysqldump以多线程的方式导出库表，再以mysql命令多线程导入新库，用于成倍加快导出，特别是导入的速度。这一切只需要在 mysqldump 或 mysql 命令前面加上 &lt;code&gt;mypumpkin.py&lt;/code&gt; 即可，所以称作魔法。&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;项目地址&lt;/strong&gt;：&lt;a href=&quot;https://github.com/seanlook/mypumpkin&quot;&gt;https://github.com/seanlook/mypumpkin&lt;/a&gt;  &lt;/p&gt;
-&lt;p&gt;该程序源于需要对现网单库几百G的数据进行转移到新库，并对中间进行一些特殊操作（如字符集转换），无法容忍mysqldump导入速度。有人可能会提到为什么不用 mydumper，其实也尝试过它但还是放弃了，原因有：&lt;/p&gt;
-&lt;ol&gt;
-&lt;li&gt;不能设置字符集&lt;br&gt;mydumper强制使用 binary 方式来连接库以达到不关心备份恢复时的字符集问题，然而我的场景下需要特意以不同的字符集导出、再导入。写这个程序的时候正好在公众号看到网易有推送的一篇文章 (&lt;a href=&quot;http://mp.weixin.qq.com/s?__biz=MzI4NTA1MDEwNg==&amp;amp;mid=2650756926&amp;amp;idx=1&amp;amp;sn=b8081a8ae9456a6051d1ba519febee54&amp;amp;chksm=f3f9e2abc48e6bbd5912edb4e6207ff6ec5bf7123fedbf10b5c65a43146af22845dbf0787b39&amp;amp;scene=0#wechat_redirect&quot;&gt;解密网易MySQL实例迁移高效完成背后的黑科技&lt;/a&gt;)，提到他们对mydumper的改进已支持字符集设置，可是在0.9.1版本的patch里还是没找到。&lt;/li&gt;
-&lt;li&gt;没有像 mysqldump 那样灵活控制过滤选项（导哪些表、忽略哪些表）&lt;br&gt;因为数据量之巨大，而且将近70%是不变更的历史表数据，这些表是可以提前导出转换的；又有少量单表大于50G的，最好是分库导出转换。mydumper 不具备 mysqldump 这样的灵活性&lt;/li&gt;
-&lt;li&gt;对忽略导出gtid信息、触发器等其它支持&lt;br&gt;阿里云rds 5.6 导出必须要设置 set-gtid-purged=OFF&lt;/li&gt;
-&lt;/ol&gt;
-&lt;p&gt;另外有人还可能提到 mysqlpump —— 它才是我认为mysqldump应该具有的模样，语法兼容，基于表的并发导出。但是只有 mysql服务端 5.7.9 以上才支持，这就是现实和理想的距离。。。&lt;/p&gt;
-&lt;h2 id=&quot;2-实现方法&quot;&gt;&lt;a href=&quot;#2-实现方法&quot; class=&quot;headerlink&quot; title=&quot;2. 实现方法&quot;&gt;&lt;/a&gt;2. 实现方法&lt;/h2&gt;&lt;p&gt;首先说明，mysqldump的导出速度并不慢，经测试能达到50M/s的速度，10G数据花费3分钟的样子，可以看到瓶颈在于网络和磁盘IO，再怎样的导出工具也快不了多少，但是导入却花了60分钟，磁盘和网络大概只用到了20%，瓶颈在目标库写入速度（而一般顺序写入达不到IOPS限制），所以mypumpkin就诞生了 —— 兼顾myloader的导入速度和mysqldump导出的灵活性。&lt;/p&gt;
-    
-    </summary>
-    
-      <category term="Python" scheme="http://seanlook.com/categories/Python/"/>
-    
-    
-      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
-    
-      <category term="mysqldump" scheme="http://seanlook.com/tags/mysqldump/"/>
-    
-      <category term="python" scheme="http://seanlook.com/tags/python/"/>
     
   </entry>
   

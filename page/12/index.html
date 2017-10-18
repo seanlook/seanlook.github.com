@@ -316,6 +316,360 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/05/06/lsyncd-synchronize-realtime/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2015/05/06/lsyncd-synchronize-realtime/" itemprop="url">
+                  lsyncd实时同步搭建指南——取代rsync+inotify
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-05-06T01:21:25+08:00">
+                2015-05-06
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2015/05/06/lsyncd-synchronize-realtime/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2015/05/06/lsyncd-synchronize-realtime/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2015/05/06/lsyncd-synchronize-realtime/" class="leancloud_visitors" data-flag-title="lsyncd实时同步搭建指南——取代rsync+inotify">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h1 id="1-几大实时同步工具比较"><a href="#1-几大实时同步工具比较" class="headerlink" title="1. 几大实时同步工具比较"></a>1. 几大实时同步工具比较</h1><h2 id="1-1-inotify-rsync"><a href="#1-1-inotify-rsync" class="headerlink" title="1.1 inotify + rsync"></a>1.1 inotify + rsync</h2><p>最近一直在寻求生产服务服务器上的同步替代方案，原先使用的是<code>inotify +  rsync</code>，但随着文件数量的增大到100W+，目录下的文件列表就达20M，在网络状况不佳或者限速的情况下，变更的文件可能10来个才几M，却因此要发送的文件列表就达20M，严重减低的带宽的使用效率以及同步效率；更为要紧的是，加入inotifywait在5s内监控到10个小文件发生变化，便会触发10个rsync同步操作，结果就是真正需要传输的才2-3M的文件，比对的文件列表就达200M。使用这两个组合的好处在于，它们都是最基本的软件，可以通过不同选项做到很精确的控制，比如排除同步的目录，同步多个模块或同步到多个主机。</p>
+<p>搭建过程参考 <a href="http://seanlook.com/2014/12/12/rsync_inotify_setup/">Linux下同步工具inotify+rsync使用详解</a> 。</p>
+<h2 id="1-2-sersync"><a href="#1-2-sersync" class="headerlink" title="1.2 sersync"></a>1.2 sersync</h2><p>后来听同事说 <a href="http://www.ccvita.com/422.html">sersync</a> 这么个工具可以提高同步的性能，也解决了同步大文件时出现异常的问题，所以就尝试了一下。sersync是国内的一个开发者开源出来的，使用c++编写，采用多线程的方式进行同步，失败后还有重传机制，对临时文件过滤，自带crontab定时同步功能。网上看到有人说性能还不错，说一下我的观点：</p>
+<ul>
+<li>国产开源，文档不是很全，在2011年之后就没更新了（googlecode都要快关闭了，其实可以转交其他人维护），网上关于它的使用和讨论都止于10年了</li>
+<li>采用xml配置文件的方式，可读性比较好，但是有些原生的有些功能没有实现就没法使用了</li>
+<li>无法实现多目录同步，只能通过多个配置文件启动多个进程</li>
+<li>文件排除功能太弱。这个要看需求，不是每个人都需要排除子目录。而对于我的环境中，这个功能很重要，而且排除的规则较多</li>
+<li>虽然提供插件的功能，但很鸡肋，因为软件本身没有持续更新，也没有看到贡献有其它插件出现（可能是我知识面不够，还用不到里面的refreshCDN plugin）。</li>
+</ul>
+<p>虽然不懂c++，但大致看了下源码 <a href="http://code.google.com/p/sersync/source/browse/FileSynchronize.cpp">FileSynchronize</a>，拼接rsync命令大概在273行左右，最后一个函数就是排除选项，简单一点可以将<code>--exclude=</code>改成<code>--eclude-from</code>来灵活控制。有机会再改吧。</p>
+<p>另外，在作者的文章 <a href="http://hi.baidu.com/johntech/item/a4a2060ecf3053c6905718e1">Sersync服务器同步程序 项目简介与设计框架</a> 评论中，说能解决上面 <code>rsync + inotify</code>中所描述的问题。阅读了下源码，这个应该是没有解决，因为在拼接rsync命令时，后面的目的地址始终是针对module的，只要执行rsync命令，就会对整个目录进行遍历，发送要比对的文件列表，然后再发送变化的文件。sersync只是减少了监听的事件，减少了rsync的次数——这已经是很大的改进，但每次rsync没办法改变。（如有其它看法可与我讨论）</p>
+<p>其实我们也不能要求每一个软件功能都十分健全，关键是看能否满足我们当下的特定的需求。所谓好的架构不是设计出来的，而是进化来的。目前使用<code>sersync2</code>没什么问题，而且看了它的设计思路应该是比较科学的，特别是过滤队列的设计。双向同步看起来也是可以实现。</p>
+<h2 id="1-3-lsyncd"><a href="#1-3-lsyncd" class="headerlink" title="1.3 lsyncd"></a>1.3 lsyncd</h2><p>废话说这么多，本文就是介绍它了。有些博客说lsyncd是谷歌开源的，实际不是了，只是托管在了googlecode上而已，幸运的是已经迁移到github了：<a href="https://github.com/axkibe/lsyncd">https://github.com/axkibe/lsyncd</a> 。</p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2015/05/06/lsyncd-synchronize-realtime/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/05/03/feel-wuyi-back/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2015/05/03/feel-wuyi-back/" itemprop="url">
+                  五一回来了
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-05-03T07:01:25+08:00">
+                2015-05-03
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Feel/" itemprop="url" rel="index">
+                    <span itemprop="name">Feel</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2015/05/03/feel-wuyi-back/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2015/05/03/feel-wuyi-back/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2015/05/03/feel-wuyi-back/" class="leancloud_visitors" data-flag-title="五一回来了">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>———————— 只是无聊，轻松的写点东西，在 LOFTER上是不需要写标题的</p>
+<p>失算了，下午四点到了汽车站，没能买到16:10的汽车，最早也要晚上六点到深圳侨社那班。这原本打算七点就可到深圳，淡定的去会展中心吃个饭啥的，说话算数太不好意思了。</p>
+<p>两个小时的等车时间真够无聊的，比在哥哥家里兼工作室要好些。这两天说过来玩，其实也是带任务来的——为哥哥的天猫手表店拍实物图片，借我的MAC一用做背景。我问他卡斯曼、卡西欧官方没给你宝贝图片吗，他说不是，是想拍出自己的特色放在介绍里。千篇一律大家都去旗舰店买了，谁来照顾我们的手表店。想想也是，现在都讲究情怀！看到房间里单反、灯光箱、360度转动盘（不晓得是个什么gui），我几百块的小叶紫檀貔貅手串都派上用场了。看到用心到连饭都没时间煮的份上，我要不要帮忙推广一下呢。</p>
+<p>本来打算是今天早点回深圳，可听他说下午还有几块手表要拍，大概要2个小时，我又怎么能无耻的坚持带走电脑呢。临走的时候，哥跟我在qq上说了一句“大老远让你从深圳跑中山来，也没弄点好吃的（也没带你去珠海玩——自己脑补的），太忙太赶了”。八月份再过来，那时候丽景名筑的房子也装修好了，开个入住仪式。昨天也去新房子看了一眼，线路已经全部埋好了，正在给洗手间做防水测试，厅中间还是一堆沙子，只有天花板刷好了乳石灰。六月份能够装修完成，八月份入住，想想那个时候过去，大飘窗、高低儿童床、乐视tv，比现在这个出租屋要好的多了去。可是，可是，这意味着一个很大的问题，哥哥收入用于装修屋子（简单八万的样子），家里在建的四层楼房怎么办？ 昨天跟家里视频，老爸正在算这一笔账，告诉我个数字，30-40万，毛坯房。现在在农村修个房子（四层可以俯瞰全村了）的成本，差不多可以在中小城市买一个90平的。老一辈人还是希望待在家里吧。鸭梨好大，只能这么形容了。</p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2015/05/03/feel-wuyi-back/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/05/01/feel-wuyi-go/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -831,364 +1185,6 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/04/23/pfsense-usage/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/04/23/pfsense-usage/" itemprop="url">
-                  图解pfSense软路由系统的使用（NAT功能）
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-04-23T15:21:25+08:00">
-                2015-04-23
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Linux/" itemprop="url" rel="index">
-                    <span itemprop="name">Linux</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2015/04/23/pfsense-usage/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2015/04/23/pfsense-usage/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2015/04/23/pfsense-usage/" class="leancloud_visitors" data-flag-title="图解pfSense软路由系统的使用（NAT功能）">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>pfsense是一款开源的路由和防火墙产品，它基于freebsd系统定制和开发。pfsene拥有友好的web的配置界面，且具有伸缩性强又不失强大性能，在众多开源网络防火墙中属于佼佼者。</p>
-<p>2004年，pfsense作为m0n0wall项目（基于freebsd内核的嵌入式软防火墙）的分支项目启动，增加了许多m0n0wall没有的功能(pfSense的官方网站称它为the better m0n0wall).pfSense除了包含宽带路由器的基本功能外,还有以下的特点:</p>
-<ul>
-<li>基于稳定可靠的FreeBSD操作系统,能适应全天候运行的要求</li>
-<li>具有用户认证功能,使用Web网页的认证方式,配合RADIUS可以实现记费功能</li>
-<li>完善的防火墙、流量控制和数据包功能,保证了网络的安全,稳定和高速运行</li>
-<li>支持多条WAN线路和负载均衡功能,可大幅度提高网络出口带宽,在带宽拥塞时自动分配负载</li>
-<li>内置了IPsec 和PPTP VPN功能,实现不同分支机构的远程互联或远程用户安全地访问内部网</li>
-<li>支持802.1Q VLAN标准,可以通过软件模拟的方式使得普通网卡能识别802.1Q的标记,同时为多个VLAN的用户提供服务</li>
-<li>支持使用额外的软件包来扩展pfSense功能,为用户提供更多的功能(如FTP和透明代理).</li>
-<li>详细的日志功能,方便用户对网络出现的事件分析,统计和处理</li>
-<li>使用Web管理界面进行配置(支持SSL),支持远程管理和软件版本自动在线升级</li>
-</ul>
-<p>本文简单介绍pfSense的安装及配置过程，完成一个基本的路由器该有的功能，如访问局外网、设置防火墙规则、配置端口映射。这里演示在ESXi虚拟服务器上，解决IP不足的问题。</p>
-<h2 id="创建虚拟机"><a href="#创建虚拟机" class="headerlink" title="创建虚拟机"></a>创建虚拟机</h2><p>首先去 <a href="https://www.pfsense.org/download/">https://www.pfsense.org/download/</a> 下载稳定版本的pfSense，如pfSense-LiveCD-2.2.2-RELEASE-amd64.iso.gz（网上看到有人提到这个版本不稳定，我在使用中偶尔也发现突然很慢，建议2.1.5）。在vSphere上创建虚拟机的过程省略，取名01_pfSense，创建虚拟机操作系统时选择“其他 -&gt; FreeBSD 64位”，单CPU,512Mb内存，4G硬盘。将下载的系统解压成iso后挂载到CD/DVD，并“打开电源时连接”。<br>下图是网卡情况：<br>为pfSense分配两个网卡，分别是可以连接公司内网的172.29.88.1/24网段的vSphere_Admin端口组，和IP范围是172.30.31.1/24的内部局域网端口组VM Local。<br><img src="http://sean-images.qiniudn.com/pfsense-vsphere0.png" alt="pfsense-vsphere0.png"></p>
-<p>记录下Mac地址<br>外网接口：00:0c:29:36:b6:c2<br>内网接口：00:0c:29:36:b6:cc</p>
-<h2 id="安装pfsense"><a href="#安装pfsense" class="headerlink" title="安装pfsense"></a>安装pfsense</h2><p>启动电源后出现欢迎界面，选择<code>1.Boot pfSense [default]</code>，或等待几秒钟自动选择，进入如下界面：<br><img src="http://sean-images.qiniudn.com/pfsense-vsphere1.png" alt="pfsense-vsphere1.png"></p>
-<p>输入I，回车，然后是一个蓝屏，开始安装。</p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2015/04/23/pfsense-usage/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/04/11/oracle_db_autostart_with_linux/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/04/11/oracle_db_autostart_with_linux/" itemprop="url">
-                  配置 Oracle 11gR2 在 CentOS6 上开机自启动
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-04-11T15:21:25+08:00">
-                2015-04-11
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Oracle/" itemprop="url" rel="index">
-                    <span itemprop="name">Oracle</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2015/04/11/oracle_db_autostart_with_linux/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2015/04/11/oracle_db_autostart_with_linux/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2015/04/11/oracle_db_autostart_with_linux/" class="leancloud_visitors" data-flag-title="配置 Oracle 11gR2 在 CentOS6 上开机自启动">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <h2 id="修改配置"><a href="#修改配置" class="headerlink" title="修改配置"></a>修改配置</h2><p>要达到oracle随开机自启动，一般使用11g自带的dbstart脚本：<code>$ORACLE_HOME/bin/dbstart</code>，但要先修改<code>/etc/oratab</code>的内容，将N改成Y，表示允许实例自启动，假如有2个实例要启动，再写一行：<br><figure class="highlight groovy"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ vi <span class="regexp">/etc/</span>oratab</div><div class="line"><span class="string">EXCRMPROD:</span><span class="regexp">/db/</span>oracle<span class="regexp">/product/</span><span class="number">11.2</span><span class="number">.0</span>/<span class="string">db_1:</span>Y</div></pre></td></tr></table></figure></p>
-<p>然后在oracle用户下执行<code>$ORACLE_HOME/bin/dbstart</code>即可启动，日志被记录在<code>$ORACLE_HOME/startup.log</code>。但是，默认情况<code>dbstart</code>和<code>dbshut</code>脚本不能自动启动或关闭监听，所以也要加以修改：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">$ vi /db/oracle/product/11.2.0/db_1/bin/dbstart</div><div class="line"><span class="comment">## 找到下面的代码(约第80行)，在实际脚本代码的前面</span></div><div class="line"><span class="comment"># First argument is used to bring up Oracle Net Listener</span></div><div class="line">ORACLE_HOME_LISTNER=<span class="variable">$1</span></div><div class="line"><span class="comment">## 将此处的 ORACLE_HOME_LISTNER=$1 修改为 ORACLE_HOME_LISTNER=$ORACLE_HOME</span></div><div class="line"><span class="keyword">if</span> [ ! <span class="variable">$ORACLE_HOME_LISTNER</span> ] ; <span class="keyword">then</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"ORACLE_HOME_LISTNER is not SET, unable to auto-start Oracle Net Listener"</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"Usage: <span class="variable">$0</span> ORACLE_HOME"</span></div><div class="line"><span class="keyword">else</span></div><div class="line">LOG=<span class="variable">$ORACLE_HOME_LISTNER</span>/listener.log</div></pre></td></tr></table></figure></p>
-<p>同样也修改dbshut脚本（约第50行）：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line">$ vi /db/oracle/product/11.2.0/db_1/bin/dbshut</div><div class="line"></div><div class="line"><span class="comment"># The this to bring down Oracle Net Listener</span></div><div class="line">ORACLE_HOME_LISTNER=<span class="variable">$ORACLE_HOME</span></div><div class="line"><span class="keyword">if</span> [ ! <span class="variable">$ORACLE_HOME_LISTNER</span> ] ; <span class="keyword">then</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"ORACLE_HOME_LISTNER is not SET, unable to auto-stop Oracle Net Listener"</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"Usage: <span class="variable">$0</span> ORACLE_HOME"</span></div><div class="line"><span class="keyword">else</span></div><div class="line">LOG=<span class="variable">$ORACLE_HOME_LISTNER</span>/listener.log</div></pre></td></tr></table></figure></p>
-<h2 id="开机启动"><a href="#开机启动" class="headerlink" title="开机启动"></a>开机启动</h2><p>这两个脚本在执行时会自动去搜索<code>/etc/oratab</code>文件的内容，将这两个命令分别加入开机启动和关闭脚本里。</p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2015/04/11/oracle_db_autostart_with_linux/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -1238,7 +1234,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">106</span>
+                <span class="site-state-item-count">108</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
