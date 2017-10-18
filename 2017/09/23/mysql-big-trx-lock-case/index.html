@@ -467,8 +467,13 @@ innodb_status.txt片段：var_mydb_snapshot.html
 <a id="more"></a>
 <p>应用程序日志里可以看 10:21:00 ~ 10:26:00 之间，mydb.mytable1 表上主键id=5317885 在做什么事情。因为我们上了听云，在听云APM里面也可以清楚的看到这个时间点的哪个方法慢：<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-bigtrx-tingyun.png" alt="mysql-bigtrx-tingyun"></p>
 <p> 响应时间230多秒，从“相关SQL”里面看到操作的记录内容，确定就是它了(根据innodb status快照时间 - ACTIVE 230.874 sec，倒退得到的时间与这里刚好吻合)。从接口名称也清楚的知道是在进行禁用用户的操作，猜想：<br>禁用用户的逻辑上有先挪到回收站，再删资料、删权限、删关系，清理缓存等等一系列操作，放在事务里保证他们的原子性，似乎是合理的。但为什么执行了将近4分钟还没有提交呢，分析相关的sql效率都很高。</p>
-<p>有两种情况，一，这个事务执行到一半，它需要操作的数据被别人锁住，等待了这么久；二，事务执行完成很快，但调用其它接口迟迟没有返回，导致事务没提交。</p>
-<p>不会是一，因为从一开始的分析看到事务 <strong>19705811640</strong> 都是在阻塞别人，而不是受害者。那么结合上图中有个有两个操作redis的接口执行时间占比96%，可以下定论了：<br>在禁用用户时，开启了一个事务，四五个增删改很快完成，但是操作redis缓存过程比较慢，也包含在了事务代码之间，长时间没有提交。前端用户操作的时候因为迟迟没有响应，进行了多次重复点击操作，因为影响的还是同一行记录，所以只能等待前面的锁释放。</p>
+<p>有三种情况：</p>
+<ol>
+<li>这个事务执行到一半，它需要操作的数据被别人锁住，等待了这么久</li>
+<li>类似事务要操作5000条数据，但是一条一条的操作，然后一起提交（已出现过类似的例子）</li>
+<li>事务务执行完成很快，但调用其它接口迟迟没有返回，导致事务没提交。</li>
+</ol>
+<p>不会是1和2，因为从一开始的分析看到事务 <strong>19705811640</strong> 都是在阻塞别人，而不是受害者。那么结合上图中有个有两个操作redis的接口执行时间占比96%，可以下定论了：<br>在禁用用户时，开启了一个事务，四五个增删改很快完成，但是操作redis缓存过程比较慢，也包含在了事务代码之间，长时间没有提交。前端用户操作的时候因为迟迟没有响应，进行了多次重复点击操作，因为影响的还是同一行记录，所以只能等待前面的锁释放。</p>
 <p>Bingo，跟最初的设想一样。但是，开发检查代码之后告诉我，没有用事务！那前面的猜想和结论都不成立了。</p>
 <h1 id="3-论证"><a href="#3-论证" class="headerlink" title="3. 论证"></a>3. 论证</h1><p>于是走另外一个思路，分析binlog。如果binlog里面记录那条记录修改(设置禁用标志)和删除（真正删除）的时间是 10:21:58，说明数据库操作那时候就完成；如果是10:25:xx，说明最后才提交。为了弄明白这个问题，也为了搞情况事务的内容到底是什么，解析当时的binlog。（阿里云rds的数据追踪功能本来挺好用，但这一次用着报内部错误）</p>
 <p>还记得前面那个thread_id吗，可以用在这里过滤(也可以用记录值)：<br><figure class="highlight ada"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">$ mysqlbinlog <span class="comment">--base64-output=decode-rows -vv --start-datetime="2017-09-16 10:21:00"  --stop-datetime="2017-09-16 10:27:00" mysql-bin.010743 &gt; mysql-bin.010743.sql</span></div><div class="line">$ grep -B5 -A200 <span class="string">"thread_id=9898630"</span> mysql-bin.<span class="number">010743</span>.sql &gt; mysql-bin.<span class="number">010743</span>.sql.txt</div><div class="line"></div><div class="line">$ ./summarize_binlogs.sh &gt; mysql-bin.<span class="number">010743</span>.sql.xid  # 会比较慢</div><div class="line">$ cat mysql-bin.<span class="number">010743</span>.sql.xid|grep Transaction|awk '&#123;<span class="keyword">if</span>($<span class="number">19</span>&gt;<span class="number">0</span>)print&#125;'</div><div class="line">[Transaction total : 10 <span class="type">Insert</span>(s) : 1 <span class="type">Update</span>(s) : 0 <span class="type">Delete</span>(s) : 9 <span class="type">Xid</span> : 99370218911 <span class="type">period</span> : 190 ] </div><div class="line">[Transaction total : 10 <span class="type">Insert</span>(s) : 1 <span class="type">Update</span>(s) : 0 <span class="type">Delete</span>(s) : 9 <span class="type">Xid</span> : 99370268888 <span class="type">period</span> : 236 ]</div></pre></td></tr></table></figure></p>
