@@ -148,9 +148,9 @@
     <entry>
       <title><![CDATA[“大”事务引起的锁等待分析案例]]></title>
       <url>http://seanlook.com/2017/09/23/mysql-big-trx-lock-case/</url>
-      <content type="html"><![CDATA[<h1 id="1-现象"><a href="#1-现象" class="headerlink" title="1. 现象"></a>1. 现象</h1><p>生产环境数据库在某一刻突然发现大量活跃连接，而且大部分状态是 <code>updating</code> 。问题出现在周六上午，持续了大概三四分钟，得益于我们自己的快照程序，拿到了当时现场的的processlist, 锁等待关系，innodb status 信息：(经过过滤处理)</p>
+      <content type="html"><![CDATA[<h1 id="1-现象"><a href="#1-现象" class="headerlink" title="1. 现象"></a>1. 现象</h1><p>生产环境数据库在某一刻突然发现大量活跃连接，而且大部分状态是 <code>updating</code> 。问题出现在周六上午，持续了大概三四分钟，得益于我们自己的快照程序，拿到了当时现场的的processlist, 锁等待关系，innodb status 信息：(经过脱敏处理)</p>
 <p><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-bigtrx-lockinfo.png" alt="mysql-bigtrx-lockinfo.png"><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-bigtrx-processlist.png" alt="mysql-bigtrx-processlist.png"></p>
-<p>innodb_status.txt片段：<br><a href="https://gist.coding.net/u/seanlook/d6ad649f81c64e23a25f3a980c44a1fe" target="_blank" rel="external">var_mydb_snapshot.html</a></p>
+<p>innodb_status.txt片段：<br><a href="https://gist.coding.net/u/seanlook/d6ad649f81c64e23a25f3a980c44a1fe" target="_blank" rel="external">var_mydb_snapshot.html</a> （也可以通过 pt-stalk 收集）</p>
 <p>首先在 Lock Waits Info 一节，看到每行的trx_id(事务)的role分为 Blocker(引起阻塞的线程) 与 Blockee（被阻塞者）；最后一列 blocking_trx_id 在role是Blockee时才有值，代表谁阻塞了当前事务。<br>根据上面的关系，可以得出以下结论：</p>
 <ol>
 <li>事务 <strong>19705811640</strong> 运行了231s，阻塞了19706118937、19706124453、19706124752，而这些事务都在做同一个UPDATE语句</li>
