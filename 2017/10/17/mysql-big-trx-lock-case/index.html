@@ -99,7 +99,7 @@ innodb_status.txt片段：var_mydb_snapshot.html （也可以通过 pt-stalk 收
 首先在">
 <meta property="og:type" content="article">
 <meta property="og:title" content="“大”事务引起的锁等待分析案例">
-<meta property="og:url" content="http://seanlook.com/2017/09/23/mysql-big-trx-lock-case/index.html">
+<meta property="og:url" content="http://seanlook.com/2017/10/17/mysql-big-trx-lock-case/index.html">
 <meta property="og:site_name" content="Sean's Notes">
 <meta property="og:description" content="1. 现象生产环境数据库在某一刻突然发现大量活跃连接，而且大部分状态是 updating 。问题出现在周六上午，持续了大概三四分钟，得益于我们自己的快照程序，拿到了当时现场的的processlist, 锁等待关系，innodb status 信息：(经过脱敏处理)
 
@@ -108,7 +108,7 @@ innodb_status.txt片段：var_mydb_snapshot.html （也可以通过 pt-stalk 收
 <meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/mysql-bigtrx-lockinfo.png">
 <meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/mysql-bigtrx-processlist.png">
 <meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/mysql-bigtrx-tingyun.png">
-<meta property="og:updated_time" content="2017-09-23T08:32:49.000Z">
+<meta property="og:updated_time" content="2017-10-17T08:32:49.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="“大”事务引起的锁等待分析案例">
 <meta name="twitter:description" content="1. 现象生产环境数据库在某一刻突然发现大量活跃连接，而且大部分状态是 updating 。问题出现在周六上午，持续了大概三四分钟，得益于我们自己的快照程序，拿到了当时现场的的processlist, 锁等待关系，innodb status 信息：(经过脱敏处理)
@@ -143,7 +143,7 @@ innodb_status.txt片段：var_mydb_snapshot.html （也可以通过 pt-stalk 收
 
 
 
-  <link rel="canonical" href="http://seanlook.com/2017/09/23/mysql-big-trx-lock-case/"/>
+  <link rel="canonical" href="http://seanlook.com/2017/10/17/mysql-big-trx-lock-case/"/>
 
 
 
@@ -328,7 +328,7 @@ innodb_status.txt片段：var_mydb_snapshot.html （也可以通过 pt-stalk 收
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/09/23/mysql-big-trx-lock-case/">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/10/17/mysql-big-trx-lock-case/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="seanlook">
@@ -364,8 +364,8 @@ innodb_status.txt片段：var_mydb_snapshot.html （也可以通过 pt-stalk 收
               
                 <span class="post-meta-item-text">Posted on</span>
               
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-09-23T16:32:49+08:00">
-                2017-09-23
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-10-17T16:32:49+08:00">
+                2017-10-17
               </time>
             
 
@@ -405,9 +405,9 @@ innodb_status.txt片段：var_mydb_snapshot.html （也可以通过 pt-stalk 收
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2017/09/23/mysql-big-trx-lock-case/#comments" itemprop="discussionUrl">
+                <a href="/2017/10/17/mysql-big-trx-lock-case/#comments" itemprop="discussionUrl">
                   <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2017/09/23/mysql-big-trx-lock-case/" itemprop="commentCount"></span>
+                        data-disqus-identifier="2017/10/17/mysql-big-trx-lock-case/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -415,7 +415,7 @@ innodb_status.txt片段：var_mydb_snapshot.html （也可以通过 pt-stalk 收
 
           
           
-             <span id="/2017/09/23/mysql-big-trx-lock-case/" class="leancloud_visitors" data-flag-title="“大”事务引起的锁等待分析案例">
+             <span id="/2017/10/17/mysql-big-trx-lock-case/" class="leancloud_visitors" data-flag-title="“大”事务引起的锁等待分析案例">
                <span class="post-meta-divider">|</span>
                <span class="post-meta-item-icon">
                  <i class="fa fa-eye"></i>
@@ -466,7 +466,7 @@ innodb_status.txt片段：var_mydb_snapshot.html （也可以通过 pt-stalk 收
 </ol>
 <a id="more"></a>
 <p>应用程序日志里可以看 10:21:00 ~ 10:26:00 之间，mydb.mytable1 表上主键id=5317885 在做什么事情。因为我们上了听云，在听云APM里面也可以清楚的看到这个时间点的哪个方法慢：<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-bigtrx-tingyun.png" alt="mysql-bigtrx-tingyun"></p>
-<p> 响应时间230多秒，从“相关SQL”里面看到操作的记录内容，确定就是它了(根据innodb status快照时间 - ACTIVE 230.874 sec，倒退得到的时间与这里刚好吻合)。从接口名称也清楚的知道是在进行禁用用户的操作，猜想：<br>禁用用户的逻辑上有先挪到回收站，再删资料、删权限、删关系，清理缓存等等一系列操作，放在事务里保证他们的原子性，似乎是合理的。但为什么执行了将近4分钟还没有提交呢，分析相关的sql效率都很高。</p>
+<p> 响应时间230多秒，从“相关SQL”里面看到操作的记录内容，确定就是它了(根据innodb status快照时间 - ACTIVE 230.874 sec，倒推得到的时间与这里刚好吻合)。从接口名称也清楚的知道是在进行禁用用户的操作，猜想：<br>禁用用户的逻辑上有先挪到回收站，再删资料、删权限、删关系，清理缓存等等一系列操作，放在事务里保证他们的原子性，似乎是合理的。但为什么执行了将近4分钟还没有提交呢，分析相关的sql效率都很高。</p>
 <p>有三种情况：</p>
 <ol>
 <li>这个事务执行到一半，它需要操作的数据被别人锁住，等待了这么久</li>
@@ -488,7 +488,7 @@ innodb_status.txt片段：var_mydb_snapshot.html （也可以通过 pt-stalk 收
 <p>我们经常说，尽量少用大事务，但由于现在开发都是基于各种框架，使用事务的方式被封装，要理解它们的用法。其次，我们上面的事务并不大，每个sql更新都很快，但是却把其它调用也写在事务里面，就容易阻塞而长时间不提交，也许这样做的初衷是操作db与清理redis缓存放在一个事务里，要么都成功，要么都失败，但是这种分布式设计就不合理（当然有办法是可以做到，这里不展开）。</p>
 <p>本文即是一个大事务锁的分析案例，也展示了引用各种工具，去分析论证的过程。</p>
 <hr>
-<p>本文链接地址：<a href="http://seanlook.com/2017/09/23/mysql-big-trx-lock-case/">http://seanlook.com/2017/09/23/mysql-big-trx-lock-case/</a></p>
+<p>本文链接地址：<a href="http://seanlook.com/2017/10/17/mysql-big-trx-lock-case/">http://seanlook.com/2017/10/17/mysql-big-trx-lock-case/</a></p>
 <hr>
 
       
@@ -550,8 +550,8 @@ innodb_status.txt片段：var_mydb_snapshot.html （也可以通过 pt-stalk 收
         <div class="post-nav">
           <div class="post-nav-next post-nav-item">
             
-              <a href="/2017/09/05/mysql-binlog-subscribe-simple-for-dba/" rel="next" title="一个简单的数据订阅程序(for DBA)">
-                <i class="fa fa-chevron-left"></i> 一个简单的数据订阅程序(for DBA)
+              <a href="/2017/10/13/mysql-table_open_cache_file_limits/" rel="next" title="table_open_cache 与 table_definition_cache 对MySQL(内存)的影响">
+                <i class="fa fa-chevron-left"></i> table_open_cache 与 table_definition_cache 对MySQL(内存)的影响
               </a>
             
           </div>
@@ -559,10 +559,6 @@ innodb_status.txt片段：var_mydb_snapshot.html （也可以通过 pt-stalk 收
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
-            
-              <a href="/2017/10/13/mysql-table_open_cache_file_limits/" rel="prev" title="table_open_cache 与 table_definition_cache 对MySQL(内存)的影响">
-                table_open_cache 与 table_definition_cache 对MySQL(内存)的影响 <i class="fa fa-chevron-right"></i>
-              </a>
             
           </div>
         </div>
@@ -862,8 +858,8 @@ innodb_status.txt片段：var_mydb_snapshot.html （也可以通过 pt-stalk 收
     
       <script type="text/javascript">
         var disqus_config = function () {
-          this.page.url = 'http://seanlook.com/2017/09/23/mysql-big-trx-lock-case/';
-          this.page.identifier = '2017/09/23/mysql-big-trx-lock-case/';
+          this.page.url = 'http://seanlook.com/2017/10/17/mysql-big-trx-lock-case/';
+          this.page.identifier = '2017/10/17/mysql-big-trx-lock-case/';
           this.page.title = '“大”事务引起的锁等待分析案例';
         };
         var d = document, s = d.createElement('script');

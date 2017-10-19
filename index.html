@@ -316,7 +316,7 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/10/17/rds_disk_io_troubleshooting/">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/10/17/mysql-big-trx-lock-case/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="seanlook">
@@ -338,8 +338,8 @@
             
               
                 
-                <a class="post-title-link" href="/2017/10/17/rds_disk_io_troubleshooting/" itemprop="url">
-                  MySQL实例阻塞分析一例(线程statistics状态)
+                <a class="post-title-link" href="/2017/10/17/mysql-big-trx-lock-case/" itemprop="url">
+                  “大”事务引起的锁等待分析案例
                 </a>
               
             
@@ -396,9 +396,9 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2017/10/17/rds_disk_io_troubleshooting/#comments" itemprop="discussionUrl">
+                <a href="/2017/10/17/mysql-big-trx-lock-case/#comments" itemprop="discussionUrl">
                   <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2017/10/17/rds_disk_io_troubleshooting/" itemprop="commentCount"></span>
+                        data-disqus-identifier="2017/10/17/mysql-big-trx-lock-case/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -406,7 +406,7 @@
 
           
           
-             <span id="/2017/10/17/rds_disk_io_troubleshooting/" class="leancloud_visitors" data-flag-title="MySQL实例阻塞分析一例(线程statistics状态)">
+             <span id="/2017/10/17/mysql-big-trx-lock-case/" class="leancloud_visitors" data-flag-title="“大”事务引起的锁等待分析案例">
                <span class="post-meta-divider">|</span>
                <span class="post-meta-item-icon">
                  <i class="fa fa-eye"></i>
@@ -436,11 +436,29 @@
 
       
         
-          <h1 id="1-现象"><a href="#1-现象" class="headerlink" title="1. 现象"></a>1. 现象</h1><p>某日下午下班后低峰期，现网MySQL一个库突然报出大量慢sql，状态是 <code>statistics</code>，但是过后拿这些sql去执行的时候，实际很快。处于 statistics 状态的线程有个特征：查询的都是视图，但看监控那个时间段并没有明显的update/detele/insert。通过我们的快照程序，去分析当时的 innodb status，发现如下信息：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div></pre></td><td class="code"><pre><div class="line">SEMAPHORES</div><div class="line"><span class="comment">----------</span></div><div class="line">OS WAIT ARRAY INFO: reservation count 17208994</div><div class="line"><span class="comment">--Thread 139964610234112 has waited at srv0srv.cc line 2132 for 14.00 seconds the semaphore:</span></div><div class="line">X-<span class="keyword">lock</span> (wait_ex) <span class="keyword">on</span> RW-latch <span class="keyword">at</span> <span class="number">0x1635a00</span> created <span class="keyword">in</span> <span class="keyword">file</span> dict0dict.cc line <span class="number">900</span></div><div class="line">a writer (<span class="keyword">thread</span> <span class="keyword">id</span> <span class="number">139964610234112</span>) has reserved it <span class="keyword">in</span> <span class="keyword">mode</span> <span class="keyword">wait</span> exclusive</div><div class="line"><span class="built_in">number</span> <span class="keyword">of</span> readers <span class="number">1</span>, waiters flag <span class="number">0</span>, lock_word: ffffffffffffffff</div><div class="line"><span class="keyword">Last</span> <span class="keyword">time</span> <span class="keyword">read</span> <span class="keyword">locked</span> <span class="keyword">in</span> <span class="keyword">file</span> row0purge.cc line <span class="number">720</span></div><div class="line"><span class="keyword">Last</span> <span class="keyword">time</span> write <span class="keyword">locked</span> <span class="keyword">in</span> <span class="keyword">file</span> /home/<span class="keyword">admin</span>/<span class="number">146</span>_20161018140650857_13830810_code/rpm_workspace/<span class="keyword">storage</span>/innobase/srv/srv0srv.cc line <span class="number">2132</span></div><div class="line">OS <span class="keyword">WAIT</span> <span class="built_in">ARRAY</span> INFO: signal <span class="keyword">count</span> <span class="number">256984450</span></div><div class="line"><span class="keyword">Mutex</span> spin waits <span class="number">626367674</span>, rounds <span class="number">2776951802</span>, OS waits <span class="number">1973672</span></div><div class="line">RW-<span class="keyword">shared</span> spins <span class="number">149944457</span>, rounds <span class="number">1650148561</span>, OS waits <span class="number">3972058</span></div><div class="line">RW-excl spins <span class="number">72090467</span>, rounds <span class="number">2017802579</span>, OS waits <span class="number">11148264</span></div><div class="line">Spin rounds per <span class="keyword">wait</span>: <span class="number">4.43</span> <span class="keyword">mutex</span>, <span class="number">11.01</span> RW-<span class="keyword">shared</span>, <span class="number">27.99</span> RW-excl</div><div class="line">...</div><div class="line"><span class="keyword">FILE</span> I/O</div><div class="line"><span class="comment">--------</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">0</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">insert</span> buffer <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">1</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">log</span> <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">2</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">read</span> <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">3</span> state: doing <span class="keyword">file</span> i/o (<span class="keyword">read</span> <span class="keyword">thread</span>) ev <span class="keyword">set</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">4</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">read</span> <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">5</span> state: doing <span class="keyword">file</span> i/o (<span class="keyword">read</span> <span class="keyword">thread</span>) ev <span class="keyword">set</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">6</span> state: doing <span class="keyword">file</span> i/o (write <span class="keyword">thread</span>) ev <span class="keyword">set</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">7</span> state: waiting <span class="keyword">for</span> i/o request (write <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">8</span> state: waiting <span class="keyword">for</span> i/o request (write <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">9</span> state: waiting <span class="keyword">for</span> i/o request (write <span class="keyword">thread</span>)</div><div class="line">Pending <span class="keyword">normal</span> aio <span class="keyword">reads</span>: <span class="number">18</span> [<span class="number">0</span>, <span class="number">12</span>, <span class="number">0</span>, <span class="number">6</span>] , aio writes: <span class="number">1</span> [<span class="number">1</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>] ,</div><div class="line">ibuf aio <span class="keyword">reads</span>: <span class="number">0</span>, <span class="keyword">log</span> i/o<span class="string">'s: 0, sync i/o'</span>s: <span class="number">0</span></div><div class="line">Pending flushes (fsync) <span class="keyword">log</span>: <span class="number">0</span>; buffer pool: 0</div><div class="line">1346747614 OS file reads, 2869418806 OS file writes, 524616747 OS fsyncs</div><div class="line">22 pending preads, 1 pending pwrites</div><div class="line">6.00 reads/s, 16384 avg bytes/read, 0.00 writes/s, 0.00 fsyncs/s</div><div class="line">...</div><div class="line">ROW OPERATIONS</div><div class="line"><span class="comment">--------------</span></div><div class="line">0 queries inside InnoDB, 0 queries in queue</div><div class="line">38 read views open inside InnoDB</div><div class="line">Main thread process no. 34414, id 139964610234112, state: enforcing dict <span class="keyword">cache</span> <span class="keyword">limit</span></div><div class="line"><span class="built_in">Number</span> <span class="keyword">of</span> <span class="keyword">rows</span> inserted <span class="number">2546811699</span>, <span class="keyword">updated</span> <span class="number">1708150459</span>, deleted <span class="number">1004154696</span>, <span class="keyword">read</span> <span class="number">413168628410</span></div><div class="line"><span class="number">0.00</span> inserts/s, <span class="number">0.00</span> updates/s, <span class="number">0.00</span> deletes/s, <span class="number">54.19</span> <span class="keyword">reads</span>/s</div></pre></td></tr></table></figure></p>
-<h1 id="2-分析"><a href="#2-分析" class="headerlink" title="2. 分析"></a>2. 分析</h1><p>从上面的信息知道 Thread 139964610234112 是主线程，在源码 srv0srv.cc:2132 行的地方等待信号14s，这个信号是在 dict0dict.cc:900 地方创建的 RW-latch 排它锁。那么奇怪了，主线程自己在等待自己的互斥锁。<br>由于环境是阿里云的RDS(基于MySQL 5.6.16-log 版本)，拿不到他们的代码，找来 5.6.35 的来看，行号对不上。但好在上段信息的最后面有一个 Main thread state: <code>enforcing dict cache limit</code>，发现在 srv0srv.cc 函数 srv_master_do_active_tasks() 约2137行的位置：<br><figure class="highlight mipsasm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">if (cur_time % SRV_MASTER_DICT_LRU_INTERVAL == <span class="number">0</span>) &#123;</div><div class="line">4srv_main_thread_op_info = <span class="string">"enforcing dict cache limit"</span><span class="comment">;</span></div><div class="line">4srv_master_evict_from_table_cache(<span class="number">50</span>)<span class="comment">;</span></div><div class="line">4MONITOR_INC_TIME_IN_MICRO_SECS(</div><div class="line">44MONITOR_SRV_DICT_LRU_MICROSECOND, counter_time)<span class="comment">;</span></div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+          <h1 id="1-现象"><a href="#1-现象" class="headerlink" title="1. 现象"></a>1. 现象</h1><p>生产环境数据库在某一刻突然发现大量活跃连接，而且大部分状态是 <code>updating</code> 。问题出现在周六上午，持续了大概三四分钟，得益于我们自己的快照程序，拿到了当时现场的的processlist, 锁等待关系，innodb status 信息：(经过脱敏处理)</p>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-bigtrx-lockinfo.png" alt="mysql-bigtrx-lockinfo.png"><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-bigtrx-processlist.png" alt="mysql-bigtrx-processlist.png"></p>
+<p>innodb_status.txt片段：<br><a href="https://gist.coding.net/u/seanlook/d6ad649f81c64e23a25f3a980c44a1fe">var_mydb_snapshot.html</a> （也可以通过 pt-stalk 收集）</p>
+<p>首先在 Lock Waits Info 一节，看到每行的trx_id(事务)的role分为 Blocker(引起阻塞的线程) 与 Blockee（被阻塞者）；最后一列 blocking_trx_id 在role是Blockee时才有值，代表谁阻塞了当前事务。<br>根据上面的关系，可以得出以下结论：</p>
+<ol>
+<li>事务 <strong>19705811640</strong> 运行了231s，阻塞了19706118937、19706124453、19706124752，而这些事务都在做同一个UPDATE语句</li>
+<li>被锁定的记录是 mydb.mytable1表的主键索引值为 5317885 行</li>
+<li>事务 19706124752 既被阻塞，也阻塞了别人19706125253</li>
+<li>不难发现 <strong>19705811640</strong> 应该最先运行的事务，且对其它事务产生了链式阻塞，它的thread_id是 9898630，来源IP</li>
+</ol>
+<p>但是当你兴冲冲的找到引起阻塞的事务 19705811640 在做什么事情时，发现它没有任何sql的信息，lock info以及processlist里面都是None。那么有哪些情况会导致在会话是活跃的，但sql的内容为空：</p>
+<ol>
+<li>执行show processlist的时候，刚好在事务里面两个sql的中间</li>
+<li>sql已经执行完成，但长时间没有提交</li>
+</ol>
+<h1 id="2-初步分析"><a href="#2-初步分析" class="headerlink" title="2. 初步分析"></a>2. 初步分析</h1><p>其实这个现象已经遇到过很多次了，第1个原因常发生在 大量单条记录更新 的情况，一个sql在一个事务里循环执行10000次，即使每条都很快，但大部分时间都在网络传输上，（可以改成批量的形式）。在本案例基本上能确定的是第2个原因：事务开启之后，sql也执行了，但中间又做别的事情去了。那么怎样才能知道这个事务是什么内容呢？两个方向去找：</p>
+<ol>
+<li>从来源ip上的应用程序的日志里分析</li>
+<li>binlog里面分析</li>
+</ol>
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2017/10/17/rds_disk_io_troubleshooting/#more" rel="contents">
+            <a class="btn" href="/2017/10/17/mysql-big-trx-lock-case/#more" rel="contents">
               Read more &raquo;
             </a>
           </div>
@@ -671,7 +689,7 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/09/23/mysql-big-trx-lock-case/">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/09/23/rds_disk_io_troubleshooting/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="seanlook">
@@ -693,8 +711,8 @@
             
               
                 
-                <a class="post-title-link" href="/2017/09/23/mysql-big-trx-lock-case/" itemprop="url">
-                  “大”事务引起的锁等待分析案例
+                <a class="post-title-link" href="/2017/09/23/rds_disk_io_troubleshooting/" itemprop="url">
+                  MySQL实例阻塞分析一例(线程statistics状态)
                 </a>
               
             
@@ -751,9 +769,9 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2017/09/23/mysql-big-trx-lock-case/#comments" itemprop="discussionUrl">
+                <a href="/2017/09/23/rds_disk_io_troubleshooting/#comments" itemprop="discussionUrl">
                   <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2017/09/23/mysql-big-trx-lock-case/" itemprop="commentCount"></span>
+                        data-disqus-identifier="2017/09/23/rds_disk_io_troubleshooting/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -761,7 +779,7 @@
 
           
           
-             <span id="/2017/09/23/mysql-big-trx-lock-case/" class="leancloud_visitors" data-flag-title="“大”事务引起的锁等待分析案例">
+             <span id="/2017/09/23/rds_disk_io_troubleshooting/" class="leancloud_visitors" data-flag-title="MySQL实例阻塞分析一例(线程statistics状态)">
                <span class="post-meta-divider">|</span>
                <span class="post-meta-item-icon">
                  <i class="fa fa-eye"></i>
@@ -791,29 +809,12 @@
 
       
         
-          <h1 id="1-现象"><a href="#1-现象" class="headerlink" title="1. 现象"></a>1. 现象</h1><p>生产环境数据库在某一刻突然发现大量活跃连接，而且大部分状态是 <code>updating</code> 。问题出现在周六上午，持续了大概三四分钟，得益于我们自己的快照程序，拿到了当时现场的的processlist, 锁等待关系，innodb status 信息：(经过脱敏处理)</p>
-<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-bigtrx-lockinfo.png" alt="mysql-bigtrx-lockinfo.png"><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-bigtrx-processlist.png" alt="mysql-bigtrx-processlist.png"></p>
-<p>innodb_status.txt片段：<br><a href="https://gist.coding.net/u/seanlook/d6ad649f81c64e23a25f3a980c44a1fe">var_mydb_snapshot.html</a> （也可以通过 pt-stalk 收集）</p>
-<p>首先在 Lock Waits Info 一节，看到每行的trx_id(事务)的role分为 Blocker(引起阻塞的线程) 与 Blockee（被阻塞者）；最后一列 blocking_trx_id 在role是Blockee时才有值，代表谁阻塞了当前事务。<br>根据上面的关系，可以得出以下结论：</p>
-<ol>
-<li>事务 <strong>19705811640</strong> 运行了231s，阻塞了19706118937、19706124453、19706124752，而这些事务都在做同一个UPDATE语句</li>
-<li>被锁定的记录是 mydb.mytable1表的主键索引值为 5317885 行</li>
-<li>事务 19706124752 既被阻塞，也阻塞了别人19706125253</li>
-<li>不难发现 <strong>19705811640</strong> 应该最先运行的事务，且对其它事务产生了链式阻塞，它的thread_id是 9898630，来源IP</li>
-</ol>
-<p>但是当你兴冲冲的找到引起阻塞的事务 19705811640 在做什么事情时，发现它没有任何sql的信息，lock info以及processlist里面都是None。那么有哪些情况会导致在会话是活跃的，但sql的内容为空：</p>
-<ol>
-<li>执行show processlist的时候，刚好在事务里面两个sql的中间</li>
-<li>sql已经执行完成，但长时间没有提交</li>
-</ol>
-<h1 id="2-初步分析"><a href="#2-初步分析" class="headerlink" title="2. 初步分析"></a>2. 初步分析</h1><p>其实这个现象已经遇到过很多次了，第1个原因常发生在 大量单条记录更新 的情况，一个sql在一个事务里循环执行10000次，即使每条都很快，但大部分时间都在网络传输上，（可以改成批量的形式）。在本案例基本上能确定的是第2个原因：事务开启之后，sql也执行了，但中间又做别的事情去了。那么怎样才能知道这个事务是什么内容呢？两个方向去找：</p>
-<ol>
-<li>从来源ip上的应用程序的日志里分析</li>
-<li>binlog里面分析</li>
-</ol>
+          <h1 id="1-现象"><a href="#1-现象" class="headerlink" title="1. 现象"></a>1. 现象</h1><p>某日下午下班后低峰期，现网MySQL一个库突然报出大量慢sql，状态是 <code>statistics</code>，但是过后拿这些sql去执行的时候，实际很快。处于 statistics 状态的线程有个特征：查询的都是视图，但看监控那个时间段并没有明显的update/detele/insert。通过我们的快照程序，去分析当时的 innodb status，发现如下信息：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div></pre></td><td class="code"><pre><div class="line">SEMAPHORES</div><div class="line"><span class="comment">----------</span></div><div class="line">OS WAIT ARRAY INFO: reservation count 17208994</div><div class="line"><span class="comment">--Thread 139964610234112 has waited at srv0srv.cc line 2132 for 14.00 seconds the semaphore:</span></div><div class="line">X-<span class="keyword">lock</span> (wait_ex) <span class="keyword">on</span> RW-latch <span class="keyword">at</span> <span class="number">0x1635a00</span> created <span class="keyword">in</span> <span class="keyword">file</span> dict0dict.cc line <span class="number">900</span></div><div class="line">a writer (<span class="keyword">thread</span> <span class="keyword">id</span> <span class="number">139964610234112</span>) has reserved it <span class="keyword">in</span> <span class="keyword">mode</span> <span class="keyword">wait</span> exclusive</div><div class="line"><span class="built_in">number</span> <span class="keyword">of</span> readers <span class="number">1</span>, waiters flag <span class="number">0</span>, lock_word: ffffffffffffffff</div><div class="line"><span class="keyword">Last</span> <span class="keyword">time</span> <span class="keyword">read</span> <span class="keyword">locked</span> <span class="keyword">in</span> <span class="keyword">file</span> row0purge.cc line <span class="number">720</span></div><div class="line"><span class="keyword">Last</span> <span class="keyword">time</span> write <span class="keyword">locked</span> <span class="keyword">in</span> <span class="keyword">file</span> /home/<span class="keyword">admin</span>/<span class="number">146</span>_20161018140650857_13830810_code/rpm_workspace/<span class="keyword">storage</span>/innobase/srv/srv0srv.cc line <span class="number">2132</span></div><div class="line">OS <span class="keyword">WAIT</span> <span class="built_in">ARRAY</span> INFO: signal <span class="keyword">count</span> <span class="number">256984450</span></div><div class="line"><span class="keyword">Mutex</span> spin waits <span class="number">626367674</span>, rounds <span class="number">2776951802</span>, OS waits <span class="number">1973672</span></div><div class="line">RW-<span class="keyword">shared</span> spins <span class="number">149944457</span>, rounds <span class="number">1650148561</span>, OS waits <span class="number">3972058</span></div><div class="line">RW-excl spins <span class="number">72090467</span>, rounds <span class="number">2017802579</span>, OS waits <span class="number">11148264</span></div><div class="line">Spin rounds per <span class="keyword">wait</span>: <span class="number">4.43</span> <span class="keyword">mutex</span>, <span class="number">11.01</span> RW-<span class="keyword">shared</span>, <span class="number">27.99</span> RW-excl</div><div class="line">...</div><div class="line"><span class="keyword">FILE</span> I/O</div><div class="line"><span class="comment">--------</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">0</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">insert</span> buffer <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">1</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">log</span> <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">2</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">read</span> <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">3</span> state: doing <span class="keyword">file</span> i/o (<span class="keyword">read</span> <span class="keyword">thread</span>) ev <span class="keyword">set</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">4</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">read</span> <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">5</span> state: doing <span class="keyword">file</span> i/o (<span class="keyword">read</span> <span class="keyword">thread</span>) ev <span class="keyword">set</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">6</span> state: doing <span class="keyword">file</span> i/o (write <span class="keyword">thread</span>) ev <span class="keyword">set</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">7</span> state: waiting <span class="keyword">for</span> i/o request (write <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">8</span> state: waiting <span class="keyword">for</span> i/o request (write <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">9</span> state: waiting <span class="keyword">for</span> i/o request (write <span class="keyword">thread</span>)</div><div class="line">Pending <span class="keyword">normal</span> aio <span class="keyword">reads</span>: <span class="number">18</span> [<span class="number">0</span>, <span class="number">12</span>, <span class="number">0</span>, <span class="number">6</span>] , aio writes: <span class="number">1</span> [<span class="number">1</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>] ,</div><div class="line">ibuf aio <span class="keyword">reads</span>: <span class="number">0</span>, <span class="keyword">log</span> i/o<span class="string">'s: 0, sync i/o'</span>s: <span class="number">0</span></div><div class="line">Pending flushes (fsync) <span class="keyword">log</span>: <span class="number">0</span>; buffer pool: 0</div><div class="line">1346747614 OS file reads, 2869418806 OS file writes, 524616747 OS fsyncs</div><div class="line">22 pending preads, 1 pending pwrites</div><div class="line">6.00 reads/s, 16384 avg bytes/read, 0.00 writes/s, 0.00 fsyncs/s</div><div class="line">...</div><div class="line">ROW OPERATIONS</div><div class="line"><span class="comment">--------------</span></div><div class="line">0 queries inside InnoDB, 0 queries in queue</div><div class="line">38 read views open inside InnoDB</div><div class="line">Main thread process no. 34414, id 139964610234112, state: enforcing dict <span class="keyword">cache</span> <span class="keyword">limit</span></div><div class="line"><span class="built_in">Number</span> <span class="keyword">of</span> <span class="keyword">rows</span> inserted <span class="number">2546811699</span>, <span class="keyword">updated</span> <span class="number">1708150459</span>, deleted <span class="number">1004154696</span>, <span class="keyword">read</span> <span class="number">413168628410</span></div><div class="line"><span class="number">0.00</span> inserts/s, <span class="number">0.00</span> updates/s, <span class="number">0.00</span> deletes/s, <span class="number">54.19</span> <span class="keyword">reads</span>/s</div></pre></td></tr></table></figure></p>
+<h1 id="2-分析"><a href="#2-分析" class="headerlink" title="2. 分析"></a>2. 分析</h1><p>从上面的信息知道 Thread 139964610234112 是主线程，在源码 srv0srv.cc:2132 行的地方等待信号14s，这个信号是在 dict0dict.cc:900 地方创建的 RW-latch 排它锁。那么奇怪了，主线程自己在等待自己的互斥锁。<br>由于环境是阿里云的RDS(基于MySQL 5.6.16-log 版本)，拿不到他们的代码，找来 5.6.35 的来看，行号对不上。但好在上段信息的最后面有一个 Main thread state: <code>enforcing dict cache limit</code>，发现在 srv0srv.cc 函数 srv_master_do_active_tasks() 约2137行的位置：</p>
+<figure class="highlight mipsasm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">if (cur_time % SRV_MASTER_DICT_LRU_INTERVAL == <span class="number">0</span>) &#123;</div><div class="line">4srv_main_thread_op_info = <span class="string">"enforcing dict cache limit"</span><span class="comment">;</span></div><div class="line">4srv_master_evict_from_table_cache(<span class="number">50</span>)<span class="comment">;</span></div><div class="line">4MONITOR_INC_TIME_IN_MICRO_SECS(</div><div class="line">44MONITOR_SRV_DICT_LRU_MICROSECOND, counter_time)<span class="comment">;</span></div><div class="line">&#125;</div></pre></td></tr></table></figure>
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2017/09/23/mysql-big-trx-lock-case/#more" rel="contents">
+            <a class="btn" href="/2017/09/23/rds_disk_io_troubleshooting/#more" rel="contents">
               Read more &raquo;
             </a>
           </div>

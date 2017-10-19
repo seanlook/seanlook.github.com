@@ -96,12 +96,12 @@
 <meta name="description" content="1. 现象某日下午下班后低峰期，现网MySQL一个库突然报出大量慢sql，状态是 statistics，但是过后拿这些sql去执行的时候，实际很快。处于 statistics 状态的线程有个特征：查询的都是视图，但看监控那个时间段并没有明显的update/detele/insert。通过我们的快照程序，去分析当时的 innodb status，发现如下信息：12345678910111213141">
 <meta property="og:type" content="article">
 <meta property="og:title" content="MySQL实例阻塞分析一例(线程statistics状态)">
-<meta property="og:url" content="http://seanlook.com/2017/10/17/rds_disk_io_troubleshooting/index.html">
+<meta property="og:url" content="http://seanlook.com/2017/09/23/rds_disk_io_troubleshooting/index.html">
 <meta property="og:site_name" content="Sean's Notes">
 <meta property="og:description" content="1. 现象某日下午下班后低峰期，现网MySQL一个库突然报出大量慢sql，状态是 statistics，但是过后拿这些sql去执行的时候，实际很快。处于 statistics 状态的线程有个特征：查询的都是视图，但看监控那个时间段并没有明显的update/detele/insert。通过我们的快照程序，去分析当时的 innodb status，发现如下信息：12345678910111213141">
 <meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/rds_diskio_slave_lag.png">
 <meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/rds_diskio_bufferpool_flushed.png">
-<meta property="og:updated_time" content="2017-10-17T08:32:49.000Z">
+<meta property="og:updated_time" content="2017-09-23T08:32:49.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="MySQL实例阻塞分析一例(线程statistics状态)">
 <meta name="twitter:description" content="1. 现象某日下午下班后低峰期，现网MySQL一个库突然报出大量慢sql，状态是 statistics，但是过后拿这些sql去执行的时候，实际很快。处于 statistics 状态的线程有个特征：查询的都是视图，但看监控那个时间段并没有明显的update/detele/insert。通过我们的快照程序，去分析当时的 innodb status，发现如下信息：12345678910111213141">
@@ -133,7 +133,7 @@
 
 
 
-  <link rel="canonical" href="http://seanlook.com/2017/10/17/rds_disk_io_troubleshooting/"/>
+  <link rel="canonical" href="http://seanlook.com/2017/09/23/rds_disk_io_troubleshooting/"/>
 
 
 
@@ -318,7 +318,7 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/10/17/rds_disk_io_troubleshooting/">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/09/23/rds_disk_io_troubleshooting/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="seanlook">
@@ -354,8 +354,8 @@
               
                 <span class="post-meta-item-text">Posted on</span>
               
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-10-17T16:32:49+08:00">
-                2017-10-17
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-09-23T16:32:49+08:00">
+                2017-09-23
               </time>
             
 
@@ -395,9 +395,9 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2017/10/17/rds_disk_io_troubleshooting/#comments" itemprop="discussionUrl">
+                <a href="/2017/09/23/rds_disk_io_troubleshooting/#comments" itemprop="discussionUrl">
                   <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2017/10/17/rds_disk_io_troubleshooting/" itemprop="commentCount"></span>
+                        data-disqus-identifier="2017/09/23/rds_disk_io_troubleshooting/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -405,7 +405,7 @@
 
           
           
-             <span id="/2017/10/17/rds_disk_io_troubleshooting/" class="leancloud_visitors" data-flag-title="MySQL实例阻塞分析一例(线程statistics状态)">
+             <span id="/2017/09/23/rds_disk_io_troubleshooting/" class="leancloud_visitors" data-flag-title="MySQL实例阻塞分析一例(线程statistics状态)">
                <span class="post-meta-divider">|</span>
                <span class="post-meta-item-icon">
                  <i class="fa fa-eye"></i>
@@ -435,9 +435,11 @@
 
       
         <h1 id="1-现象"><a href="#1-现象" class="headerlink" title="1. 现象"></a>1. 现象</h1><p>某日下午下班后低峰期，现网MySQL一个库突然报出大量慢sql，状态是 <code>statistics</code>，但是过后拿这些sql去执行的时候，实际很快。处于 statistics 状态的线程有个特征：查询的都是视图，但看监控那个时间段并没有明显的update/detele/insert。通过我们的快照程序，去分析当时的 innodb status，发现如下信息：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div></pre></td><td class="code"><pre><div class="line">SEMAPHORES</div><div class="line"><span class="comment">----------</span></div><div class="line">OS WAIT ARRAY INFO: reservation count 17208994</div><div class="line"><span class="comment">--Thread 139964610234112 has waited at srv0srv.cc line 2132 for 14.00 seconds the semaphore:</span></div><div class="line">X-<span class="keyword">lock</span> (wait_ex) <span class="keyword">on</span> RW-latch <span class="keyword">at</span> <span class="number">0x1635a00</span> created <span class="keyword">in</span> <span class="keyword">file</span> dict0dict.cc line <span class="number">900</span></div><div class="line">a writer (<span class="keyword">thread</span> <span class="keyword">id</span> <span class="number">139964610234112</span>) has reserved it <span class="keyword">in</span> <span class="keyword">mode</span> <span class="keyword">wait</span> exclusive</div><div class="line"><span class="built_in">number</span> <span class="keyword">of</span> readers <span class="number">1</span>, waiters flag <span class="number">0</span>, lock_word: ffffffffffffffff</div><div class="line"><span class="keyword">Last</span> <span class="keyword">time</span> <span class="keyword">read</span> <span class="keyword">locked</span> <span class="keyword">in</span> <span class="keyword">file</span> row0purge.cc line <span class="number">720</span></div><div class="line"><span class="keyword">Last</span> <span class="keyword">time</span> write <span class="keyword">locked</span> <span class="keyword">in</span> <span class="keyword">file</span> /home/<span class="keyword">admin</span>/<span class="number">146</span>_20161018140650857_13830810_code/rpm_workspace/<span class="keyword">storage</span>/innobase/srv/srv0srv.cc line <span class="number">2132</span></div><div class="line">OS <span class="keyword">WAIT</span> <span class="built_in">ARRAY</span> INFO: signal <span class="keyword">count</span> <span class="number">256984450</span></div><div class="line"><span class="keyword">Mutex</span> spin waits <span class="number">626367674</span>, rounds <span class="number">2776951802</span>, OS waits <span class="number">1973672</span></div><div class="line">RW-<span class="keyword">shared</span> spins <span class="number">149944457</span>, rounds <span class="number">1650148561</span>, OS waits <span class="number">3972058</span></div><div class="line">RW-excl spins <span class="number">72090467</span>, rounds <span class="number">2017802579</span>, OS waits <span class="number">11148264</span></div><div class="line">Spin rounds per <span class="keyword">wait</span>: <span class="number">4.43</span> <span class="keyword">mutex</span>, <span class="number">11.01</span> RW-<span class="keyword">shared</span>, <span class="number">27.99</span> RW-excl</div><div class="line">...</div><div class="line"><span class="keyword">FILE</span> I/O</div><div class="line"><span class="comment">--------</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">0</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">insert</span> buffer <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">1</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">log</span> <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">2</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">read</span> <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">3</span> state: doing <span class="keyword">file</span> i/o (<span class="keyword">read</span> <span class="keyword">thread</span>) ev <span class="keyword">set</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">4</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">read</span> <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">5</span> state: doing <span class="keyword">file</span> i/o (<span class="keyword">read</span> <span class="keyword">thread</span>) ev <span class="keyword">set</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">6</span> state: doing <span class="keyword">file</span> i/o (write <span class="keyword">thread</span>) ev <span class="keyword">set</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">7</span> state: waiting <span class="keyword">for</span> i/o request (write <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">8</span> state: waiting <span class="keyword">for</span> i/o request (write <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">9</span> state: waiting <span class="keyword">for</span> i/o request (write <span class="keyword">thread</span>)</div><div class="line">Pending <span class="keyword">normal</span> aio <span class="keyword">reads</span>: <span class="number">18</span> [<span class="number">0</span>, <span class="number">12</span>, <span class="number">0</span>, <span class="number">6</span>] , aio writes: <span class="number">1</span> [<span class="number">1</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>] ,</div><div class="line">ibuf aio <span class="keyword">reads</span>: <span class="number">0</span>, <span class="keyword">log</span> i/o<span class="string">'s: 0, sync i/o'</span>s: <span class="number">0</span></div><div class="line">Pending flushes (fsync) <span class="keyword">log</span>: <span class="number">0</span>; buffer pool: 0</div><div class="line">1346747614 OS file reads, 2869418806 OS file writes, 524616747 OS fsyncs</div><div class="line">22 pending preads, 1 pending pwrites</div><div class="line">6.00 reads/s, 16384 avg bytes/read, 0.00 writes/s, 0.00 fsyncs/s</div><div class="line">...</div><div class="line">ROW OPERATIONS</div><div class="line"><span class="comment">--------------</span></div><div class="line">0 queries inside InnoDB, 0 queries in queue</div><div class="line">38 read views open inside InnoDB</div><div class="line">Main thread process no. 34414, id 139964610234112, state: enforcing dict <span class="keyword">cache</span> <span class="keyword">limit</span></div><div class="line"><span class="built_in">Number</span> <span class="keyword">of</span> <span class="keyword">rows</span> inserted <span class="number">2546811699</span>, <span class="keyword">updated</span> <span class="number">1708150459</span>, deleted <span class="number">1004154696</span>, <span class="keyword">read</span> <span class="number">413168628410</span></div><div class="line"><span class="number">0.00</span> inserts/s, <span class="number">0.00</span> updates/s, <span class="number">0.00</span> deletes/s, <span class="number">54.19</span> <span class="keyword">reads</span>/s</div></pre></td></tr></table></figure></p>
-<h1 id="2-分析"><a href="#2-分析" class="headerlink" title="2. 分析"></a>2. 分析</h1><p>从上面的信息知道 Thread 139964610234112 是主线程，在源码 srv0srv.cc:2132 行的地方等待信号14s，这个信号是在 dict0dict.cc:900 地方创建的 RW-latch 排它锁。那么奇怪了，主线程自己在等待自己的互斥锁。<br>由于环境是阿里云的RDS(基于MySQL 5.6.16-log 版本)，拿不到他们的代码，找来 5.6.35 的来看，行号对不上。但好在上段信息的最后面有一个 Main thread state: <code>enforcing dict cache limit</code>，发现在 srv0srv.cc 函数 srv_master_do_active_tasks() 约2137行的位置：<br><figure class="highlight mipsasm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">if (cur_time % SRV_MASTER_DICT_LRU_INTERVAL == <span class="number">0</span>) &#123;</div><div class="line">4srv_main_thread_op_info = <span class="string">"enforcing dict cache limit"</span><span class="comment">;</span></div><div class="line">4srv_master_evict_from_table_cache(<span class="number">50</span>)<span class="comment">;</span></div><div class="line">4MONITOR_INC_TIME_IN_MICRO_SECS(</div><div class="line">44MONITOR_SRV_DICT_LRU_MICROSECOND, counter_time)<span class="comment">;</span></div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<h1 id="2-分析"><a href="#2-分析" class="headerlink" title="2. 分析"></a>2. 分析</h1><p>从上面的信息知道 Thread 139964610234112 是主线程，在源码 srv0srv.cc:2132 行的地方等待信号14s，这个信号是在 dict0dict.cc:900 地方创建的 RW-latch 排它锁。那么奇怪了，主线程自己在等待自己的互斥锁。<br>由于环境是阿里云的RDS(基于MySQL 5.6.16-log 版本)，拿不到他们的代码，找来 5.6.35 的来看，行号对不上。但好在上段信息的最后面有一个 Main thread state: <code>enforcing dict cache limit</code>，发现在 srv0srv.cc 函数 srv_master_do_active_tasks() 约2137行的位置：</p>
+<figure class="highlight mipsasm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">if (cur_time % SRV_MASTER_DICT_LRU_INTERVAL == <span class="number">0</span>) &#123;</div><div class="line">4srv_main_thread_op_info = <span class="string">"enforcing dict cache limit"</span><span class="comment">;</span></div><div class="line">4srv_master_evict_from_table_cache(<span class="number">50</span>)<span class="comment">;</span></div><div class="line">4MONITOR_INC_TIME_IN_MICRO_SECS(</div><div class="line">44MONITOR_SRV_DICT_LRU_MICROSECOND, counter_time)<span class="comment">;</span></div><div class="line">&#125;</div></pre></td></tr></table></figure>
 <a id="more"></a>
-<p>应该是在调用 srv_master_evict_from_table_cache() 从innodb table cache里面清理缓存的地方waiting（这里不是一定会清理，而是先判断空间够不够用，参数50表示只扫描 unused_table list的50%）。<br>srv_master_evict_from_table_cache()：<br><figure class="highlight mipsasm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line">srv_master_evict_from_table_cache(</div><div class="line"><span class="comment">/*==============================*/</span></div><div class="line">4ulint	pct_check)	<span class="comment">/*!&lt; in: max percent to check */</span></div><div class="line">&#123;</div><div class="line">4ulint	n_tables_evicted = <span class="number">0</span><span class="comment">;</span></div><div class="line"></div><div class="line">4rw_lock_x_lock(&amp;<span class="keyword">dict_operation_lock);</span></div><div class="line"></div><div class="line">4<span class="keyword">dict_mutex_enter_for_mysql();</span></div><div class="line"></div><div class="line">4n_tables_evicted = <span class="keyword">dict_make_room_in_cache( </span> <span class="comment">/** 在dict0dict.cc里面 **/</span></div><div class="line">44innobase_get_table_cache_size(), pct_check)<span class="comment">;</span></div><div class="line"></div><div class="line">4<span class="keyword">dict_mutex_exit_for_mysql();</span></div><div class="line"></div><div class="line">4rw_lock_x_unlock(&amp;<span class="keyword">dict_operation_lock);</span></div><div class="line"></div><div class="line">4return(n_tables_evicted)<span class="comment">;</span></div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>应该是在调用 srv_master_evict_from_table_cache() 从innodb table cache里面清理缓存的地方waiting（这里不是一定会清理，而是先判断空间够不够用，参数50表示只扫描 unused_table list的50%）。<br><code>srv_master_evict_from_table_cache()</code>：</p>
+<figure class="highlight mipsasm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line">srv_master_evict_from_table_cache(</div><div class="line"><span class="comment">/*==============================*/</span></div><div class="line">4ulint	pct_check)	<span class="comment">/*!&lt; in: max percent to check */</span></div><div class="line">&#123;</div><div class="line">4ulint	n_tables_evicted = <span class="number">0</span><span class="comment">;</span></div><div class="line"></div><div class="line">4rw_lock_x_lock(&amp;<span class="keyword">dict_operation_lock);</span></div><div class="line"></div><div class="line">4<span class="keyword">dict_mutex_enter_for_mysql();</span></div><div class="line"></div><div class="line">4n_tables_evicted = <span class="keyword">dict_make_room_in_cache( </span> <span class="comment">/** 在dict0dict.cc里面 **/</span></div><div class="line">44innobase_get_table_cache_size(), pct_check)<span class="comment">;</span></div><div class="line"></div><div class="line">4<span class="keyword">dict_mutex_exit_for_mysql();</span></div><div class="line"></div><div class="line">4rw_lock_x_unlock(&amp;<span class="keyword">dict_operation_lock);</span></div><div class="line"></div><div class="line">4return(n_tables_evicted)<span class="comment">;</span></div><div class="line">&#125;</div></pre></td></tr></table></figure>
 <p>就是在 <em>rw_lock_x_lock(&amp;dict_operation_lock)</em> 这个地方获取Latch的时候等待了14s，这个锁就是在数据字典模块 dict0dict.cc:dict_init() 约1065行的地方创建的，与innodb status输出基本一致。<br>关于 <code>dict_operation_lock</code> 直接看注释吧：<br><figure class="highlight mizar"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">/** @brief the data dictionary rw-latch protecting dict_sys</div><div class="line"></div><div class="line">table create, drop, etc. <span class="keyword">reserve</span> this <span class="keyword">in</span> X-<span class="keyword">mode</span>; implicit <span class="keyword">or</span></div><div class="line">backround operations purge, rollback, foreign key checks <span class="keyword">reserve</span> this</div><div class="line"><span class="keyword">in</span> S-<span class="keyword">mode</span>; we cannot trust <span class="keyword">that</span> MySQL protects implicit <span class="keyword">or</span> background</div><div class="line">operations a table drop since MySQL does <span class="keyword">not</span> know <span class="keyword">of</span> them; therefore</div><div class="line">we need this; NOTE: a transaction which reserves this must keep book</div><div class="line">on the <span class="keyword">mode</span> <span class="keyword">in</span> trx_t<span class="comment">::dict_operation_lock_mode */</span></div></pre></td></tr></table></figure></p>
 <p>在尝试把表定义逐出缓存时获取的是 dict_operation_lock X-mode lock，可是从已有的信息里看不到另一个数据字典锁是什么。<br>之前是怀疑是不是 table_definition_cache, table_open_cache, innodb_open_files 设置小了，视图一般是多表join，更容易消耗打开表的数量，导致不断的逐出cache而导致锁征用。但是检查一番并没发现什么问题，更何况是14s的等待。关于它们的设置和关系，可以参考我的文章 <a href="http://seanlook/2017/10/13/mysql-table_open_cache_file_limits" target="_blank" rel="external">table_open_cache 与 table_definition_cache 对MySQL的影响</a> 。</p>
 <p>那么得换个思路了，processlist里面有13个长时间处于 statistics 状态的线程，表示正在计算统计数据，以制定一个查询执行计划。 如果一个线程处于这种状态很长一段时间，可能是磁盘IO性能很差，或者磁盘在执行其他工作。</p>
@@ -459,7 +461,7 @@
 <li><a href="http://imysql.com/2016/11/20/mysql-faq-what-cause-diskio-so-high.shtml" target="_blank" rel="external">http://imysql.com/2016/11/20/mysql-faq-what-cause-diskio-so-high.shtml</a></li>
 </ul>
 <hr>
-<p>本文链接地址：<a href="http://seanlook.com/2017/10/17/rds_disk_io_troubleshooting/">http://seanlook.com/2017/10/17/rds_disk_io_troubleshooting/</a></p>
+<p>本文链接地址：<a href="http://seanlook.com/2017/09/23/rds_disk_io_troubleshooting/">http://seanlook.com/2017/09/23/rds_disk_io_troubleshooting/</a></p>
 <hr>
 
       
@@ -521,8 +523,8 @@
         <div class="post-nav">
           <div class="post-nav-next post-nav-item">
             
-              <a href="/2017/10/13/mysql-table_open_cache_file_limits/" rel="next" title="table_open_cache 与 table_definition_cache 对MySQL(内存)的影响">
-                <i class="fa fa-chevron-left"></i> table_open_cache 与 table_definition_cache 对MySQL(内存)的影响
+              <a href="/2017/09/05/mysql-binlog-subscribe-simple-for-dba/" rel="next" title="一个简单的数据订阅程序(for DBA)">
+                <i class="fa fa-chevron-left"></i> 一个简单的数据订阅程序(for DBA)
               </a>
             
           </div>
@@ -530,6 +532,10 @@
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2017/10/13/mysql-table_open_cache_file_limits/" rel="prev" title="table_open_cache 与 table_definition_cache 对MySQL(内存)的影响">
+                table_open_cache 与 table_definition_cache 对MySQL(内存)的影响 <i class="fa fa-chevron-right"></i>
+              </a>
             
           </div>
         </div>
@@ -829,8 +835,8 @@
     
       <script type="text/javascript">
         var disqus_config = function () {
-          this.page.url = 'http://seanlook.com/2017/10/17/rds_disk_io_troubleshooting/';
-          this.page.identifier = '2017/10/17/rds_disk_io_troubleshooting/';
+          this.page.url = 'http://seanlook.com/2017/09/23/rds_disk_io_troubleshooting/';
+          this.page.identifier = '2017/09/23/rds_disk_io_troubleshooting/';
           this.page.title = 'MySQL实例阻塞分析一例(线程statistics状态)';
         };
         var d = document, s = d.createElement('script');
