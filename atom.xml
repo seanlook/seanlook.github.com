@@ -367,6 +367,53 @@
   </entry>
   
   <entry>
+    <title>网易云跟帖迁移评论到disqus</title>
+    <link href="http://seanlook.com/2017/08/29/blog_migrate_gentie163_disqus/"/>
+    <id>http://seanlook.com/2017/08/29/blog_migrate_gentie163_disqus/</id>
+    <published>2017-08-29T08:32:49.000Z</published>
+    <updated>2017-08-29T08:32:49.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>早前折腾博客的时候，在众多评论系统中选择了多说，用了2年结果多说倒闭了，也算是影响了网络上众多的站点。</p>
+<p>于是在16年的时候把评论换成了网易云跟帖，以为有网易这个靠山，体验虽然差点但是不会轻易关闭。云跟帖还提供了从多说直接导入的工具，随意旧的评论直接弄过来了。</p>
+<p>可谁想不到一年，网易云跟帖也关闭了。</p>
+<p>现在不怎么去折腾博客这玩意了，往里面写写东西才是王道，所以就决定直接把评论系统换成国外的 disqus，总不至于国内种种原因关闭了，代价就是要懂得科学上网，考虑博客的受众都是IT同仁，也就只好这样了。</p>
+<p>然而被坑了，网上有许多文章和工具可以<a href="https://github.com/JamesPan/duoshuo-migrator/blob/master/duoshuo-migrator.py" target="_blank" rel="external">从多说迁移到disqus</a>，但是几乎没看到从网易云跟帖迁移到disqus，三者导出的评论格式不一样。云跟帖导出的是 json，disqus导入是扩展的Wordpress格式。</p>
+<p>在拖了3个月后，找到了从网易云跟帖备份出来的旧评论文件，简单用python转换了一下，现在可以用了。</p>
+<p>WXR格式：<a href="https://help.disqus.com/customer/portal/articles/472150-custom-xml-import-format" target="_blank" rel="external">https://help.disqus.com/customer/portal/articles/472150-custom-xml-import-format</a></p>
+<p><strong>转换代码gist地址</strong>：<a href="https://gist.coding.net/u/seanlook/c395cda7c5f4421b85efcd898a8fdf21" target="_blank" rel="external">https://gist.coding.net/u/seanlook/c395cda7c5f4421b85efcd898a8fdf21</a>  (comments_convert.py)</p>
+<p>云跟帖导出文件命名为 gentie163.py，懒得用python处理，直接修改这个文件的内容为 python 字典定义：<br><figure class="highlight stylus"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">sed -<span class="selector-tag">i</span> <span class="string">'s/"url":"seanlook.com/"url":"http:\/\/seanlook.com/g'</span> gentie163<span class="selector-class">.py</span></div><div class="line">sed -<span class="selector-tag">i</span> <span class="string">'s/false/False/g'</span> gentie163<span class="selector-class">.py</span></div><div class="line">sed -<span class="selector-tag">i</span> <span class="string">'s/:null/:""/g'</span> gentie163<span class="selector-class">.py</span></div><div class="line">sed -<span class="selector-tag">i</span> <span class="string">'s/^/comments = /'</span> gentie163.py</div></pre></td></tr></table></figure></p>
+<p>字典直接转xml比较容易：<a href="http://python3-cookbook.readthedocs.io/zh_CN/latest/c06/p05_turning_dictionary_into_xml.html#" target="_blank" rel="external">http://python3-cookbook.readthedocs.io/zh_CN/latest/c06/p05_turning_dictionary_into_xml.html#</a></p>
+<p>转换后的文件为 <code>data_output.xml</code>:<br><figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># python3 comments_convert.py</span></div></pre></td></tr></table></figure></p>
+<p>在这个页面导入：<a href="https://seanlook.disqus.com/admin/discussions/import/platform/generic/" target="_blank" rel="external">https://seanlook.disqus.com/admin/discussions/import/platform/generic/</a></p>
+<p>可在页面 <a href="https://import.disqus.com/seanlook/" target="_blank" rel="external">https://import.disqus.com/seanlook/</a> 看到import进度，包括失败信息。（不要重复导入）</p>
+<p>说明：</p>
+<ul>
+<li>disqus每篇文章有个thread_idendifier，这里处理直接根据文章的时间戳转换来用，不影响</li>
+<li>dsq:remote是设置单点登录，没去深究，直接丢弃这个属性了</li>
+<li>头像信息丢失(因为sso)</li>
+</ul>
+<hr>
+<p>本文链接地址：<a href="http://seanlook.com/2017/08/29/blog_migrate_gentie163_disqus/">http://seanlook.com/2017/08/29/blog_migrate_gentie163_disqus/</a></p>
+<hr>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;早前折腾博客的时候，在众多评论系统中选择了多说，用了2年结果多说倒闭了，也算是影响了网络上众多的站点。&lt;/p&gt;
+&lt;p&gt;于是在16年的时候把评论换成了网易云跟帖，以为有网易这个靠山，体验虽然差点但是不会轻易关闭。云跟帖还提供了从多说直接导入的工具，随意旧的评论直接弄过来了。&lt;
+    
+    </summary>
+    
+      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
+    
+    
+      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
+    
+      <category term="blog" scheme="http://seanlook.com/tags/blog/"/>
+    
+  </entry>
+  
+  <entry>
     <title>ProxySQL PPT分享</title>
     <link href="http://seanlook.com/2017/07/19/proxysql-tutorials-ec/"/>
     <id>http://seanlook.com/2017/07/19/proxysql-tutorials-ec/</id>
@@ -1720,79 +1767,6 @@
 &lt;li&gt;&lt;code&gt;Telegraf&lt;/code&gt;：收集信息的agent&lt;br&gt;看了下 telegraf 的最新的 &lt;a href=&quot;https://github.com/influxdata/telegraf/tree/master/plugins/inputs/mysql&quot;&gt;mysql 插件&lt;/a&gt;，一开始很欣慰：支持收集 Table schema statistics 和 Info schema auto increment columns。试用了一下，有数据，但是如前面所说，除了自增值外其他都是预估值，telegraf收集频率过高没啥意义，也许一天2次就足够了，它提供的 &lt;code&gt;IntervalSlow&lt;/code&gt;选项固定写死在代码里，只能是放缓 global status 监控频率。不过倒是可以与其它监控指标分开成两份配置文件，各自定义收集间隔来实现。&lt;br&gt;最后打算自己用python撸一个，上报到influxdb里 :)&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h2 id=&quot;2-Concept&quot;&gt;&lt;a href=&quot;#2-Concept&quot; class=&quot;headerlink&quot; title=&quot;2. Concept&quot;&gt;&lt;/a&gt;2. Concept&lt;/h2&gt;&lt;p&gt;完整代码见 GitHub项目地址：&lt;a href=&quot;https://github.com/seanlook/DBschema_gather&quot;&gt;DBschema_gather&lt;/a&gt;&lt;br&gt;实现也特别简单，就是查询 &lt;code&gt;information_schema&lt;/code&gt; 库的 &lt;code&gt;COLUMNS&lt;/code&gt;、&lt;code&gt;TABLES&lt;/code&gt; 两个表：&lt;br&gt;
-    
-    </summary>
-    
-      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
-    
-    
-      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
-    
-      <category term="监控" scheme="http://seanlook.com/tags/%E7%9B%91%E6%8E%A7/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>一种直观记录表结构变更历史的方法</title>
-    <link href="http://seanlook.com/2016/11/28/mysql-schema-gather-structure/"/>
-    <id>http://seanlook.com/2016/11/28/mysql-schema-gather-structure/</id>
-    <published>2016-11-28T08:32:49.000Z</published>
-    <updated>2016-11-28T08:32:49.000Z</updated>
-    
-    <content type="html"><![CDATA[<h2 id="1-Story"><a href="#1-Story" class="headerlink" title="1. Story"></a>1. Story</h2><p>在没有形成自己的数据库管理平台以前，数据库实例一多（包括生产和测试环境），许多表要执行DDL会变得异常繁杂。</p>
-<p>说个自己的经历，需要改现网的一个索引来看优化的效果，因为存在风险，不会一次全改，先只改1个库，然后逐步放开。前后验证效果可能花上一两周的时间，除非实现完整的记录了当时的ddl语句和对应的库，否则根本难以记得。这就完全依赖于个人的习惯及能力。</p>
-<p>又比如现网出了个问题，开发追查到一个时间点，想确认那个时候有没有对库表进行过更改操作，如果没有记录表结构变更的历史，也就难以提供需要的信息。</p>
-<p>记录差异，很早就思考过能不能用git来做。终于花了一天时间来实现，并验证、修改达到预期的效果，还算满意。</p>
-<p>github项目地址在文后。</p>
-<h2 id="2-Concept"><a href="#2-Concept" class="headerlink" title="2. Concept"></a>2. Concept</h2><p>思路很简单，就是利用 <code>mydumper</code> 导出表时会把各表（结构）单独导成一个文件的特性，每天低峰期导出所有对象元数据：表、视图、存储过程、事件、触发器。需要过滤掉 <code>AUTO_INCREMENT</code> 值。</p>
-<p>结构内容存放在一个git仓库下，通过shell脚本提交到 gitlab。所有DDL更改由原来依赖于DBA的主动记录，变成被动采集。</p>
-<p>测试环境和生产环境表结构总会有些差异，为了兼顾同时收集两个环境的数据，设置了 <code>environment</code> 选项，根据当前所在运行的机器，自动判断采集哪些实例信息。</p>
-<h2 id="3-Usage"><a href="#3-Usage" class="headerlink" title="3. Usage"></a>3. Usage</h2><p>首先你需要能够存放表结构信息的git仓库，如gitlab，而且建议设置为私有。<br><a id="more"></a></p>
-<ol>
-<li><p>安装 git 和 mydumper<br>mydumper 0.9.1 版本需要编译安装，可以参考这里 <a href="https://gist.github.com/nicksantamaria/66726bca586d152a3a01#file-mydumper-install-ubuntu14-04-sh" target="_blank" rel="external">file-mydumper-install-ubuntu14-04-sh</a>。当然 yum 或 apt-get 安装其他版本也是一样的。<br>脚本会尝试自动获取 <code>mydumper</code> 命令的路径。<br>注意配置git权限的时候，最好不允许其它用户手动提交修改仓库内容。</p>
-</li>
-<li><p>配置db实例地址<br><code>settings.ini</code>示例：</p>
-<figure class="highlight ini"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div></pre></td><td class="code"><pre><div class="line"><span class="section">[environment]</span></div><div class="line"><span class="attr">production</span>=puppetmaster</div><div class="line"><span class="attr">test</span>=puppettestmaster</div><div class="line"><span class="section"></span></div><div class="line">[production]</div><div class="line"><span class="attr">production_auth</span>=your_defaultuser:yourpassword</div><div class="line"></div><div class="line"><span class="attr">db_name1</span>=<span class="number">192.168</span>.<span class="number">1.100</span>:<span class="number">3306</span></div><div class="line"><span class="attr">db_name2</span>=<span class="number">192.168</span>.<span class="number">1.101</span>:<span class="number">3306</span></div><div class="line"><span class="attr">db_name3</span>=name3.dbhost.com:<span class="number">3306</span></div><div class="line"><span class="attr">db_name4</span>=<span class="number">192.168</span>.<span class="number">1.100</span>:<span class="number">3306</span>:myuser:mypassword</div><div class="line"><span class="section"></span></div><div class="line">[test]</div><div class="line"><span class="attr">test_auth</span>=user1:password1</div><div class="line"></div><div class="line"><span class="attr">db_name1</span>=<span class="number">10.0</span>.<span class="number">100.1</span>:<span class="number">3306</span></div><div class="line"><span class="attr">db_name2</span>=<span class="number">10.0</span>.<span class="number">100.1</span>:<span class="number">3307</span></div><div class="line"><span class="attr">db_name3</span>=<span class="number">10.0</span>.<span class="number">100.2</span>:<span class="number">3306</span></div><div class="line"></div><div class="line"><span class="attr">db_name4</span>=<span class="number">10.0</span>.<span class="number">100.3</span>:<span class="number">3306</span>:myuser1:mypassword1</div></pre></td></tr></table></figure>
-</li>
-</ol>
-<ul>
-<li>上面的配置采集 <code>production</code>和<code>test</code>两个环境的表结构，识别两个环境是根据 hostname 来决定的。这样做的好吃就是这个脚本在两个环境下运行不需要做任何修改。  </li>
-<li><code>[production]</code>节的名字就是 <code>[environment]</code>节指定的名字 <em>production=xx</em>  </li>
-<li><code>dbname1=</code>就是配置各个db，地址+端口的形式。用户名和密码可以继续用 <code>:</code> 跟上</li>
-<li><code>production_auth=</code>表示 production 环境下，如 <code>dbname1</code>没有配置用户名时，默认采用这个用户名和密码。这样设计主要是简化配置。<br>该数据库用户需要 select,show view,event,trigger,procedure 权限。<br><code>settings_parser.py</code> 用于解析上面的配置文件，输出<code>collect_tableMeta.sh</code>易处理的格式。</li>
-</ul>
-<ol>
-<li><p>每天运行<br>可使用 <code>python settings_parser.py</code> 测试解析配置是否正常。<br>在配置文件里两个环境下（一般网络不互通）分别加上定时任务：</p>
-<figure class="highlight dts"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># Puppet Name: collect_DBschema</span></div><div class="line"><span class="number">5</span> <span class="number">5</span> * * * <span class="meta-keyword">/opt/</span>DBschema/collect_tableMeta.sh &gt;&gt; <span class="meta-keyword">/tmp/</span>collect_DBschema.log <span class="number">2</span>&gt;<span class="variable">&amp;1</span></div></pre></td></tr></table></figure>
-</li>
-<li><p>展示效果<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-schema-structure1.png" alt="mysql_schema_info"><br><code>A</code> 是新增，<code>M</code> 是修改，<code>D</code> 是删除，一目了然。点开可以前后对比。</p>
-</li>
-</ol>
-<h2 id="4-More"><a href="#4-More" class="headerlink" title="4. More"></a>4. More</h2><p>思路和实现都不难，主要是意识，和如何快速找到解决当前需求的办法。一切都是为了效率 :)</p>
-<p>目前所能想到更多的：  </p>
-<ol>
-<li>有内容push到git仓库后，使用 web hook 发出邮件。  </li>
-<li>根据A,B两个表的结构，快速得到A修改成B的样子的DDL。  </li>
-<li>event 权限问题。event权限没有所谓的读和修改之分，阿里云RDS就把它从 <em>只读</em> 账号里拿除了，导致收集不到事件定义。所以它的高权限账号管理模式还是很有作用的。  </li>
-<li>密码明文。<br>最近公司邀请了一个安全公司给做培训，数据库安全里面，密码明文配置在文件里面是广泛存在的，难搞。</li>
-</ol>
-<p>GitHub地址：<a href="https://github.com/seanlook/DBschema_gather" target="_blank" rel="external">https://github.com/seanlook/DBschema_gather</a></p>
-<hr>
-<p>原文链接地址：<a href="http://seanlook.com/2016/11/28/mysql-schema-gather-structure/">http://seanlook.com/2016/11/28/mysql-schema-gather-structure/</a></p>
-<hr>
-]]></content>
-    
-    <summary type="html">
-    
-      &lt;h2 id=&quot;1-Story&quot;&gt;&lt;a href=&quot;#1-Story&quot; class=&quot;headerlink&quot; title=&quot;1. Story&quot;&gt;&lt;/a&gt;1. Story&lt;/h2&gt;&lt;p&gt;在没有形成自己的数据库管理平台以前，数据库实例一多（包括生产和测试环境），许多表要执行DDL会变得异常繁杂。&lt;/p&gt;
-&lt;p&gt;说个自己的经历，需要改现网的一个索引来看优化的效果，因为存在风险，不会一次全改，先只改1个库，然后逐步放开。前后验证效果可能花上一两周的时间，除非实现完整的记录了当时的ddl语句和对应的库，否则根本难以记得。这就完全依赖于个人的习惯及能力。&lt;/p&gt;
-&lt;p&gt;又比如现网出了个问题，开发追查到一个时间点，想确认那个时候有没有对库表进行过更改操作，如果没有记录表结构变更的历史，也就难以提供需要的信息。&lt;/p&gt;
-&lt;p&gt;记录差异，很早就思考过能不能用git来做。终于花了一天时间来实现，并验证、修改达到预期的效果，还算满意。&lt;/p&gt;
-&lt;p&gt;github项目地址在文后。&lt;/p&gt;
-&lt;h2 id=&quot;2-Concept&quot;&gt;&lt;a href=&quot;#2-Concept&quot; class=&quot;headerlink&quot; title=&quot;2. Concept&quot;&gt;&lt;/a&gt;2. Concept&lt;/h2&gt;&lt;p&gt;思路很简单，就是利用 &lt;code&gt;mydumper&lt;/code&gt; 导出表时会把各表（结构）单独导成一个文件的特性，每天低峰期导出所有对象元数据：表、视图、存储过程、事件、触发器。需要过滤掉 &lt;code&gt;AUTO_INCREMENT&lt;/code&gt; 值。&lt;/p&gt;
-&lt;p&gt;结构内容存放在一个git仓库下，通过shell脚本提交到 gitlab。所有DDL更改由原来依赖于DBA的主动记录，变成被动采集。&lt;/p&gt;
-&lt;p&gt;测试环境和生产环境表结构总会有些差异，为了兼顾同时收集两个环境的数据，设置了 &lt;code&gt;environment&lt;/code&gt; 选项，根据当前所在运行的机器，自动判断采集哪些实例信息。&lt;/p&gt;
-&lt;h2 id=&quot;3-Usage&quot;&gt;&lt;a href=&quot;#3-Usage&quot; class=&quot;headerlink&quot; title=&quot;3. Usage&quot;&gt;&lt;/a&gt;3. Usage&lt;/h2&gt;&lt;p&gt;首先你需要能够存放表结构信息的git仓库，如gitlab，而且建议设置为私有。&lt;br&gt;
     
     </summary>
     

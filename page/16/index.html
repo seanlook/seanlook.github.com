@@ -316,6 +316,202 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/01/15/openldap_introduction/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2015/01/15/openldap_introduction/" itemprop="url">
+                  LDAP服务器的概念和原理简单介绍
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-01-15T01:21:25+08:00">
+                2015-01-15
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/OpenLDAP/" itemprop="url" rel="index">
+                    <span itemprop="name">OpenLDAP</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2015/01/15/openldap_introduction/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2015/01/15/openldap_introduction/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2015/01/15/openldap_introduction/" class="leancloud_visitors" data-flag-title="LDAP服务器的概念和原理简单介绍">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h2 id="1-目录服务"><a href="#1-目录服务" class="headerlink" title="1. 目录服务"></a>1. 目录服务</h2><p>目录是一个为查询、浏览和搜索而优化的专业分布式数据库，它呈树状结构组织数据，就好象Linux/Unix系统中的文件目录一样。目录数据库和关系数据库不同，它有优异的读性能，但写性能差，并且没有事务处理、回滚等复杂功能，不适于存储修改频繁的数据。所以目录天生是用来查询的，就好象它的名字一样。</p>
+<p>目录服务是由目录数据库和一套访问协议组成的系统。类似以下的信息适合储存在目录中：</p>
+<ul>
+<li>企业员工信息，如姓名、电话、邮箱等；</li>
+<li>公用证书和安全密钥；</li>
+<li>公司的物理设备信息，如服务器，它的IP地址、存放位置、厂商、购买时间等；</li>
+</ul>
+<p><a href="http://www.openldap.org/doc/admin24/intro.html">LDAP</a>是轻量目录访问协议(Lightweight Directory Access Protocol)的缩写，LDAP是从X.500目录访问协议的基础上发展过来的，目前的版本是v3.0。与LDAP一样提供类似的目录服务软件还有<a href="http://directory.apache.org/apacheds/">ApacheDS</a>、<a href="https://technet.microsoft.com/en-us/library/dd448614.aspx">Active Directory</a>、<a href="http://www.redhat.com/en/technologies/cloud-computing/directory-server">Red Hat Directory Service</a> 。</p>
+<h2 id="2-LDAP特点"><a href="#2-LDAP特点" class="headerlink" title="2. LDAP特点"></a>2. LDAP特点</h2><ul>
+<li>LDAP的结构用树来表示，而不是用表格。正因为这样，就不能用SQL语句了</li>
+<li>LDAP可以很快地得到查询结果，不过在写方面，就慢得多</li>
+<li>LDAP提供了静态数据的快速查询方式</li>
+<li>Client/server模型，Server 用于存储数据，Client提供操作目录信息树的工具</li>
+<li>这些工具可以将数据库的内容以文本格式（LDAP 数据交换格式，LDIF）呈现在您的面前</li>
+<li>LDAP是一种开放Internet标准，LDAP协议是跨平台的Interent协议</li>
+</ul>
+<h2 id="3-LDAP组织数据的方式"><a href="#3-LDAP组织数据的方式" class="headerlink" title="3. LDAP组织数据的方式"></a>3. LDAP组织数据的方式</h2><p><img src="http://sean-images.qiniudn.com/ldap_intro_dctree.png" alt="ldap_intro_dctree"></p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2015/01/15/openldap_introduction/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/01/15/openssl-certificate-encryption/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1038,196 +1234,6 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/12/18/docker-core-technology-preview/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/12/18/docker-core-technology-preview/" itemprop="url">
-                  【转+改】Docker核心技术预览
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-12-18T13:21:25+08:00">
-                2014-12-18
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Virtualization/" itemprop="url" rel="index">
-                    <span itemprop="name">Virtualization</span>
-                  </a>
-                </span>
-
-                
-                
-                  , 
-                
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Virtualization/Docker/" itemprop="url" rel="index">
-                    <span itemprop="name">Docker</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2014/12/18/docker-core-technology-preview/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2014/12/18/docker-core-technology-preview/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2014/12/18/docker-core-technology-preview/" class="leancloud_visitors" data-flag-title="【转+改】Docker核心技术预览">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>本文简单介绍docker使用到的部分核心技术，但不做深入探究，因为每一个技术都是一个独立的项目，有机会再分别详细介绍。<br>来源地址：<a href="http://www.infoq.com/cn/articles/docker-core-technology-preview">http://www.infoq.com/cn/articles/docker-core-technology-preview</a></p>
-<p><img src="http://sean-images.qiniudn.com/docker-core-tech.png" alt="docker-core-tech"></p>
-<h2 id="Linux-Namespace-（实例隔离）"><a href="#Linux-Namespace-（实例隔离）" class="headerlink" title="Linux Namespace （实例隔离）"></a>Linux Namespace （实例隔离）</h2><blockquote>
-<p>The purpose of each namespace is to wrap a particular global system resource in an abstraction that makes it appear to the processes within the namespace that they have their own isolated instance of the global resource.</p>
-</blockquote>
-<p>每个用户实例之间相互隔离，互不影响。一般的硬件虚拟化方法给出的方法是VM，而LXC给出的方法是container，更细一点讲就是kernel namespace。其中pid、net、ipc、mnt、uts、user等namespace将container的进程、网络、消息、文件系统、UTS(“UNIX Time-sharing System”)和用户空间隔离开。</p>
-<ul>
-<li><strong>pid namespace</strong></li>
-</ul>
-<p>不同用户的进程就是通过pid namespace隔离开的，且不同 namespace 中可以有相同pid。所有的LXC进程在docker中的父进程为docker进程，每个lxc进程具有不同的namespace。同时由于允许嵌套，因此可以很方便的实现 Docker in Docker。</p>
-<p><img src="http://sean-images.qiniudn.com/docker-kernel-pid-namespace.png" alt="docker-kernel-pid-namespace.png"></p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2014/12/18/docker-core-technology-preview/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -1277,7 +1283,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">108</span>
+                <span class="site-state-item-count">109</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -1299,7 +1305,7 @@
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">118</span>
+                <span class="site-state-item-count">119</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>
