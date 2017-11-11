@@ -1,0 +1,1217 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="en">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="mysql,优化," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0" />
+
+
+
+
+
+
+<meta name="description" content="生产库遇到过好几例本文要讨论的案例，而且比较棘手。简而言之，有类似这样的查询 SELECT * FROM t1 where t1.f2&amp;gt;1 and t2.f2&amp;lt;100 order by t1.id，id是主键，条件里面有个range查询，就会造成优化器是选择主键，还是选择filesort问题，有些特殊情况就会选错索引，比如为了回避内存排序，选择了主键扫描，导致原本走范围过滤再sort">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MySQL order by limit 走错索引(range->indexscan)">
+<meta property="og:url" content="http://seanlook.com/2017/10/26/mysql-bad-plan-order_by-limit/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="生产库遇到过好几例本文要讨论的案例，而且比较棘手。简而言之，有类似这样的查询 SELECT * FROM t1 where t1.f2&amp;gt;1 and t2.f2&amp;lt;100 order by t1.id，id是主键，条件里面有个range查询，就会造成优化器是选择主键，还是选择filesort问题，有些特殊情况就会选错索引，比如为了回避内存排序，选择了主键扫描，导致原本走范围过滤再sort">
+<meta property="og:updated_time" content="2017-10-26T07:32:49.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="MySQL order by limit 走错索引(range->indexscan)">
+<meta name="twitter:description" content="生产库遇到过好几例本文要讨论的案例，而且比较棘手。简而言之，有类似这样的查询 SELECT * FROM t1 where t1.f2&amp;gt;1 and t2.f2&amp;lt;100 order by t1.id，id是主键，条件里面有个range查询，就会造成优化器是选择主键，还是选择filesort问题，有些特殊情况就会选错索引，比如为了回避内存排序，选择了主键扫描，导致原本走范围过滤再sort">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post","offset":12,"offset_float":0,"b2t":false,"scrollpercent":false},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: 'WNWHBKUL26',
+      apiKey: 'cec5cc7d455c77d448433aa60f989766',
+      indexName: 'seanlook',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://seanlook.com/2017/10/26/mysql-bad-plan-order_by-limit/"/>
+
+
+
+
+
+  <title> MySQL order by limit 走错索引(range->indexscan) | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s95.cnzz.com/z_stat.php?id=1253513173&web_id=1253513173" language="JavaScript"></script>
+  </div>
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Sean's Notes</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">Stay hungry, stay foolish.</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            About
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocapitalize="off" autocomplete="off" autocorrect="off"
+             placeholder="Searching..." spellcheck="false"
+             type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/10/26/mysql-bad-plan-order_by-limit/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                MySQL order by limit 走错索引(range->indexscan)
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-10-26T15:32:49+08:00">
+                2017-10-26
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2017/10/26/mysql-bad-plan-order_by-limit/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2017/10/26/mysql-bad-plan-order_by-limit/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2017/10/26/mysql-bad-plan-order_by-limit/" class="leancloud_visitors" data-flag-title="MySQL order by limit 走错索引(range->indexscan)">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>生产库遇到过好几例本文要讨论的案例，而且比较棘手。简而言之，有类似这样的查询 <code>SELECT * FROM t1 where t1.f2&gt;1 and t2.f2&lt;100 order by t1.id</code>，id是主键，条件里面有个range查询，就会造成优化器是选择主键，还是选择filesort问题，有些特殊情况就会选错索引，比如为了回避内存排序，选择了主键扫描，导致原本走范围过滤再sort 500ms勉强可以结束的查询，5分钟不出结果。</p>
+<p>下面具体来这个案例。</p>
+<h1 id="1-背景"><a href="#1-背景" class="headerlink" title="1. 背景"></a>1. 背景</h1><p>阿里云RDS，5.6.16-log。<br>表 d_ec_someextend.t_tbl_test_time_08:<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="string">`t_tbl_test_time_08`</span> (</div><div class="line">  <span class="string">`f_some_id`</span> <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">unsigned</span> <span class="keyword">DEFAULT</span> <span class="string">'0'</span>,</div><div class="line">  <span class="string">`f_qiye_id`</span> <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">DEFAULT</span> <span class="string">'0'</span>,</div><div class="line">  <span class="string">`f_type`</span> tinyint(<span class="number">3</span>) <span class="keyword">DEFAULT</span> <span class="string">'0'</span> <span class="keyword">COMMENT</span> <span class="string">'有效联系类型 1: QQ联系，2:拨打电话，3:发送邮件，4:发送短信，5:添加跟进记录，6:拜访客户，7:EC联系，8:更新客户阶段'</span>,</div><div class="line">  <span class="string">`f_contact_time`</span> <span class="keyword">timestamp</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">'1970-01-01 16:00:01'</span>,</div><div class="line">  <span class="keyword">UNIQUE</span> <span class="keyword">KEY</span> <span class="string">`some_qiye_type`</span> (<span class="string">`f_some_id`</span>,<span class="string">`f_qiye_id`</span>,<span class="string">`f_type`</span>),</div><div class="line">  <span class="keyword">KEY</span> <span class="string">`f_contact_time`</span> (<span class="string">`f_contact_time`</span>)</div><div class="line">) <span class="keyword">ENGINE</span>=<span class="keyword">InnoDB</span> <span class="keyword">DEFAULT</span> <span class="keyword">CHARSET</span>=utf8mb4;</div></pre></td></tr></table></figure></p>
+<p>表索引信息：<br><figure class="highlight gherkin"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div></pre></td><td class="code"><pre><div class="line">mysql&gt; show table status like <span class="string">"t_tbl_test_time_08"</span>;</div><div class="line">+-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+</div><div class="line">|<span class="string"> Name                  </span>|<span class="string"> Engine </span>|<span class="string"> Version </span>|<span class="string"> Row_format </span>|<span class="string"> Rows     </span>|<span class="string"> Avg_row_length </span>|<span class="string"> Data_length </span>|<span class="string"> Max_data_length </span>|<span class="string"> Index_length </span>|<span class="string"> Data_free </span>|<span class="string"> Auto_increment </span>|<span class="string"> Create_time         </span>|<span class="string"> Update_time </span>|<span class="string"> Check_time </span>|<span class="string"> Collation          </span>|<span class="string"> Checksum </span>|<span class="string"> Create_options </span>|<span class="string"> Comment </span>|<span class="string"> Block_format </span>|</div><div class="line">+-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+</div><div class="line">|<span class="string"> t_tbl_test_time_08 </span>|<span class="string"> InnoDB </span>|<span class="string">      10 </span>|<span class="string"> Compact    </span>|<span class="string"> 19264318 </span>|<span class="string">             45 </span>|<span class="string">   882900992 </span>|<span class="string">               0 </span>|<span class="string">   2176843776 </span>|<span class="string"> 752877568 </span>|<span class="string"> NULL           </span>|<span class="string"> 2017-10-25 20:27:08 </span>|<span class="string"> NULL        </span>|<span class="string"> NULL       </span>|<span class="string"> utf8mb4_general_ci </span>|<span class="string"> NULL     </span>|<span class="string">                </span>|<span class="string">         </span>|<span class="string"> Original     </span>|</div><div class="line">+-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+</div><div class="line">1 row in set</div><div class="line"> </div><div class="line">mysql&gt; show index from t_tbl_test_time_08;</div><div class="line">+--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+</div><div class="line">|<span class="string"> Table              </span>|<span class="string"> Non_unique </span>|<span class="string"> Key_name        </span>|<span class="string"> Seq_in_index </span>|<span class="string"> Column_name    </span>|<span class="string"> Collation </span>|<span class="string"> Cardinality </span>|<span class="string"> Sub_part </span>|<span class="string"> Packed </span>|<span class="string"> Null </span>|<span class="string"> Index_type </span>|<span class="string"> Comment </span>|<span class="string"> Index_comment </span>|</div><div class="line">+--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+</div><div class="line">|<span class="string"> t_tbl_test_time_08 </span>|<span class="string">          0 </span>|<span class="string"> some_qiye_type  </span>|<span class="string">            1 </span>|<span class="string"> f_some_id      </span>|<span class="string"> A         </span>|<span class="string">    19264318 </span>|<span class="string"> NULL     </span>|<span class="string"> NULL   </span>|<span class="string"> YES  </span>|<span class="string"> BTREE      </span>|<span class="string">         </span>|<span class="string">               </span>|</div><div class="line">|<span class="string"> t_tbl_test_time_08 </span>|<span class="string">          0 </span>|<span class="string"> some_qiye_type  </span>|<span class="string">            2 </span>|<span class="string"> f_qiye_id      </span>|<span class="string"> A         </span>|<span class="string">    19264318 </span>|<span class="string"> NULL     </span>|<span class="string"> NULL   </span>|<span class="string"> YES  </span>|<span class="string"> BTREE      </span>|<span class="string">         </span>|<span class="string">               </span>|</div><div class="line">|<span class="string"> t_tbl_test_time_08 </span>|<span class="string">          0 </span>|<span class="string"> some_qiye_type  </span>|<span class="string">            3 </span>|<span class="string"> f_type         </span>|<span class="string"> A         </span>|<span class="string">    19264318 </span>|<span class="string"> NULL     </span>|<span class="string"> NULL   </span>|<span class="string"> YES  </span>|<span class="string"> BTREE      </span>|<span class="string">         </span>|<span class="string">               </span>|</div><div class="line">|<span class="string"> t_tbl_test_time_08 </span>|<span class="string">          1 </span>|<span class="string"> f_contact_time  </span>|<span class="string">            1 </span>|<span class="string"> f_contact_time </span>|<span class="string"> A         </span>|<span class="string">     9632159 </span>|<span class="string"> NULL     </span>|<span class="string"> NULL   </span>|<span class="string"> YES  </span>|<span class="string"> BTREE      </span>|<span class="string">         </span>|<span class="string">               </span>|</div><div class="line">+--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+</div><div class="line">4 rows in set</div></pre></td></tr></table></figure></p>
+<p><strong>问题查询：</strong><br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">select</span> f_some_id <span class="keyword">from</span> d_ec_some1.t_tbl_test_time_08</div><div class="line"><span class="keyword">where</span> f_qiye_id=<span class="number">5077665</span> <span class="keyword">and</span> f_type=<span class="number">9</span></div><div class="line"><span class="keyword">and</span> f_contact_time &gt; <span class="string">'2017-10-17 14:23:49'</span> <span class="keyword">and</span> f_contact_time &lt; <span class="string">'2017-10-17 14:23:53'</span></div><div class="line"><span class="keyword">order</span> <span class="keyword">by</span> f_some_id <span class="keyword">limit</span> <span class="number">300</span></div></pre></td></tr></table></figure></p>
+<a id="more"></a>
+<p>该表的其它查询：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">SELECT</span> <span class="string">`c`</span>.<span class="string">`f_some_id`</span>, <span class="keyword">max</span>(f_contact_time) <span class="keyword">AS</span> <span class="string">`time`</span> <span class="keyword">FROM</span> <span class="string">`d_ec_some`</span>.<span class="string">`t_some_relation`</span> <span class="keyword">AS</span> <span class="string">`r`</span></div><div class="line"><span class="keyword">LEFT</span> <span class="keyword">JOIN</span> <span class="string">`d_ec_someextend`</span>.<span class="string">`t_tbl_test_time_10`</span> <span class="keyword">AS</span> <span class="string">`c`</span> <span class="keyword">ON</span> c.f_some_id=r.f_some_id <span class="keyword">AND</span> c.f_type <span class="keyword">in</span>(<span class="number">1</span>,<span class="number">2</span>,<span class="number">3</span>,<span class="number">4</span>,<span class="number">5</span>,<span class="number">6</span>,<span class="number">7</span>)</div><div class="line"><span class="keyword">WHERE</span> (r.f_qiye_id=<span class="string">'4047065'</span> <span class="keyword">and</span> r.f_user_id=<span class="string">'4047064'</span> <span class="keyword">and</span> c.f_some_id <span class="keyword">is</span> <span class="keyword">not</span> <span class="literal">null</span>)</div><div class="line"><span class="keyword">GROUP</span> <span class="keyword">BY</span> <span class="string">`f_some_id`</span> <span class="keyword">ORDER</span> <span class="keyword">BY</span> <span class="string">`time`</span> <span class="keyword">desc</span> <span class="keyword">LIMIT</span> <span class="number">20</span></div><div class="line"><span class="comment">-- group-by, order-by</span></div><div class="line">  </div><div class="line"><span class="keyword">select</span> f_some_id, f_type, f_contact_time <span class="keyword">from</span> d_ec_some1.t_tbl_test_time_08</div><div class="line"><span class="keyword">where</span> f_qiye_id = <span class="number">1181333</span></div><div class="line"><span class="keyword">and</span> f_type &gt; <span class="number">0</span> <span class="keyword">and</span> f_type &lt; <span class="number">11</span></div><div class="line"><span class="keyword">and</span> f_some_id &gt; <span class="number">263047293</span> <span class="keyword">and</span> f_some_id &lt; <span class="number">780306437</span></div><div class="line"><span class="keyword">order</span> <span class="keyword">by</span> f_some_id</div><div class="line"><span class="comment">-- 分页</span></div></pre></td></tr></table></figure></p>
+<h1 id="2-explain"><a href="#2-explain" class="headerlink" title="2. explain"></a>2. explain</h1><p>问题查询执行计划：<br><figure class="highlight coq"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div></pre></td><td class="code"><pre><div class="line">mysql&gt; explain extended select f_some_id from d_ec_some1.t_tbl_test_time_08</div><div class="line"><span class="keyword">where</span> f_qiye_id=<span class="number">5077665</span> and f_type=<span class="number">9</span></div><div class="line">and f_contact_time &gt; '<span class="number">2017</span><span class="number">-10</span><span class="number">-17</span> <span class="number">14</span>:<span class="number">23</span>:<span class="number">49</span>' and f_contact_time &lt; '<span class="number">2017</span><span class="number">-10</span><span class="number">-17</span> <span class="number">14</span>:<span class="number">23</span>:<span class="number">53</span>'</div><div class="line">order <span class="built_in">by</span> f_some_id limit <span class="number">300</span>;</div><div class="line">+----+-------------+-----------------------+-------+----------------+---------------+---------+------+-------+----------+-------------+</div><div class="line">| <span class="type">id</span> | <span class="type">select_type</span> | <span class="type">table</span>                 | <span class="type">type</span>  | <span class="type">possible_keys</span>  | <span class="type">key</span>           | <span class="type">key_len</span> | <span class="type">ref</span>  | <span class="type">rows</span>  | <span class="type">filtered</span> | <span class="type">Extra</span>       |</div><div class="line"><span class="type">+----+-------------+-----------------------+-------+----------------+---------------+---------+------+-------+----------+-------------+</span></div><div class="line">|  1 | <span class="type">SIMPLE</span>      | <span class="type">t_tbl_test_time_08</span>    | <span class="type">index</span> | <span class="type">f_contact_time</span> | <span class="type">some_qiye_type</span> | <span class="type">12</span>     | <span class="type">NULL</span> | <span class="type">16032</span> |  <span class="type">2248</span><span class="number">.49</span> | <span class="type">Using</span> <span class="keyword">where</span> |</div><div class="line"><span class="type">+----+-------------+-----------------------+-------+----------------+---------------+---------+------+-------+----------+-------------+</span></div><div class="line">1 row <span class="built_in">in</span> <span class="built_in">set</span></div><div class="line"> </div><div class="line">-- 指定一个索引</div><div class="line">mysql&gt; explain extended select f_some_id from d_ec_some1.t_tbl_test_time_08  use index(f_contact_time)</div><div class="line"><span class="keyword">where</span> f_qiye_id=<span class="number">5077665</span> and f_type=<span class="number">9</span></div><div class="line">and f_contact_time &gt; '<span class="number">2017</span><span class="number">-10</span><span class="number">-17</span> <span class="number">14</span>:<span class="number">23</span>:<span class="number">49</span>' and f_contact_time &lt; '<span class="number">2017</span><span class="number">-10</span><span class="number">-17</span> <span class="number">14</span>:<span class="number">23</span>:<span class="number">53</span>'</div><div class="line">order <span class="built_in">by</span> f_some_id limit <span class="number">300</span>;</div><div class="line">+----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+----------+---------------------------------------------------------------+</div><div class="line">| <span class="type">id</span> | <span class="type">select_type</span> | <span class="type">table</span>                 | <span class="type">type</span>  | <span class="type">possible_keys</span>  | <span class="type">key</span>            | <span class="type">key_len</span> | <span class="type">ref</span>  | <span class="type">rows</span>   | <span class="type">filtered</span> | <span class="type">Extra</span>                                                         |</div><div class="line"><span class="type">+----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+----------+---------------------------------------------------------------+</span></div><div class="line">|  1 | <span class="type">SIMPLE</span>      | <span class="type">t_tbl_test_time_08</span>    | <span class="type">range</span> | <span class="type">f_contact_time</span> | <span class="type">f_contact_time</span> | <span class="type">5</span>       | <span class="type">NULL</span> | <span class="type">360478</span> |      <span class="type">100</span> | <span class="type">Using</span> index condition; Using <span class="keyword">where</span>; Using MRR; Using filesort |</div><div class="line"><span class="type">+----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+----------+---------------------------------------------------------------+</span></div><div class="line">1 row <span class="built_in">in</span> <span class="built_in">set</span></div></pre></td></tr></table></figure></p>
+<p>解释：<br>第一个explain结果里面，<code>type=index</code>，表示 full index scan。注意这里看到的 index 不代表“查询用到索引了”。全索引扫描比全表扫描并不好到拿去，甚至更慢（因为随机IO）。是否用到正确的索引要看key那一列:<br><code>some_qiye_type</code> 索引定义是 <code>(f_some_id,f_qiye_id,f_type)</code>，从key_len=12看得出这三列都用上了（12=4+5+3）。但实际这个执行计划需要200多秒。</p>
+<p>第二个explain，在sql里面指定了 <code>use index(f_contact_time)</code>，依据是where条件里面f_contact_time的范围固定4s，猜想数据量不会很大，过滤效果会比较好。<br>解释器结果，<code>type=range</code>，表示是个范围查找(“范围”涵盖的种类不止&lt;/&gt;)，使用的索引是 <code>f_contact_time(f_contact_time)</code>。Extra列:</p>
+<ul>
+<li><code>Using index condition</code>: 用到了索引下推特性。Using where是回表拿数据。关于ICP见文后参考。</li>
+<li><code>Using MRR</code>: 用到了 Multi-Range Read 优化特性。mysql在通过二级索引范围查找的时候，得到的记录在物理上是无序的，为了减少去获取数据的随机IO，它会在内存缓冲区里面先根据rowid快速排序，然后顺序IO去拉取数据。（这个缓冲区大小参数由 read_rnd_buffer_size 控制）</li>
+<li><code>Using filesort</code>: 需要内存排序。对应 order by f_some_id</li>
+</ul>
+<p>rows扫描虽然36w行，比前面的 16032 要多，但这个执行计划实际运行只需要0.7s，要快将近300倍。</p>
+<p>但MySQL优化器默认选择了第一个更慢的执行计划，它的理由是走 some_qiye_type 索引不需要内存排序，候选的 f_contact_time 被淘汰。mysql是基于cost的，所以在想是不是有什么参数可以改变optimizer的行为，让它filesort。<br>（这里提一下，这类查询该表上非常多，绝大部分都走的是 f_contact_time，偶尔会有几条走some_qiye_type。这种执行计划不稳定的查询，实际带来的风险是会很高的，可能会拖垮db）</p>
+<p>这里我们祭出优化sql的两大法宝：profiling和optimizer_trace，来尝试找出是什么因素。</p>
+<ul>
+<li><code>profiling</code>：可以定位出sql从接受到返回结果，时间都耗在哪里</li>
+<li><code>optimizer_trace</code>: 跟踪优化器的成本评估过程，可以情况的看到它如何从多个候选索引里，做出选择</li>
+</ul>
+<h1 id="3-profiling"><a href="#3-profiling" class="headerlink" title="3. profiling"></a>3. profiling</h1><p>先来看两种查询计划 profiling 的结果。</p>
+<p>profiling 默认<br><figure class="highlight gherkin"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div></pre></td><td class="code"><pre><div class="line">mysql&gt; set profiling=1;</div><div class="line">mysql&gt; select f_some_id from d_ec_some1.t_tbl_test_time_08 where f_qiye_id=5077665 and f_type=9</div><div class="line">and f_contact_time &gt; '2017-10-17 14:23:49' and f_contact_time <span class="variable">&lt; '2017-10-17 14:23:53' order by f_some_id limit 300;</span></div><div class="line"></div><div class="line">mysql&gt; show profile block io,cpu for query 1;</div><div class="line">+----------------------+------------+------------+------------+--------------+---------------+</div><div class="line">|<span class="string"> Status               </span>|<span class="string"> Duration   </span>|<span class="string"> CPU_user   </span>|<span class="string"> CPU_system </span>|<span class="string"> Block_ops_in </span>|<span class="string"> Block_ops_out </span>|</div><div class="line">+----------------------+------------+------------+------------+--------------+---------------+</div><div class="line">|<span class="string"> starting             </span>|<span class="string"> 0.000121   </span>|<span class="string"> 0          </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> checking permissions </span>|<span class="string"> 3.2E-5     </span>|<span class="string"> 0          </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> Opening tables       </span>|<span class="string"> 3.7E-5     </span>|<span class="string"> 0          </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> init                 </span>|<span class="string"> 4.2E-5     </span>|<span class="string"> 0          </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> System lock          </span>|<span class="string"> 2.9E-5     </span>|<span class="string"> 0          </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> optimizing           </span>|<span class="string"> 3.3E-5     </span>|<span class="string"> 0          </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> statistics           </span>|<span class="string"> 0.005796   </span>|<span class="string"> 0          </span>|<span class="string"> 0.000999   </span>|<span class="string">          448 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> preparing            </span>|<span class="string"> 4.3E-5     </span>|<span class="string"> 0          </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> Sorting result       </span>|<span class="string"> 2.8E-5     </span>|<span class="string"> 0          </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> executing            </span>|<span class="string"> 2.7E-5     </span>|<span class="string"> 0          </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> Sending data         </span>|<span class="string"> 172.824522 </span>|<span class="string"> 189.040262 </span>|<span class="string"> 2.441629   </span>|<span class="string">      1504928 </span>|<span class="string">          6896 </span>|</div><div class="line">|<span class="string"> end                  </span>|<span class="string"> 8.3E-5     </span>|<span class="string"> 0          </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> query end            </span>|<span class="string"> 3E-5       </span>|<span class="string"> 0          </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> closing tables       </span>|<span class="string"> 3.3E-5     </span>|<span class="string"> 0          </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> freeing items        </span>|<span class="string"> 7E-5       </span>|<span class="string"> 0          </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> logging slow query   </span>|<span class="string"> 3.1E-5     </span>|<span class="string"> 0          </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> Opening tables       </span>|<span class="string"> 3.4E-5     </span>|<span class="string"> 0          </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> System lock          </span>|<span class="string"> 7E-5       </span>|<span class="string"> 0          </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             8 </span>|</div><div class="line">|<span class="string"> cleaning up          </span>|<span class="string"> 9.5E-5     </span>|<span class="string"> 0          </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">+----------------------+------------+------------+------------+--------------+---------------+</div><div class="line">19 rows in set</div><div class="line"> </div><div class="line">mysql&gt; show status like <span class="string">"Handler%"</span>;</div><div class="line">+----------------------------+---------+</div><div class="line">|<span class="string"> Variable_name              </span>|<span class="string"> Value   </span>|</div><div class="line">+----------------------------+---------+</div><div class="line">|<span class="string"> Handler_commit             </span>|<span class="string"> 1       </span>|</div><div class="line">|<span class="string"> Handler_delete             </span>|<span class="string"> 0       </span>|</div><div class="line">|<span class="string"> Handler_discover           </span>|<span class="string"> 0       </span>|</div><div class="line">|<span class="string"> Handler_external_lock      </span>|<span class="string"> 4       </span>|</div><div class="line">|<span class="string"> Handler_mrr_init           </span>|<span class="string"> 0       </span>|</div><div class="line">|<span class="string"> Handler_prepare            </span>|<span class="string"> 0       </span>|</div><div class="line">|<span class="string"> Handler_read_first         </span>|<span class="string"> 1       </span>|</div><div class="line">|<span class="string"> Handler_read_key           </span>|<span class="string"> 1       </span>|</div><div class="line">|<span class="string"> Handler_read_last          </span>|<span class="string"> 0       </span>|</div><div class="line">|<span class="string"> Handler_read_next          </span>|<span class="string"> 9430930 </span>|</div><div class="line">|<span class="string"> Handler_read_prev          </span>|<span class="string"> 0       </span>|</div><div class="line">|<span class="string"> Handler_read_rnd           </span>|<span class="string"> 0       </span>|</div><div class="line">|<span class="string"> Handler_read_rnd_next      </span>|<span class="string"> 0       </span>|</div><div class="line">|<span class="string"> Handler_rollback           </span>|<span class="string"> 0       </span>|</div><div class="line">|<span class="string"> Handler_savepoint          </span>|<span class="string"> 0       </span>|</div><div class="line">|<span class="string"> Handler_savepoint_rollback </span>|<span class="string"> 0       </span>|</div><div class="line">|<span class="string"> Handler_update             </span>|<span class="string"> 0       </span>|</div><div class="line">|<span class="string"> Handler_write              </span>|<span class="string"> 1       </span>|</div><div class="line">+----------------------------+---------+</div><div class="line">18 rows in set</div></pre></td></tr></table></figure></p>
+<p>profiling use index:<br><figure class="highlight gherkin"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div></pre></td><td class="code"><pre><div class="line">mysql&gt; set profiling=1;</div><div class="line">mysql&gt; select .... use index(f_contact_time)</div><div class="line">mysql&gt; show profile block io,cpu for query 1;</div><div class="line">+----------------------+----------+----------+------------+--------------+---------------+</div><div class="line">|<span class="string"> Status               </span>|<span class="string"> Duration </span>|<span class="string"> CPU_user </span>|<span class="string"> CPU_system </span>|<span class="string"> Block_ops_in </span>|<span class="string"> Block_ops_out </span>|</div><div class="line">+----------------------+----------+----------+------------+--------------+---------------+</div><div class="line">|<span class="string"> starting             </span>|<span class="string"> 0.00013  </span>|<span class="string"> 0        </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> checking permissions </span>|<span class="string"> 3.4E-5   </span>|<span class="string"> 0        </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> Opening tables       </span>|<span class="string"> 4.5E-5   </span>|<span class="string"> 0        </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> init                 </span>|<span class="string"> 4.6E-5   </span>|<span class="string"> 0        </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> System lock          </span>|<span class="string"> 3E-5     </span>|<span class="string"> 0        </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> optimizing           </span>|<span class="string"> 3.9E-5   </span>|<span class="string"> 0        </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> statistics           </span>|<span class="string"> 0.000109 </span>|<span class="string"> 0        </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> preparing            </span>|<span class="string"> 5.5E-5   </span>|<span class="string"> 0        </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> Sorting result       </span>|<span class="string"> 3.1E-5   </span>|<span class="string"> 0        </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> executing            </span>|<span class="string"> 3.2E-5   </span>|<span class="string"> 0        </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> Sending data         </span>|<span class="string"> 3.4E-5   </span>|<span class="string"> 0        </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> Creating sort index  </span>|<span class="string"> 1.703224 </span>|<span class="string"> 1.718739 </span>|<span class="string"> 0.012999   </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> end                  </span>|<span class="string"> 8.4E-5   </span>|<span class="string"> 0        </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> query end            </span>|<span class="string"> 3.2E-5   </span>|<span class="string"> 0        </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> closing tables       </span>|<span class="string"> 3.9E-5   </span>|<span class="string"> 0        </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> freeing items        </span>|<span class="string"> 7.3E-5   </span>|<span class="string"> 0        </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> logging slow query   </span>|<span class="string"> 3.2E-5   </span>|<span class="string"> 0        </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> Opening tables       </span>|<span class="string"> 5E-5     </span>|<span class="string"> 0        </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">|<span class="string"> System lock          </span>|<span class="string"> 6.9E-5   </span>|<span class="string"> 0        </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             8 </span>|</div><div class="line">|<span class="string"> cleaning up          </span>|<span class="string"> 4.1E-5   </span>|<span class="string"> 0        </span>|<span class="string"> 0          </span>|<span class="string">            0 </span>|<span class="string">             0 </span>|</div><div class="line">+----------------------+----------+----------+------------+--------------+---------------+</div><div class="line">20 rows in set</div><div class="line">set profiling=0;</div><div class="line"> </div><div class="line">mysql&gt; show status like <span class="string">"Handler%"</span>;</div><div class="line">+----------------------------+--------+</div><div class="line">|<span class="string"> Variable_name              </span>|<span class="string"> Value  </span>|</div><div class="line">+----------------------------+--------+</div><div class="line">|<span class="string"> Handler_commit             </span>|<span class="string"> 1      </span>|</div><div class="line">|<span class="string"> Handler_delete             </span>|<span class="string"> 0      </span>|</div><div class="line">|<span class="string"> Handler_discover           </span>|<span class="string"> 0      </span>|</div><div class="line">|<span class="string"> Handler_external_lock      </span>|<span class="string"> 6      </span>|</div><div class="line">|<span class="string"> Handler_mrr_init           </span>|<span class="string"> 0      </span>|</div><div class="line">|<span class="string"> Handler_prepare            </span>|<span class="string"> 0      </span>|</div><div class="line">|<span class="string"> Handler_read_first         </span>|<span class="string"> 0      </span>|</div><div class="line">|<span class="string"> Handler_read_key           </span>|<span class="string"> 188156 </span>|</div><div class="line">|<span class="string"> Handler_read_last          </span>|<span class="string"> 0      </span>|</div><div class="line">|<span class="string"> Handler_read_next          </span>|<span class="string"> 188155 </span>|</div><div class="line">|<span class="string"> Handler_read_prev          </span>|<span class="string"> 0      </span>|</div><div class="line">|<span class="string"> Handler_read_rnd           </span>|<span class="string"> 188155 </span>|</div><div class="line">|<span class="string"> Handler_read_rnd_next      </span>|<span class="string"> 0      </span>|</div><div class="line">|<span class="string"> Handler_rollback           </span>|<span class="string"> 0      </span>|</div><div class="line">|<span class="string"> Handler_savepoint          </span>|<span class="string"> 0      </span>|</div><div class="line">|<span class="string"> Handler_savepoint_rollback </span>|<span class="string"> 0      </span>|</div><div class="line">|<span class="string"> Handler_update             </span>|<span class="string"> 0      </span>|</div><div class="line">|<span class="string"> Handler_write              </span>|<span class="string"> 1      </span>|</div><div class="line">+----------------------------+--------+</div><div class="line">18 rows in set</div></pre></td></tr></table></figure></p>
+<p><strong>第一个profiling</strong><br>看到第一个profiling里面 <code>Sending data</code> 时间最长，第二个 <code>Creating sort index</code> 最久<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">Sending data:</div><div class="line">The thread is reading and processing rows for a <span class="keyword">SELECT</span> <span class="keyword">statement</span>, <span class="keyword">and</span> sending <span class="keyword">data</span> <span class="keyword">to</span> the client. Because <span class="keyword">operations</span> occurring during this state tend <span class="keyword">to</span> perform <span class="keyword">large</span> amounts <span class="keyword">of</span> disk <span class="keyword">access</span> (<span class="keyword">reads</span>), it <span class="keyword">is</span> often the longest-running state <span class="keyword">over</span> the lifetime <span class="keyword">of</span> a given query.</div><div class="line">  </div><div class="line">Creating <span class="keyword">sort</span> <span class="keyword">index</span></div><div class="line">The <span class="keyword">thread</span> <span class="keyword">is</span> processing a <span class="keyword">SELECT</span> that <span class="keyword">is</span> resolved <span class="keyword">using</span> an internal <span class="keyword">temporary</span> <span class="keyword">table</span></div></pre></td></tr></table></figure></p>
+<p>Sending data 很具有误导性，它不仅表示发送数据到客户端，还包括“收集”数据，即mysql根据索引条件检索完数据后，得到一堆rowid，再根据rowid回表拿数据，有可能还要对数据过滤、排序，所以抛开网络因素，sending data时间长表明有大量的读磁盘操作，是非常笼统的一个状态。<br>下面的status里面</p>
+<ul>
+<li><code>Handler_read_first</code>: 索引里面第一条记录被读取的次数，为1，说明做了一次索引全扫描。与前面 explain 结果 type=index 是一致的。</li>
+<li><code>Handler_read_key</code>：根据索引定位到一行记录的次数。这个值越高，说明使用到了高效的索引。</li>
+<li><p><code>Handler_read_next</code>：<br>Number of requests to read the next row in key order, incremented if you are querying an index column<br>with a range constraint or if you are doing an index scan.</p>
+<p>即根据索引key的顺序，依次去获取行数据的次数。<br>这个值在这里非常的大，表明Server读取从头读取索引 <code>(f_some_id,f_qiye_id,f_type)</code> key的 9430930 行数据之后，找到了300个满足条件的记录，并且已是排好顺序。在这里值会随着limit的增大而增大。</p>
+</li>
+</ul>
+<p><strong>第二个profiling</strong></p>
+<ul>
+<li><p><code>Handler_read_rnd</code>：<br>The number of requests to read a row based on a fixed position. This value is high if you are doing a lot of queries<br>that require sorting of the result. You probably have a lot of queries that require MySQL to scan entire tables or you have joins<br>that don’t use keys properly.</p>
+<p>随机读取行数据的次数，可以认为是有一堆没有顺序的主键，要依次去读取数据的次数（随机IO）。一般在有内存排序的时候，后者join查询的副表关联字段上没有好的索引，这个值都会比较高。</p>
+</li>
+</ul>
+<p>经过计算，条件满足 <code>f_contact_time &gt; &#39;2017-10-17 14:23:49&#39; and f_contact_time &lt; &#39;2017-10-17 14:23:53&#39;</code> 的记录有188155 个，因此根据索引依次读取到的行数 Handler_read_key=188155。</p>
+<p>这里有两个疑问个人没有解开：</p>
+<ol>
+<li>既然有MRR，Handler_read_rnd为什么还这么高呢，不应该是是顺序IO了？<br>这里不太肯定，两种可能：一是MRR不影响这个计数；第二种可能是，我们这个表上没有主键，唯一索引也不满足所有列都NOT NULL定义，也就是这个表的主键实际是innodb内部维持增长的rowid，使用MRR之后，rowid有序但并不连续，读取行的随机性没有得到大的改善。</li>
+<li><code>Using index condition</code> 在这里有点费解，因为似乎没有where条件可以下推，f_contact_time索引只有 f_contact_time 这一列。</li>
+</ol>
+<p>上面的分析过程只能知道实际执行过程是怎样的，直接从explain也能看出结果，这里是顺便理解一下 Hander_read_xxx, MRR, ICP 的含义，大部分sql优化都不用不到profiling和status。</p>
+<h1 id="4-optimizer-trace"><a href="#4-optimizer-trace" class="headerlink" title="4. optimizer_trace"></a>4. optimizer_trace</h1><p>再看 optimizer_trace 跟踪的结果：(因为trace的信息太长，放到github gist上了)</p>
+<ul>
+<li>default： <a href="https://gist.github.com/seanlook/fe7d9065b1c05e766d88b4a5c3babb65" target="_blank" rel="external">https://gist.github.com/seanlook/fe7d9065b1c05e766d88b4a5c3babb65</a></li>
+<li>use index：<a href="https://gist.github.com/seanlook/b687daf63c8babee96f567c123cb9ddd" target="_blank" rel="external">https://gist.github.com/seanlook/b687daf63c8babee96f567c123cb9ddd</a></li>
+</ul>
+<p>optimizer_trace包含三个步骤，下面是本次trace简化的结构：</p>
+<ol>
+<li>json_preparation</li>
+<li>json_optimization<ul>
+<li>condition_processing<ul>
+<li>equality_propagation</li>
+<li>constant_propagation</li>
+<li>trivial_condition_removal</li>
+</ul>
+</li>
+<li>table_dependencies</li>
+<li>ref_optimizer_key_uses</li>
+<li>rows_estimation<ul>
+<li>range_analysis</li>
+<li>table_scan</li>
+<li>potential_range_indices</li>
+<li>chosen_range_access_summary</li>
+</ul>
+</li>
+<li>considered_execution_plans<ul>
+<li>best_access_path</li>
+</ul>
+</li>
+<li>attaching_conditions_to_tables<ul>
+<li>attached_conditions_computation</li>
+<li>rechecking_index_usage</li>
+</ul>
+</li>
+<li>clause_processing</li>
+<li>refine_plan<ul>
+<li>pushed_index_condition</li>
+<li>access_type</li>
+</ul>
+</li>
+<li>reconsidering_access_paths_for_index_ordering<ul>
+<li>plan_changed</li>
+<li>access_type, index</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>json_execution</li>
+</ol>
+<p>可以看到上面default与use index两次的trace，前大半部分都是一样的，候选索引都是 <em>access_type=range, index=f_contact_time</em>，就在 <code>reconsidering_access_paths_for_index_ordering</code> 的地方，“一票否决”，从而选择了 <em>access_type=index_scan, index=some_qiye_type</em>。</p>
+<p>搜索 reconsidering_access_paths_for_index_ordering 可以在mysql或percona的官网上，找到四五个相关的 bug report ：</p>
+<p><a href="https://bugs.mysql.com/bug.php?id=70245" target="_blank" rel="external">#70245</a>，<a href="https://bugs.mysql.com/bug.php?id=78997" target="_blank" rel="external">#78997</a>，<a href="https://bugs.launchpad.net/percona-server/+bug/1362212" target="_blank" rel="external">percona#1362212</a>，<a href="https://bugs.mysql.com/bug.php?id=74602" target="_blank" rel="external">#74602 </a></p>
+<p>网上提及比较多的是 #70245，调整参数 <code>eq_range_index_dive_limit</code> 可解决这个问题。我们也遇到过这个案例，见 <a href="http://imysql.com/2014/08/05/a-fake-bug-with-eq-range-index-dive-limit.shtml" target="_blank" rel="external">MySQL 5.6 查询优化器新特性的“BUG”</a> 。但是本文的例子满足range的个数达到18w(explain估算是36w)，也试着加大这个参数从2到800000，都没作用。</p>
+<p><code>#74602</code> 这个说的是low_limit导致的，刚好在 optimizer_trace 里面的 <code>rechecking_index_usage:recheck_reason:low_limit</code> 。<br>测试神奇的发发现，上面的查询limit有个分解值，会选择不同的索引：<br>（<a href="https://gist.github.com/seanlook/64990b956bf986eaeece5b26055f2f18" target="_blank" rel="external">https://gist.github.com/seanlook/64990b956bf986eaeece5b26055f2f18</a>  limit 8168后默认选择filesort的trace）<br><figure class="highlight coq"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line">mysql&gt; explain select f_some_id from d_ec_some1.t_tbl_test_time_08</div><div class="line"><span class="keyword">where</span> f_qiye_id=<span class="number">5077665</span> and f_type=<span class="number">9</span></div><div class="line">and f_contact_time &gt; '<span class="number">2017</span><span class="number">-10</span><span class="number">-17</span> <span class="number">14</span>:<span class="number">23</span>:<span class="number">49</span>' and f_contact_time &lt; '<span class="number">2017</span><span class="number">-10</span><span class="number">-17</span> <span class="number">14</span>:<span class="number">23</span>:<span class="number">53</span>'</div><div class="line">order <span class="built_in">by</span> f_some_id limit <span class="number">8167</span>;</div><div class="line">+----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+-------------+</div><div class="line">| <span class="type">id</span> | <span class="type">select_type</span> | <span class="type">table</span>                 | <span class="type">type</span>  | <span class="type">possible_keys</span>  | <span class="type">key</span>            | <span class="type">key_len</span> | <span class="type">ref</span>  | <span class="type">rows</span>   | <span class="type">Extra</span>       |</div><div class="line"><span class="type">+----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+-------------+</span></div><div class="line">|  1 | <span class="type">SIMPLE</span>      | <span class="type">t_tbl_test_time_08</span>    | <span class="type">index</span> | <span class="type">f_contact_time</span> | <span class="type">some_qiye_type</span> | <span class="type">12</span>      | <span class="type">NULL</span> | <span class="type">414115</span> | <span class="type">Using</span> <span class="keyword">where</span> |</div><div class="line"><span class="type">+----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+-------------+</span></div><div class="line">1 row <span class="built_in">in</span> <span class="built_in">set</span></div><div class="line"> </div><div class="line">mysql&gt; explain select f_some_id from d_ec_some1.t_tbl_test_time_08</div><div class="line"><span class="keyword">where</span> f_qiye_id=<span class="number">5077665</span> and f_type=<span class="number">9</span></div><div class="line">and f_contact_time &gt; '<span class="number">2017</span><span class="number">-10</span><span class="number">-17</span> <span class="number">14</span>:<span class="number">23</span>:<span class="number">49</span>' and f_contact_time &lt; '<span class="number">2017</span><span class="number">-10</span><span class="number">-17</span> <span class="number">14</span>:<span class="number">23</span>:<span class="number">53</span>'</div><div class="line">order <span class="built_in">by</span> f_some_id limit <span class="number">8168</span>;</div><div class="line">+----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+---------------------------------------------------------------+</div><div class="line">| <span class="type">id</span> | <span class="type">select_type</span> | <span class="type">table</span>                 | <span class="type">type</span>  | <span class="type">possible_keys</span>  | <span class="type">key</span>            | <span class="type">key_len</span> | <span class="type">ref</span>  | <span class="type">rows</span>   | <span class="type">Extra</span>                                                         |</div><div class="line"><span class="type">+----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+---------------------------------------------------------------+</span></div><div class="line">|  1 | <span class="type">SIMPLE</span>      | <span class="type">t_tbl_test_time_08</span>    | <span class="type">range</span> | <span class="type">f_contact_time</span> | <span class="type">f_contact_time</span> | <span class="type">5</span>       | <span class="type">NULL</span> | <span class="type">360478</span> | <span class="type">Using</span> index condition; Using <span class="keyword">where</span>; Using MRR; Using filesort |</div><div class="line"><span class="type">+----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+---------------------------------------------------------------+</span></div><div class="line">1 row <span class="built_in">in</span> <span class="built_in">set</span></div></pre></td></tr></table></figure></p>
+<p>具体为啥这样，bug里面没说，只是提到5.7已修复，5.6应该不会修复。</p>
+<h1 id="5-解决办法"><a href="#5-解决办法" class="headerlink" title="5. 解决办法"></a>5. 解决办法</h1><p>其实做sql优化，执行计划不稳定这种，是不容易搞定的，因为并不是这个sql所有都会慢，而是不同值的特征，走不同的索引，会偶发性的慢。优化索引的时候，反而容易把原本较快的查询的索引改掉，造成更大的灾难。</p>
+<p>本文的sql便是如此。从业务那边了解到，f_contact_time范围是固定4s，99%的情况，这个索引效率很高，但是正好有一大批数据(18万) f_contact_time=’2017-10-17 14:23:51’，导致优化器做出了自己以为更优的决定。</p>
+<p>那么解决这个问题，就是要去掉干扰因素，或者提供更优的选项给它。</p>
+<ol>
+<li><p>去掉干扰因素<br>干扰它的索引是 some_qiye_type，是个唯一索引，因为恰好f_some_id开头，索引优化器想当然的用它来避免排序。</p>
+<p>去掉这个干扰因素就是调换 f_qiye_id,f_some_id的顺序。调换顺序还有个好处，有f_qiye_id等值条件，可以用在索引检索上。<br>但是它的负面作用有两个：</p>
+<ul>
+<li>原本这个表上有 f_some_id 的等值、join ref以及分页查询，调换索引这两个字段顺序后，全都变成慢查询</li>
+<li>f_qiye_id作为第一列，满足条件的值可能会有上百万，对这个查询的改观不大</li>
+</ul>
+</li>
+<li><p>提供更优的索引<br>添加索引 (f_qiye_id,f_contact_time) 看起来不错。这样一来，该类查询都会走这个索引</p>
+</li>
+</ol>
+<p>另外这个表上只有一个唯一索引，而且该唯一索引有字段允许null，所以没有主键。<br>加一个自增主键 f_id bigint unsigned not null<br>修改f_some_id字段为 f_some_id bigint unsigned NOT NULL<br>修改f_qiye_id字段为 f_qiye_id int unsigned NOT NULL<br>修改字段f_type字段为 tinyint NOT NULL<br>总之一句话：所有（作为索引的）字段，都定义为NOT NULL，f_some_id全部定义为bigint。最终表结构：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="string">`t_tbl_test_time_16`</span> (</div><div class="line">  <span class="string">`f_id`</span> <span class="built_in">bigint</span>(<span class="number">20</span>) <span class="keyword">unsigned</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> AUTO_INCREMENT,</div><div class="line">  <span class="string">`f_some_id`</span> <span class="built_in">bigint</span>(<span class="number">20</span>) <span class="keyword">unsigned</span> <span class="keyword">NOT</span> <span class="literal">NULL</span>,</div><div class="line">  <span class="string">`f_qiye_id`</span> <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">unsigned</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">'0'</span>,</div><div class="line">  <span class="string">`f_type`</span> tinyint(<span class="number">3</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">'0'</span> <span class="keyword">COMMENT</span> <span class="string">'有效联系类型 1: QQ联系，2:拨打电话，3:发送邮件，4:发送短信，5:添加跟进记录，6:拜访客户，7:EC联系，8:更新客户阶段'</span>,</div><div class="line">  <span class="string">`f_contact_time`</span> <span class="keyword">timestamp</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">'1970-01-01 16:00:01'</span>,</div><div class="line">  PRIMARY <span class="keyword">KEY</span>(f_id),</div><div class="line">  <span class="keyword">UNIQUE</span> <span class="keyword">KEY</span> <span class="string">`some_qiye_type`</span> (<span class="string">`f_some_id`</span>,<span class="string">`f_qiye_id`</span>,<span class="string">`f_type`</span>) <span class="keyword">USING</span> BTREE,</div><div class="line">  <span class="keyword">KEY</span> <span class="string">`idx_qiye_time`</span> (<span class="string">`f_qiye_id`</span>,<span class="string">`f_contact_time`</span>)</div><div class="line">) <span class="keyword">ENGINE</span>=<span class="keyword">InnoDB</span> <span class="keyword">DEFAULT</span> <span class="keyword">CHARSET</span>=utf8mb4;</div></pre></td></tr></table></figure>
+<p>或者唯一索引变成联合主键（关于自增主键与联合主键的选择，参考 <a href="http://seanlook.com/2016/05/13/mysql-innodb-primary_key/">http://seanlook.com/2016/05/13/mysql-innodb-primary_key/</a> ）</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="string">`t_tbl_test_time_16`</span> (</div><div class="line">  <span class="string">`f_some_id`</span> <span class="built_in">bigint</span>(<span class="number">20</span>) <span class="keyword">unsigned</span> <span class="keyword">NOT</span> <span class="literal">NULL</span>,</div><div class="line">  <span class="string">`f_qiye_id`</span> <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">unsigned</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">'0'</span>,</div><div class="line">  <span class="string">`f_type`</span> tinyint(<span class="number">3</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">'0'</span> <span class="keyword">COMMENT</span> <span class="string">'有效联系类型 1: QQ联系，2:拨打电话，3:发送邮件，4:发送短信，5:添加跟进记录，6:拜访客户，7:EC联系，8:更新客户阶段'</span>,</div><div class="line">  <span class="string">`f_contact_time`</span> <span class="keyword">timestamp</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">'1970-01-01 16:00:01'</span>,</div><div class="line">  PRIMARY <span class="keyword">KEY</span>(<span class="string">`f_qiye_id`</span>,<span class="string">`f_some_id`</span>,<span class="string">`f_type`</span>),</div><div class="line">  <span class="keyword">KEY</span> <span class="string">`idx_qiye_time`</span> (<span class="string">`f_qiye_id`</span>,<span class="string">`f_contact_time`</span>),</div><div class="line">  <span class="keyword">KEY</span> <span class="string">`idx_some`</span>(<span class="string">`f_some_id`</span>)</div><div class="line">) <span class="keyword">ENGINE</span>=<span class="keyword">InnoDB</span> <span class="keyword">DEFAULT</span> <span class="keyword">CHARSET</span>=utf8mb4;</div></pre></td></tr></table></figure>
+<hr>
+<p>原文连接地址：<a href="http://seanlook.com/2017/10/26/mysql-bad-plan-order_by-limit/">http://seanlook.com/2017/10/26/mysql-bad-plan-order_by-limit/</a></p>
+<hr>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+  <div style="padding: 10px 0; margin: 20px auto; width: 90%; text-align: center;">
+    <div>支持可请我喝杯茶 ^_- (上限10个铜板)</div>
+    <button id="rewardButton" disable="enable" onclick="var qr = document.getElementById('QR'); if (qr.style.display === 'none') {qr.style.display='block';} else {qr.style.display='none'}">
+      <span>赏</span>
+    </button>
+    <div id="QR" style="display: none;">
+      
+      
+        <div id="alipay" style="display: inline-block">
+          <img id="alipay_qr" src="/images/reward_alipay_seanlook.jpg" alt="seanlook Alipay"/>
+          <p>支付宝打赏</p>
+        </div>
+      
+    </div>
+  </div>
+
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/mysql/" rel="tag"># mysql</a>
+          
+            <a href="/tags/优化/" rel="tag"># 优化</a>
+          
+        </div>
+      
+
+      
+        
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2017/10/17/mysql-big-trx-lock-case/" rel="next" title="“大”事务引起的锁等待分析案例">
+                <i class="fa fa-chevron-left"></i> “大”事务引起的锁等待分析案例
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2017/11/02/mysql_schemasync/" rel="prev" title="MySQL数据库表结构同步之SchemaSync">
+                MySQL数据库表结构同步之SchemaSync <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div id="disqus_thread">
+        <noscript>
+          Please enable JavaScript to view the
+          <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a>
+        </noscript>
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+           
+              <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+          
+        </div>
+        <nav class="site-state motion-element">
+
+          
+            <div class="site-state-item site-state-posts">
+              <a href="/archives">
+                <span class="site-state-item-count">113</span>
+                <span class="site-state-item-name">posts</span>
+              </a>
+            </div>
+          
+
+          
+            
+            
+            <div class="site-state-item site-state-categories">
+              <a href="/categories/index.html">
+                <span class="site-state-item-count">23</span>
+                <span class="site-state-item-name">categories</span>
+              </a>
+            </div>
+          
+
+          
+            
+            
+            <div class="site-state-item site-state-tags">
+              <a href="/tags/index.html">
+                <span class="site-state-item-count">122</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+        
+
+
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-背景"><span class="nav-text">1. 背景</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-explain"><span class="nav-text">2. explain</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-profiling"><span class="nav-text">3. profiling</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-optimizer-trace"><span class="nav-text">4. optimizer_trace</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-解决办法"><span class="nav-text">5. 解决办法</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2017</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+
+        
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.0"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.0"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.0"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  
+
+    
+      <script id="dsq-count-scr" src="https://seanlook.disqus.com/count.js" async></script>
+    
+
+    
+      <script type="text/javascript">
+        var disqus_config = function () {
+          this.page.url = 'http://seanlook.com/2017/10/26/mysql-bad-plan-order_by-limit/';
+          this.page.identifier = '2017/10/26/mysql-bad-plan-order_by-limit/';
+          this.page.title = 'MySQL order by limit 走错索引(range->indexscan)';
+        };
+        var d = document, s = d.createElement('script');
+        s.src = 'https://seanlook.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', '' + +new Date());
+        (d.head || d.body).appendChild(s);
+      </script>
+    
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+      search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.popup').toggle();
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+      $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = $( "entry", xmlResponse ).map(function() {
+            return {
+              title: $( "title", this ).text(),
+              content: $("content",this).text(),
+              url: $( "url" , this).text()
+            };
+          }).get();
+          var $input = document.getElementById(search_id);
+          var $resultContent = document.getElementById(content_id);
+          $input.addEventListener('input', function(){
+            var matchcounts = 0;
+            var str='<ul class=\"search-result-list\">';
+            var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+            $resultContent.innerHTML = "";
+            if (this.value.trim().length > 1) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var content_index = [];
+                var data_title = data.title.trim().toLowerCase();
+                var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                var data_url = decodeURIComponent(data.url);
+                var index_title = -1;
+                var index_content = -1;
+                var first_occur = -1;
+                // only match artiles with not empty titles and contents
+                if(data_title != '') {
+                  keywords.forEach(function(keyword, i) {
+                    index_title = data_title.indexOf(keyword);
+                    index_content = data_content.indexOf(keyword);
+                    if( index_title >= 0 || index_content >= 0 ){
+                      isMatch = true;
+                      if (i == 0) {
+                        first_occur = index_content;
+                      }
+                    }
+
+                  });
+                }
+                // show search results
+                if (isMatch) {
+                  matchcounts += 1;
+                  str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                  var content = data.content.trim().replace(/<[^>]+>/g,"");
+                  if (first_occur >= 0) {
+                    // cut out 100 characters
+                    var start = first_occur - 20;
+                    var end = first_occur + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if(start == 0){
+                      end = 50;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    var match_content = content.substring(start, end);
+                    // highlight all keywords
+                    keywords.forEach(function(keyword){
+                      var regS = new RegExp(keyword, "gi");
+                      match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                    });
+
+                    str += "<p class=\"search-result\">" + match_content +"...</p>"
+                  }
+                  str += "</li>";
+                }
+              })};
+            str += "</ul>";
+            if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+            if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+            $resultContent.innerHTML = str;
+          });
+          proceedsearch();
+        }
+      });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.1.js"></script>
+  <script>AV.initialize("NliJVBn0857TMk5HYrIRt5wp-gzGzoHsz", "jB9B4QG8Rm8YP04RQqnsKy5M");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

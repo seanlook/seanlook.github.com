@@ -316,6 +316,393 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/12/18/docker-introduction/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2014/12/18/docker-introduction/" itemprop="url">
+                  Docker简介
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-12-18T11:21:25+08:00">
+                2014-12-18
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Virtualization/" itemprop="url" rel="index">
+                    <span itemprop="name">Virtualization</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Virtualization/Docker/" itemprop="url" rel="index">
+                    <span itemprop="name">Docker</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2014/12/18/docker-introduction/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2014/12/18/docker-introduction/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2014/12/18/docker-introduction/" class="leancloud_visitors" data-flag-title="Docker简介">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h1 id="1-docker是什么"><a href="#1-docker是什么" class="headerlink" title="1. docker是什么"></a>1. docker是什么</h1><blockquote>
+<p>Docker is an open-source engine that automates the deployment of any application as a lightweight, portable, self-sufficient container that will run virtually anywhere.</p>
+</blockquote>
+<p><a href="https://www.docker.com/">Docker</a>是 PaaS 提供商<a href="https://www.dotcloud.com/">dotCloud</a>开源的一个基于 LXC 的高级容器引擎， <a href="https://github.com/docker/docker">源代码</a>托管在 Github 上, 基于go语言并遵从Apache2.0协议开源。Docker近期非常火热，无论是从 GitHub 上的代码活跃度，还是Redhat宣布在<a href="http://server.cnw.com.cn/server-os/htm2014/20140616_303249.shtml">RHEL7中正式支持Docker</a>，都给业界一个信号，这是一项创新型的技术解决方案。就连 Google 公司的 Compute Engine 也支持 docker 在其之上运行，国内“BAT”先锋企业百度Baidu App Engine(BAE)平台也是<a href="http://blog.docker.com/2013/12/baidu-using-docker-for-its-paas/">以Docker作为其PaaS云基础</a>。</p>
+<p>Docker产生的目的就是为了解决以下问题：</p>
+<ol>
+<li>环境管理复杂：从各种OS到各种中间件再到各种App，一款产品能够成功发布，作为开发者需要关心的东西太多，且难于管理，这个问题在软件行业中普遍存在并需要直接面对。Docker可以简化部署多种应用实例工作，比如Web应用、后台应用、数据库应用、大数据应用比如Hadoop集群、消息队列等等都可以打包成一个Image部署。</li>
+<li>云计算时代的到来：AWS的成功，引导开发者将应用转移到云上, 解决了硬件管理的问题，然而软件配置和管理相关的问题依然存在 (AWS cloudformation是这个方向的业界标准, 样例模板可参考这里)。Docker的出现正好能帮助软件开发者开阔思路，尝试新的软件管理方法来解决这个问题。</li>
+<li>虚拟化手段的变化：云时代采用标配硬件来降低成本，采用虚拟化手段来满足用户按需分配的资源需求以及保证可用性和隔离性。然而无论是KVM还是Xen，在 Docker 看来都在浪费资源，因为用户需要的是高效运行环境而非OS，GuestOS既浪费资源又难于管理，更加轻量级的LXC更加灵活和快速。<br><img src="http://sean-images.qiniudn.com/docker-traditional-virtualization.png" alt="docker-traditional-virtualization"><br><img src="http://sean-images.qiniudn.com/docker-virtualization.png" alt="docker-virtualization"></li>
+<li>LXC的便携性：LXC在 Linux 2.6 的 Kernel 里就已经存在了，但是其设计之初并非为云计算考虑的，缺少标准化的描述手段和容器的可便携性，决定其构建出的环境难于分发和标准化管理(相对于KVM之类image和snapshot的概念)。Docker就在这个问题上做出了实质性的创新方法。</li>
+</ol>
+<p>Docker的主要特性如下：</p>
+<ol>
+<li>文件系统隔离：每个进程容器运行在完全独立的根文件系统里。</li>
+<li>资源隔离：可以使用cgroup为每个进程容器分配不同的系统资源，例如CPU和内存。</li>
+<li>网络隔离：每个进程容器运行在自己的网络命名空间里，拥有自己的虚拟接口和IP地址。</li>
+<li>写时复制：采用写时复制方式创建根文件系统，这让部署变得极其快捷，并且节省内存和硬盘空间。</li>
+<li>日志记录：Docker将会收集和记录每个进程容器的标准流（stdout/stderr/stdin），用于实时检索或批量检索。</li>
+<li>变更管理：容器文件系统的变更可以提交到新的映像中，并可重复使用以创建更多的容器。无需使用模板或手动配置。</li>
+<li>交互式Shell：Docker可以分配一个虚拟终端并关联到任何容器的标准输入上，例如运行一个一次性交互shell。</li>
+</ol>
+<h1 id="2-比较"><a href="#2-比较" class="headerlink" title="2. 比较"></a>2. 比较</h1><h2 id="2-1-docker-vs-传统虚拟化技术"><a href="#2-1-docker-vs-传统虚拟化技术" class="headerlink" title="2.1 docker vs 传统虚拟化技术"></a>2.1 docker vs 传统虚拟化技术</h2><p>作为一种新兴的虚拟化方式，Docker 跟传统的虚拟化方式（xen、kvm、vmware）相比具有众多的优势。</p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2014/12/18/docker-introduction/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/12/12/rsync_inotify_setup/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2014/12/12/rsync_inotify_setup/" itemprop="url">
+                  Linux下同步工具inotify+rsync使用详解
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-12-12T01:21:25+08:00">
+                2014-12-12
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2014/12/12/rsync_inotify_setup/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2014/12/12/rsync_inotify_setup/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2014/12/12/rsync_inotify_setup/" class="leancloud_visitors" data-flag-title="Linux下同步工具inotify+rsync使用详解">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h1 id="1-rsync"><a href="#1-rsync" class="headerlink" title="1. rsync"></a>1. rsync</h1><h2 id="1-1-什么是rsync"><a href="#1-1-什么是rsync" class="headerlink" title="1.1 什么是rsync"></a>1.1 什么是rsync</h2><p>rsync是一个远程数据同步工具，可通过LAN/WAN快速同步多台主机间的文件。它使用所谓的“Rsync演算法”来使本地和远程两个主机之间的文件达到同步，这个算法只传送两个文件的不同部分，而不是每次都整份传送，因此速度相当快。所以通常可以作为备份工具来使用。</p>
+<p>运行Rsync server的机器也叫backup server，一个Rsync server可同时备份多个client的数据；也可以多个Rsync server备份一个client的数据。Rsync可以搭配ssh甚至使用daemon模式。Rsync server会打开一个873的服务通道(port)，等待对方rsync连接。连接时，Rsync server会检查口令是否相符，若通过口令查核，则可以开始进行文件传输。第一次连通完成时，会把整份文件传输一次，下一次就只传送二个文件之间不同的部份。</p>
+<p><strong>基本特点：</strong></p>
+<ol>
+<li>可以镜像保存整个目录树和文件系统；</li>
+<li>可以很容易做到保持原来文件的权限、时间、软硬链接等；</li>
+<li>无须特殊权限即可安装；</li>
+<li>优化的流程，文件传输效率高；</li>
+<li>可以使用rcp、ssh等方式来传输文件，当然也可以通过直接的socket连接；</li>
+<li>支持匿名传输。</li>
+</ol>
+<p><strong>命令语法：</strong><br>rsync的命令格式可以为以下六种：<br>　rsync [OPTION]… SRC DEST<br>　rsync [OPTION]… SRC [USER@]HOST:DEST<br>　rsync [OPTION]… [USER@]HOST:SRC DEST<br>　rsync [OPTION]… [USER@]HOST::SRC DEST<br>　rsync [OPTION]… SRC [USER@]HOST::DEST<br>　rsync [OPTION]… rsync://[USER@]HOST[:PORT]/SRC [DEST]</p>
+<p>对应于以上六种命令格式，我们可以总结rsync有2种不同的工作模式：</p>
+<ul>
+<li>shell模式：使用远程shell程序（如ssh或rsh）进行连接。当源路径或目的路径的主机名后面包含一个冒号分隔符时使用这种模式，rsync安装完成后就可以直接使用了，无所谓启动。（目前没有尝试过这个方法）</li>
+<li>daemon模式：使用TCP直接连接rsync daemon。当源路径或目的路径的主机名后面包含两个冒号，或使用rsync://URL时使用这种模式，无需远程shell，但必须在一台机器上启动rsync daemon，默认端口873，这里可以通过<code>rsync --daemon</code>使用独立进程的方式，或者通过xinetd超级进程来管理rsync后台进程。</li>
+</ul>
+<p>当rsync作为daemon运行时，它需要一个用户身份。如果你希望启用chroot，则必须以root的身份来运行daemon，监听端口，或设定文件属主；如果不启用chroot，也可以不使用root用户来运行daemon，但该用户必须对相应的模块拥有读写数据、日志和lock file的权限。当rsync以daemon模式运行时，它还需要一个配置文件——rsyncd.conf。修改这个配置后不必重启rsync daemon，因为每一次的client连接都会去重新读取该文件。</p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2014/12/12/rsync_inotify_setup/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/12/08/tar_backup_filesystem/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -860,372 +1247,6 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/12/02/oracle11gr2_installation_precheck_scripts/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/12/02/oracle11gr2_installation_precheck_scripts/" itemprop="url">
-                  Oracle单实例安装环境一键配置脚本（CentOS6 + 11gR2 ）
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-12-02T15:21:25+08:00">
-                2014-12-02
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Oracle/" itemprop="url" rel="index">
-                    <span itemprop="name">Oracle</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2014/12/02/oracle11gr2_installation_precheck_scripts/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2014/12/02/oracle11gr2_installation_precheck_scripts/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2014/12/02/oracle11gr2_installation_precheck_scripts/" class="leancloud_visitors" data-flag-title="Oracle单实例安装环境一键配置脚本（CentOS6 + 11gR2 ）">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>这是自己曾经写的一个oracle 11gR2在CentOS6 x86_64服务器上，一键配置安装环境的脚本，能快速完成安装前环境的配置。</p>
-<p>具体完成以下工作：</p>
-<ul>
-<li>备份系统配置文件，以防出错</li>
-<li>添加oracle用户和用户组</li>
-<li>创建安装目录</li>
-<li>关闭selinux</li>
-<li>在.bash_profile中修改环境变量</li>
-<li>修改<code>sysctl.conf</code>文件</li>
-<li>修改<code>limits.conf</code>文件</li>
-<li>修改PAM的login文件</li>
-<li>安装必要的依赖包</li>
-</ul>
-<p>使用注意事项：</p>
-<ul>
-<li>root的用户执行，<code>chmod +x oraclePreInstCheck.sh</code></li>
-<li><code>./oraclePreInstCheck.sh</code>运行后，请仔细阅读说明，再决定是否使用该脚本</li>
-<li>该脚本默认参数适用于2核4G内存的环境，你可以根据需要修改<code>kernelset()</code>部分</li>
-<li>执行完后，你检查一下你的安装目录及权限（默认<code>/db/oracle</code>）</li>
-<li>该脚本会有提示输入的地方，请不要挑战它的健壮性，比如输入安装根目录时，不要带入空格</li>
-<li>脚本只需执行一次，修改系统参数如sysctl.conf之前，都有备份成<code>xxx.ora_bak</code></li>
-<li>请<strong>确保</strong>可以通过yum方式安装软件包（使用挂载DVD镜像或联网）</li>
-<li>建议结合<code>tee</code>将执行过程记录在日志文件中，<code>./oraclePreInstCheck.sh | tee oraclePreInstCheck.log</code></li>
-</ul>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2014/12/02/oracle11gr2_installation_precheck_scripts/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/11/30/thoughts_about_graduate_from_course/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/11/30/thoughts_about_graduate_from_course/" itemprop="url">
-                  关于研究生的一点担忧
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-11-30T18:21:25+08:00">
-                2014-11-30
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Feel/" itemprop="url" rel="index">
-                    <span itemprop="name">Feel</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2014/11/30/thoughts_about_graduate_from_course/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2014/11/30/thoughts_about_graduate_from_course/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2014/11/30/thoughts_about_graduate_from_course/" class="leancloud_visitors" data-flag-title="关于研究生的一点担忧">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>最近有个在大学玩的比较好现在在读研的同学，来询问我一些如何给老师做精品课程在线测试系统的问题，从沟通中我忍不住从个人的角度来表达一下感想和担忧。</p>
-<p><img src="http://sean-images.qiniudn.com/give_yourself_courage.jpg" alt="rate_online_test"></p>
-<p>首先从我接收到的信息来看，高校导师为了给自己擅长的课程评选上学校、市级或省级精品课程，急于完成一个展示成果的平台，只要能在最短的时间内提交所能看的见的成果，那就表明有效率和实力。所以这个在线测试系统只需要能够展示一个页面，页面上有单项、多选题，提交测试后直接显示对错和总分，无需记录测试者姓名等其他任何与试题无关的信息，也就是没有数据库。差不多就是一个静态页面了，对错的判断，包括答案都固定在代码里面了。我相信稍微了解IT软件开发的人都知道，这样的系统设计可以让人感到无语，当然还有很多不是计算机类专业的，可能看不懂这些，只关心最终实现的效果达到预期就行。偏偏导师和所交予任务的学生，都不懂设计和编程。所以当我说至少应该有个数据库时，“太麻烦，不懂，周期太长”。由于是出于帮忙的目的，也就没有说太多的话来打击他的积极性，说多了反而有点表现自己有多牛B的嫌疑，就硬着头皮做了个demo。</p>
-<p>由此可见大学老师为评上精品课程，那种急功近利的心理，只要对外宣传“我们有一个在线测评系统来检验学生学习效果，blablabla…”，然后评选小组比对评选规则里面有“在线测评”，加分！但请问像上面那样的系统意义何在？老师不知道有谁做过测试，不知道分数，只知道“当前浏览xxx次”，学生完全取决于是否主动。我想如果老师把这个测评当做一个硬性要求或作为所熟知却非常神秘的“平时成绩”的一部分，那只能是通过某种方式提交测试截图了。我心还想，在线测评系统一次性完成上线，是不是就再也不会修改了，加题减题，都要大动干戈的去修改后台代码，丝毫没有规划以后的扩展，当然也许我想多了，因为“这就是很简单的一个测试系统”，嗯，都说是测试而不是正式环境了，认真你就输了。</p>
-<p><img src="http://sean-images.qiniudn.com/rate_online_test.png" alt="rate_online_test"></p>
-<p>这里做个小插曲。我们生活的环境，充斥着太多的指标、太多的名声。想起上周在我司门口早上卖炸酱面的摊贩被城管执法包围那件事。每天早上这位大叔家的炸酱面是附近最好吃的，每天都排着很长的队，如果不赶时间我和同事们都会优先选择这家。大家都生活不易，城管也是，起早贪黑，四处蹲点追赶流动摊贩，因为没有业绩没有完成指标，如何回去交差。又想起电视里报道过某地的交警每月要达到罚款20万的指标，这说多了其实就是社会问题了，我们这些小众市民除了旁观，祈祷不要发生在我们身上，还能做些什么呢。指标本应该是一个积极充满正能量的、督促机构上进的一个目标，但是如果是为了充数而不择手段去实现，急功近利，那就变质了。</p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2014/11/30/thoughts_about_graduate_from_course/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -1275,7 +1296,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">111</span>
+                <span class="site-state-item-count">113</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -1297,7 +1318,7 @@
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">120</span>
+                <span class="site-state-item-count">122</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>

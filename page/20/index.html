@@ -316,6 +316,372 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/11/05/docker-command-best-use-2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2014/11/05/docker-command-best-use-2/" itemprop="url">
+                  docker常用管理命令（下）
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-11-05T16:21:25+08:00">
+                2014-11-05
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Virtualization/" itemprop="url" rel="index">
+                    <span itemprop="name">Virtualization</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Virtualization/Docker/" itemprop="url" rel="index">
+                    <span itemprop="name">Docker</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2014/11/05/docker-command-best-use-2/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2014/11/05/docker-command-best-use-2/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2014/11/05/docker-command-best-use-2/" class="leancloud_visitors" data-flag-title="docker常用管理命令（下）">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>本文承接<a href="http://seanlook.com/2014/10/31/docker-command-best-use-1/">docker专题(2)：docker常用管理命令（上）</a>。</p>
+<h3 id="1-开启-停止-重启container（start-stop-restart）"><a href="#1-开启-停止-重启container（start-stop-restart）" class="headerlink" title="1. 开启/停止/重启container（start/stop/restart）"></a>1. 开启/停止/重启container（start/stop/restart）</h3><p>容器可以通过<code>run</code>新建一个来运行，也可以重新<code>start</code>已经停止的container，但<code>start</code>不能够再指定容器启动时运行的指令，因为docker只能有一个前台进程。<br>容器stop（或<code>Ctrl+D</code>）时，会在保存当前容器的状态之后退出，下次start时保有上次关闭时更改。而且每次进入<code>attach</code>进去的界面是一样的，与第一次run启动或commit提交的时刻相同。<br><figure class="highlight elixir"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">CONTAINER_ID=<span class="variable">$(</span>docker start &lt;containner_id&gt;)</div><div class="line">docker stop <span class="variable">$CONTAINER_ID</span></div><div class="line">docker restart <span class="variable">$CONTAINER_ID</span></div></pre></td></tr></table></figure></p>
+<p>关于这几个命令可以通过一个完整的实例使用：<a href="http://seanlook.com/2014/11/03/docker-run-container-with-shell-daemon_process/">docker如何创建一个运行后台进程的容器并同时提供shell终端</a>。</p>
+<h3 id="2-连接到正在运行中的container（attach）"><a href="#2-连接到正在运行中的container（attach）" class="headerlink" title="2. 连接到正在运行中的container（attach）"></a>2. 连接到正在运行中的container（attach）</h3><p>要<code>attach</code>上去的容器必须正在运行，可以同时连接上同一个container来共享屏幕（与<code>screen</code>命令的attach类似）。<br>官方文档中说<code>attach</code>后可以通过<code>CTRL-C</code>来detach，但实际上经过我的测试，如果container当前在运行bash，<code>CTRL-C</code>自然是当前行的输入，没有退出；如果container当前正在前台运行进程，如输出nginx的access.log日志，<code>CTRL-C</code>不仅会导致退出容器，而且还stop了。这不是我们想要的，detach的意思按理应该是脱离容器终端，但容器依然运行。好在<code>attach</code>是可以带上<code>--sig-proxy=false</code>来确保<code>CTRL-D</code>或<code>CTRL-C</code>不会关闭容器。</p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2014/11/05/docker-command-best-use-2/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/11/03/docker-run-container-with-shell-daemon_process/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2014/11/03/docker-run-container-with-shell-daemon_process/" itemprop="url">
+                  docker如何创建一个运行后台进程的容器并同时提供shell终端
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-11-03T20:21:25+08:00">
+                2014-11-03
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Virtualization/" itemprop="url" rel="index">
+                    <span itemprop="name">Virtualization</span>
+                  </a>
+                </span>
+
+                
+                
+                  , 
+                
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Virtualization/Docker/" itemprop="url" rel="index">
+                    <span itemprop="name">Docker</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2014/11/03/docker-run-container-with-shell-daemon_process/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2014/11/03/docker-run-container-with-shell-daemon_process/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2014/11/03/docker-run-container-with-shell-daemon_process/" class="leancloud_visitors" data-flag-title="docker如何创建一个运行后台进程的容器并同时提供shell终端">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>只看标题还不是很明显，本文实现docker的这样一种比较常用的功能：通过<code>docker run</code>启动一个容器后，容器中已经运行了一个后台进程（这里以监听80端口的nginx为例），同时进入一个shell终端可供操作，而不受限于只能在前台运行nginx与运行shell终端之间的一种。这个例子实现了，那么其他类似的运行多任务docker就可以以此类推。另外本文还提供了一种在docker容器内部安装软件（<code>vim</code>）的方法，对于定制自己需要的镜像大有帮助。<br>你可能需要先阅读<a href="hhttp://seanlook.com/2014/10/31/docker-command-best-use-1/">docker专题(2)：docker常用管理命令（上）</a>、<a href="http://seanlook.com/2014/11/05/docker-command-best-use-2/">docker专题(2)：docker常用管理命令（下）</a>来理解更多。</p>
+<h2 id="1-已经pull了官方的nginx-1-7-6的镜像（也可以从私服获取）"><a href="#1-已经pull了官方的nginx-1-7-6的镜像（也可以从私服获取）" class="headerlink" title="1. 已经pull了官方的nginx 1.7.6的镜像（也可以从私服获取）"></a>1. 已经pull了官方的<a href="https://registry.hub.docker.com/_/nginx/">nginx 1.7.6</a>的镜像（也可以从私服获取）</h2><figure class="highlight lsl"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"># docker images|grep nginx</div><div class="line">nginx              <span class="number">1.7</span><span class="number">.6</span>          <span class="number">561</span>ed4952ef0     <span class="number">10</span> days ago         <span class="number">100</span> MB</div></pre></td></tr></table></figure>
+<h2 id="2-根据官方指示启动这个容器"><a href="#2-根据官方指示启动这个容器" class="headerlink" title="2. 根据官方指示启动这个容器"></a>2. 根据官方指示启动这个容器</h2><figure class="highlight xml"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">先做好自己要显示的页面</div><div class="line"># echo "<span class="tag">&lt;<span class="name">h2</span> &gt;</span>This is nginx official container running <span class="tag">&lt;/<span class="name">h2</span>&gt;</span> <span class="tag">&lt;<span class="name">br</span> /&gt;</span> static files:/tmp/doccker/index.html" &gt; /tmp/docker/index.html</div></pre></td></tr></table></figure>
+<p>使用官方image启动一个容器，名字nginx_dist，把host的目录（包含刚才的html）映射到容器中nginx server的root，绑定80端口：</p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2014/11/03/docker-run-container-with-shell-daemon_process/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/11/03/one-troubleshooting-for-centos-corrupt/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -832,357 +1198,6 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/10/29/apache-3tomcat-cluster-jk-memcached/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/10/29/apache-3tomcat-cluster-jk-memcached/" itemprop="url">
-                  apache+3tomcat+jk+memcached集群环境搭建
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-10-29T10:21:25+08:00">
-                2014-10-29
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Linux/" itemprop="url" rel="index">
-                    <span itemprop="name">Linux</span>
-                  </a>
-                </span>
-
-                
-                
-                  , 
-                
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Linux/Web-Server/" itemprop="url" rel="index">
-                    <span itemprop="name">Web_Server</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2014/10/29/apache-3tomcat-cluster-jk-memcached/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2014/10/29/apache-3tomcat-cluster-jk-memcached/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2014/10/29/apache-3tomcat-cluster-jk-memcached/" class="leancloud_visitors" data-flag-title="apache+3tomcat+jk+memcached集群环境搭建">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>注意本文不讨论原理，只讲述具体的搭建过程，而且步骤都经过了整理，否则过程可能会出现其他异常，请自行google。apache与tomcat整合的方式除了jk之外，使用apache自带的mod_ajp_proxy模块也可以很方便的完成。<br>先来看一下架构图：<br><img src="http://sean-images.qiniudn.com/apache_tomcat_cluster_msm.png" alt="apache_tomcat_cluster_msm"><br>属于正式环境中原session复制方案的改进。</p>
-<h1 id="1-所需软件包"><a href="#1-所需软件包" class="headerlink" title="1. 所需软件包"></a>1. 所需软件包</h1><figure class="highlight css"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line"><span class="selector-tag">jrrt-3</span><span class="selector-class">.1</span><span class="selector-class">.2-1</span><span class="selector-class">.6</span><span class="selector-class">.0-linux-x64</span><span class="selector-class">.bin</span>（或<span class="selector-tag">jdk1</span><span class="selector-class">.6</span><span class="selector-class">.0_33</span>）   <span class="selector-tag">jvm</span></div><div class="line"><span class="selector-tag">httpd-2</span><span class="selector-class">.2</span><span class="selector-class">.26</span><span class="selector-class">.tar</span><span class="selector-class">.gz</span>                              <span class="selector-tag">web</span>服务器，处理静态资源</div><div class="line"><span class="selector-tag">apache-tomcat-6</span><span class="selector-class">.0</span><span class="selector-class">.32</span><span class="selector-class">.tar</span><span class="selector-class">.gz</span>                      应用服务器，<span class="selector-tag">Servlet</span>容器处理动态请求</div><div class="line"><span class="selector-tag">tomcat-connectors-1</span><span class="selector-class">.2</span><span class="selector-class">.30-src</span><span class="selector-class">.tar</span><span class="selector-class">.gz</span>              <span class="selector-tag">apache</span>与<span class="selector-tag">tomcat</span>整合插件<span class="selector-tag">mod_jk</span><span class="selector-class">.so</span></div><div class="line"><span class="selector-tag">tomcat-native</span><span class="selector-class">.tar</span><span class="selector-class">.gz</span>                             <span class="selector-tag">APR</span>加速<span class="selector-tag">tomcat</span>，提高线程并发能力。使用<span class="selector-tag">tomcat</span>自带版本。</div><div class="line"><span class="selector-tag">memcached-session-manager</span>                        使用<span class="selector-tag">msm</span>解决多<span class="selector-tag">tomcat</span>集群时<span class="selector-tag">session</span>同步问题所需<span class="selector-tag">jar</span>包</div><div class="line">    <span class="selector-tag">asm-3</span><span class="selector-class">.2</span><span class="selector-class">.jar</span>, <span class="selector-tag">couchbase-client-1</span><span class="selector-class">.2</span><span class="selector-class">.2</span><span class="selector-class">.jar</span>, </div><div class="line">    <span class="selector-tag">kryo-1</span><span class="selector-class">.04</span><span class="selector-class">.jar</span>, <span class="selector-tag">kryo-serializers-0</span><span class="selector-class">.11</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">msm-kryo-serializer-1</span><span class="selector-class">.6</span><span class="selector-class">.5</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">memcached-session-manager-1</span><span class="selector-class">.6</span><span class="selector-class">.5</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">memcached-session-manager-tc6-1</span><span class="selector-class">.6</span><span class="selector-class">.5</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">minlog-1</span><span class="selector-class">.2</span><span class="selector-class">.jar</span>, <span class="selector-tag">reflectasm-1</span><span class="selector-class">.01</span><span class="selector-class">.jar</span></div><div class="line">    <span class="selector-tag">spymemcached-2</span><span class="selector-class">.10</span><span class="selector-class">.2</span><span class="selector-class">.jar</span></div></pre></td></tr></table></figure>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2014/10/29/apache-3tomcat-cluster-jk-memcached/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/10/28/vsphere-recover-from-missing-vmdk/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/10/28/vsphere-recover-from-missing-vmdk/" itemprop="url">
-                  误删vSphere虚拟机.vmdk文件的恢复
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-10-28T15:21:25+08:00">
-                2014-10-28
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Virtualization/" itemprop="url" rel="index">
-                    <span itemprop="name">Virtualization</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2014/10/28/vsphere-recover-from-missing-vmdk/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2014/10/28/vsphere-recover-from-missing-vmdk/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2014/10/28/vsphere-recover-from-missing-vmdk/" class="leancloud_visitors" data-flag-title="误删vSphere虚拟机.vmdk文件的恢复">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <h2 id="1-错误描述"><a href="#1-错误描述" class="headerlink" title="1. 错误描述"></a>1. 错误描述</h2><p>在vSphere上，一次重启虚拟服务器时出现启动不了，提示找不到vmdk虚拟磁盘文件：<br><img src="http://sean-images.qiniudn.com/vmdk_not_found.png" alt="vmdk_not_found"></p>
-<h2 id="2-原因分析"><a href="#2-原因分析" class="headerlink" title="2. 原因分析"></a>2. 原因分析</h2><p>查看这台虚拟服务器的摘要信息，对比datastore上其他可用的虚拟机，发现损坏的服务器上确实缺少一个vmdk磁盘文件，但是可以看见一个50G的<code>xxx-flat.vmdk</code>文件；而正常的服务器只有<code>xxx.vmdk</code>，没有<code>xxx-flat.vmdk</code>，关机之后两个文件都存在，而且真实的磁盘容量从vmdk转移到了<code>xxx-flat.vmdk</code>。<br>虚拟主机在运行的时候，实际在使用的是<code>xxx-flat.vmdk</code>，然而<code>xxx.vmdk</code>是可以同时被删除的，才导致了问题。</p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2014/10/28/vsphere-recover-from-missing-vmdk/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -1232,7 +1247,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">111</span>
+                <span class="site-state-item-count">113</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -1254,7 +1269,7 @@
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">120</span>
+                <span class="site-state-item-count">122</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>
