@@ -93,19 +93,19 @@
 
 
 
-<meta name="description" content="最近一段时间一边在线上抓取SQL来优化，一边在整理这个开发规范，尽量减少新的问题SQL进入生产库。今天也是对公司的开发做了一次培训，PPT就不放上来了，里面有十来个生产SQL的案例。因为规范大部分还是具有通用性，所以也借鉴了像去哪儿和赶集的规范，但实际在撰写本文的过程中，每一条规范的背后无不是在工作中有参照的反面例子的。如果时间可以的话，会抽出一部分或分析其原理，或用案例证明。
-1. 命名规范">
+<meta name="description" content="updated: 2017-11-12
+最近一段时间一边在线上抓取SQL来优化，一边在整理这个开发规范，尽量减少新的问题SQL进入生产库。今天也是对公司的开发做了一次培训，PPT就不放上来了，里面有十来个生产SQL的案例。因为规范大部分还是具有通用性，所以也借鉴了像去哪儿和赶集的规范，但实际在撰写本文的过程中，每一条规范的背后无不是在工作中有参照的反面例子的。如果时间可以的话，会抽出一部分或分析">
 <meta property="og:type" content="article">
 <meta property="og:title" content="MySQL数据库开发规范-EC">
 <meta property="og:url" content="http://seanlook.com/2016/05/11/mysql-dev-principle-ec/index.html">
 <meta property="og:site_name" content="Sean's Notes">
-<meta property="og:description" content="最近一段时间一边在线上抓取SQL来优化，一边在整理这个开发规范，尽量减少新的问题SQL进入生产库。今天也是对公司的开发做了一次培训，PPT就不放上来了，里面有十来个生产SQL的案例。因为规范大部分还是具有通用性，所以也借鉴了像去哪儿和赶集的规范，但实际在撰写本文的过程中，每一条规范的背后无不是在工作中有参照的反面例子的。如果时间可以的话，会抽出一部分或分析其原理，或用案例证明。
-1. 命名规范">
-<meta property="og:updated_time" content="2016-05-11T08:32:49.000Z">
+<meta property="og:description" content="updated: 2017-11-12
+最近一段时间一边在线上抓取SQL来优化，一边在整理这个开发规范，尽量减少新的问题SQL进入生产库。今天也是对公司的开发做了一次培训，PPT就不放上来了，里面有十来个生产SQL的案例。因为规范大部分还是具有通用性，所以也借鉴了像去哪儿和赶集的规范，但实际在撰写本文的过程中，每一条规范的背后无不是在工作中有参照的反面例子的。如果时间可以的话，会抽出一部分或分析">
+<meta property="og:updated_time" content="2017-11-11T08:32:49.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="MySQL数据库开发规范-EC">
-<meta name="twitter:description" content="最近一段时间一边在线上抓取SQL来优化，一边在整理这个开发规范，尽量减少新的问题SQL进入生产库。今天也是对公司的开发做了一次培训，PPT就不放上来了，里面有十来个生产SQL的案例。因为规范大部分还是具有通用性，所以也借鉴了像去哪儿和赶集的规范，但实际在撰写本文的过程中，每一条规范的背后无不是在工作中有参照的反面例子的。如果时间可以的话，会抽出一部分或分析其原理，或用案例证明。
-1. 命名规范">
+<meta name="twitter:description" content="updated: 2017-11-12
+最近一段时间一边在线上抓取SQL来优化，一边在整理这个开发规范，尽量减少新的问题SQL进入生产库。今天也是对公司的开发做了一次培训，PPT就不放上来了，里面有十来个生产SQL的案例。因为规范大部分还是具有通用性，所以也借鉴了像去哪儿和赶集的规范，但实际在撰写本文的过程中，每一条规范的背后无不是在工作中有参照的反面例子的。如果时间可以的话，会抽出一部分或分析">
 
 
 
@@ -440,24 +440,27 @@ http://highdb.com/mysql%E5%BC%80%E5%8F%91%E8%A7%84%E8%8C%83/
 http://blog.csdn.net/xlgen157387/article/details/48086607
 http://www.iteye.com/topic/1141229
 -->
+<p>updated: 2017-11-12</p>
 <p>最近一段时间一边在线上抓取SQL来优化，一边在整理这个开发规范，尽量减少新的问题SQL进入生产库。今天也是对公司的开发做了一次培训，PPT就不放上来了，里面有十来个生产SQL的案例。因为规范大部分还是具有通用性，所以也借鉴了像去哪儿和赶集的规范，但实际在撰写本文的过程中，每一条规范的背后无不是在工作中有参照的反面例子的。如果时间可以的话，会抽出一部分或分析其原理，或用案例证明。</p>
 <h2 id="1-命名规范"><a href="#1-命名规范" class="headerlink" title="1. 命名规范"></a>1. 命名规范</h2><ol>
 <li><h3 id="库名、表名、字段名必须使用小写字母，并采用下划线分割"><a href="#库名、表名、字段名必须使用小写字母，并采用下划线分割" class="headerlink" title="库名、表名、字段名必须使用小写字母，并采用下划线分割"></a>库名、表名、字段名必须使用小写字母，并采用下划线分割</h3><ul>
 <li>MySQL有配置参数lower_case_table_names=1，即库表名以小写存储，大小写不敏感。如果是0，则库表名以实际情况存储，大小写敏感；如果是2，以实际情况存储，但以小写比较。</li>
 <li>如果大小写混合使用，可能存在abc，Abc，ABC等多个表共存，容易导致混乱。</li>
 <li>字段名显示区分大小写，但实际使⽤时不区分，即不可以建立两个名字一样但大小写不一样的字段。</li>
-<li>为了统一规范， 库名、表名、字段名使用小写字母。</li>
+<li>为了统一规范， 库名、表名、字段名使用小写字母，不允许 <code>-</code> 号。</li>
 </ul>
 </li>
 <li><h3 id="库名以-d-开头，表名以-t-开头，字段名以-f-开头"><a href="#库名以-d-开头，表名以-t-开头，字段名以-f-开头" class="headerlink" title="库名以 d 开头，表名以 t 开头，字段名以 f_ 开头"></a>库名以 d<em> 开头，表名以 t</em> 开头，字段名以 f_ 开头</h3><ul>
 <li>比如表 <code>t_crm_relation</code>，中间的 crm 代表业务模块名</li>
+<li>库名，如果不是分库，两个不同db实例里面的db名，不能相同，以免混淆</li>
 <li>视图以<code>view_</code>开头，事件以<code>event_</code>开头，触发器以<code>trig_</code>开头，存储过程以<code>proc_</code>开头，函数以<code>func_</code>开头</li>
 <li>普通索引以<code>idx_col1_col2</code>命名，唯一索引以<code>uk_col1_col2</code>命名（可去掉f_公共部分）。如 idx_companyid_corpid_contacttime(f_company_id,f_corp_id,f_contact_time)</li>
+<li>如果某些特殊情况需要在sql里面指定索引，select * from t_test using index(idx_i_abc)，这种所以如果可以，命名的时候加上 i 分隔，如idx_i_corpid, uk_i_user，方便DBA在修改索引的时候会注意到这个 i 标识，不能随意修改这个索引(名称)，否则查询会出错。当然这种情况尽量不要出现。</li>
 </ul>
 </li>
 <li><h3 id="库名、表名、字段名禁止超过32个字符，需见名知意"><a href="#库名、表名、字段名禁止超过32个字符，需见名知意" class="headerlink" title="库名、表名、字段名禁止超过32个字符，需见名知意"></a>库名、表名、字段名禁止超过32个字符，需见名知意</h3><p>库名、表名、字段名支持最多64个字符，但为了统一规范、易于辨识以及减少传输量，禁止超过32个字符</p>
 </li>
-<li><h3 id="临时库、表名须以tmp加日期为后缀"><a href="#临时库、表名须以tmp加日期为后缀" class="headerlink" title="临时库、表名须以tmp加日期为后缀"></a>临时库、表名须以tmp加日期为后缀</h3><p>如 t_crm_relation_tmp0425。备份表也类似，形如 <code>_bak20160425</code> 。</p>
+<li><h3 id="临时用的库、表名须以tmp位前缀，日期为后缀"><a href="#临时用的库、表名须以tmp位前缀，日期为后缀" class="headerlink" title="临时用的库、表名须以tmp位前缀，日期为后缀"></a>临时用的库、表名须以tmp位前缀，日期为后缀</h3><p>如 <code>tmp_t_crm_relation_0425</code>。备份表也类似，形如 bak_t_xxxx_20160425 ，这样便于查找和知道有效期。<br>正常业务里用的临时表、中间表，后缀尽量不要包含 tmp 命名，以免造成歧义。</p>
 </li>
 <li><h3 id="按日期时间分表须符合-YYYY-MM-DD-格式"><a href="#按日期时间分表须符合-YYYY-MM-DD-格式" class="headerlink" title="按日期时间分表须符合_YYYY[MM][DD]格式"></a>按日期时间分表须符合_YYYY[MM][DD]格式</h3><p>这也是为将来有可能分表做准备的，比如<code>t_crm_ec_record_201403</code>，但像 t_crm_contact_at201506就打破了这种规范。<br>不具有时间特性的，直接以 <code>t_tbname_001</code> 这样的方式命名。</p>
 </li>
@@ -465,9 +468,9 @@ http://www.iteye.com/topic/1141229
 <h2 id="2-库表基础规范"><a href="#2-库表基础规范" class="headerlink" title="2. 库表基础规范"></a>2. 库表基础规范</h2><ol>
 <li><h3 id="使用Innodb存储引擎"><a href="#使用Innodb存储引擎" class="headerlink" title="使用Innodb存储引擎"></a>使用Innodb存储引擎</h3><p>5.5版本开始mysql默认存储引擎就是InnoDB，5.7版本开始，系统表都放弃MyISAM了。</p>
 </li>
-<li><h3 id="表字符集统一使用UTF8"><a href="#表字符集统一使用UTF8" class="headerlink" title="表字符集统一使用UTF8"></a>表字符集统一使用UTF8</h3><ul>
+<li><h3 id="表字符集统一使用UTF8MB4"><a href="#表字符集统一使用UTF8MB4" class="headerlink" title="表字符集统一使用UTF8MB4"></a>表字符集统一使用UTF8MB4</h3><ul>
 <li>UTF8字符集存储汉字占用3个字节，存储英文字符占用一个字节</li>
-<li>校对字符集使用默认的 utf8_general_ci</li>
+<li>校对字符集使用默认的 utf8mb4_general_ci。特别对于使用GUI设计表结构时，要检查它生成的sql定义</li>
 <li>连接的客户端也使用utf8，建立连接时指定charset或<code>SET NAMES UTF8;</code>。（对于已经在项目中长期使用latin1的，救不了了）</li>
 <li>如果遇到EMOJ等表情符号的存储需求，可申请使用UTF8MB4字符集</li>
 </ul>
@@ -484,9 +487,10 @@ http://www.iteye.com/topic/1141229
 </li>
 <li><h3 id="所有表都必须要显式指定主键"><a href="#所有表都必须要显式指定主键" class="headerlink" title="所有表都必须要显式指定主键"></a>所有表都必须要显式指定主键</h3><ul>
 <li>主键尽量采用自增方式，InnoDB表实际是一棵索引组织表，顺序存储可以提高存取效率，充分利用磁盘空间。还有对一些复杂查询可能需要自连接来优化时需要用到。</li>
-<li>需要全局唯一主键时，使用外部发号器ticket server（建设中）</li>
+<li>只有需要全局唯一主键时，使用外部自增id服务</li>
 <li>如果没有主键或唯一索引，update/delete是通过所有字段来定位操作的行，相当于每行就是一次全表扫描</li>
 <li>少数情况可以使用联合唯一主键，需与DBA协商</li>
+<li>对于主键字段值是从其它地方插入（非自己使用AUTO_INCREMENT生产），去掉auto_increment定义。比如一些31天表、历史月份表上，不要auto_increment属性；再必须全局id服务获取的主键。</li>
 </ul>
 </li>
 <li><h3 id="不强制使用外键参考"><a href="#不强制使用外键参考" class="headerlink" title="不强制使用外键参考"></a>不强制使用外键参考</h3><p>即使2个表的字段有明确的外键参考关系，也不使用 FOREIGN KEY ，因为新纪录会去主键表做校验，影响性能。</p>
@@ -503,12 +507,12 @@ http://www.iteye.com/topic/1141229
 <li>事件（event）也是一种偷懒的表现，目前已经遇到数次由于定时任务执行失败影响业务的情况，而且mysql无法对它做失败预警。建立专门的 job scheduler 平台。</li>
 </ul>
 <ol>
-<li><h3 id="单表数据量控制在5000w以内"><a href="#单表数据量控制在5000w以内" class="headerlink" title="单表数据量控制在5000w以内"></a>单表数据量控制在5000w以内</h3></li>
+<li><h3 id="单表数据量控制在5000w以内"><a href="#单表数据量控制在5000w以内" class="headerlink" title="单表数据量控制在5000w以内"></a>单表数据量控制在5000w以内</h3>表字段数量不要超过20个，如果有需要建立主副表，主键一一关联，避免单行数据过多以及修改记录binlog ROW模式导致文件过大。<br>特别对于有一个text/blob或很大长度的varchar字段时，更应考虑单独存储。但也要注意查询条件尽量放在一个表上。</li>
 <li><h3 id="数据库中不允许存储明文密码"><a href="#数据库中不允许存储明文密码" class="headerlink" title="数据库中不允许存储明文密码"></a>数据库中不允许存储明文密码</h3></li>
 </ol>
 <h2 id="3-字段规范"><a href="#3-字段规范" class="headerlink" title="3. 字段规范"></a>3. 字段规范</h2><ol>
 <li><h3 id="char、varchar、text等字符串类型定义"><a href="#char、varchar、text等字符串类型定义" class="headerlink" title="char、varchar、text等字符串类型定义"></a>char、varchar、text等字符串类型定义</h3><ul>
-<li>对于长度基本固定的列，如果该列恰好更新又特别频繁，适合char</li>
+<li>对于长度基本固定的列，如果该列恰好更新又特别频繁，适合char。 utf8mb4字符集下，尽量使用varchar</li>
 <li>varchar虽然存储变长字符串，但不可太小也不可太大。UTF8最多能存21844个汉字，或65532个英文</li>
 <li>varbinary(M)保存的是二进制字符串，它保存的是字节而不是字符，所以没有字符集的概念，M长度0-255（字节）。只用于排序或比较时大小写敏感的类型，不包括密码存储</li>
 <li>TEXT类型与VARCHAR都类似，存储可变长度，最大限制也是2^16，但是它20bytes以后的内容是在数据页以外的空间存储（row_format=dynamic），对它的使用需要多一次寻址，没有默认值。<br>一般用于存放容量平均都很大、操作没有其它字段那样频繁的值。<br>网上部分文章说要避免使用text和blob，要知道如果纯用varchar可能会导致行溢出，效果差不多，但因为每行占用字节数过多，会导致buffer_pool能缓存的数据行、页下降。另外text和blob上面一般不会去建索引，而是利用sphinx之类的第三方全文搜索引擎，如果确实要创建（前缀）索引，那就会影响性能。凡事看具体场景。<br>另外尽可能把text/blob拆到另一个表中</li>
@@ -518,16 +522,18 @@ http://www.iteye.com/topic/1141229
 <li><h3 id="int、tinyint、decimal等数字类型定义"><a href="#int、tinyint、decimal等数字类型定义" class="headerlink" title="int、tinyint、decimal等数字类型定义"></a>int、tinyint、decimal等数字类型定义</h3><ul>
 <li>使用tinyint来代替 enum和boolean<br>ENUM类型在需要修改或增加枚举值时，需要在线DDL，成本较高；ENUM列值如果含有数字类型，可能会引起默认值混淆<br>tinyint使用1个字节，一般用于status,type,flag的列</li>
 <li>建议使用 UNSIGNED 存储非负数值<br>相比不使用 unsigned，可以扩大一倍使用数值范围</li>
-<li>int使用固定4个字节存储，int(11)与int(4)只是显示宽度的区别</li>
+<li>int使用固定4个字节存储，int(11)与int(4)只是显示宽度的区别。但是定义是bigint(20), int(11)，不要随便改动这个显示宽度，c++里面需要这个长度去截取字段</li>
 <li>使用Decimal 代替float/double存储精确浮点数<br>对于货币、金额这样的类型，使用decimal，如 decimal(9,2)。float默认只能能精确到6位有效数字</li>
 </ul>
 </li>
 <li><h3 id="timestamp与datetime选择"><a href="#timestamp与datetime选择" class="headerlink" title="timestamp与datetime选择"></a>timestamp与datetime选择</h3><ul>
-<li>datetime 和 timestamp类型所占的存储空间不同，前者8个字节，后者4个字节，这样造成的后果是两者能表示的时间范围不同。前者范围为1000-01-01 00:00:00 ~ 9999-12-31 23:59:59，后者范围为 1970-01-01 08:00:01 到 2038-01-19 11:14:07 。所以 TIMESTAMP 支持的范围比 DATATIME 要小。</li>
+<li>datetime 和 timestamp类型所占的存储空间不同，前者5个字节(5.5是8字节)，后者4个字节，这样造成的后果是两者能表示的时间范围不同。前者范围为1000-01-01 00:00:00 ~ 9999-12-31 23:59:59，后者范围为 1970-01-01 08:00:01 到 2038-01-19 11:14:07 。所以 TIMESTAMP 支持的范围比 DATATIME 要小。</li>
 <li>timestamp可以在insert/update行时，自动更新时间字段（如 f_set_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP），但一个表只能有一个这样的定义。</li>
 <li>timestamp显示与时区有关，内部总是以 UTC 毫秒 来存的。还受到严格模式的限制</li>
 <li>优先使用timestamp，datetime也没问题</li>
+<li>默认时间，要么current_timestamp，要么’1970-01-02 01:01:01’，不要设置为’’或0</li>
 <li>where条件里不要对时间列上使用时间函数</li>
+<li>如果使用int的型存储时间戳，约定统一使用 int unsigned default 0</li>
 </ul>
 </li>
 <li><h3 id="建议字段都定义为NOT-NULL"><a href="#建议字段都定义为NOT-NULL" class="headerlink" title="建议字段都定义为NOT NULL"></a>建议字段都定义为NOT NULL</h3><ul>
@@ -592,6 +598,8 @@ http://www.iteye.com/topic/1141229
 </li>
 <li><h3 id="尽量不要在频繁更新的列上创建索引"><a href="#尽量不要在频繁更新的列上创建索引" class="headerlink" title="尽量不要在频繁更新的列上创建索引"></a>尽量不要在频繁更新的列上创建索引</h3><p>如不在定义了 ON UPDATE CURRENT_STAMP 的列上创建索引，维护成本太高（好在mysql有insert buffer，会合并索引的插入）</p>
 </li>
+<li><p>修改表结构时 drop colum 时要注意，与这个字段相关的索引都会改变，变化是从原索引抽掉该字段定义。这种情况有可能导致部分索引重复或失效。</p>
+</li>
 </ol>
 <h2 id="5-SQL设计"><a href="#5-SQL设计" class="headerlink" title="5. SQL设计"></a>5. SQL设计</h2><ol>
 <li><h3 id="杜绝直接-SELECT-读取全部字段"><a href="#杜绝直接-SELECT-读取全部字段" class="headerlink" title="杜绝直接 SELECT * 读取全部字段"></a>杜绝直接 SELECT * 读取全部字段</h3><p> 即使需要所有字段，减少网络带宽消耗，能有效利用覆盖索引，表结构变更对程序基本无影响</p>
@@ -624,7 +632,7 @@ http://www.iteye.com/topic/1141229
 <li><h3 id="使用join时，where条件尽量使用充分利用同一表上的索引"><a href="#使用join时，where条件尽量使用充分利用同一表上的索引" class="headerlink" title="使用join时，where条件尽量使用充分利用同一表上的索引"></a>使用join时，where条件尽量使用充分利用同一表上的索引</h3><ul>
 <li>如 select t1.a,t2.b * from t1,t2 and t1.a=t2.a and t1.b=123 and t2.c= 4 ，如果t1.c与t2.c字段相同，那么t1上的索引(b,c)就只用到b了。此时如果把where条件中的t2.c=4改成t1.c=4，那么可以用到完整的索引</li>
 <li>这种情况可能会在字段冗余设计（反范式）时出现</li>
-<li>正确选取inner join和left join</li>
+<li>正确选取inner join和left join。不允许滥用left join</li>
 </ul>
 </li>
 <li><h3 id="少用子查询，改用join"><a href="#少用子查询，改用join" class="headerlink" title="少用子查询，改用join"></a>少用子查询，改用join</h3><p>小于5.6版本时，子查询效率很低，不像Oracle那样先计算子查询后外层查询。5.6版本开始得到优化</p>
@@ -634,9 +642,9 @@ http://www.iteye.com/topic/1141229
 <li>如果UNION结果中有使用limit，在2个子SQL可能有许多返回值的情况下，各自加上limit。如果还有order by，请找DBA。</li>
 </ul>
 </li>
-<li><h3 id="IN的内容尽量不超过200个"><a href="#IN的内容尽量不超过200个" class="headerlink" title="IN的内容尽量不超过200个"></a>IN的内容尽量不超过200个</h3><p>超过500个值使用批量的方式，否则一次执行会影响数据库的并发能力，因为单SQL只能且一直占用单CPU，而且可能导致主从复制延迟</p>
+<li><h3 id="IN的内容尽量不超过200个"><a href="#IN的内容尽量不超过200个" class="headerlink" title="IN的内容尽量不超过200个"></a>IN的内容尽量不超过200个</h3><p>超过500个值使用批量的方式，否则一次执行会影响数据库的并发能力，因为单SQL只能且一直占用单CPU，而且可能导致主从复制延迟。</p>
 </li>
-<li><h3 id="拒绝大事务"><a href="#拒绝大事务" class="headerlink" title="拒绝大事务"></a>拒绝大事务</h3><p>比如在一个事务里进行多个select，多个update，如果是高频事务，会严重影响MySQL并发能力，因为事务持有的锁等资源只在事务rollback/commit时才能释放。但同时也要权衡数据写入的一致性。</p>
+<li><h3 id="拒绝大事务"><a href="#拒绝大事务" class="headerlink" title="拒绝大事务"></a>拒绝大事务</h3><p>比如在一个事务里进行多个select，多个update，如果是高频事务，会严重影响MySQL并发能力，因为事务持有的锁等资源只在事务rollback/commit时才能释放。但同时也要权衡数据写入的一致性。<br>不要再事务里面做除数据库以外的操作。</p>
 </li>
 <li><h3 id="避免使用is-null-is-not-null这样的比较"><a href="#避免使用is-null-is-not-null这样的比较" class="headerlink" title="避免使用is null, is not null这样的比较"></a>避免使用is null, is not null这样的比较</h3></li>
 <li><h3 id="order-by-limit"><a href="#order-by-limit" class="headerlink" title="order by .. limit"></a>order by .. limit</h3><p>这种查询更多的是通过索引去优化，但order by的字段有讲究，比如主键id与f_time都是顺序递增，那就可以考虑order by id而非 f_time 。</p>
@@ -665,6 +673,10 @@ http://www.iteye.com/topic/1141229
 <li>SQL中不允许出现DDL语句。一般也不给予create/alter这类权限，但阿里云RDS只区分读写用户</li>
 </ul>
 </li>
+<li><p>是否应该 order by 主键<br>许多排序的场景，如果主键id是增长的，如果 order by f_create_time 查询慢，有可能使用了filesort，此时最简单的办法是看能否换成 order by id，因为id作为主键是递增的，并且附带在了每个二级索引后面。<br>但是也要谨慎使用 order by id，特别是在explain结果看到filesort的情况下，优化器极有可能放弃这个filesort，而选择了它所认为更高效的扫描方式，实则更慢。</p>
+</li>
+<li><p>使用正确的表<br>比如要统计昨天的数据这类业务较多，是否可以设计一个昨天表，不在31天表上统计，在月份表上统计也行。<br>或者其它组已经有“半统计”的数据，从他们那抽取数据，而不是在原始数据上统计</p>
+</li>
 </ol>
 <h2 id="6-行为规范"><a href="#6-行为规范" class="headerlink" title="6. 行为规范"></a>6. 行为规范</h2><ul>
 <li>不允许在DBA不知情的情况下导现网数据</li>
@@ -672,6 +684,13 @@ http://www.iteye.com/topic/1141229
 <li>及时处理已下线业务的SQL</li>
 <li>复杂sql上线审核<br>因为目前还没有SQL审查机制，复杂sql如多表join,count,group by，主动上报DBA评估。</li>
 <li>重要项目的数据库方案选型和设计必须提前通知DBA参与</li>
+</ul>
+<h2 id="7-DBA运维规范"><a href="#7-DBA运维规范" class="headerlink" title="7. DBA运维规范"></a>7. DBA运维规范</h2><p>这部分可另起一篇规范了，这里先开个头。</p>
+<ul>
+<li>安装初始化MySQL，严格安装约定的目录、配置文件、权限、参数来初始化</li>
+<li>第一时间添加监控、备份</li>
+<li>定期巡检</li>
+<li>对先上过期废弃的表，及时与开发确认归档清除，同时也要注意与它相关的视图、过程、事件等。</li>
 </ul>
 <h2 id="本文参考"><a href="#本文参考" class="headerlink" title="本文参考"></a>本文参考</h2><ul>
 <li><a href="http://wangwei007.blog.51cto.com/68019/1709769" target="_blank" rel="external">互联网MySQL开发规范</a> 这个基本也是《去哪儿MySQL开发规范.pdf》版本</li>
@@ -918,7 +937,7 @@ http://www.iteye.com/topic/1141229
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-命名规范"><span class="nav-text">1. 命名规范</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#库名、表名、字段名必须使用小写字母，并采用下划线分割"><span class="nav-text">库名、表名、字段名必须使用小写字母，并采用下划线分割</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#库名以-d-开头，表名以-t-开头，字段名以-f-开头"><span class="nav-text">库名以 d 开头，表名以 t 开头，字段名以 f_ 开头</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#库名、表名、字段名禁止超过32个字符，需见名知意"><span class="nav-text">库名、表名、字段名禁止超过32个字符，需见名知意</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#临时库、表名须以tmp加日期为后缀"><span class="nav-text">临时库、表名须以tmp加日期为后缀</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#按日期时间分表须符合-YYYY-MM-DD-格式"><span class="nav-text">按日期时间分表须符合_YYYY[MM][DD]格式</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-库表基础规范"><span class="nav-text">2. 库表基础规范</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#使用Innodb存储引擎"><span class="nav-text">使用Innodb存储引擎</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#表字符集统一使用UTF8"><span class="nav-text">表字符集统一使用UTF8</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#所有表都要添加注释"><span class="nav-text">所有表都要添加注释</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#控制单表字段数量"><span class="nav-text">控制单表字段数量</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#所有表都必须要显式指定主键"><span class="nav-text">所有表都必须要显式指定主键</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#不强制使用外键参考"><span class="nav-text">不强制使用外键参考</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#适度使用存储过程、视图，禁止使用触发器、事件"><span class="nav-text">适度使用存储过程、视图，禁止使用触发器、事件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#单表数据量控制在5000w以内"><span class="nav-text">单表数据量控制在5000w以内</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#数据库中不允许存储明文密码"><span class="nav-text">数据库中不允许存储明文密码</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-字段规范"><span class="nav-text">3. 字段规范</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#char、varchar、text等字符串类型定义"><span class="nav-text">char、varchar、text等字符串类型定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#int、tinyint、decimal等数字类型定义"><span class="nav-text">int、tinyint、decimal等数字类型定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#timestamp与datetime选择"><span class="nav-text">timestamp与datetime选择</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#建议字段都定义为NOT-NULL"><span class="nav-text">建议字段都定义为NOT NULL</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#同一意义的字段定义必须相同"><span class="nav-text">同一意义的字段定义必须相同</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-索引规范"><span class="nav-text">4. 索引规范</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#任何新的select-update-delete上线，都要先explain，看索引使用情况"><span class="nav-text">任何新的select,update,delete上线，都要先explain，看索引使用情况</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#索引个数限制"><span class="nav-text">索引个数限制</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#避免冗余索引"><span class="nav-text">避免冗余索引</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#没有特殊要求，使用自增id作为主键"><span class="nav-text">没有特殊要求，使用自增id作为主键</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#索引尽量建在选择性高的列上"><span class="nav-text">索引尽量建在选择性高的列上</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#最左前缀原则"><span class="nav-text">最左前缀原则</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#前缀索引"><span class="nav-text">前缀索引</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#合理使用覆盖索引减少IO"><span class="nav-text">合理使用覆盖索引减少IO</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#尽量不要在频繁更新的列上创建索引"><span class="nav-text">尽量不要在频繁更新的列上创建索引</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-SQL设计"><span class="nav-text">5. SQL设计</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#杜绝直接-SELECT-读取全部字段"><span class="nav-text">杜绝直接 SELECT * 读取全部字段</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#能确定返回结果只有一条时，使用-limit-1"><span class="nav-text">能确定返回结果只有一条时，使用 limit 1</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#小心隐式类型转换"><span class="nav-text">小心隐式类型转换</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#禁止在where条件列上使用函数"><span class="nav-text">禁止在where条件列上使用函数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#使用like模糊匹配，-不要放首位"><span class="nav-text">使用like模糊匹配，%不要放首位</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#涉及到复杂sql时，务必先参考已有索引设计，先explain"><span class="nav-text">涉及到复杂sql时，务必先参考已有索引设计，先explain</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#使用join时，where条件尽量使用充分利用同一表上的索引"><span class="nav-text">使用join时，where条件尽量使用充分利用同一表上的索引</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#少用子查询，改用join"><span class="nav-text">少用子查询，改用join</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#考虑使用union-all，少使用union，注意考虑去重"><span class="nav-text">考虑使用union all，少使用union，注意考虑去重</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#IN的内容尽量不超过200个"><span class="nav-text">IN的内容尽量不超过200个</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#拒绝大事务"><span class="nav-text">拒绝大事务</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#避免使用is-null-is-not-null这样的比较"><span class="nav-text">避免使用is null, is not null这样的比较</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#order-by-limit"><span class="nav-text">order by .. limit</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#c1-lt-a-order-by-c2"><span class="nav-text">c1 < a order by c2</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#分页优化"><span class="nav-text">分页优化</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#count计数"><span class="nav-text">count计数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#delete-update语句改成select再explain"><span class="nav-text">delete,update语句改成select再explain</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#减少与数据库交互的次数，尽量采用批量SQL语句"><span class="nav-text">减少与数据库交互的次数，尽量采用批量SQL语句</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#杜绝危险SQL"><span class="nav-text">杜绝危险SQL</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-行为规范"><span class="nav-text">6. 行为规范</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#本文参考"><span class="nav-text">本文参考</span></a></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-命名规范"><span class="nav-text">1. 命名规范</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#库名、表名、字段名必须使用小写字母，并采用下划线分割"><span class="nav-text">库名、表名、字段名必须使用小写字母，并采用下划线分割</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#库名以-d-开头，表名以-t-开头，字段名以-f-开头"><span class="nav-text">库名以 d 开头，表名以 t 开头，字段名以 f_ 开头</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#库名、表名、字段名禁止超过32个字符，需见名知意"><span class="nav-text">库名、表名、字段名禁止超过32个字符，需见名知意</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#临时用的库、表名须以tmp位前缀，日期为后缀"><span class="nav-text">临时用的库、表名须以tmp位前缀，日期为后缀</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#按日期时间分表须符合-YYYY-MM-DD-格式"><span class="nav-text">按日期时间分表须符合_YYYY[MM][DD]格式</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-库表基础规范"><span class="nav-text">2. 库表基础规范</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#使用Innodb存储引擎"><span class="nav-text">使用Innodb存储引擎</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#表字符集统一使用UTF8MB4"><span class="nav-text">表字符集统一使用UTF8MB4</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#所有表都要添加注释"><span class="nav-text">所有表都要添加注释</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#控制单表字段数量"><span class="nav-text">控制单表字段数量</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#所有表都必须要显式指定主键"><span class="nav-text">所有表都必须要显式指定主键</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#不强制使用外键参考"><span class="nav-text">不强制使用外键参考</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#适度使用存储过程、视图，禁止使用触发器、事件"><span class="nav-text">适度使用存储过程、视图，禁止使用触发器、事件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#单表数据量控制在5000w以内"><span class="nav-text">单表数据量控制在5000w以内</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#数据库中不允许存储明文密码"><span class="nav-text">数据库中不允许存储明文密码</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-字段规范"><span class="nav-text">3. 字段规范</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#char、varchar、text等字符串类型定义"><span class="nav-text">char、varchar、text等字符串类型定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#int、tinyint、decimal等数字类型定义"><span class="nav-text">int、tinyint、decimal等数字类型定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#timestamp与datetime选择"><span class="nav-text">timestamp与datetime选择</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#建议字段都定义为NOT-NULL"><span class="nav-text">建议字段都定义为NOT NULL</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#同一意义的字段定义必须相同"><span class="nav-text">同一意义的字段定义必须相同</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-索引规范"><span class="nav-text">4. 索引规范</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#任何新的select-update-delete上线，都要先explain，看索引使用情况"><span class="nav-text">任何新的select,update,delete上线，都要先explain，看索引使用情况</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#索引个数限制"><span class="nav-text">索引个数限制</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#避免冗余索引"><span class="nav-text">避免冗余索引</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#没有特殊要求，使用自增id作为主键"><span class="nav-text">没有特殊要求，使用自增id作为主键</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#索引尽量建在选择性高的列上"><span class="nav-text">索引尽量建在选择性高的列上</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#最左前缀原则"><span class="nav-text">最左前缀原则</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#前缀索引"><span class="nav-text">前缀索引</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#合理使用覆盖索引减少IO"><span class="nav-text">合理使用覆盖索引减少IO</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#尽量不要在频繁更新的列上创建索引"><span class="nav-text">尽量不要在频繁更新的列上创建索引</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-SQL设计"><span class="nav-text">5. SQL设计</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#杜绝直接-SELECT-读取全部字段"><span class="nav-text">杜绝直接 SELECT * 读取全部字段</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#能确定返回结果只有一条时，使用-limit-1"><span class="nav-text">能确定返回结果只有一条时，使用 limit 1</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#小心隐式类型转换"><span class="nav-text">小心隐式类型转换</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#禁止在where条件列上使用函数"><span class="nav-text">禁止在where条件列上使用函数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#使用like模糊匹配，-不要放首位"><span class="nav-text">使用like模糊匹配，%不要放首位</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#涉及到复杂sql时，务必先参考已有索引设计，先explain"><span class="nav-text">涉及到复杂sql时，务必先参考已有索引设计，先explain</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#使用join时，where条件尽量使用充分利用同一表上的索引"><span class="nav-text">使用join时，where条件尽量使用充分利用同一表上的索引</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#少用子查询，改用join"><span class="nav-text">少用子查询，改用join</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#考虑使用union-all，少使用union，注意考虑去重"><span class="nav-text">考虑使用union all，少使用union，注意考虑去重</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#IN的内容尽量不超过200个"><span class="nav-text">IN的内容尽量不超过200个</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#拒绝大事务"><span class="nav-text">拒绝大事务</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#避免使用is-null-is-not-null这样的比较"><span class="nav-text">避免使用is null, is not null这样的比较</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#order-by-limit"><span class="nav-text">order by .. limit</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#c1-lt-a-order-by-c2"><span class="nav-text">c1 < a order by c2</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#分页优化"><span class="nav-text">分页优化</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#count计数"><span class="nav-text">count计数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#delete-update语句改成select再explain"><span class="nav-text">delete,update语句改成select再explain</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#减少与数据库交互的次数，尽量采用批量SQL语句"><span class="nav-text">减少与数据库交互的次数，尽量采用批量SQL语句</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#杜绝危险SQL"><span class="nav-text">杜绝危险SQL</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-行为规范"><span class="nav-text">6. 行为规范</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-DBA运维规范"><span class="nav-text">7. DBA运维规范</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#本文参考"><span class="nav-text">本文参考</span></a></li></ol></div>
             
 
           </div>
