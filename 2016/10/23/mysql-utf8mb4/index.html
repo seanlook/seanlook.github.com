@@ -445,7 +445,7 @@
 <ul>
 <li>准确性<br><code>utf8mb4_unicode_ci</code> 是基于标准的Unicode来排序和比较，能够在各种语言之间精确排序<br><code>utf8mb4_general_ci</code> 没有实现Unicode排序规则，在遇到某些特殊语言或字符是，排序结果可能不是所期望的。<br><strong>但是在绝大多数情况下，这种特殊字符的顺序一定要那么精确吗</strong>。比如Unicode把<code>ß</code>、<code>Œ</code>当成<code>ss</code>和<code>OE</code>来看；而general会把它们当成<code>s</code>、<code>e</code>，再如<code>ÀÁÅåāă</code>各自都与 <code>A</code> 相等。</li>
 <li>性能<br><code>utf8mb4_general_ci</code> 在比较和排序的时候更快<br><code>utf8mb4_unicode_ci</code> 在特殊情况下，Unicode排序规则为了能够处理特殊字符的情况，实现了略微复杂的排序算法。<br><strong>但是在绝大多数情况下，不会发生此类复杂比较</strong>。general理论上比Unicode可能快些，但相比现在的CPU来说，它远远不足以成为考虑性能的因素，索引涉及、SQL设计才是。<a id="more"></a>
-我个人推荐是 <code>utf8mb4_unicode_ci</code>，将来 8.0 里也极有可能使用变为默认的规则。</li>
+我个人推荐是 <code>utf8mb4_unicode_ci</code>，将来 8.0 里也极有可能使用变为默认的规则。相比选择哪一种collation，使用者应该更关心字符集与排序规则在db里要统一就好。</li>
 </ul>
 <p>这也从另一个角度告诉我们，不要可能产生乱码的字段作为主键或唯一索引。我遇到过一例，以 url 来作为唯一索引，但是它记录的有可能是乱码，导致后来想把它们修复就特别麻烦。</p>
 <h2 id="3-怎么从utf8转换为utf8mb4"><a href="#3-怎么从utf8转换为utf8mb4" class="headerlink" title="3. 怎么从utf8转换为utf8mb4"></a>3. 怎么从utf8转换为utf8mb4</h2><h3 id="3-1-“伪”转换"><a href="#3-1-“伪”转换" class="headerlink" title="3.1 “伪”转换"></a>3.1 “伪”转换</h3><p>如果你的表定义和连接字符集都是utf8，那么直接在你的表上执行<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">ALTER</span> <span class="keyword">TABLE</span> tbl_name <span class="keyword">CONVERT</span> <span class="keyword">TO</span> <span class="built_in">CHARACTER</span> <span class="keyword">SET</span> utf8mb4;</div></pre></td></tr></table></figure></p>
@@ -637,7 +637,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">109</span>
+                <span class="site-state-item-count">111</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -659,7 +659,7 @@
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">119</span>
+                <span class="site-state-item-count">120</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>

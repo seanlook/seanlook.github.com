@@ -1,0 +1,1152 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="en">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="mysql,表结构," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0" />
+
+
+
+
+
+
+<meta name="description" content="mysqldiffmysql官方有个 mysql-utilities 工具集，其中 mysqldiff 可用于比较两个db之间的表结构。mysqldiff的语法格式是：1$ mysqldiff --server1=user:pass@host:port:socket --server2=user:pass@host:port:socket db1.object1:db2.object1 db3:d">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MySQL数据库表结构同步之mysqldiff">
+<meta property="og:url" content="http://seanlook.com/2017/08/05/mysql_mysqldiff/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="mysqldiffmysql官方有个 mysql-utilities 工具集，其中 mysqldiff 可用于比较两个db之间的表结构。mysqldiff的语法格式是：1$ mysqldiff --server1=user:pass@host:port:socket --server2=user:pass@host:port:socket db1.object1:db2.object1 db3:d">
+<meta property="og:updated_time" content="2017-08-05T07:32:49.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="MySQL数据库表结构同步之mysqldiff">
+<meta name="twitter:description" content="mysqldiffmysql官方有个 mysql-utilities 工具集，其中 mysqldiff 可用于比较两个db之间的表结构。mysqldiff的语法格式是：1$ mysqldiff --server1=user:pass@host:port:socket --server2=user:pass@host:port:socket db1.object1:db2.object1 db3:d">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post","offset":12,"offset_float":0,"b2t":false,"scrollpercent":false},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: 'WNWHBKUL26',
+      apiKey: 'cec5cc7d455c77d448433aa60f989766',
+      indexName: 'seanlook',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://seanlook.com/2017/08/05/mysql_mysqldiff/"/>
+
+
+
+
+
+  <title> MySQL数据库表结构同步之mysqldiff | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s95.cnzz.com/z_stat.php?id=1253513173&web_id=1253513173" language="JavaScript"></script>
+  </div>
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Sean's Notes</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">Stay hungry, stay foolish.</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            About
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocapitalize="off" autocomplete="off" autocorrect="off"
+             placeholder="Searching..." spellcheck="false"
+             type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/08/05/mysql_mysqldiff/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                MySQL数据库表结构同步之mysqldiff
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-08-05T15:32:49+08:00">
+                2017-08-05
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2017/08/05/mysql_mysqldiff/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2017/08/05/mysql_mysqldiff/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2017/08/05/mysql_mysqldiff/" class="leancloud_visitors" data-flag-title="MySQL数据库表结构同步之mysqldiff">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h1 id="mysqldiff"><a href="#mysqldiff" class="headerlink" title="mysqldiff"></a>mysqldiff</h1><p>mysql官方有个 mysql-utilities 工具集，其中 mysqldiff 可用于比较两个db之间的表结构。<br>mysqldiff的语法格式是：<br><figure class="highlight groovy"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ mysqldiff --server1=<span class="string">user:</span>pass<span class="meta">@host</span>:<span class="string">port:</span>socket --server2=<span class="string">user:</span>pass<span class="meta">@host</span>:<span class="string">port:</span>socket db1.<span class="string">object1:</span>db2.object1 <span class="string">db3:</span>db4</div></pre></td></tr></table></figure></p>
+<p>这个语法有两个用法：</p>
+<ul>
+<li><code>db1:db2</code>：如果只指定数据库，那么就将两个数据库中互相缺少的对象显示出来，不比较对象里面的差异。这里的对象包括表、存储过程、函数、触发器等。<br>如果db1与db2名字相同，可以只指定 <code>db1</code></li>
+<li><code>db1.object1:db2.object1</code>：如果指定了具体表对象，那么就会详细对比两个表的差异，包括表名、字段名、备注、索引、大小写等所有的表相关的对象。<br>如果两边db和对象名都相同，可以只指定 <code>db1.object1</code></li>
+</ul>
+<p>接下来看一些主要的参数：</p>
+<ul>
+<li><code>--server1</code>：配置server1的连接。</li>
+<li><code>--server2</code>：配置server2的连接。</li>
+<li><code>--character-set</code>：配置连接时用的字符集，如果不显示配置默认使用character_set_client。</li>
+<li><code>--width</code>：配置显示的宽度。</li>
+<li><code>--skip-table-options</code>：保持表的选项不变，即对比的差异里面不包括表名、AUTO_INCREMENT、ENGINE、CHARSET等差异。</li>
+<li><code>-d DIFFTYPE,--difftype=DIFFTYPE</code>：差异的信息显示的方式，有 [unified|context|differ|sql]，默认是unified。如果使用<code>sql</code>，那么就直接生成差异的SQL，这样非常方便。</li>
+<li><code>--changes-for=</code>：修改对象。例如 –changes-for=server2，那么对比以sever1为主，生成的差异的修改也是针对server2的对象的修改。</li>
+<li><code>--show-reverse</code>：在生成的差异修改里面，同时会包含server2和server1的修改。</li>
+<li><code>--force</code>：完成所有的比较，不会在遇到一个差异之后退出</li>
+<li><code>-vv</code>：便于调试，输出许多信息</li>
+<li><code>-q</code>：quiet模式，关闭多余的信息输出</li>
+</ul>
+<h1 id="问题修复与增强"><a href="#问题修复与增强" class="headerlink" title="问题修复与增强"></a>问题修复与增强</h1><p>但是试用下来，发现有以下几大问题</p>
+<ol>
+<li>对象在一方不存在时，比对结果是 object does not exist，而我们通常需要的是，生产 <code>CREATE/DROP XXX</code> 语句</li>
+<li>要比对一个db下面所有的对象（table, view, event, proc, func, trigger），要手动挨个 db1.t1, db2.v2…，而 db1:db2只是检查对象是否存在，不会自动比较db1与db2下的所有对象</li>
+<li>比较时，<code>auto_increment</code>应该忽略，但是 mysqldiff 只提供 <code>--skip-table-options</code> ，忽略全部表选项，包括 auto_increment, engine, charset等等。</li>
+<li>严重bug<ul>
+<li>T1: idx1(f1,f2),  T2: idx1(f1)，这种索引会生成 ADD INDEX idx(f2)</li>
+<li>T1: idx2(f1,f2), idx3(f3,f4),  T2: idx4(f5)，这种组合索引，有可能生成的会乱序</li>
+</ul>
+</li>
+</ol>
+<p>这两个bug与mysqldiff的设计有关系，个人觉得它把比较和生产差异sql完全分开，复杂化了。它得到差异结果之后，生成sql又从db捞各种元数据来组装，其它从差异diff里面就可以获得组装需要的数据，也不容易出现隐藏的bug。参考实现 <a href="https://github.com/hidu/mysql-schema-sync" target="_blank" rel="external">https://github.com/hidu/mysql-schema-sync</a></p>
+<p>针对上面几大问题，花了两天的时间阅读并修改了 mysqldiff 以及相关依赖的代码，都一一解决。<br>修复后的地址：<a href="https://github.com/seanlook/mysql-utilities/commits/master" target="_blank" rel="external">https://github.com/seanlook/mysql-utilities/commits/master</a><br>(mysql-utilities不像percona-toolkit那样每个工具都是All In One，需要改动mysqldiff.py意外的依赖模块)</p>
+<p>默认情况与官方的 mysqldiff 完全兼容，新增3个选项</p>
+<ol>
+<li><code>--include-create</code>：是否生成创建对象(表等)的语句，而不是仅告知对象不存在。只有在 <code>--difftype=sql</code> 时有效。默认False</li>
+<li><code>--include-drop</code>：是否生成DROP对象的语句，针对对象在原db不存在，而仅目标db存在的情况。只有在指定了<code>--include-create</code> 时起作用。drop操作因为比较危险，默认False，所以多加了这个选项</li>
+<li><code>--skip-opt-autoinc</code>：比较时跳过AUTO_INCREMNT。默认False</li>
+<li>比较对象是，指定 <code>db1.*</code>  或 <code>db1.*:db2.*</code> 时，会比较他们所有的对象差异，而不仅显示缺少的对象</li>
+</ol>
+<h2 id="使用注意"><a href="#使用注意" class="headerlink" title="使用注意"></a>使用注意</h2><ol>
+<li>比较时，尽量选择mysql版本相近的实例，比如mysql与mariadb比较，相同的表结构 show create table xxx 时可能得到不同的结果：<ul>
+<li>mariadb会把int字段 default ‘0’ 自动改成 default 0</li>
+<li><code>CURRENT_TIMESTAMP</code>会显示成 <code>current_timestamp()</code></li>
+<li>字段 <code>default NULL</code> 时，mysql connector/python 查 <code>information_schema.COLUMNS.COLUMN_DEFAULT</code> 字段为 <code>‘NULL’</code> （带引号的字符），而不是None（即查出来是NULL），导致与mysql版本用不一样</li>
+</ul>
+</li>
+<li>字段注释 <code>COMMENT &#39;是否批准加入群 默认1批准 0拒绝\0e=&#39;&#39;t_user_g\0&#39;</code> ，是成立的，正常\0后面的都是没用的，但有个 <code>&#39;</code> 号，会导致生产sql时有多余的 <code>&#39;</code> 好，直接执行会失败。<br>所以，字段注释要规范，不要带入这些乱起乱七八糟的字符，特别是用IDE建表时，完成后在命令行 show create table xxx 看一下。</li>
+</ol>
+<a id="more"></a>
+<h1 id="演示对比"><a href="#演示对比" class="headerlink" title="演示对比"></a>演示对比</h1><figure class="highlight oxygene"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line">mysqldiff --server1=ecdba:xx@yyyy:<span class="number">3305</span> --server2=ecdba:xx@yyyy:<span class="number">3305</span> mydb1.t_user:mydb2.t_user  --changes-<span class="keyword">for</span>=server2  --difftype=sql</div><div class="line"># WARNING: <span class="keyword">Using</span> a password <span class="keyword">on</span> the command line <span class="keyword">interface</span> can be insecure.</div><div class="line"># server1 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># server2 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># Comparing mydb1.t_user <span class="keyword">to</span> mydb2.t_user                           [FAIL]</div><div class="line"># Transformation <span class="keyword">for</span> --changes-<span class="keyword">for</span>=server2:</div><div class="line">#</div><div class="line"> </div><div class="line">ALTER TABLE `mydb2`.`t_user`</div><div class="line">  DROP <span class="keyword">INDEX</span> idx_corpid,</div><div class="line">  <span class="keyword">ADD</span> <span class="keyword">INDEX</span> idx_corpid_deptid (f_corp_id,f_dept_id),</div><div class="line">  <span class="keyword">ADD</span> <span class="keyword">INDEX</span> idx_dept (f_dept_id);</div><div class="line"> </div><div class="line"># Compare failed. One <span class="keyword">or</span> more differences found.</div><div class="line">  </div><div class="line">这个地方原版里面会将idx_corpid_deptid生成 <span class="keyword">ADD</span> <span class="keyword">INDEX</span> idx_corpid_deptid(f_corp_id), <span class="keyword">ADD</span> <span class="keyword">INDEX</span> idx_corpid_deptid(f_dept_id)。这里已修复</div></pre></td></tr></table></figure>
+<figure class="highlight stata"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div></pre></td><td class="code"><pre><div class="line">原版：</div><div class="line">mydb1.t_test1:mydb2.t_test1  --changes-<span class="keyword">for</span>=server2  --difftype=sql</div><div class="line"># WARNING: Using a password <span class="keyword">on</span> the command <span class="keyword">line</span> interface can be insecure.</div><div class="line"># server1 <span class="keyword">on</span> 10.xx.xx.127: ... connected.</div><div class="line"># server2 <span class="keyword">on</span> 10.xx.xx.127: ... connected.</div><div class="line"><span class="keyword">ERROR</span>: The object mydb2.t_test1 does not exist.</div><div class="line"> </div><div class="line"> </div><div class="line">新选项 --<span class="keyword">include</span>-create --<span class="keyword">include</span>-<span class="keyword">drop</span></div><div class="line">mydb1.t_test1:mydb2.t_test1  --changes-<span class="keyword">for</span>=server2  --difftype=sql --<span class="keyword">include</span>-create --<span class="keyword">include</span>-<span class="keyword">drop</span></div><div class="line"># WARNING: Using a password <span class="keyword">on</span> the command <span class="keyword">line</span> interface can be insecure.</div><div class="line"># server1 <span class="keyword">on</span> 10.xx.xx.127: ... connected.</div><div class="line"># server2 <span class="keyword">on</span> 10.xx.xx.127: ... connected.</div><div class="line"> </div><div class="line"><span class="keyword">USE</span> mydb2;</div><div class="line">CREATE <span class="keyword">TABLE</span> `t_test1` (</div><div class="line">  `id` int(11) DEFAULT NULL</div><div class="line">) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4';</div><div class="line">'</div><div class="line"># <span class="keyword">Compare</span> failed. <span class="keyword">One</span> or <span class="keyword">more</span> differences found.</div><div class="line"> </div><div class="line"> </div><div class="line">新选项，修改changes-<span class="keyword">for</span>后，生成<span class="keyword">drop</span></div><div class="line">mydb1.t_test1:mydb2.t_test1  --changes-<span class="keyword">for</span>=server1  --difftype=sql --<span class="keyword">include</span>-create --<span class="keyword">include</span>-<span class="keyword">drop</span></div><div class="line"># WARNING: Using a password <span class="keyword">on</span> the command <span class="keyword">line</span> interface can be insecure.</div><div class="line"># server1 <span class="keyword">on</span> 10.xx.xx.127: ... connected.</div><div class="line"># server2 <span class="keyword">on</span> 10.xx.xx.127: ... connected.</div><div class="line"><span class="keyword">DROP</span> <span class="keyword">TABLE</span> <span class="keyword">IF</span> EXISTS mydb1.t_test1;</div><div class="line"> </div><div class="line"># <span class="keyword">Compare</span> failed. <span class="keyword">One</span> or <span class="keyword">more</span> differences found.</div></pre></td></tr></table></figure>
+<figure class="highlight oxygene"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div></pre></td><td class="code"><pre><div class="line">mydb1.t_user_face:mydb2.t_user_face  --changes-<span class="keyword">for</span>=server2  --difftype=sql --include-<span class="keyword">create</span> --include-drop</div><div class="line"># WARNING: <span class="keyword">Using</span> a password <span class="keyword">on</span> the command line <span class="keyword">interface</span> can be insecure.</div><div class="line"># server1 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># server2 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># Comparing mydb1.t_user_face <span class="keyword">to</span> mydb2.t_user_face                 [FAIL]</div><div class="line"># Transformation <span class="keyword">for</span> --changes-<span class="keyword">for</span>=server2:</div><div class="line">#</div><div class="line"> </div><div class="line">ALTER TABLE `mydb2`.`t_user_face`</div><div class="line">  DROP <span class="keyword">INDEX</span> idx_tt2,</div><div class="line">  DROP <span class="keyword">INDEX</span> idx_corp_time,</div><div class="line">  DROP COLUMN f_test,</div><div class="line">  <span class="keyword">ADD</span> <span class="keyword">INDEX</span> idx_corp_time (f_corp_id,f_modify_time),</div><div class="line">  CHANGE COLUMN f_corp_id f_corp_id int(<span class="number">11</span>) unsigned <span class="keyword">NOT</span> NULL COMMENT <span class="string">'企业id'</span>,</div><div class="line">  CHANGE COLUMN f_user_id f_user_id int(<span class="number">11</span>) unsigned <span class="keyword">NOT</span> NULL COMMENT <span class="string">'用户id'</span>,</div><div class="line">AUTO_INCREMENT=<span class="number">123434</span>, COLLATE=utf8mb4_general_ci;</div><div class="line"> </div><div class="line"># Compare failed. One <span class="keyword">or</span> more differences found.</div><div class="line">这个地方原版处理 idx_corp_time 时，因为第一列索引字段相同，会生成 <span class="keyword">ADD</span> <span class="keyword">INDEX</span> idx_corp_time(f_modify_time)。这里已修复</div><div class="line"> </div><div class="line">新选项 --<span class="keyword">skip</span>-option-autoinc</div><div class="line">mydb1.t_user_face:mydb2.t_user_face  --changes-<span class="keyword">for</span>=server1  --difftype=sql --include-<span class="keyword">create</span> --include-drop --<span class="keyword">skip</span>-option-autoinc</div><div class="line"># WARNING: <span class="keyword">Using</span> a password <span class="keyword">on</span> the command line <span class="keyword">interface</span> can be insecure.</div><div class="line"># server1 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># server2 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># Comparing mydb1.t_user_face <span class="keyword">to</span> mydb2.t_user_face                 [FAIL]</div><div class="line"># Transformation <span class="keyword">for</span> --changes-<span class="keyword">for</span>=server1:</div><div class="line">#</div><div class="line"> </div><div class="line">ALTER TABLE `mydb1`.`t_user_face`</div><div class="line">  DROP <span class="keyword">INDEX</span> idx_corp_time,</div><div class="line">  <span class="keyword">ADD</span> UNIQUE <span class="keyword">INDEX</span> idx_tt2 (f_user_id,f_modify_time),</div><div class="line">  <span class="keyword">ADD</span> <span class="keyword">INDEX</span> idx_corp_time (f_corp_id),</div><div class="line">  CHANGE COLUMN f_corp_id f_corp_id int(<span class="number">10</span>) unsigned <span class="keyword">NOT</span> NULL COMMENT <span class="string">'企业id'</span>,</div><div class="line">  CHANGE COLUMN f_user_id f_user_id int(<span class="number">10</span>) unsigned <span class="keyword">NOT</span> NULL COMMENT <span class="string">'用户id'</span>,</div><div class="line">  <span class="keyword">ADD</span> COLUMN f_test varchar(<span class="number">20</span>) <span class="keyword">NOT</span> NULL <span class="keyword">DEFAULT</span> <span class="string">''</span> AFTER f_url,</div><div class="line">COLLATE=utf8_general_ci;</div><div class="line"> </div><div class="line"># Compare failed. One <span class="keyword">or</span> more differences found.</div></pre></td></tr></table></figure>
+<figure class="highlight oxygene"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div></pre></td><td class="code"><pre><div class="line">直接指定db，原版预修改版处理相同</div><div class="line">mydb1:mydb2  --changes-<span class="keyword">for</span>=server2  --difftype=sql</div><div class="line"># WARNING: <span class="keyword">Using</span> a password <span class="keyword">on</span> the command line <span class="keyword">interface</span> can be insecure.</div><div class="line"># server1 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># server2 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># WARNING: Objects <span class="keyword">in</span> server1.mydb1 but <span class="keyword">not</span> <span class="keyword">in</span> server1.mydb2:</div><div class="line">#        TABLE: t_test1</div><div class="line"># WARNING: Objects <span class="keyword">in</span> server1.mydb2 but <span class="keyword">not</span> <span class="keyword">in</span> server1.mydb1:</div><div class="line">#         VIEW: view_test</div><div class="line">#        TABLE: t_test2</div><div class="line"># Compare failed. One <span class="keyword">or</span> more differences found.</div><div class="line"> </div><div class="line"> </div><div class="line">指定 db.* ，处理相同</div><div class="line">mydb1.*:mydb2.*  --changes-<span class="keyword">for</span>=server2  --difftype=sql</div><div class="line"># WARNING: <span class="keyword">Using</span> a password <span class="keyword">on</span> the command line <span class="keyword">interface</span> can be insecure.</div><div class="line"># server1 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># server2 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line">ERROR: The object mydb1.* does <span class="keyword">not</span> exist.</div><div class="line"> </div><div class="line"> </div><div class="line">指定 db.* 和 --include-<span class="keyword">create</span> ，依次处理全部对象，包括过程，视图等</div><div class="line">mydb1.*:mydb2.*  --changes-<span class="keyword">for</span>=server2  --difftype=sql --difftype=sql --include-<span class="keyword">create</span> --include-drop --<span class="keyword">skip</span>-option-autoinc</div><div class="line"># WARNING: <span class="keyword">Using</span> a password <span class="keyword">on</span> the command line <span class="keyword">interface</span> can be insecure.</div><div class="line"># server1 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># server2 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># WARNING: Objects <span class="keyword">in</span> server1.mydb1 but <span class="keyword">not</span> <span class="keyword">in</span> server1.mydb2:</div><div class="line">#        TABLE: t_test1</div><div class="line"># WARNING: Objects <span class="keyword">in</span> server1.mydb2 but <span class="keyword">not</span> <span class="keyword">in</span> server1.mydb1:</div><div class="line">#         VIEW: view_test</div><div class="line">#        TABLE: t_test2</div><div class="line"># Comparing mydb1.t_user_face <span class="keyword">to</span> mydb2.t_user_face                 [FAIL]</div><div class="line"># Transformation <span class="keyword">for</span> --changes-<span class="keyword">for</span>=server2:</div><div class="line">#</div><div class="line"> </div><div class="line">ALTER TABLE `mydb2`.`t_user_face`</div><div class="line">  DROP <span class="keyword">INDEX</span> idx_tt2,</div><div class="line">  DROP <span class="keyword">INDEX</span> idx_corp_time,</div><div class="line">  DROP COLUMN f_test,</div><div class="line">  <span class="keyword">ADD</span> <span class="keyword">INDEX</span> idx_corp_time (f_corp_id,f_modify_time),</div><div class="line">  CHANGE COLUMN f_corp_id f_corp_id int(<span class="number">11</span>) unsigned <span class="keyword">NOT</span> NULL COMMENT <span class="string">'企业id'</span>,</div><div class="line">  CHANGE COLUMN f_user_id f_user_id int(<span class="number">11</span>) unsigned <span class="keyword">NOT</span> NULL COMMENT <span class="string">'用户id'</span>,</div><div class="line">COLLATE=utf8mb4_general_ci;</div><div class="line"> </div><div class="line">DROP VIEW <span class="keyword">IF</span> EXISTS mydb2.view_test;</div><div class="line"> </div><div class="line"> </div><div class="line">USE mydb2;</div><div class="line"><span class="keyword">CREATE</span> TABLE `t_test1` (</div><div class="line">  `id` int(<span class="number">11</span>) <span class="keyword">DEFAULT</span> NULL</div><div class="line">) ENGINE=InnoDB <span class="keyword">DEFAULT</span> CHARSET=utf8mb4<span class="string">';</span></div><div class="line">'</div><div class="line"># Comparing mydb1.t_user <span class="keyword">to</span> mydb2.t_user                           [FAIL]</div><div class="line"># Transformation <span class="keyword">for</span> --changes-<span class="keyword">for</span>=server2:</div><div class="line">#</div><div class="line"> </div><div class="line">ALTER TABLE `mydb2`.`t_user`</div><div class="line">  DROP <span class="keyword">INDEX</span> idx_corpid,</div><div class="line">  <span class="keyword">ADD</span> <span class="keyword">INDEX</span> idx_corpid_deptid (f_corp_id,f_dept_id),</div><div class="line">  <span class="keyword">ADD</span> <span class="keyword">INDEX</span> idx_dept (f_dept_id);</div><div class="line"> </div><div class="line"># Comparing mydb1.proc_test <span class="keyword">to</span> mydb2.proc_test                     [FAIL]</div><div class="line"># Transformation <span class="keyword">for</span> --changes-<span class="keyword">for</span>=server2:</div><div class="line">#</div><div class="line"> </div><div class="line">DROP <span class="function"><span class="keyword">PROCEDURE</span> <span class="title">IF</span> <span class="title">EXISTS</span> `<span class="title">mydb2</span>`.`<span class="title">proc_test</span>`;</span></div><div class="line">DELIMITER <span class="comment">//</span></div><div class="line"><span class="keyword">CREATE</span> DEFINER=`ecdba`@`%` <span class="function"><span class="keyword">PROCEDURE</span> `<span class="title">mydb2</span>`.`<span class="title">proc_test</span>` <span class="params">()</span> <span class="title">CONTAINS</span> <span class="title">SQL</span> <span class="title">SQL</span> <span class="title">SECURITY</span> <span class="title">DEFINER</span> <span class="title">BEGIN</span></span></div><div class="line">    <span class="title">select</span> 1;</div><div class="line"> </div><div class="line"><span class="keyword">END</span><span class="comment">//</span></div><div class="line">DELIMITER ;</div><div class="line"> </div><div class="line"> </div><div class="line">DROP TABLE <span class="keyword">IF</span> EXISTS mydb2.t_test2;</div><div class="line"> </div><div class="line"># Compare failed. One <span class="keyword">or</span> more differences found.</div></pre></td></tr></table></figure>
+<hr>
+<p>原文连接地址：<a href="http://seanlook.com/2017/08/05/mysql_mysqldiff/">http://seanlook.com/2017/08/05/mysql_mysqldiff/</a></p>
+<hr>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+  <div style="padding: 10px 0; margin: 20px auto; width: 90%; text-align: center;">
+    <div>支持可请我喝杯茶 ^_- (上限10个铜板)</div>
+    <button id="rewardButton" disable="enable" onclick="var qr = document.getElementById('QR'); if (qr.style.display === 'none') {qr.style.display='block';} else {qr.style.display='none'}">
+      <span>赏</span>
+    </button>
+    <div id="QR" style="display: none;">
+      
+      
+        <div id="alipay" style="display: inline-block">
+          <img id="alipay_qr" src="/images/reward_alipay_seanlook.jpg" alt="seanlook Alipay"/>
+          <p>支付宝打赏</p>
+        </div>
+      
+    </div>
+  </div>
+
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/mysql/" rel="tag"># mysql</a>
+          
+            <a href="/tags/表结构/" rel="tag"># 表结构</a>
+          
+        </div>
+      
+
+      
+        
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2017/07/19/proxysql-tutorials-ec/" rel="next" title="ProxySQL PPT分享">
+                <i class="fa fa-chevron-left"></i> ProxySQL PPT分享
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2017/08/29/blog_migrate_gentie163_disqus/" rel="prev" title="网易云跟帖迁移评论到disqus">
+                网易云跟帖迁移评论到disqus <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div id="disqus_thread">
+        <noscript>
+          Please enable JavaScript to view the
+          <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a>
+        </noscript>
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+           
+              <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+          
+        </div>
+        <nav class="site-state motion-element">
+
+          
+            <div class="site-state-item site-state-posts">
+              <a href="/archives">
+                <span class="site-state-item-count">111</span>
+                <span class="site-state-item-name">posts</span>
+              </a>
+            </div>
+          
+
+          
+            
+            
+            <div class="site-state-item site-state-categories">
+              <a href="/categories/index.html">
+                <span class="site-state-item-count">23</span>
+                <span class="site-state-item-name">categories</span>
+              </a>
+            </div>
+          
+
+          
+            
+            
+            <div class="site-state-item site-state-tags">
+              <a href="/tags/index.html">
+                <span class="site-state-item-count">120</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+        
+
+
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#mysqldiff"><span class="nav-text">mysqldiff</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#问题修复与增强"><span class="nav-text">问题修复与增强</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#使用注意"><span class="nav-text">使用注意</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#演示对比"><span class="nav-text">演示对比</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2017</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+
+        
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.0"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.0"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.0"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  
+
+    
+      <script id="dsq-count-scr" src="https://seanlook.disqus.com/count.js" async></script>
+    
+
+    
+      <script type="text/javascript">
+        var disqus_config = function () {
+          this.page.url = 'http://seanlook.com/2017/08/05/mysql_mysqldiff/';
+          this.page.identifier = '2017/08/05/mysql_mysqldiff/';
+          this.page.title = 'MySQL数据库表结构同步之mysqldiff';
+        };
+        var d = document, s = d.createElement('script');
+        s.src = 'https://seanlook.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', '' + +new Date());
+        (d.head || d.body).appendChild(s);
+      </script>
+    
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+      search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.popup').toggle();
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+      $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = $( "entry", xmlResponse ).map(function() {
+            return {
+              title: $( "title", this ).text(),
+              content: $("content",this).text(),
+              url: $( "url" , this).text()
+            };
+          }).get();
+          var $input = document.getElementById(search_id);
+          var $resultContent = document.getElementById(content_id);
+          $input.addEventListener('input', function(){
+            var matchcounts = 0;
+            var str='<ul class=\"search-result-list\">';
+            var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+            $resultContent.innerHTML = "";
+            if (this.value.trim().length > 1) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var content_index = [];
+                var data_title = data.title.trim().toLowerCase();
+                var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                var data_url = decodeURIComponent(data.url);
+                var index_title = -1;
+                var index_content = -1;
+                var first_occur = -1;
+                // only match artiles with not empty titles and contents
+                if(data_title != '') {
+                  keywords.forEach(function(keyword, i) {
+                    index_title = data_title.indexOf(keyword);
+                    index_content = data_content.indexOf(keyword);
+                    if( index_title >= 0 || index_content >= 0 ){
+                      isMatch = true;
+                      if (i == 0) {
+                        first_occur = index_content;
+                      }
+                    }
+
+                  });
+                }
+                // show search results
+                if (isMatch) {
+                  matchcounts += 1;
+                  str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                  var content = data.content.trim().replace(/<[^>]+>/g,"");
+                  if (first_occur >= 0) {
+                    // cut out 100 characters
+                    var start = first_occur - 20;
+                    var end = first_occur + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if(start == 0){
+                      end = 50;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    var match_content = content.substring(start, end);
+                    // highlight all keywords
+                    keywords.forEach(function(keyword){
+                      var regS = new RegExp(keyword, "gi");
+                      match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                    });
+
+                    str += "<p class=\"search-result\">" + match_content +"...</p>"
+                  }
+                  str += "</li>";
+                }
+              })};
+            str += "</ul>";
+            if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+            if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+            $resultContent.innerHTML = str;
+          });
+          proceedsearch();
+        }
+      });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.1.js"></script>
+  <script>AV.initialize("NliJVBn0857TMk5HYrIRt5wp-gzGzoHsz", "jB9B4QG8Rm8YP04RQqnsKy5M");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

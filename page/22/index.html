@@ -316,6 +316,357 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/08/23/linux-logwatch-usage/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2014/08/23/linux-logwatch-usage/" itemprop="url">
+                  在Linux上使用logwatch分析监控日志文件
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-08-23T01:21:25+08:00">
+                2014-08-23
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2014/08/23/linux-logwatch-usage/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2014/08/23/linux-logwatch-usage/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2014/08/23/linux-logwatch-usage/" class="leancloud_visitors" data-flag-title="在Linux上使用logwatch分析监控日志文件">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h1 id="1-介绍"><a href="#1-介绍" class="headerlink" title="1. 介绍"></a>1. 介绍</h1><p>在维护Linux服务器时，经常需要查看系统中各种服务的日志，以检查服务器的运行状态。 如登陆历史、邮件、软件安装等日志。系统管理员一个个去检查会十分不方便；且大多时候，这会是一种被动的检查，即只有在发现系统运行异常时才会想到去查看日志以获取异常的信息。那么如何主动、集中的分析这些日志，并产生报告，定时发送给管理员就会显得十分重要。</p>
+<p>logwatch 是一款用 Perl 语言编写的开源日志解析分析器。它能对原始的日志文件进行解析并转换成结构化格式的文档，也能根据您的使用情况和需求来定制报告。logwatch 的主要目的是生成更易于使用的日志摘要，并不是用来对日志进行实时的处理和监控的。正因为如此，logwatch 通常被设定好时间和频率的自动定时任务来调度运行或者是有需要日志处理的时候从命令行里手动运行。一旦日志报告生成，logwatch 可以通过电子邮件把这报告发送给您，您可以把它保存成文件或者直接显示在屏幕上。</p>
+<p>Logwatch 报告的详细程度和报告覆盖范围是完全可定制化的。Logwatch 的日志处理引擎也是可扩展的，从某种意义上来说，如果您想在一个新的应用程序中使用 logwatch 功能的话，只需要为这个应用程序的日志文件编写一个日志处理脚本（使用 Perl 语言），然后挂接到 logwatch 上就行。</p>
+<p>logwatch 有一点不好的就是，在它生成的报告中没有详细的时间戳信息，而原来的日志文件中是存在的。您只能知道被记录下来的一段时间之内的特定事件，如果想要知道精确的时间点的信息，就不得不去查看原日志文件了。</p>
+<h1 id="2-安装与配置说明"><a href="#2-安装与配置说明" class="headerlink" title="2. 安装与配置说明"></a>2. 安装与配置说明</h1><h2 id="2-1-安装"><a href="#2-1-安装" class="headerlink" title="2.1 安装"></a>2.1 安装</h2><p>无论在Debian系还是Redhat系上，安装logwatch都非常简单：</p>
+<pre><code># apt-get install logwatch     //Debian、Ubuntu.etc
+# yum install logwatch -y       //Redhat、Centos.etc
+</code></pre>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2014/08/23/linux-logwatch-usage/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/08/07/vim-tips/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2014/08/07/vim-tips/" itemprop="url">
+                  vim编辑器技巧备忘（初级-中级）
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-08-07T01:21:25+08:00">
+                2014-08-07
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2014/08/07/vim-tips/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2014/08/07/vim-tips/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2014/08/07/vim-tips/" class="leancloud_visitors" data-flag-title="vim编辑器技巧备忘（初级-中级）">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>“学习vim并且其会成为你最后一个使用的文本编辑器”<br>学习建议：</p>
+<ul>
+<li>丢弃鼠标和小键盘</li>
+<li>具有搭配使用各种按键的意识</li>
+</ul>
+<p>首先来一张 <a href="http://jrmiii.com/2009/03/06/learning-vim-the-pragmatic-way.html">mindmap</a> :</p>
+<p><img src="http://sean-images.qiniudn.com/Vim-mindmap.png" alt="vim-learn-card"></p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2014/08/07/vim-tips/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/03/09/linux-bash/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -863,186 +1214,11 @@ iptables -I INPUT 1 -m state --state RELATED,ESTABLISHED -j ACCEPT把这条语�
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2014/02/20/linux-process-running-background-screen/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2014/02/20/linux-process-running-background-screen/" itemprop="url">
-                  linux进程后台运行的几种方式
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2014-02-20T11:21:25+08:00">
-                2014-02-20
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Linux/" itemprop="url" rel="index">
-                    <span itemprop="name">Linux</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2014/02/20/linux-process-running-background-screen/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2014/02/20/linux-process-running-background-screen/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2014/02/20/linux-process-running-background-screen/" class="leancloud_visitors" data-flag-title="linux进程后台运行的几种方式">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <h2 id="Ctrl-z-bg-nohup-setsid-amp"><a href="#Ctrl-z-bg-nohup-setsid-amp" class="headerlink" title="Ctrl+z/bg/nohup/setsid/&amp;"></a>Ctrl+z/bg/nohup/setsid/&amp;</h2><p>在Linux中，如果要让进程在后台运行，一般情况下，我们在命令后面加上&amp;即可，实际上，这样是将命令放入到一个作业队列中了：<br><figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># ./rsync.sh &amp;</span></div><div class="line"><span class="meta"># jobs</span></div></pre></td></tr></table></figure></p>
-<p>对于已经在前台执行的命令，也可以重新放到后台执行，首先按ctrl+z暂停已经运行的进程，然后使用bg命令将停止的作业放到后台运行：<code>bg %1</code>，放回前台运行：<code>%1</code>。</p>
-<p>但是如上方到后台执行的进程，其父进程还是当前终端shell的进程，而一旦父进程退出，则会发送hangup信号给所有子进程，子进程收到hangup以后也会退出。如果我们要在退出shell的时候继续运行进程，则需要使用<code>nohup</code>忽略hangup信号，或者<code>setsid</code>将将父进程设为init进程(进程号为1)：<br><figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># nohup ./rsync.sh &amp;</span></div><div class="line"></div><div class="line"><span class="meta"># setsid ./rsync.sh &amp;</span></div><div class="line">或</div><div class="line"><span class="meta"># (./rsync.sh &amp;)        ////在一个subshell中执行</span></div><div class="line"><span class="meta"># ps -ef|grep rsync</span></div></pre></td></tr></table></figure></p>
-<p>nohup 的用途就是让提交的命令忽略 hangup 信号，标准输出和标准错误缺省会被重定向到 nohup.out 文件中。。一般我们可在结尾加上”&amp;”来将命令同时放入后台运行，也可用” &gt; log.out 2&gt;&amp;1”来更改缺省的重定向文件名。</p>
-<p>上面的试验演示了使用nohup/setsid加上&amp;使进程在后台运行，同时不受当前shell退出的影响。那么对于已经在后台运行的进程，该怎么办呢？可以使用<code>disown</code>命令：<br><figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># jobs</span></div><div class="line"><span class="meta"># disown -h %1</span></div><div class="line"><span class="meta"># ps -ef|grep rsync</span></div></pre></td></tr></table></figure></p>
-<p>效果与setid相同，但是disown后无法通过<code>jobs</code>命令查看了。</p>
-<h2 id="screen"><a href="#screen" class="headerlink" title="screen"></a>screen</h2><p>还有一种更加强大的方式是使用screen，首先创建一个断开模式的虚拟终端，然后用<code>-r</code>选项重新连接这个虚拟终端，在其中执行的任何命令，都能达到nohup的效果，这在有多个命令需要在后台连续执行的时候比较方便。</p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2014/02/20/linux-process-running-background-screen/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/21/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/21/">21</a><span class="page-number current">22</span>
+    <a class="extend prev" rel="prev" href="/page/21/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/21/">21</a><span class="page-number current">22</span><a class="page-number" href="/page/23/">23</a><a class="extend next" rel="next" href="/page/23/"><i class="fa fa-angle-right"></i></a>
   </nav>
 
 
@@ -1087,7 +1263,7 @@ iptables -I INPUT 1 -m state --state RELATED,ESTABLISHED -j ACCEPT把这条语�
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">109</span>
+                <span class="site-state-item-count">111</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -1109,7 +1285,7 @@ iptables -I INPUT 1 -m state --state RELATED,ESTABLISHED -j ACCEPT把这条语�
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">119</span>
+                <span class="site-state-item-count">120</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>

@@ -316,6 +316,358 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/04/27/mysql-proxysql-patch-querytext-sample/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2017/04/27/mysql-proxysql-patch-querytext-sample/" itemprop="url">
+                  ProxySQL之改进patch：记录查询sql完整样例与合并digest多个?
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-04-27T15:32:49+08:00">
+                2017-04-27
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2017/04/27/mysql-proxysql-patch-querytext-sample/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2017/04/27/mysql-proxysql-patch-querytext-sample/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2017/04/27/mysql-proxysql-patch-querytext-sample/" class="leancloud_visitors" data-flag-title="ProxySQL之改进patch：记录查询sql完整样例与合并digest多个?">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>近期一直在思考sql上线审核该怎么做，刚好接触到 ProxySQL 这个中间件，内置了一个计算sql指纹的功能，但是没有记录原始的sql语句。当前正有个紧急的拆库项目也希望知道库上所有的查询。于是把ProxySQL的代码下了回来研究了几天，改了把，加入了两个功能：</p>
+<ol>
+<li>在 <code>stats_mysql_query_digest</code> 表上增加 <code>query_text</code> 字段，当第一次出现这个digest_text时，把原始sql记录下来。</li>
+<li>修改计算指纹的模块，对 IN或者 VALUES 后面的多个 <code>?</code> 合并。这个是目前 <code>c_tokenizer.c</code> 文件里没有做的，用到底1点上可以避免重复记录。</li>
+</ol>
+<p>效果：<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/proxysql-querytext-sample-digest.png" alt="proxysql-querytext-sample-digest"></p>
+<p>多个 <code>?</code> 被折叠成 <code>?,</code>，有些意外情况时 <code>??</code>，因为后面一些多余空格的缘故，没有像 <em>pt-fingerprint</em> 那样完全模糊化，像这里digest就保留了大小写、去除重复空格、保留 ` 分隔符。但仅有的几种意外情况是可以接受的。</p>
+<p>后面的 query_text 列也有些未知情况，就是末尾会加上一些奇怪的字符，还在排除，但大体不影响需求。</p>
+<p>代码是基于最新 v1.3.6 稳定版修改的，查看变更 <a href="https://github.com/sysown/proxysql/compare/v1.3.6...seanlook:v1.3.7-querysample_digest">https://github.com/sysown/proxysql/compare/v1.3.6...seanlook:v1.3.7-querysample_digest</a> </p>
+<p>多个 <code>?</code> 合并只涉及到 <em>c_tokenizer.c</em> 文件，分别在flag=4（处理 <code>&#39;abc&#39;,&#39;def&#39;</code> 的情况）和flag=5（处理 <code>1,2, 3</code> 的情况）加入判断：<br><figure class="highlight cpp"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// wrap two more ? to one ?,</span></div><div class="line"><span class="keyword">if</span> (*(<span class="keyword">p_r_t</span><span class="number">-2</span>) == <span class="string">'?'</span> &amp;&amp; (*(<span class="keyword">p_r_t</span><span class="number">-1</span>) ==<span class="string">' '</span> || *(<span class="keyword">p_r_t</span><span class="number">-1</span>) == <span class="string">','</span> || *(<span class="keyword">p_r_t</span><span class="number">-1</span>) == <span class="string">'?'</span>))&#123;</div><div class="line">    *(p_r<span class="number">-1</span>) = <span class="string">','</span>;</div><div class="line">&#125;</div><div class="line"><span class="keyword">else</span></div><div class="line">    *p_r++ = <span class="string">'?'</span>;</div></pre></td></tr></table></figure></p>
+<p>然后在 line:450 左右 COPY CHAR 的时候进行一次过滤：<br><figure class="highlight cpp"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// COPY CHAR</span></div><div class="line"><span class="comment">// =================================================</span></div><div class="line"><span class="comment">// wrap two more ? to ?,</span></div><div class="line"><span class="keyword">if</span> ((*s == <span class="string">' '</span> || *s == <span class="string">','</span>) &amp;&amp; (*(<span class="keyword">p_r_t</span><span class="number">-1</span>) == <span class="string">'?'</span> || *(<span class="keyword">p_r_t</span><span class="number">-1</span>) == <span class="string">','</span> || *(<span class="keyword">p_r_t</span><span class="number">-1</span>) == <span class="string">' '</span>)) &#123;</div><div class="line">    <span class="keyword">if</span> (*(<span class="keyword">p_r_t</span><span class="number">-1</span>) == <span class="string">' '</span> &amp;&amp; *(<span class="keyword">p_r_t</span><span class="number">-2</span>) == <span class="string">'?'</span>)</div><div class="line">        *(p_r<span class="number">-1</span>) = <span class="string">','</span>;  <span class="comment">// p_r may be changed in line:435:is_digit_string</span></div><div class="line">&#125;</div><div class="line"><span class="keyword">else</span> &#123;</div></pre></td></tr></table></figure></p>
+<p>这部分代码调试花了不少功夫，一是理清逻辑，而是意外情况处理。变量的用途注释不清晰，几年没写C，不得不动用 gdb 来跟踪调试，怀念大学时用IDE的日子。</p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2017/04/27/mysql-proxysql-patch-querytext-sample/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/04/20/mysql-proxysql-performance-test/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2017/04/20/mysql-proxysql-performance-test/" itemprop="url">
+                  ProxySQL之性能测试对比
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-04-20T21:32:49+08:00">
+                2017-04-20
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2017/04/20/mysql-proxysql-performance-test/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2017/04/20/mysql-proxysql-performance-test/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2017/04/20/mysql-proxysql-performance-test/" class="leancloud_visitors" data-flag-title="ProxySQL之性能测试对比">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          
+          本文会通过sysbench对ProxySQL进行基准测试，并与直连的性能进行对比。与此同时也对 Maxscale 和 Qihu360 Atlas 放在一起参考。提示：压测前确保把query cache完全关掉。
+1. proxysql vs 直连1.1 select nontrx12345./bin/sysbench --test=/root/sysbench2/sysbench/tests/db/oltp.lua --mysql-host=10.0.100.36 --mysql-port=6033 --mysql-user=myuser --mysql-password=mypass \--mysql-db=db15 --oltp-tables-count=20 --oltp-table-size=5000000 --report-interval=20 --oltp-dist-type=uniform --rand-init=on --max-requests=0 --oltp-test-mode=nontrx --oltp-nontrx-mode=select \--oltp-r
+          ...
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2017/04/20/mysql-proxysql-performance-test/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/04/17/mysql-proxysql-multiplexing/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -849,370 +1201,11 @@ sql流量镜像
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/04/02/qingming-2017/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2017/04/02/qingming-2017/" itemprop="url">
-                  清明闲扯
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-04-02T16:32:49+08:00">
-                2017-04-02
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Feel/" itemprop="url" rel="index">
-                    <span itemprop="name">Feel</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2017/04/02/qingming-2017/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2017/04/02/qingming-2017/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2017/04/02/qingming-2017/" class="leancloud_visitors" data-flag-title="清明闲扯">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          这个清明假期，没有做特意的安排，4月1日晚上的时候冒出个想法——去爬七娘山。后来考虑天太热，便作罢了，正好抽一点时间整理些近来的事情。
-** 关于博客很早在朋友圈看到 多说 要关闭的消息，不久后也收到了邮件。全国第一的评论系统，说倒就倒，到底是没有好的营收模式，看到网上一堆评论说挺惋惜的，但那么多用户评论数据在上面，价值可想而知，不应遭此地步。在2014年刚用 多说 的时候，就感觉到它后台基本上没有人在维护了，自身管理后台都有不少问题，提反馈也没响应。
-选择网易云跟帖，把它替换掉了，并把以前的评论数据迁移了过来，就是人和人对不上号，以前那些网友找不到自己的评论，抱歉了。不过能用就行，还是多添点内容，也已经过了纠结样式主题的年纪了。有时候看到后台的评论，或者通过其它途径辛苦找到我的，给我了继续写博的动力。
-再一个就是搜索功能，以前用的 swiftype 是在去年的时候，不免费了，只提供企业版。它提供的站内搜索引擎功能，十分强大，也很美观，后台管理能看到许多的分析数据，可是它偏偏就突然收费了，而且298$/m，不能接受。也是秉着能用的原则，装上了 hexo-generator-search
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2017/04/02/qingming-2017/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/03/27/mysql-ppt-charset-conversion-acmug/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2017/03/27/mysql-ppt-charset-conversion-acmug/" itemprop="url">
-                  一次艰辛的字符集转换历程 ACMUG分享
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-03-27T21:32:49+08:00">
-                2017-03-27
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2017/03/27/mysql-ppt-charset-conversion-acmug/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2017/03/27/mysql-ppt-charset-conversion-acmug/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2017/03/27/mysql-ppt-charset-conversion-acmug/" class="leancloud_visitors" data-flag-title="一次艰辛的字符集转换历程 ACMUG分享">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          本文的ppt是3月25日在中国MySQL用户组2017深圳活动上，我所做的一个主题分享，关于实际生产使用mysql过程中与字符集有关的一些坑。
-这个总结其实自己去年一直也想去做，前后花了2个多月的时间，最后所有库无痛完成迁移转化。在2017年二月中下旬的时候微信上请教周董（去哪儿周彦韦大师）一个问题，因为以前也聊过一些，所以他突然问我要不要在3月份的活动上做个主题分享。当时有点不敢想，毕竟之前2次有关培训都是在公司内部的，而这次对外的分享，且不说台下听众有牛人存在，演讲嘉宾里面可各个都是大师级别的，所以当时没有马上答应。过了两天，偶然想到关于字符集这个经历可以讲一讲，不是为了展示自己有多牛B，只是分享下整个问题的处理经验，放低姿态。列了个提纲发给了周董，10分钟不到周董说定了。向经理请示了下没问题，这下赶着鸭子都得上了……
-毕竟第一次公开在这样的场合演讲，说不紧张肯定是假的，所以早早的就在准备ppt，一边回顾，一边画图。上阵前一天晚上还在对演示稿微调，并尽量控制时间。
-闲话不多说，PPT奉上：
-
-
-	
-	  
-	
-
-
-
-IT大咖说有录视频：
-
-http://www.itdks.com/
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2017/03/27/mysql-ppt-charset-conversion-acmug/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/2/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><a class="page-number" href="/page/2/">2</a><span class="page-number current">3</span><a class="page-number" href="/page/4/">4</a><span class="space">&hellip;</span><a class="page-number" href="/page/22/">22</a><a class="extend next" rel="next" href="/page/4/"><i class="fa fa-angle-right"></i></a>
+    <a class="extend prev" rel="prev" href="/page/2/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><a class="page-number" href="/page/2/">2</a><span class="page-number current">3</span><a class="page-number" href="/page/4/">4</a><span class="space">&hellip;</span><a class="page-number" href="/page/23/">23</a><a class="extend next" rel="next" href="/page/4/"><i class="fa fa-angle-right"></i></a>
   </nav>
 
 
@@ -1257,7 +1250,7 @@ http://www.itdks.com/
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">109</span>
+                <span class="site-state-item-count">111</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -1279,7 +1272,7 @@ http://www.itdks.com/
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">119</span>
+                <span class="site-state-item-count">120</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>

@@ -5,7 +5,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://seanlook.com/"/>
-  <updated>2017-10-17T08:32:49.000Z</updated>
+  <updated>2017-11-02T07:32:49.000Z</updated>
   <id>http://seanlook.com/</id>
   
   <author>
@@ -14,6 +14,70 @@
   </author>
   
   <generator uri="http://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>MySQL数据库表结构同步之SchemaSync</title>
+    <link href="http://seanlook.com/2017/11/02/mysql_schemasync/"/>
+    <id>http://seanlook.com/2017/11/02/mysql_schemasync/</id>
+    <published>2017-11-02T07:32:49.000Z</published>
+    <updated>2017-11-02T07:32:49.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>SchemaSync是个能够在mysql数据库之间，比较并生成表结构差异的工具，项目地址 <a href="https://github.com/mmatuson/SchemaSync" target="_blank" rel="external">https://github.com/mmatuson/SchemaSync</a>  。</p>
+<h1 id="SchemaSync介绍与使用"><a href="#SchemaSync介绍与使用" class="headerlink" title="SchemaSync介绍与使用"></a>SchemaSync介绍与使用</h1><p>因为工作中经常需要在各个环境之间同步表结构，特别是生产与测试环境之间，长时间的运行后，总会有不一致的。测试环境的表结构一般是测试验证功能之后没有问题，然后通过工单的形式由DBA在生产环境修改。但生产库的结构，如修改索引，紧急修改字段长度，久而久之就会与测试环境有差异，需要同步到测试环境。</p>
+<p>又或者有多套测试环境之间要保持结构同步，又比如同一类db（分库）的情况下，比较schema之间的对象差异。</p>
+<p>SchemaSync不仅限于表结构，它可以处理的对象还有：视图、事件、存储过程、函数、触发器、外键，与 mysql-utilities 相当。但 SchemaSync 更适合于实践：</p>
+<ol>
+<li>默认不会同步 <code>AUTO_INCREMENT</code> 和  COMMENT`，有选项可以控制</li>
+<li>对不存在的对象会生成对应的CREATE，对多余的对象会生成DROP</li>
+<li>对生成 alter…column 的sql，是有列顺序的</li>
+<li>安装简单，相比mysqldiff，要安装mysql-connector-python和一整套mysql-utilities工具</li>
+</ol>
+<p>当然前两点在我自己的 <code>mysqldiff</code> 版本里，已经加入了支持，见 <a href="http://seanlook.com/2017/08/05/mysql_mysqldiff/">MySQL数据库表结构同步之mysqldiff</a></p>
+<p><strong>SchemaSync安装：</strong><br><figure class="highlight mipsasm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">（使用virtualenv）</div><div class="line">$ pip <span class="keyword">install </span>mysql-python pymysql <span class="keyword">schemaobject </span><span class="keyword">schemasync</span></div></pre></td></tr></table></figure></p>
+<p>SchemaObject也是同一个作者的，专门用于操作数据库对象的库，于是schemasync只需要获取对象，比较差异，然后调用schemaobect生成sql。（SchemaObject依赖pymysql，SchemaSync依赖MySQLdb，其实可以用同一个）<br><a id="more"></a></p>
+<p><strong>SchemaSync用法：</strong><br><figure class="highlight vim"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div></pre></td><td class="code"><pre><div class="line">$ schemasync --<span class="keyword">help</span></div><div class="line">Usage: </div><div class="line">                schemasync [<span class="keyword">options</span>] <span class="symbol">&lt;source&gt;</span> <span class="symbol">&lt;target&gt;</span></div><div class="line">                <span class="keyword">source</span>/target forma<span class="variable">t:</span> mysq<span class="variable">l:</span>//user:pass@hos<span class="variable">t:port</span>/database</div><div class="line"></div><div class="line">                        A MySQL Schema Synchronization Utility</div><div class="line"></div><div class="line">Option<span class="variable">s:</span></div><div class="line">  -h, --<span class="keyword">help</span>            show this <span class="keyword">help</span> message <span class="built_in">and</span> <span class="keyword">exit</span></div><div class="line">  -V, --<span class="keyword">version</span>         show <span class="keyword">version</span> <span class="built_in">and</span> <span class="keyword">exit</span>.</div><div class="line">  -r, --revision        increment the migration script <span class="keyword">version</span> <span class="keyword">number</span> <span class="keyword">if</span> <span class="keyword">a</span></div><div class="line">                        <span class="keyword">file</span> with the same name already <span class="built_in">exists</span>.</div><div class="line">  -<span class="keyword">a</span>, --<span class="keyword">sync</span>-auto-inc   <span class="keyword">sync</span> the AUTO_INCREMENT value <span class="keyword">for</span> each table.</div><div class="line">  -<span class="keyword">c</span>, --<span class="keyword">sync</span>-comments   <span class="keyword">sync</span> the COMMENT field <span class="keyword">for</span> <span class="keyword">all</span> tables AND columns</div><div class="line">  -D, --<span class="keyword">no</span>-date         removes the date from the <span class="keyword">file</span> format</div><div class="line">  --charset=CHARSET     <span class="keyword">set</span> the connection charset, defaul<span class="variable">t:</span> utf8</div><div class="line">  --<span class="keyword">tag</span>=TAG             <span class="keyword">tag</span> the migration scripts <span class="keyword">as</span> <span class="symbol">&lt;database&gt;</span>_<span class="symbol">&lt;tag&gt;</span>. Valid</div><div class="line">                        characters include [A-Za-z0-<span class="number">9</span>-_]</div><div class="line">  --output-directory=OUTPUT_DIRECTORY</div><div class="line">                        directory <span class="keyword">to</span> <span class="keyword">write</span> the migration scrips. The default</div><div class="line">                        <span class="keyword">is</span> current working directory. Must use absolute path</div><div class="line">                        <span class="keyword">if</span> provided.</div><div class="line">  --<span class="built_in">log</span>-directory=LOG_DIRECTORY</div><div class="line">                        <span class="keyword">set</span> the directory <span class="keyword">to</span> <span class="keyword">write</span> the <span class="built_in">log</span> <span class="keyword">to</span>. Must use</div><div class="line">                        absolute path <span class="keyword">if</span> provided. Default <span class="keyword">is</span> output</div><div class="line">                        directory. Log filename <span class="keyword">is</span> schemasync.<span class="built_in">log</span></div></pre></td></tr></table></figure></p>
+<p>示例：<br><figure class="highlight groovy"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">$ schemasync <span class="string">mysql:</span><span class="comment">//ecuser:dbpass@10.x.xxx.141:3307/d_dbtest mysql://ecuser:dbpass@192.168.x.<span class="doctag">xxx:</span>3306/d_dbtest --tag=BASE</span></div><div class="line">Migration scripts created <span class="keyword">for</span> <span class="string">mysql:</span><span class="comment">//192.168.x.xxx/d_dbtest</span></div><div class="line">Patch <span class="string">Script:</span> <span class="regexp">/home/</span>zx<span class="regexp">/SchemaSync/</span>d_dbtest_BASE<span class="number">.20171111</span>.patch.sql</div><div class="line">Revert <span class="string">Script:</span> <span class="regexp">/home/</span>zx<span class="regexp">/SchemaSync/</span>d_dbtest_BASE<span class="number">.20171111</span>.revert.sql</div></pre></td></tr></table></figure></p>
+<p>  第一个是source db，第二个是target db，是标准的 connection string url 格式。<br>  <code>--tag</code>, <code>--no-date</code>：都是控制生成的ddl文件名格式。</p>
+<h1 id="问题修复与增强"><a href="#问题修复与增强" class="headerlink" title="问题修复与增强"></a>问题修复与增强</h1><p>有两个小问题都是在SchemaObject里面，而且都有人 <a href="https://github.com/mmatuson/SchemaObject/pulls" target="_blank" rel="external">提交patch</a> 但还没合并到主干：</p>
+<ol>
+<li>ADD INDEX 语法错误，<code>alter table t ADD INDEX ON t</code>，不需要这个ON。在不用alter table而直接 ADD INDEX 才要。</li>
+<li>schemaobject 生成 <code>DEFAULT &#39;xx&#39;</code> 时不支持python3。当然文件里也只说了支持2.6,2.7<br>目前我们的做法是对 schemaobject/index.py 大概170行的地方，手动修改，也懒的fork自己的分支：<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">-            return "<span class="keyword">DROP</span> <span class="keyword">INDEX</span> <span class="string">`%s`</span> <span class="keyword">ON</span> <span class="string">`%s`</span><span class="string">" % (self.name, self.parent.name)</span></div><div class="line">+            return "<span class="keyword">DROP</span> <span class="keyword">INDEX</span> <span class="string">`%s`</span><span class="string">" % (self.name)</span></div></pre></td></tr></table></figure>
+</li>
+</ol>
+<p>另一个增强是如果我想比较一个实例下面的所有database，SchemaSync是要手动一个一个去运行，于是拉了个自己的分支，支持<br><code>mysql://user:pass@host:port/*</code> 的格式，自动遍历实例下面所有的schema（忽略mysql,information_schema,performance_schema,sys），然后递归调用自身。使用起来就方便多了。<br><figure class="highlight gradle"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line">$ schemasync mysql:<span class="comment">//ecuser:dbpass@10.x.xxx.141:3307/* mysql://ecuser:dbpass@192.168.x.<span class="doctag">xxx:</span>3306/* --tag=BASE</span></div><div class="line"> </div><div class="line">Migration scripts created <span class="keyword">for</span> mysql:<span class="comment">//192.168.x.xxx/d_ec_admin</span></div><div class="line">Patch Script: <span class="regexp">/home/</span>zx<span class="regexp">/SchemaSync/</span>d_ec_admin_BASE.<span class="number">20171110</span>.patch.sql</div><div class="line">Revert Script: <span class="regexp">/home/</span>zx<span class="regexp">/SchemaSync/</span>d_ec_admin_BASE.<span class="number">2017110</span>.revert.sql</div><div class="line">...</div><div class="line">MySQL Error <span class="number">1049</span>: Unknown database <span class="string">'d_ec_package_bak_1027'</span> (Ignore)  # 对db在目标库不存在的情况，忽略，不会CREAETE DATABASE</div><div class="line">...</div><div class="line">Migration scripts created <span class="keyword">for</span> mysql:<span class="comment">//192.168.x.xxx/d_ec_package</span></div><div class="line">Patch Script: <span class="regexp">/home/</span>zx<span class="regexp">/SchemaSync/</span>d_ec_package_BASE.<span class="number">20171110</span>.patch.sql</div><div class="line">Revert Script: <span class="regexp">/home/</span>zx<span class="regexp">/SchemaSync/</span>d_ec_package_BASE.<span class="number">20171110</span>.revert.sql</div><div class="line">cat *_BASE.<span class="number">20171110</span>.patch.sql &gt; target_schema_BASE.<span class="number">20171110</span>.patch.sql</div></pre></td></tr></table></figure></p>
+<p>生成结构后不要盲目去执行同步，还要审查一遍，否则把不改删的字段删了就惨了。<br>还有，如果你在目标表上只是改变了列名，那么schema比较的时候，也是先drop在add，这个风险要自己把握。</p>
+<p>如果要安装这个增强后的版本，请使用这种方式安装：<br><figure class="highlight awk"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">pip install git+https:<span class="regexp">//gi</span>thub.com<span class="regexp">/seanlook/</span>SchemaSync.git</div></pre></td></tr></table></figure></p>
+<hr>
+<p>原文连接地址：<a href="http://seanlook.com/2017/11/02/mysql_schemasync/">http://seanlook.com/2017/11/02/mysql_schemasync/</a></p>
+<hr>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;SchemaSync是个能够在mysql数据库之间，比较并生成表结构差异的工具，项目地址 &lt;a href=&quot;https://github.com/mmatuson/SchemaSync&quot;&gt;https://github.com/mmatuson/SchemaSync&lt;/a&gt;  。&lt;/p&gt;
+&lt;h1 id=&quot;SchemaSync介绍与使用&quot;&gt;&lt;a href=&quot;#SchemaSync介绍与使用&quot; class=&quot;headerlink&quot; title=&quot;SchemaSync介绍与使用&quot;&gt;&lt;/a&gt;SchemaSync介绍与使用&lt;/h1&gt;&lt;p&gt;因为工作中经常需要在各个环境之间同步表结构，特别是生产与测试环境之间，长时间的运行后，总会有不一致的。测试环境的表结构一般是测试验证功能之后没有问题，然后通过工单的形式由DBA在生产环境修改。但生产库的结构，如修改索引，紧急修改字段长度，久而久之就会与测试环境有差异，需要同步到测试环境。&lt;/p&gt;
+&lt;p&gt;又或者有多套测试环境之间要保持结构同步，又比如同一类db（分库）的情况下，比较schema之间的对象差异。&lt;/p&gt;
+&lt;p&gt;SchemaSync不仅限于表结构，它可以处理的对象还有：视图、事件、存储过程、函数、触发器、外键，与 mysql-utilities 相当。但 SchemaSync 更适合于实践：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;默认不会同步 &lt;code&gt;AUTO_INCREMENT&lt;/code&gt; 和  COMMENT`，有选项可以控制&lt;/li&gt;
+&lt;li&gt;对不存在的对象会生成对应的CREATE，对多余的对象会生成DROP&lt;/li&gt;
+&lt;li&gt;对生成 alter…column 的sql，是有列顺序的&lt;/li&gt;
+&lt;li&gt;安装简单，相比mysqldiff，要安装mysql-connector-python和一整套mysql-utilities工具&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;当然前两点在我自己的 &lt;code&gt;mysqldiff&lt;/code&gt; 版本里，已经加入了支持，见 &lt;a href=&quot;http://seanlook.com/2017/08/05/mysql_mysqldiff/&quot;&gt;MySQL数据库表结构同步之mysqldiff&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;SchemaSync安装：&lt;/strong&gt;&lt;br&gt;&lt;figure class=&quot;highlight mipsasm&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;2&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;（使用virtualenv）&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;$ pip &lt;span class=&quot;keyword&quot;&gt;install &lt;/span&gt;mysql-python pymysql &lt;span class=&quot;keyword&quot;&gt;schemaobject &lt;/span&gt;&lt;span class=&quot;keyword&quot;&gt;schemasync&lt;/span&gt;&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;&lt;/p&gt;
+&lt;p&gt;SchemaObject也是同一个作者的，专门用于操作数据库对象的库，于是schemasync只需要获取对象，比较差异，然后调用schemaobect生成sql。（SchemaObject依赖pymysql，SchemaSync依赖MySQLdb，其实可以用同一个）&lt;br&gt;
+    
+    </summary>
+    
+      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
+    
+    
+      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
+    
+      <category term="表结构" scheme="http://seanlook.com/tags/%E8%A1%A8%E7%BB%93%E6%9E%84/"/>
+    
+  </entry>
   
   <entry>
     <title>“大”事务引起的锁等待分析案例</title>
@@ -410,6 +474,135 @@
       <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
     
       <category term="blog" scheme="http://seanlook.com/tags/blog/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>MySQL数据库表结构同步之mysqldiff</title>
+    <link href="http://seanlook.com/2017/08/05/mysql_mysqldiff/"/>
+    <id>http://seanlook.com/2017/08/05/mysql_mysqldiff/</id>
+    <published>2017-08-05T07:32:49.000Z</published>
+    <updated>2017-08-05T07:32:49.000Z</updated>
+    
+    <content type="html"><![CDATA[<h1 id="mysqldiff"><a href="#mysqldiff" class="headerlink" title="mysqldiff"></a>mysqldiff</h1><p>mysql官方有个 mysql-utilities 工具集，其中 mysqldiff 可用于比较两个db之间的表结构。<br>mysqldiff的语法格式是：<br><figure class="highlight groovy"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ mysqldiff --server1=<span class="string">user:</span>pass<span class="meta">@host</span>:<span class="string">port:</span>socket --server2=<span class="string">user:</span>pass<span class="meta">@host</span>:<span class="string">port:</span>socket db1.<span class="string">object1:</span>db2.object1 <span class="string">db3:</span>db4</div></pre></td></tr></table></figure></p>
+<p>这个语法有两个用法：</p>
+<ul>
+<li><code>db1:db2</code>：如果只指定数据库，那么就将两个数据库中互相缺少的对象显示出来，不比较对象里面的差异。这里的对象包括表、存储过程、函数、触发器等。<br>如果db1与db2名字相同，可以只指定 <code>db1</code></li>
+<li><code>db1.object1:db2.object1</code>：如果指定了具体表对象，那么就会详细对比两个表的差异，包括表名、字段名、备注、索引、大小写等所有的表相关的对象。<br>如果两边db和对象名都相同，可以只指定 <code>db1.object1</code></li>
+</ul>
+<p>接下来看一些主要的参数：</p>
+<ul>
+<li><code>--server1</code>：配置server1的连接。</li>
+<li><code>--server2</code>：配置server2的连接。</li>
+<li><code>--character-set</code>：配置连接时用的字符集，如果不显示配置默认使用character_set_client。</li>
+<li><code>--width</code>：配置显示的宽度。</li>
+<li><code>--skip-table-options</code>：保持表的选项不变，即对比的差异里面不包括表名、AUTO_INCREMENT、ENGINE、CHARSET等差异。</li>
+<li><code>-d DIFFTYPE,--difftype=DIFFTYPE</code>：差异的信息显示的方式，有 [unified|context|differ|sql]，默认是unified。如果使用<code>sql</code>，那么就直接生成差异的SQL，这样非常方便。</li>
+<li><code>--changes-for=</code>：修改对象。例如 –changes-for=server2，那么对比以sever1为主，生成的差异的修改也是针对server2的对象的修改。</li>
+<li><code>--show-reverse</code>：在生成的差异修改里面，同时会包含server2和server1的修改。</li>
+<li><code>--force</code>：完成所有的比较，不会在遇到一个差异之后退出</li>
+<li><code>-vv</code>：便于调试，输出许多信息</li>
+<li><code>-q</code>：quiet模式，关闭多余的信息输出</li>
+</ul>
+<h1 id="问题修复与增强"><a href="#问题修复与增强" class="headerlink" title="问题修复与增强"></a>问题修复与增强</h1><p>但是试用下来，发现有以下几大问题</p>
+<ol>
+<li>对象在一方不存在时，比对结果是 object does not exist，而我们通常需要的是，生产 <code>CREATE/DROP XXX</code> 语句</li>
+<li>要比对一个db下面所有的对象（table, view, event, proc, func, trigger），要手动挨个 db1.t1, db2.v2…，而 db1:db2只是检查对象是否存在，不会自动比较db1与db2下的所有对象</li>
+<li>比较时，<code>auto_increment</code>应该忽略，但是 mysqldiff 只提供 <code>--skip-table-options</code> ，忽略全部表选项，包括 auto_increment, engine, charset等等。</li>
+<li>严重bug<ul>
+<li>T1: idx1(f1,f2),  T2: idx1(f1)，这种索引会生成 ADD INDEX idx(f2)</li>
+<li>T1: idx2(f1,f2), idx3(f3,f4),  T2: idx4(f5)，这种组合索引，有可能生成的会乱序</li>
+</ul>
+</li>
+</ol>
+<p>这两个bug与mysqldiff的设计有关系，个人觉得它把比较和生产差异sql完全分开，复杂化了。它得到差异结果之后，生成sql又从db捞各种元数据来组装，其它从差异diff里面就可以获得组装需要的数据，也不容易出现隐藏的bug。参考实现 <a href="https://github.com/hidu/mysql-schema-sync" target="_blank" rel="external">https://github.com/hidu/mysql-schema-sync</a></p>
+<p>针对上面几大问题，花了两天的时间阅读并修改了 mysqldiff 以及相关依赖的代码，都一一解决。<br>修复后的地址：<a href="https://github.com/seanlook/mysql-utilities/commits/master" target="_blank" rel="external">https://github.com/seanlook/mysql-utilities/commits/master</a><br>(mysql-utilities不像percona-toolkit那样每个工具都是All In One，需要改动mysqldiff.py意外的依赖模块)</p>
+<p>默认情况与官方的 mysqldiff 完全兼容，新增3个选项</p>
+<ol>
+<li><code>--include-create</code>：是否生成创建对象(表等)的语句，而不是仅告知对象不存在。只有在 <code>--difftype=sql</code> 时有效。默认False</li>
+<li><code>--include-drop</code>：是否生成DROP对象的语句，针对对象在原db不存在，而仅目标db存在的情况。只有在指定了<code>--include-create</code> 时起作用。drop操作因为比较危险，默认False，所以多加了这个选项</li>
+<li><code>--skip-opt-autoinc</code>：比较时跳过AUTO_INCREMNT。默认False</li>
+<li>比较对象是，指定 <code>db1.*</code>  或 <code>db1.*:db2.*</code> 时，会比较他们所有的对象差异，而不仅显示缺少的对象</li>
+</ol>
+<h2 id="使用注意"><a href="#使用注意" class="headerlink" title="使用注意"></a>使用注意</h2><ol>
+<li>比较时，尽量选择mysql版本相近的实例，比如mysql与mariadb比较，相同的表结构 show create table xxx 时可能得到不同的结果：<ul>
+<li>mariadb会把int字段 default ‘0’ 自动改成 default 0</li>
+<li><code>CURRENT_TIMESTAMP</code>会显示成 <code>current_timestamp()</code></li>
+<li>字段 <code>default NULL</code> 时，mysql connector/python 查 <code>information_schema.COLUMNS.COLUMN_DEFAULT</code> 字段为 <code>‘NULL’</code> （带引号的字符），而不是None（即查出来是NULL），导致与mysql版本用不一样</li>
+</ul>
+</li>
+<li>字段注释 <code>COMMENT &#39;是否批准加入群 默认1批准 0拒绝\0e=&#39;&#39;t_user_g\0&#39;</code> ，是成立的，正常\0后面的都是没用的，但有个 <code>&#39;</code> 号，会导致生产sql时有多余的 <code>&#39;</code> 好，直接执行会失败。<br>所以，字段注释要规范，不要带入这些乱起乱七八糟的字符，特别是用IDE建表时，完成后在命令行 show create table xxx 看一下。</li>
+</ol>
+<a id="more"></a>
+<h1 id="演示对比"><a href="#演示对比" class="headerlink" title="演示对比"></a>演示对比</h1><figure class="highlight oxygene"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line">mysqldiff --server1=ecdba:xx@yyyy:<span class="number">3305</span> --server2=ecdba:xx@yyyy:<span class="number">3305</span> mydb1.t_user:mydb2.t_user  --changes-<span class="keyword">for</span>=server2  --difftype=sql</div><div class="line"># WARNING: <span class="keyword">Using</span> a password <span class="keyword">on</span> the command line <span class="keyword">interface</span> can be insecure.</div><div class="line"># server1 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># server2 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># Comparing mydb1.t_user <span class="keyword">to</span> mydb2.t_user                           [FAIL]</div><div class="line"># Transformation <span class="keyword">for</span> --changes-<span class="keyword">for</span>=server2:</div><div class="line">#</div><div class="line"> </div><div class="line">ALTER TABLE `mydb2`.`t_user`</div><div class="line">  DROP <span class="keyword">INDEX</span> idx_corpid,</div><div class="line">  <span class="keyword">ADD</span> <span class="keyword">INDEX</span> idx_corpid_deptid (f_corp_id,f_dept_id),</div><div class="line">  <span class="keyword">ADD</span> <span class="keyword">INDEX</span> idx_dept (f_dept_id);</div><div class="line"> </div><div class="line"># Compare failed. One <span class="keyword">or</span> more differences found.</div><div class="line">  </div><div class="line">这个地方原版里面会将idx_corpid_deptid生成 <span class="keyword">ADD</span> <span class="keyword">INDEX</span> idx_corpid_deptid(f_corp_id), <span class="keyword">ADD</span> <span class="keyword">INDEX</span> idx_corpid_deptid(f_dept_id)。这里已修复</div></pre></td></tr></table></figure>
+<figure class="highlight stata"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div></pre></td><td class="code"><pre><div class="line">原版：</div><div class="line">mydb1.t_test1:mydb2.t_test1  --changes-<span class="keyword">for</span>=server2  --difftype=sql</div><div class="line"># WARNING: Using a password <span class="keyword">on</span> the command <span class="keyword">line</span> interface can be insecure.</div><div class="line"># server1 <span class="keyword">on</span> 10.xx.xx.127: ... connected.</div><div class="line"># server2 <span class="keyword">on</span> 10.xx.xx.127: ... connected.</div><div class="line"><span class="keyword">ERROR</span>: The object mydb2.t_test1 does not exist.</div><div class="line"> </div><div class="line"> </div><div class="line">新选项 --<span class="keyword">include</span>-create --<span class="keyword">include</span>-<span class="keyword">drop</span></div><div class="line">mydb1.t_test1:mydb2.t_test1  --changes-<span class="keyword">for</span>=server2  --difftype=sql --<span class="keyword">include</span>-create --<span class="keyword">include</span>-<span class="keyword">drop</span></div><div class="line"># WARNING: Using a password <span class="keyword">on</span> the command <span class="keyword">line</span> interface can be insecure.</div><div class="line"># server1 <span class="keyword">on</span> 10.xx.xx.127: ... connected.</div><div class="line"># server2 <span class="keyword">on</span> 10.xx.xx.127: ... connected.</div><div class="line"> </div><div class="line"><span class="keyword">USE</span> mydb2;</div><div class="line">CREATE <span class="keyword">TABLE</span> `t_test1` (</div><div class="line">  `id` int(11) DEFAULT NULL</div><div class="line">) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4';</div><div class="line">'</div><div class="line"># <span class="keyword">Compare</span> failed. <span class="keyword">One</span> or <span class="keyword">more</span> differences found.</div><div class="line"> </div><div class="line"> </div><div class="line">新选项，修改changes-<span class="keyword">for</span>后，生成<span class="keyword">drop</span></div><div class="line">mydb1.t_test1:mydb2.t_test1  --changes-<span class="keyword">for</span>=server1  --difftype=sql --<span class="keyword">include</span>-create --<span class="keyword">include</span>-<span class="keyword">drop</span></div><div class="line"># WARNING: Using a password <span class="keyword">on</span> the command <span class="keyword">line</span> interface can be insecure.</div><div class="line"># server1 <span class="keyword">on</span> 10.xx.xx.127: ... connected.</div><div class="line"># server2 <span class="keyword">on</span> 10.xx.xx.127: ... connected.</div><div class="line"><span class="keyword">DROP</span> <span class="keyword">TABLE</span> <span class="keyword">IF</span> EXISTS mydb1.t_test1;</div><div class="line"> </div><div class="line"># <span class="keyword">Compare</span> failed. <span class="keyword">One</span> or <span class="keyword">more</span> differences found.</div></pre></td></tr></table></figure>
+<figure class="highlight oxygene"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div></pre></td><td class="code"><pre><div class="line">mydb1.t_user_face:mydb2.t_user_face  --changes-<span class="keyword">for</span>=server2  --difftype=sql --include-<span class="keyword">create</span> --include-drop</div><div class="line"># WARNING: <span class="keyword">Using</span> a password <span class="keyword">on</span> the command line <span class="keyword">interface</span> can be insecure.</div><div class="line"># server1 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># server2 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># Comparing mydb1.t_user_face <span class="keyword">to</span> mydb2.t_user_face                 [FAIL]</div><div class="line"># Transformation <span class="keyword">for</span> --changes-<span class="keyword">for</span>=server2:</div><div class="line">#</div><div class="line"> </div><div class="line">ALTER TABLE `mydb2`.`t_user_face`</div><div class="line">  DROP <span class="keyword">INDEX</span> idx_tt2,</div><div class="line">  DROP <span class="keyword">INDEX</span> idx_corp_time,</div><div class="line">  DROP COLUMN f_test,</div><div class="line">  <span class="keyword">ADD</span> <span class="keyword">INDEX</span> idx_corp_time (f_corp_id,f_modify_time),</div><div class="line">  CHANGE COLUMN f_corp_id f_corp_id int(<span class="number">11</span>) unsigned <span class="keyword">NOT</span> NULL COMMENT <span class="string">'企业id'</span>,</div><div class="line">  CHANGE COLUMN f_user_id f_user_id int(<span class="number">11</span>) unsigned <span class="keyword">NOT</span> NULL COMMENT <span class="string">'用户id'</span>,</div><div class="line">AUTO_INCREMENT=<span class="number">123434</span>, COLLATE=utf8mb4_general_ci;</div><div class="line"> </div><div class="line"># Compare failed. One <span class="keyword">or</span> more differences found.</div><div class="line">这个地方原版处理 idx_corp_time 时，因为第一列索引字段相同，会生成 <span class="keyword">ADD</span> <span class="keyword">INDEX</span> idx_corp_time(f_modify_time)。这里已修复</div><div class="line"> </div><div class="line">新选项 --<span class="keyword">skip</span>-option-autoinc</div><div class="line">mydb1.t_user_face:mydb2.t_user_face  --changes-<span class="keyword">for</span>=server1  --difftype=sql --include-<span class="keyword">create</span> --include-drop --<span class="keyword">skip</span>-option-autoinc</div><div class="line"># WARNING: <span class="keyword">Using</span> a password <span class="keyword">on</span> the command line <span class="keyword">interface</span> can be insecure.</div><div class="line"># server1 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># server2 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># Comparing mydb1.t_user_face <span class="keyword">to</span> mydb2.t_user_face                 [FAIL]</div><div class="line"># Transformation <span class="keyword">for</span> --changes-<span class="keyword">for</span>=server1:</div><div class="line">#</div><div class="line"> </div><div class="line">ALTER TABLE `mydb1`.`t_user_face`</div><div class="line">  DROP <span class="keyword">INDEX</span> idx_corp_time,</div><div class="line">  <span class="keyword">ADD</span> UNIQUE <span class="keyword">INDEX</span> idx_tt2 (f_user_id,f_modify_time),</div><div class="line">  <span class="keyword">ADD</span> <span class="keyword">INDEX</span> idx_corp_time (f_corp_id),</div><div class="line">  CHANGE COLUMN f_corp_id f_corp_id int(<span class="number">10</span>) unsigned <span class="keyword">NOT</span> NULL COMMENT <span class="string">'企业id'</span>,</div><div class="line">  CHANGE COLUMN f_user_id f_user_id int(<span class="number">10</span>) unsigned <span class="keyword">NOT</span> NULL COMMENT <span class="string">'用户id'</span>,</div><div class="line">  <span class="keyword">ADD</span> COLUMN f_test varchar(<span class="number">20</span>) <span class="keyword">NOT</span> NULL <span class="keyword">DEFAULT</span> <span class="string">''</span> AFTER f_url,</div><div class="line">COLLATE=utf8_general_ci;</div><div class="line"> </div><div class="line"># Compare failed. One <span class="keyword">or</span> more differences found.</div></pre></td></tr></table></figure>
+<figure class="highlight oxygene"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div></pre></td><td class="code"><pre><div class="line">直接指定db，原版预修改版处理相同</div><div class="line">mydb1:mydb2  --changes-<span class="keyword">for</span>=server2  --difftype=sql</div><div class="line"># WARNING: <span class="keyword">Using</span> a password <span class="keyword">on</span> the command line <span class="keyword">interface</span> can be insecure.</div><div class="line"># server1 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># server2 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># WARNING: Objects <span class="keyword">in</span> server1.mydb1 but <span class="keyword">not</span> <span class="keyword">in</span> server1.mydb2:</div><div class="line">#        TABLE: t_test1</div><div class="line"># WARNING: Objects <span class="keyword">in</span> server1.mydb2 but <span class="keyword">not</span> <span class="keyword">in</span> server1.mydb1:</div><div class="line">#         VIEW: view_test</div><div class="line">#        TABLE: t_test2</div><div class="line"># Compare failed. One <span class="keyword">or</span> more differences found.</div><div class="line"> </div><div class="line"> </div><div class="line">指定 db.* ，处理相同</div><div class="line">mydb1.*:mydb2.*  --changes-<span class="keyword">for</span>=server2  --difftype=sql</div><div class="line"># WARNING: <span class="keyword">Using</span> a password <span class="keyword">on</span> the command line <span class="keyword">interface</span> can be insecure.</div><div class="line"># server1 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># server2 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line">ERROR: The object mydb1.* does <span class="keyword">not</span> exist.</div><div class="line"> </div><div class="line"> </div><div class="line">指定 db.* 和 --include-<span class="keyword">create</span> ，依次处理全部对象，包括过程，视图等</div><div class="line">mydb1.*:mydb2.*  --changes-<span class="keyword">for</span>=server2  --difftype=sql --difftype=sql --include-<span class="keyword">create</span> --include-drop --<span class="keyword">skip</span>-option-autoinc</div><div class="line"># WARNING: <span class="keyword">Using</span> a password <span class="keyword">on</span> the command line <span class="keyword">interface</span> can be insecure.</div><div class="line"># server1 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># server2 <span class="keyword">on</span> <span class="number">10</span>.xx.xx.<span class="number">127</span>: ... connected.</div><div class="line"># WARNING: Objects <span class="keyword">in</span> server1.mydb1 but <span class="keyword">not</span> <span class="keyword">in</span> server1.mydb2:</div><div class="line">#        TABLE: t_test1</div><div class="line"># WARNING: Objects <span class="keyword">in</span> server1.mydb2 but <span class="keyword">not</span> <span class="keyword">in</span> server1.mydb1:</div><div class="line">#         VIEW: view_test</div><div class="line">#        TABLE: t_test2</div><div class="line"># Comparing mydb1.t_user_face <span class="keyword">to</span> mydb2.t_user_face                 [FAIL]</div><div class="line"># Transformation <span class="keyword">for</span> --changes-<span class="keyword">for</span>=server2:</div><div class="line">#</div><div class="line"> </div><div class="line">ALTER TABLE `mydb2`.`t_user_face`</div><div class="line">  DROP <span class="keyword">INDEX</span> idx_tt2,</div><div class="line">  DROP <span class="keyword">INDEX</span> idx_corp_time,</div><div class="line">  DROP COLUMN f_test,</div><div class="line">  <span class="keyword">ADD</span> <span class="keyword">INDEX</span> idx_corp_time (f_corp_id,f_modify_time),</div><div class="line">  CHANGE COLUMN f_corp_id f_corp_id int(<span class="number">11</span>) unsigned <span class="keyword">NOT</span> NULL COMMENT <span class="string">'企业id'</span>,</div><div class="line">  CHANGE COLUMN f_user_id f_user_id int(<span class="number">11</span>) unsigned <span class="keyword">NOT</span> NULL COMMENT <span class="string">'用户id'</span>,</div><div class="line">COLLATE=utf8mb4_general_ci;</div><div class="line"> </div><div class="line">DROP VIEW <span class="keyword">IF</span> EXISTS mydb2.view_test;</div><div class="line"> </div><div class="line"> </div><div class="line">USE mydb2;</div><div class="line"><span class="keyword">CREATE</span> TABLE `t_test1` (</div><div class="line">  `id` int(<span class="number">11</span>) <span class="keyword">DEFAULT</span> NULL</div><div class="line">) ENGINE=InnoDB <span class="keyword">DEFAULT</span> CHARSET=utf8mb4<span class="string">';</span></div><div class="line">'</div><div class="line"># Comparing mydb1.t_user <span class="keyword">to</span> mydb2.t_user                           [FAIL]</div><div class="line"># Transformation <span class="keyword">for</span> --changes-<span class="keyword">for</span>=server2:</div><div class="line">#</div><div class="line"> </div><div class="line">ALTER TABLE `mydb2`.`t_user`</div><div class="line">  DROP <span class="keyword">INDEX</span> idx_corpid,</div><div class="line">  <span class="keyword">ADD</span> <span class="keyword">INDEX</span> idx_corpid_deptid (f_corp_id,f_dept_id),</div><div class="line">  <span class="keyword">ADD</span> <span class="keyword">INDEX</span> idx_dept (f_dept_id);</div><div class="line"> </div><div class="line"># Comparing mydb1.proc_test <span class="keyword">to</span> mydb2.proc_test                     [FAIL]</div><div class="line"># Transformation <span class="keyword">for</span> --changes-<span class="keyword">for</span>=server2:</div><div class="line">#</div><div class="line"> </div><div class="line">DROP <span class="function"><span class="keyword">PROCEDURE</span> <span class="title">IF</span> <span class="title">EXISTS</span> `<span class="title">mydb2</span>`.`<span class="title">proc_test</span>`;</span></div><div class="line">DELIMITER <span class="comment">//</span></div><div class="line"><span class="keyword">CREATE</span> DEFINER=`ecdba`@`%` <span class="function"><span class="keyword">PROCEDURE</span> `<span class="title">mydb2</span>`.`<span class="title">proc_test</span>` <span class="params">()</span> <span class="title">CONTAINS</span> <span class="title">SQL</span> <span class="title">SQL</span> <span class="title">SECURITY</span> <span class="title">DEFINER</span> <span class="title">BEGIN</span></span></div><div class="line">    <span class="title">select</span> 1;</div><div class="line"> </div><div class="line"><span class="keyword">END</span><span class="comment">//</span></div><div class="line">DELIMITER ;</div><div class="line"> </div><div class="line"> </div><div class="line">DROP TABLE <span class="keyword">IF</span> EXISTS mydb2.t_test2;</div><div class="line"> </div><div class="line"># Compare failed. One <span class="keyword">or</span> more differences found.</div></pre></td></tr></table></figure>
+<hr>
+<p>原文连接地址：<a href="http://seanlook.com/2017/08/05/mysql_mysqldiff/">http://seanlook.com/2017/08/05/mysql_mysqldiff/</a></p>
+<hr>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;h1 id=&quot;mysqldiff&quot;&gt;&lt;a href=&quot;#mysqldiff&quot; class=&quot;headerlink&quot; title=&quot;mysqldiff&quot;&gt;&lt;/a&gt;mysqldiff&lt;/h1&gt;&lt;p&gt;mysql官方有个 mysql-utilities 工具集，其中 mysqldiff 可用于比较两个db之间的表结构。&lt;br&gt;mysqldiff的语法格式是：&lt;br&gt;&lt;figure class=&quot;highlight groovy&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;$ mysqldiff --server1=&lt;span class=&quot;string&quot;&gt;user:&lt;/span&gt;pass&lt;span class=&quot;meta&quot;&gt;@host&lt;/span&gt;:&lt;span class=&quot;string&quot;&gt;port:&lt;/span&gt;socket --server2=&lt;span class=&quot;string&quot;&gt;user:&lt;/span&gt;pass&lt;span class=&quot;meta&quot;&gt;@host&lt;/span&gt;:&lt;span class=&quot;string&quot;&gt;port:&lt;/span&gt;socket db1.&lt;span class=&quot;string&quot;&gt;object1:&lt;/span&gt;db2.object1 &lt;span class=&quot;string&quot;&gt;db3:&lt;/span&gt;db4&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;&lt;/p&gt;
+&lt;p&gt;这个语法有两个用法：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;db1:db2&lt;/code&gt;：如果只指定数据库，那么就将两个数据库中互相缺少的对象显示出来，不比较对象里面的差异。这里的对象包括表、存储过程、函数、触发器等。&lt;br&gt;如果db1与db2名字相同，可以只指定 &lt;code&gt;db1&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;db1.object1:db2.object1&lt;/code&gt;：如果指定了具体表对象，那么就会详细对比两个表的差异，包括表名、字段名、备注、索引、大小写等所有的表相关的对象。&lt;br&gt;如果两边db和对象名都相同，可以只指定 &lt;code&gt;db1.object1&lt;/code&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;接下来看一些主要的参数：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;--server1&lt;/code&gt;：配置server1的连接。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;--server2&lt;/code&gt;：配置server2的连接。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;--character-set&lt;/code&gt;：配置连接时用的字符集，如果不显示配置默认使用character_set_client。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;--width&lt;/code&gt;：配置显示的宽度。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;--skip-table-options&lt;/code&gt;：保持表的选项不变，即对比的差异里面不包括表名、AUTO_INCREMENT、ENGINE、CHARSET等差异。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;-d DIFFTYPE,--difftype=DIFFTYPE&lt;/code&gt;：差异的信息显示的方式，有 [unified|context|differ|sql]，默认是unified。如果使用&lt;code&gt;sql&lt;/code&gt;，那么就直接生成差异的SQL，这样非常方便。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;--changes-for=&lt;/code&gt;：修改对象。例如 –changes-for=server2，那么对比以sever1为主，生成的差异的修改也是针对server2的对象的修改。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;--show-reverse&lt;/code&gt;：在生成的差异修改里面，同时会包含server2和server1的修改。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;--force&lt;/code&gt;：完成所有的比较，不会在遇到一个差异之后退出&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;-vv&lt;/code&gt;：便于调试，输出许多信息&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;-q&lt;/code&gt;：quiet模式，关闭多余的信息输出&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h1 id=&quot;问题修复与增强&quot;&gt;&lt;a href=&quot;#问题修复与增强&quot; class=&quot;headerlink&quot; title=&quot;问题修复与增强&quot;&gt;&lt;/a&gt;问题修复与增强&lt;/h1&gt;&lt;p&gt;但是试用下来，发现有以下几大问题&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;对象在一方不存在时，比对结果是 object does not exist，而我们通常需要的是，生产 &lt;code&gt;CREATE/DROP XXX&lt;/code&gt; 语句&lt;/li&gt;
+&lt;li&gt;要比对一个db下面所有的对象（table, view, event, proc, func, trigger），要手动挨个 db1.t1, db2.v2…，而 db1:db2只是检查对象是否存在，不会自动比较db1与db2下的所有对象&lt;/li&gt;
+&lt;li&gt;比较时，&lt;code&gt;auto_increment&lt;/code&gt;应该忽略，但是 mysqldiff 只提供 &lt;code&gt;--skip-table-options&lt;/code&gt; ，忽略全部表选项，包括 auto_increment, engine, charset等等。&lt;/li&gt;
+&lt;li&gt;严重bug&lt;ul&gt;
+&lt;li&gt;T1: idx1(f1,f2),  T2: idx1(f1)，这种索引会生成 ADD INDEX idx(f2)&lt;/li&gt;
+&lt;li&gt;T1: idx2(f1,f2), idx3(f3,f4),  T2: idx4(f5)，这种组合索引，有可能生成的会乱序&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;这两个bug与mysqldiff的设计有关系，个人觉得它把比较和生产差异sql完全分开，复杂化了。它得到差异结果之后，生成sql又从db捞各种元数据来组装，其它从差异diff里面就可以获得组装需要的数据，也不容易出现隐藏的bug。参考实现 &lt;a href=&quot;https://github.com/hidu/mysql-schema-sync&quot;&gt;https://github.com/hidu/mysql-schema-sync&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;针对上面几大问题，花了两天的时间阅读并修改了 mysqldiff 以及相关依赖的代码，都一一解决。&lt;br&gt;修复后的地址：&lt;a href=&quot;https://github.com/seanlook/mysql-utilities/commits/master&quot;&gt;https://github.com/seanlook/mysql-utilities/commits/master&lt;/a&gt;&lt;br&gt;(mysql-utilities不像percona-toolkit那样每个工具都是All In One，需要改动mysqldiff.py意外的依赖模块)&lt;/p&gt;
+&lt;p&gt;默认情况与官方的 mysqldiff 完全兼容，新增3个选项&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;code&gt;--include-create&lt;/code&gt;：是否生成创建对象(表等)的语句，而不是仅告知对象不存在。只有在 &lt;code&gt;--difftype=sql&lt;/code&gt; 时有效。默认False&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;--include-drop&lt;/code&gt;：是否生成DROP对象的语句，针对对象在原db不存在，而仅目标db存在的情况。只有在指定了&lt;code&gt;--include-create&lt;/code&gt; 时起作用。drop操作因为比较危险，默认False，所以多加了这个选项&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;--skip-opt-autoinc&lt;/code&gt;：比较时跳过AUTO_INCREMNT。默认False&lt;/li&gt;
+&lt;li&gt;比较对象是，指定 &lt;code&gt;db1.*&lt;/code&gt;  或 &lt;code&gt;db1.*:db2.*&lt;/code&gt; 时，会比较他们所有的对象差异，而不仅显示缺少的对象&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id=&quot;使用注意&quot;&gt;&lt;a href=&quot;#使用注意&quot; class=&quot;headerlink&quot; title=&quot;使用注意&quot;&gt;&lt;/a&gt;使用注意&lt;/h2&gt;&lt;ol&gt;
+&lt;li&gt;比较时，尽量选择mysql版本相近的实例，比如mysql与mariadb比较，相同的表结构 show create table xxx 时可能得到不同的结果：&lt;ul&gt;
+&lt;li&gt;mariadb会把int字段 default ‘0’ 自动改成 default 0&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;CURRENT_TIMESTAMP&lt;/code&gt;会显示成 &lt;code&gt;current_timestamp()&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;字段 &lt;code&gt;default NULL&lt;/code&gt; 时，mysql connector/python 查 &lt;code&gt;information_schema.COLUMNS.COLUMN_DEFAULT&lt;/code&gt; 字段为 &lt;code&gt;‘NULL’&lt;/code&gt; （带引号的字符），而不是None（即查出来是NULL），导致与mysql版本用不一样&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;字段注释 &lt;code&gt;COMMENT &amp;#39;是否批准加入群 默认1批准 0拒绝\0e=&amp;#39;&amp;#39;t_user_g\0&amp;#39;&lt;/code&gt; ，是成立的，正常\0后面的都是没用的，但有个 &lt;code&gt;&amp;#39;&lt;/code&gt; 号，会导致生产sql时有多余的 &lt;code&gt;&amp;#39;&lt;/code&gt; 好，直接执行会失败。&lt;br&gt;所以，字段注释要规范，不要带入这些乱起乱七八糟的字符，特别是用IDE建表时，完成后在命令行 show create table xxx 看一下。&lt;/li&gt;
+&lt;/ol&gt;
+    
+    </summary>
+    
+      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
+    
+    
+      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
+    
+      <category term="表结构" scheme="http://seanlook.com/tags/%E8%A1%A8%E7%BB%93%E6%9E%84/"/>
     
   </entry>
   
@@ -1592,190 +1785,6 @@
       <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
     
       <category term="schema设计" scheme="http://seanlook.com/tags/schema%E8%AE%BE%E8%AE%A1/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>关于MySQL自增主键的几点问题（上）</title>
-    <link href="http://seanlook.com/2017/02/16/mysql-autoincrement/"/>
-    <id>http://seanlook.com/2017/02/16/mysql-autoincrement/</id>
-    <published>2017-02-16T08:32:49.000Z</published>
-    <updated>2017-02-16T08:32:49.000Z</updated>
-    
-    <content type="html"><![CDATA[<p>前段时间遇到一个InnoDB表自增锁导致的问题，最近刚好有一个同行网友也问到自增锁的疑问，所以抽空系统的总结一下，这两个问题下篇会有阐述。</p>
-<h2 id="1-划分三种插入类型"><a href="#1-划分三种插入类型" class="headerlink" title="1. 划分三种插入类型"></a>1. 划分三种插入类型</h2><p>这里区分一下几种插入数据行的类型，便于后面描述：（纯逻辑上的划分）</p>
-<ol>
-<li><p>“Simple inserts”<br>简单插入，就是在处理sql语句的时候，能够提前预估到插入的行数，包括 <code>INSERT</code> / <code>REPLACE</code> 的单行、多行插入，但不含嵌套子查询以及 <code>INSERT ... ON DUPLICATE KEY UPDATE</code>。</p>
-</li>
-<li><p>“Bulk inserts”<br>本文暂且叫做 大块插入，不能提前预知语句要插入的行数，也就无法知道分配多少个自增值，包括 <code>INSERT ... SELECT</code>, <code>REPLACE ... SELECT</code>, 以及 <code>LOAD DATA</code> 导入语句。InnoDB会每处理一行记录就为 AUTO_INCREMENT 列分配一个值。</p>
-</li>
-<li><p>“Mixed-mode inserts”<br>混合插入，比如在 “简单插入” 多行记录的时候，有的新行有指定自增值，有的没有，所以获得最坏情况下需要插入的数量，然后一次性分配足够的auto_increment id。比如:</p>
-<figure class="highlight less"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"># <span class="selector-tag">c1</span> 是 <span class="selector-tag">t1</span> 的 <span class="selector-tag">AUTO_INCREMENT</span> 列</div><div class="line"><span class="selector-tag">INSERT</span> <span class="selector-tag">INTO</span> <span class="selector-tag">t1</span> (c1,c2) <span class="selector-tag">VALUES</span> (<span class="number">1</span>,<span class="string">'a'</span>), (NULL,<span class="string">'b'</span>), (<span class="number">5</span>,<span class="string">'c'</span>), (NULL,<span class="string">'d'</span>);</div></pre></td></tr></table></figure>
-</li>
-</ol>
-<p>又比如 <code>INSERT ... ON DUPLICATE KEY UPDATE</code>，它在 update 阶段有可能分配新的自增id，也可能不会。</p>
-<h2 id="2-三种自增模式：innodb-autoinc-lock-mode"><a href="#2-三种自增模式：innodb-autoinc-lock-mode" class="headerlink" title="2. 三种自增模式：innodb_autoinc_lock_mode"></a>2. 三种自增模式：<code>innodb_autoinc_lock_mode</code></h2><p>在以 5.6 版本，自增id累加模式分为：</p>
-<ul>
-<li><p><strong> 传统模式</strong><br>traditional，<code>innodb_autoinc_lock_mode = 0</code><br>在具有 AUTO_INCREMENT 的表上，所有插入语句会获取一个特殊的表级锁 <em>AUTO-INC</em> ，这个表锁是在语句结束之后立即释放（无需等到事务结束），它可以保证在一个insert里面的多行记录连续递增，也能保证多个insert并发情况下自增值是连续的（不会有空洞）。</p>
-</li>
-<li><p><strong> 连续模式 </strong><br>consecutive，<code>innodb_autoinc_lock_mode = 1</code><br>MySQL 5.1.22开始，InnoDB提供了一种轻量级互斥的自增实现机制，在内存中会有一个互斥量（mutex），每次分配自增长ID时，就通过估算插入的数量（前提是必须能够估算到插入的数量，否则还是使用传统模式），然后更新mutex，下一个线程过来时从新 mutex 开始继续计算，这样就能避免传统模式非要等待每个都插入之后才能获取下一个，把“锁”降级到 只在分配id的时候 锁定互斥量。<br>在 <code>innodb_autoinc_lock_mode = 1</code>（默认） 模式下，“简单插入”采用上面的 mutex 方式，“大块插入”（insert/replace … select … 、load data…）依旧采用 AUTO-INC 表级锁方式。当然如果一个事务里已经持有表 AUTO-INC 锁，那么后续的简单插入也需要等待这个 AUTO-INC 锁释放。这能够保证任意insert并发情况下自增值是连续的。</p>
-<a id="more"></a></li>
-<li><p><strong> 交叉模式 </strong><br>interleaved，<code>innodb_autoinc_lock_mode = 2</code><br>该模式下所有 INSERT SQL 都不会有表级 AUTO-INC 锁，多个 <strong>语句</strong> 可以同时执行，所以在高并发插入场景下性能会好一些。但是当 binlog 采用 SBR 格式时，对于从库重放日志或者主库实例恢复时，并不可靠。<br>另者，它只能保证自增值在 insert语句级别 （单调）递增，所以多个insert可能会交叉着分配id，最终可能导致多个语句之间的id值不连续，这种情况出现在 混合插入：</p>
-<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> t1 (c1,c2) <span class="keyword">VALUES</span> (<span class="number">1</span>,<span class="string">'a'</span>), (<span class="literal">NULL</span>,<span class="string">'b'</span>), (<span class="number">5</span>,<span class="string">'c'</span>), (<span class="literal">NULL</span>,<span class="string">'d'</span>);</div></pre></td></tr></table></figure>
-<p>mutex 会按行分配4个id，但实际只用到2个，因此出现空洞。</p>
-</li>
-</ul>
-<h2 id="3-自增空洞（auto-increment-sequence-gap）"><a href="#3-自增空洞（auto-increment-sequence-gap）" class="headerlink" title="3. 自增空洞（auto-increment sequence gap）"></a>3. 自增空洞（auto-increment sequence gap）</h2><p>关于 AUTO_INCREMENT 自增出现空洞的问题，有必要再说明一下。</p>
-<ol>
-<li><p>在 0, 1, 2 三种任何模式下，如果事务回滚，那么里面获得自增值的sql回滚，但产生的自增值会一起丢失，不可能重新分配给其它insert语句。这也会产生空洞。</p>
-</li>
-<li><p>在大块插入情景下</p>
-<ul>
-<li><code>innodb_autoinc_lock_mode</code>为 0 或 1 时，因为 AUTO-INC 锁会持续到语句结束，同一时间只有一个 语句 在表上执行，所以自增值是连续的（其它事务需要等待），不会有空洞；</li>
-<li><code>innodb_autoinc_lock_mode</code>为 2 时，两个 “大块插入” 之间可能会有空洞，因为每条语句事先无法预知精确的数量而导致分配过多的id，可能有空洞。</li>
-</ul>
-</li>
-</ol>
-<h2 id="4-混合插入对-AUTO-INCREMENT-的影响"><a href="#4-混合插入对-AUTO-INCREMENT-的影响" class="headerlink" title="4. 混合插入对 AUTO_INCREMENT 的影响"></a>4. 混合插入对 AUTO_INCREMENT 的影响</h2><p>混合插入在 innodb_autoinc_lock_mode 不同模式下会有对 表自增值有不同的表现。<br><figure class="highlight markdown"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line">CREATE TABLE t1 (</div><div class="line">  c1 INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,</div><div class="line">  c2 CHAR(1)</div><div class="line">  ) ENGINE=INNODB;</div><div class="line"></div><div class="line">ALTER TABLE t1 AUTO_INCREMENT 101;</div><div class="line"></div><div class="line"></div><div class="line">mysql&gt; SHOW CREATE TABLE t1\G</div><div class="line"><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">** 1. row **</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span><span class="strong">*****</span></div><div class="line"><span class="code">       Table: t1</span></div><div class="line">Create Table: CREATE TABLE <span class="code">`t1`</span> (</div><div class="line">  <span class="code">`c1`</span> int(10) unsigned NOT NULL AUTO_INCREMENT,</div><div class="line">  <span class="code">`c2`</span> char(1) DEFAULT NULL,</div><div class="line">  PRIMARY KEY (<span class="code">`c1`</span>)</div><div class="line">) ENGINE=InnoDB AUTO_INCREMENT=101 DEFAULT CHARSET=utf8</div></pre></td></tr></table></figure></p>
-<h3 id="1-mode-0"><a href="#1-mode-0" class="headerlink" title="1. mode 0"></a>1. mode 0</h3><figure class="highlight asciidoc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div></pre></td><td class="code"><pre><div class="line"><span class="section">mysql&gt; select @@innodb_autoinc_lock_mode;</span></div><div class="line">+----------------------------+</div><div class="line"><span class="section">| @@innodb_autoinc_lock_mode |</span></div><div class="line">+----------------------------+</div><div class="line"><span class="section">|                          0 |</span></div><div class="line">+----------------------------+</div><div class="line"></div><div class="line">mysql&gt; INSERT INTO t1 (c1,c2) VALUES (1,<span class="emphasis">'a'</span>), (NULL,<span class="emphasis">'b'</span>), (5,<span class="emphasis">'c'</span>), (NULL,<span class="emphasis">'d'</span>);</div><div class="line"><span class="section">mysql&gt; select * from t1;</span></div><div class="line">+-----+------+</div><div class="line"><span class="section">| c1  | c2   |</span></div><div class="line">+-----+------+</div><div class="line">|   1 | a    |</div><div class="line">|   5 | c    |</div><div class="line">| 101 | b    |</div><div class="line"><span class="section">| 102 | d    |</span></div><div class="line">+-----+------+</div><div class="line"></div><div class="line">mysql&gt; show create table t1\G</div><div class="line"><span class="bullet">...</span></div><div class="line">) ENGINE=InnoDB AUTO<span class="emphasis">_INCREMENT=103 DEFAULT CHARSET=utf8</span></div><div class="line">...</div></pre></td></tr></table></figure>
-<p>可以看到下一个自增值是 103 ，因为即使这是 <strong> 一条 </strong> insert语句（多行记录），自增值还是每次分配一个，不会在语句开始前一次分配全。</p>
-<h3 id="2-mode-1"><a href="#2-mode-1" class="headerlink" title="2. mode 1"></a>2. mode 1</h3><figure class="highlight asciidoc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div></pre></td><td class="code"><pre><div class="line">mysql&gt; truncate table t1; ALTER TABLE t1 AUTO<span class="emphasis">_INCREMENT 101;  -- 复原</span></div><div class="line">mysql&gt; select @@innodb_autoinc<span class="emphasis">_lock_</span>mode;</div><div class="line"><span class="code">+----------------------------+</span></div><div class="line"><span class="section">| @@innodb_autoinc_lock_mode |</span></div><div class="line">+----------------------------+</div><div class="line"><span class="section">|                          1 |</span></div><div class="line">+----------------------------+</div><div class="line">1 row in set (0.00 sec)</div><div class="line"></div><div class="line">mysql&gt; INSERT INTO t1 (c1,c2) VALUES (1,<span class="emphasis">'a'</span>), (NULL,<span class="emphasis">'b'</span>), (5,<span class="emphasis">'c'</span>), (NULL,<span class="emphasis">'d'</span>);</div><div class="line">Query OK, 4 rows affected (0.00 sec)</div><div class="line">Records: 4  Duplicates: 0  Warnings: 0</div><div class="line"></div><div class="line"><span class="section">mysql&gt; select * from t1;</span></div><div class="line">+-----+------+</div><div class="line"><span class="section">| c1  | c2   |</span></div><div class="line">+-----+------+</div><div class="line">|   1 | a    |</div><div class="line">|   5 | c    |</div><div class="line">| 101 | b    |</div><div class="line"><span class="section">| 102 | d    |</span></div><div class="line">+-----+------+</div><div class="line"></div><div class="line">mysql&gt; show create table t1\G</div><div class="line"><span class="bullet">...</span></div><div class="line">) ENGINE=InnoDB AUTO<span class="emphasis">_INCREMENT=105 DEFAULT CHARSET=utf8</span></div></pre></td></tr></table></figure>
-<p>可以看到最终插入的值是一样的，但下一个自增值变成了 105，因为该模式下insert语句处理的时候，提前分配了 4 个自增值，但实际只有了两个。</p>
-<p>注：如果你的insert自增列全都有带值，那么处理的时候是不会分配自增值的，经过下面这个实验，可以知道 <strong> 分配自增值，是在遇到第一个没有带自增列的行时，一次性分配的 </strong> ：<br><figure class="highlight asciidoc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line"><span class="bullet">-- </span>Tx1，先运行。 -- 插入第2行的时候 sleep 5s</div><div class="line">INSERT INTO t1 (c1,c2) VALUES (2,<span class="emphasis">'e'</span>),(sleep(5)+6,<span class="emphasis">'g'</span>),(NULL,<span class="emphasis">'f'</span>), (NULL,<span class="emphasis">'h'</span>);</div><div class="line"></div><div class="line"><span class="bullet">-- </span>Tx2，后运行。 -- 第一行没有给自增列值，马上分配 4 个</div><div class="line">INSERT INTO t1 (c1,c2) VALUES  (NULL,<span class="emphasis">'b'</span>), (1,<span class="emphasis">'a'</span>), (sleep(5)+5,<span class="emphasis">'c'</span>), (NULL,<span class="emphasis">'d'</span>);</div><div class="line"></div><div class="line"><span class="section">-- 得到的结果是</span></div><div class="line">+-----+------+</div><div class="line"><span class="section">| c1  | c2   |</span></div><div class="line">+-----+------+</div><div class="line">|   1 | a    |</div><div class="line">|   2 | e    |</div><div class="line">|   5 | c    |</div><div class="line">|   6 | g    |</div><div class="line">| 101 | b    |</div><div class="line">| 102 | d    |</div><div class="line">| 105 | f    |</div><div class="line"><span class="section">| 106 | h    |</span></div><div class="line">+-----+------+</div></pre></td></tr></table></figure></p>
-<h3 id="3-mode-2"><a href="#3-mode-2" class="headerlink" title="3. mode 2"></a>3. mode 2</h3><figure class="highlight asciidoc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div></pre></td><td class="code"><pre><div class="line">mysql&gt; truncate table t1; ALTER TABLE t1 AUTO<span class="emphasis">_INCREMENT 101;  -- 复原</span></div><div class="line">mysql&gt; select @@innodb_autoinc<span class="emphasis">_lock_</span>mode;</div><div class="line"><span class="code">+----------------------------+</span></div><div class="line"><span class="section">| @@innodb_autoinc_lock_mode |</span></div><div class="line">+----------------------------+</div><div class="line"><span class="section">|                          2 |</span></div><div class="line">+----------------------------+</div><div class="line"></div><div class="line">mysql&gt; INSERT INTO t1 (c1,c2) VALUES (1,<span class="emphasis">'a'</span>), (NULL,<span class="emphasis">'b'</span>), (5,<span class="emphasis">'c'</span>), (NULL,<span class="emphasis">'d'</span>);</div><div class="line"><span class="section">mysql&gt; select * from t1;</span></div><div class="line">+-----+------+</div><div class="line"><span class="section">| c1  | c2   |</span></div><div class="line">+-----+------+</div><div class="line">|   1 | a    |</div><div class="line">|   5 | c    |</div><div class="line">| 101 | b    |</div><div class="line"><span class="section">| 102 | d    |</span></div><div class="line">+-----+------+</div><div class="line"></div><div class="line">mysql&gt; show create table t1\G</div><div class="line"><span class="bullet">...</span></div><div class="line">) ENGINE=InnoDB AUTO<span class="emphasis">_INCREMENT=105 DEFAULT CHARSET=utf8</span></div></pre></td></tr></table></figure>
-<p>结果看起来与 连续模式 一样，其实不然！该模式下，如果另外一个 大块插入 并发执行时，可能会出现以下现象：</p>
-<ol>
-<li>大块插入的的自增值有间断</li>
-<li>其它并发执行的事务插入出现 duplicate-key error</li>
-</ol>
-<figure class="highlight gradle"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">第<span class="number">1</span>点 (create t2 select * <span class="keyword">from</span> t1)</div><div class="line">Tx1: insert <span class="keyword">into</span> t1(c2) select c2 <span class="keyword">from</span> t2；  -- 先执行</div><div class="line">Tx2: INSERT <span class="keyword">INTO</span> t1 (c1,c2) VALUES (<span class="number">1</span>,<span class="string">'a'</span>), (<span class="keyword">NULL</span>,<span class="string">'b'</span>), (<span class="number">5</span>,<span class="string">'c'</span>), (<span class="keyword">NULL</span>,<span class="string">'d'</span>);  -- 后 并发执行</div><div class="line"></div><div class="line">在交叉模式下，Tx1事务插入的数据行会与 Tx1 交叉出现。</div><div class="line">注：如果 Tx1 改成 insert <span class="keyword">into</span> t1 select * <span class="keyword">from</span> t2 ，那么 Tx2 执行极有可能会报 duplicate-key error，与下面第<span class="number">2</span>点所说的重复键是不一样的</div><div class="line"></div><div class="line">第<span class="number">2</span>点</div><div class="line">mysql&gt; truncate table t1; ALTER TABLE t1 AUTO_INCREMENT <span class="number">5</span>;  -- 复原</div><div class="line">mysql&gt; INSERT <span class="keyword">INTO</span> t1 (c1,c2) VALUES (<span class="number">1</span>,<span class="string">'a'</span>), (<span class="keyword">NULL</span>,<span class="string">'b'</span>), (<span class="number">5</span>,<span class="string">'c'</span>), (<span class="keyword">NULL</span>,<span class="string">'d'</span>);</div><div class="line">ERROR <span class="number">1062</span> (<span class="number">23000</span>): Duplicate entry <span class="string">'5'</span> <span class="keyword">for</span> key <span class="string">'PRIMARY'</span></div></pre></td></tr></table></figure>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>上面说了这么多，那么自增模式到底该怎么选择呢？其实很简单，目前数据库默认的 traditional 即 <code>innodb_autoinc_lock_mode=1</code> 就是最好的模式，一般业务生产库不会有 <code>insert into ... select ...</code>或者 load data infile 这样的维护动作。（提示：即使晚上有数据迁移任务，也不要通过这样的形式进行）</p>
-<p><code>innodb_autoinc_lock_mode=2</code> 可以提高获取表自增id的并发能力（性能），但是除非出现上面演示的 duplicate-key 特殊用法情形，不会像网上所说的获取到相同key导致重复的问题。但是如果binlog在 RBR 格式下不建议使用，可能出现主从数据不一致。还有就是能够容忍gap的存在，以及多个语句insert的自增值交叉。</p>
-<p>参考： <a href="https://dev.mysql.com/doc/refman/5.6/en/innodb-auto-increment-handling.html" target="_blank" rel="external">https://dev.mysql.com/doc/refman/5.6/en/innodb-auto-increment-handling.html</a></p>
-<p>下篇分析遇到过的 MySQL 自增主键相关的具体问题。</p>
-<hr>
-<p>本文链接地址：<a href="http://seanlook.com/2017/02/16/mysql-autoincrement/">http://seanlook.com/2017/02/16/mysql-autoincrement/</a></p>
-<hr>
-]]></content>
-    
-    <summary type="html">
-    
-      &lt;p&gt;前段时间遇到一个InnoDB表自增锁导致的问题，最近刚好有一个同行网友也问到自增锁的疑问，所以抽空系统的总结一下，这两个问题下篇会有阐述。&lt;/p&gt;
-&lt;h2 id=&quot;1-划分三种插入类型&quot;&gt;&lt;a href=&quot;#1-划分三种插入类型&quot; class=&quot;headerlink&quot; title=&quot;1. 划分三种插入类型&quot;&gt;&lt;/a&gt;1. 划分三种插入类型&lt;/h2&gt;&lt;p&gt;这里区分一下几种插入数据行的类型，便于后面描述：（纯逻辑上的划分）&lt;/p&gt;
-&lt;ol&gt;
-&lt;li&gt;&lt;p&gt;“Simple inserts”&lt;br&gt;简单插入，就是在处理sql语句的时候，能够提前预估到插入的行数，包括 &lt;code&gt;INSERT&lt;/code&gt; / &lt;code&gt;REPLACE&lt;/code&gt; 的单行、多行插入，但不含嵌套子查询以及 &lt;code&gt;INSERT ... ON DUPLICATE KEY UPDATE&lt;/code&gt;。&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;&lt;p&gt;“Bulk inserts”&lt;br&gt;本文暂且叫做 大块插入，不能提前预知语句要插入的行数，也就无法知道分配多少个自增值，包括 &lt;code&gt;INSERT ... SELECT&lt;/code&gt;, &lt;code&gt;REPLACE ... SELECT&lt;/code&gt;, 以及 &lt;code&gt;LOAD DATA&lt;/code&gt; 导入语句。InnoDB会每处理一行记录就为 AUTO_INCREMENT 列分配一个值。&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;&lt;p&gt;“Mixed-mode inserts”&lt;br&gt;混合插入，比如在 “简单插入” 多行记录的时候，有的新行有指定自增值，有的没有，所以获得最坏情况下需要插入的数量，然后一次性分配足够的auto_increment id。比如:&lt;/p&gt;
-&lt;figure class=&quot;highlight less&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;2&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;# &lt;span class=&quot;selector-tag&quot;&gt;c1&lt;/span&gt; 是 &lt;span class=&quot;selector-tag&quot;&gt;t1&lt;/span&gt; 的 &lt;span class=&quot;selector-tag&quot;&gt;AUTO_INCREMENT&lt;/span&gt; 列&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;selector-tag&quot;&gt;INSERT&lt;/span&gt; &lt;span class=&quot;selector-tag&quot;&gt;INTO&lt;/span&gt; &lt;span class=&quot;selector-tag&quot;&gt;t1&lt;/span&gt; (c1,c2) &lt;span class=&quot;selector-tag&quot;&gt;VALUES&lt;/span&gt; (&lt;span class=&quot;number&quot;&gt;1&lt;/span&gt;,&lt;span class=&quot;string&quot;&gt;&#39;a&#39;&lt;/span&gt;), (NULL,&lt;span class=&quot;string&quot;&gt;&#39;b&#39;&lt;/span&gt;), (&lt;span class=&quot;number&quot;&gt;5&lt;/span&gt;,&lt;span class=&quot;string&quot;&gt;&#39;c&#39;&lt;/span&gt;), (NULL,&lt;span class=&quot;string&quot;&gt;&#39;d&#39;&lt;/span&gt;);&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;
-&lt;/li&gt;
-&lt;/ol&gt;
-&lt;p&gt;又比如 &lt;code&gt;INSERT ... ON DUPLICATE KEY UPDATE&lt;/code&gt;，它在 update 阶段有可能分配新的自增id，也可能不会。&lt;/p&gt;
-&lt;h2 id=&quot;2-三种自增模式：innodb-autoinc-lock-mode&quot;&gt;&lt;a href=&quot;#2-三种自增模式：innodb-autoinc-lock-mode&quot; class=&quot;headerlink&quot; title=&quot;2. 三种自增模式：innodb_autoinc_lock_mode&quot;&gt;&lt;/a&gt;2. 三种自增模式：&lt;code&gt;innodb_autoinc_lock_mode&lt;/code&gt;&lt;/h2&gt;&lt;p&gt;在以 5.6 版本，自增id累加模式分为：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;&lt;p&gt;&lt;strong&gt; 传统模式&lt;/strong&gt;&lt;br&gt;traditional，&lt;code&gt;innodb_autoinc_lock_mode = 0&lt;/code&gt;&lt;br&gt;在具有 AUTO_INCREMENT 的表上，所有插入语句会获取一个特殊的表级锁 &lt;em&gt;AUTO-INC&lt;/em&gt; ，这个表锁是在语句结束之后立即释放（无需等到事务结束），它可以保证在一个insert里面的多行记录连续递增，也能保证多个insert并发情况下自增值是连续的（不会有空洞）。&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;&lt;p&gt;&lt;strong&gt; 连续模式 &lt;/strong&gt;&lt;br&gt;consecutive，&lt;code&gt;innodb_autoinc_lock_mode = 1&lt;/code&gt;&lt;br&gt;MySQL 5.1.22开始，InnoDB提供了一种轻量级互斥的自增实现机制，在内存中会有一个互斥量（mutex），每次分配自增长ID时，就通过估算插入的数量（前提是必须能够估算到插入的数量，否则还是使用传统模式），然后更新mutex，下一个线程过来时从新 mutex 开始继续计算，这样就能避免传统模式非要等待每个都插入之后才能获取下一个，把“锁”降级到 只在分配id的时候 锁定互斥量。&lt;br&gt;在 &lt;code&gt;innodb_autoinc_lock_mode = 1&lt;/code&gt;（默认） 模式下，“简单插入”采用上面的 mutex 方式，“大块插入”（insert/replace … select … 、load data…）依旧采用 AUTO-INC 表级锁方式。当然如果一个事务里已经持有表 AUTO-INC 锁，那么后续的简单插入也需要等待这个 AUTO-INC 锁释放。这能够保证任意insert并发情况下自增值是连续的。&lt;/p&gt;
-    
-    </summary>
-    
-      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
-    
-    
-      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
-    
-      <category term="schema设计" scheme="http://seanlook.com/tags/schema%E8%AE%BE%E8%AE%A1/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>监控MySQL你还应该收集表信息</title>
-    <link href="http://seanlook.com/2016/12/04/mysql-schema-gather-statistics/"/>
-    <id>http://seanlook.com/2016/12/04/mysql-schema-gather-statistics/</id>
-    <published>2016-12-04T08:32:49.000Z</published>
-    <updated>2016-12-04T08:32:49.000Z</updated>
-    
-    <content type="html"><![CDATA[<h2 id="1-Story"><a href="#1-Story" class="headerlink" title="1. Story"></a>1. Story</h2><p>也许你经常会被问到，库里某个表最近一年的内每个月的数据量增长情况。当然如果你有按月分表比较好办，挨个 <code>show table status</code>，如果只有一个大表，那估计要在大家都休息的时候，寂寞的夜里去跑sql统计了，因为你只能获取当前的表信息，历史信息追查不到了。</p>
-<p>除此以外，作为DBA本身也要对数据库空间增长情况进行预估，用以规划容量。我们说的表信息主要包括：</p>
-<ol>
-<li>表数据大小（DATA_LENGTH）</li>
-<li>索引大小(INDEX_LENGTH)</li>
-<li>行数（ROWS）</li>
-<li>当前自增值（AUTO_INCREMENT，如果有）</li>
-</ol>
-<p>目前是没有看到哪个mysql监控工具上提供这样的指标。这些信息不需要采集的太频繁，而且结果也只是个预估值，不一定准确，所以这是站在一个全局、长远的角度去监控(采集)表的。</p>
-<p>本文要介绍的自己写的采集工具，是基于组内现有的一套监控体系：</p>
-<ul>
-<li><code>InfluxDB</code>：时间序列数据库，存储监控数据</li>
-<li><code>Grafana</code>：数据展示面板</li>
-<li><code>Telegraf</code>：收集信息的agent<br>看了下 telegraf 的最新的 <a href="https://github.com/influxdata/telegraf/tree/master/plugins/inputs/mysql" target="_blank" rel="external">mysql 插件</a>，一开始很欣慰：支持收集 Table schema statistics 和 Info schema auto increment columns。试用了一下，有数据，但是如前面所说，除了自增值外其他都是预估值，telegraf收集频率过高没啥意义，也许一天2次就足够了，它提供的 <code>IntervalSlow</code>选项固定写死在代码里，只能是放缓 global status 监控频率。不过倒是可以与其它监控指标分开成两份配置文件，各自定义收集间隔来实现。<br>最后打算自己用python撸一个，上报到influxdb里 :)</li>
-</ul>
-<h2 id="2-Concept"><a href="#2-Concept" class="headerlink" title="2. Concept"></a>2. Concept</h2><p>完整代码见 GitHub项目地址：<a href="https://github.com/seanlook/DBschema_gather" target="_blank" rel="external">DBschema_gather</a><br>实现也特别简单，就是查询 <code>information_schema</code> 库的 <code>COLUMNS</code>、<code>TABLES</code> 两个表：<br><a id="more"></a><br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">SELECT</span></div><div class="line">    <span class="keyword">IFNULL</span>(@@hostname, @@server_id) SERVER_NAME,</div><div class="line">    %s <span class="keyword">as</span> HOST,</div><div class="line">    t.TABLE_SCHEMA,</div><div class="line">    t.TABLE_NAME,</div><div class="line">    t.TABLE_ROWS,</div><div class="line">    t.DATA_LENGTH,</div><div class="line">    t.INDEX_LENGTH,</div><div class="line">    t.AUTO_INCREMENT,</div><div class="line">  c.COLUMN_NAME,</div><div class="line">  c.DATA_TYPE,</div><div class="line">  <span class="keyword">LOCATE</span>(<span class="string">'unsigned'</span>, c.COLUMN_TYPE) COL_UNSIGNED</div><div class="line">  # <span class="keyword">CONCAT</span>(c.DATA_TYPE, <span class="keyword">IF</span>(<span class="keyword">LOCATE</span>(<span class="string">'unsigned'</span>, c.COLUMN_TYPE)=<span class="number">0</span>, <span class="string">''</span>, <span class="string">'_unsigned'</span>))</div><div class="line"><span class="keyword">FROM</span></div><div class="line">    information_schema.<span class="string">`TABLES`</span> t</div><div class="line"><span class="keyword">LEFT</span> <span class="keyword">JOIN</span> information_schema.<span class="string">`COLUMNS`</span> c <span class="keyword">ON</span> t.TABLE_SCHEMA = c.TABLE_SCHEMA</div><div class="line"><span class="keyword">AND</span> t.TABLE_NAME = c.TABLE_NAME</div><div class="line"><span class="keyword">AND</span> c.EXTRA = <span class="string">'auto_increment'</span></div><div class="line"><span class="keyword">WHERE</span></div><div class="line">    t.TABLE_SCHEMA <span class="keyword">NOT</span> <span class="keyword">IN</span> (</div><div class="line">        <span class="string">'mysql'</span>,</div><div class="line">        <span class="string">'information_schema'</span>,</div><div class="line">        <span class="string">'performance_schema'</span>,</div><div class="line">        <span class="string">'sys'</span></div><div class="line">    )</div><div class="line"><span class="keyword">AND</span> t.TABLE_TYPE = <span class="string">'BASE TABLE'</span></div></pre></td></tr></table></figure></p>
-<p>关于 <code>auto_increment</code>，我们除了关注当前增长到哪了，还会在意相比 <code>int / bigint</code> 的最大值，还有多少可用空间。于是计算了 <code>autoIncrUsage</code> 这一列，用于保存当前已使用的比例。</p>
-<p>然后使用 InfluxDB 的python客户端，批量存入influxdb。如果没有InfluxDB，结果会打印出json —— 这是Zabbix、Open-Falcon这些监控工具普遍支持的格式。</p>
-<p>最后就是使用 Grafana 从 influxdb 数据源画图。</p>
-<h2 id="3-Usage"><a href="#3-Usage" class="headerlink" title="3. Usage"></a>3. Usage</h2><ol>
-<li><p>环境<br>在 python 2.7 环境下编写的，2.6，3.x没测。<br>运行需要<code>MySQLdb</code>、<code>influxdb</code>两个库：</p>
-<figure class="highlight cmake"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo pip <span class="keyword">install</span> mysql-python influxdb</div></pre></td></tr></table></figure>
-</li>
-<li><p>配置<br><code>settings_dbs.py</code> 配置文件</p>
-<ul>
-<li><code>DBLIST_INFO</code>：列表存放需要采集的哪些MySQL实例表信息，元组内分别是连接地址、端口、用户名、密码<br>用户需要select表的权限，否则看不到对应的信息.</li>
-<li><code>InfluxDB_INFO</code>：influxdb的连接信息，注意提前创建好数据库名 <code>mysql_info</code><br>设置为 <code>None</code> 可输出结果为json.</li>
-</ul>
-</li>
-<li><p>创建influxdb上的数据库和存储策略<br>存放2年，1个复制集：（按需调整）</p>
-<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">CREATE</span> <span class="keyword">DATABASE</span> <span class="string">"mysql_info"</span></div><div class="line"><span class="keyword">CREATE</span> <span class="keyword">RETENTION</span> <span class="keyword">POLICY</span> <span class="string">"mysql_info_schema"</span> <span class="keyword">ON</span> <span class="string">"mysql_info"</span> <span class="keyword">DURATION</span> <span class="number">730</span>d <span class="keyword">REPLICATION</span> <span class="number">1</span> <span class="keyword">DEFAULT</span></div></pre></td></tr></table></figure>
-</li>
-</ol>
-<p>看大的信息类似于：<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-schema-statistics.png" alt="schema-influxdb-data"></p>
-<ol>
-<li><p>放crontab跑<br>可以单独放在用于监控的服务器上，不过建议在生产环境可以运行在mysql实例所在主机上，安全起见。<br>一般库在晚上会有数据迁移的动作，可以在迁移前后分别运行 <code>mysql_schema_info.py</code> 来收集一次。不建议太频繁。</p>
-<figure class="highlight basic"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"><span class="symbol">40 </span><span class="number">23</span>,<span class="number">5</span>,<span class="number">12</span>,<span class="number">18</span> * * * /opt/DBschema_info/mysql_schema_info.py &gt;&gt; /tmp/collect_DBschema_info.<span class="keyword">log</span> <span class="number">2</span>&gt;&amp;<span class="number">1</span></div></pre></td></tr></table></figure>
-</li>
-<li><p>生成图表</p>
-</li>
-</ol>
-<p>导入项目下的 <code>grafana_table_stats.json</code> 到 Grafana面板中。效果如下：<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-schema-statistics2.png" alt="表数据大小和行数"><br><em>表数据大小和行数</em></p>
-<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-schema-statistics3.png" alt="每天行数变化增量,auto_increment使用率"><br><em>每天行数变化增量,auto_increment使用率</em></p>
-<h2 id="4-More"><a href="#4-More" class="headerlink" title="4. More"></a>4. More</h2><ol>
-<li>分库分表情况下，全局唯一ID在表里无法计算 autoIncrUsage  </li>
-<li>实现上其实很简单，更主要的是唤醒收集这些信息的意识  </li>
-<li>可以增加 Graphite 输出格式  </li>
-</ol>
-<hr>
-<p>  原文链接地址：<a href="http://seanlook.com/2016/12/04/mysql-schema-gather-statistics/">http://seanlook.com/2016/12/04/mysql-schema-gather-statistics/</a></p>
-<hr>
-]]></content>
-    
-    <summary type="html">
-    
-      &lt;h2 id=&quot;1-Story&quot;&gt;&lt;a href=&quot;#1-Story&quot; class=&quot;headerlink&quot; title=&quot;1. Story&quot;&gt;&lt;/a&gt;1. Story&lt;/h2&gt;&lt;p&gt;也许你经常会被问到，库里某个表最近一年的内每个月的数据量增长情况。当然如果你有按月分表比较好办，挨个 &lt;code&gt;show table status&lt;/code&gt;，如果只有一个大表，那估计要在大家都休息的时候，寂寞的夜里去跑sql统计了，因为你只能获取当前的表信息，历史信息追查不到了。&lt;/p&gt;
-&lt;p&gt;除此以外，作为DBA本身也要对数据库空间增长情况进行预估，用以规划容量。我们说的表信息主要包括：&lt;/p&gt;
-&lt;ol&gt;
-&lt;li&gt;表数据大小（DATA_LENGTH）&lt;/li&gt;
-&lt;li&gt;索引大小(INDEX_LENGTH)&lt;/li&gt;
-&lt;li&gt;行数（ROWS）&lt;/li&gt;
-&lt;li&gt;当前自增值（AUTO_INCREMENT，如果有）&lt;/li&gt;
-&lt;/ol&gt;
-&lt;p&gt;目前是没有看到哪个mysql监控工具上提供这样的指标。这些信息不需要采集的太频繁，而且结果也只是个预估值，不一定准确，所以这是站在一个全局、长远的角度去监控(采集)表的。&lt;/p&gt;
-&lt;p&gt;本文要介绍的自己写的采集工具，是基于组内现有的一套监控体系：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;&lt;code&gt;InfluxDB&lt;/code&gt;：时间序列数据库，存储监控数据&lt;/li&gt;
-&lt;li&gt;&lt;code&gt;Grafana&lt;/code&gt;：数据展示面板&lt;/li&gt;
-&lt;li&gt;&lt;code&gt;Telegraf&lt;/code&gt;：收集信息的agent&lt;br&gt;看了下 telegraf 的最新的 &lt;a href=&quot;https://github.com/influxdata/telegraf/tree/master/plugins/inputs/mysql&quot;&gt;mysql 插件&lt;/a&gt;，一开始很欣慰：支持收集 Table schema statistics 和 Info schema auto increment columns。试用了一下，有数据，但是如前面所说，除了自增值外其他都是预估值，telegraf收集频率过高没啥意义，也许一天2次就足够了，它提供的 &lt;code&gt;IntervalSlow&lt;/code&gt;选项固定写死在代码里，只能是放缓 global status 监控频率。不过倒是可以与其它监控指标分开成两份配置文件，各自定义收集间隔来实现。&lt;br&gt;最后打算自己用python撸一个，上报到influxdb里 :)&lt;/li&gt;
-&lt;/ul&gt;
-&lt;h2 id=&quot;2-Concept&quot;&gt;&lt;a href=&quot;#2-Concept&quot; class=&quot;headerlink&quot; title=&quot;2. Concept&quot;&gt;&lt;/a&gt;2. Concept&lt;/h2&gt;&lt;p&gt;完整代码见 GitHub项目地址：&lt;a href=&quot;https://github.com/seanlook/DBschema_gather&quot;&gt;DBschema_gather&lt;/a&gt;&lt;br&gt;实现也特别简单，就是查询 &lt;code&gt;information_schema&lt;/code&gt; 库的 &lt;code&gt;COLUMNS&lt;/code&gt;、&lt;code&gt;TABLES&lt;/code&gt; 两个表：&lt;br&gt;
-    
-    </summary>
-    
-      <category term="MySQL" scheme="http://seanlook.com/categories/MySQL/"/>
-    
-    
-      <category term="mysql" scheme="http://seanlook.com/tags/mysql/"/>
-    
-      <category term="监控" scheme="http://seanlook.com/tags/%E7%9B%91%E6%8E%A7/"/>
     
   </entry>
   
