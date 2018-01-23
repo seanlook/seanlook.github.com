@@ -447,7 +447,10 @@
 <p>但是联合主键有一个好处：逻辑上一批数据，在物理上很有可能相邻存储，有可能检索的数据，在一个block里面，减少了读取并缓存磁盘块的数量，一个是速度的提升，一个是减小内存的消耗。<br>比如 (f_c_id,f_m_id,f_type) 作为联合主键，f_c_id=22299有20w条记录，每条记录平均160bytes，一个页能存16kB，即100条记录（不考虑预留），那么f_c_id=22299需要2000个page，而且是相邻的page。</p>
 <p>举例，应用检索数据 f_c_id=22299, f_m_id IN(12345,23456) ，假设数据在块1和块10，缓存到内存。不多久检索f_c_id=22299, f_m_id=12399，刚好在块1。</p>
 <p>如果是自增id，那么就没有这个顺序， 而是根据插入数据时间来的，那么这两条记录可能在物理上很远的地方，要多读取磁盘。</p>
-<h1 id="3-全局ID"><a href="#3-全局ID" class="headerlink" title="3. 全局ID"></a>3. 全局ID</h1><p>全局ID跟自增ID特性基本相同，但是它的值是从另外的服务获取的数字增长类型，不要UUID。<br>只在有全局统计需求，或其它可能需要全局唯一性的情况下，才使用，否则没必要引入多余的服务依赖。<br>另外，定义全局ID时，注意字段范围要满足要求，小心溢出；不要加上多余的 AUTO_INCREMENT 定义。</p>
+<h1 id="3-全局ID"><a href="#3-全局ID" class="headerlink" title="3. 全局ID"></a>3. 全局ID</h1><p>全局ID跟自增ID特性基本相同，但是它的值是从另外的服务获取的数字增长类型，不要UUID。</p>
+<p>只在有分库（一般有全局统计需求），或其它可能需要全局唯一性的情况下，才使用，否则没必要引入多余的服务依赖。</p>
+<p>另外，定义全局ID时，注意字段范围要满足要求，小心溢出；不要加上多余的 AUTO_INCREMENT 定义。</p>
+<p>使用全局id还有一个好处：在做数据迁移或拆库时，可以无缝切换，因为新旧数据id不用担心重复。</p>
 <h1 id="4-设计原则：自增主键-VS-联合主键"><a href="#4-设计原则：自增主键-VS-联合主键" class="headerlink" title="4. 设计原则：自增主键 VS 联合主键"></a>4. 设计原则：自增主键 VS 联合主键</h1><ol>
 <li>所有索引字段，特别主键，无论自增或联合主键，一定定义为 not null</li>
 <li>表没有特殊情况下，都使用自增主键，尽量不用联合主键</li>
@@ -617,7 +620,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">113</span>
+                <span class="site-state-item-count">116</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -628,7 +631,7 @@
             
             <div class="site-state-item site-state-categories">
               <a href="/categories/index.html">
-                <span class="site-state-item-count">23</span>
+                <span class="site-state-item-count">24</span>
                 <span class="site-state-item-name">categories</span>
               </a>
             </div>
@@ -639,7 +642,7 @@
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">122</span>
+                <span class="site-state-item-count">125</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>
@@ -724,7 +727,7 @@
         <div class="copyright" >
   
   &copy;  2014 - 
-  <span itemprop="copyrightYear">2017</span>
+  <span itemprop="copyrightYear">2018</span>
   <span class="with-love">
     <i class="fa fa-heart"></i>
   </span>

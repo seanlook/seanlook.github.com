@@ -316,6 +316,554 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2018/01/14/rabbitmq-maxwell-consumer/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2018/01/14/rabbitmq-maxwell-consumer/" itemprop="url">
+                  基于MySQL binlog增量数据同步方案(maxwell+rabbimt+pydbsync)
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2018-01-14T15:32:49+08:00">
+                2018-01-14
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2018/01/14/rabbitmq-maxwell-consumer/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2018/01/14/rabbitmq-maxwell-consumer/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2018/01/14/rabbitmq-maxwell-consumer/" class="leancloud_visitors" data-flag-title="基于MySQL binlog增量数据同步方案(maxwell+rabbimt+pydbsync)">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>应用场景：同 <a href="http://seanlook.com/2017/09/05/mysql-binlog-subscribe-simple-for-dba/">http://seanlook.com/2017/09/05/mysql-binlog-subscribe-simple-for-dba/</a> ，但更灵活：</p>
+<blockquote>
+<p>实时同步部分表到另外一个数据库实例<br>比如在轨迹迁库时，将当天表的数据同步到新库，模拟阿里云dms数据传输的功能，相当于在测试环境演练，减少失误。<br>另外还可以从新库反向同步增量数据到老库，解决测试环境多项目测试引起数据库冲突的问题。  </p>
+<p>正式切库时的回滚措施<br>比如轨迹数据独立项目，切换期间数据写向新库，但如果切换失败需要回滚到老库，就需要把这段时间新增的数据同步回老库（启动消费程序），这就不需要程序段再考虑复杂的回滚设计。</p>
+<p>数据库闪回<br>关于数据库误操作的闪回方案，见文章MySQL根据离线binlog快速闪回 。binlog2sql的 -B 选项可以将sql反向组装，生产回滚sql。如果需要完善的闪回功能，要进一步开发，提高易用性。</p>
+<p>binlog搜索功能<br>目前组内一版的binlog搜索功能，是离线任务处理的方式，好处是不会占用太大空间，缺点是处理时间较长。通过实时binlog解析过滤的方式，入ES可以快速搜索。需要进一步开发完善。<br>结合graylog可以实现阿里云RDS类似的数据追踪功能</p>
+</blockquote>
+<p>rabbitmq介绍：<a href="http://seanlook.com/2018/01/06/rabbitmq-introduce/">http://seanlook.com/2018/01/06/rabbitmq-introduce/</a></p>
+<p>maxwell介绍：<a href="http://seanlook.com/2018/01/13/maxwell-binlog/">http://seanlook.com/2018/01/13/maxwell-binlog/</a></p>
+<p>数据已经生成，要完成 MySQL binlog 增量数据同步，还差一个消费者程序，将rabbitmq里面的消息取出来，在目标库重放：</p>
+<p>目前这个增量程序重放动作是：</p>
+<ul>
+<li>binlog里面 insert 和 update 行，都变成 replace into </li>
+<li>binlog里面 delele ，变成 delete ignore xxx limit 1</li>
+<li>alter/create，原封不动</li>
+</ul>
+<p>所以如果表上没有主键或者唯一索引，是非常难搞定的，原本的update变成 replace into 多插入一条数据。当然如果把 update 事件改成 <code>update tables set f1=v1,f2=v2 where f1=v1,f2=vv2 limit 1</code> 也没毛病。</p>
+<p>使用python3，安装rabbitmq 的python客户端即可：<code>pip install pika</code><br>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2018/01/14/rabbitmq-maxwell-consumer/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2018/01/13/maxwell-binlog/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2018/01/13/maxwell-binlog/" itemprop="url">
+                  自建Binlog订阅服务 —— Maxwell
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2018-01-13T15:32:49+08:00">
+                2018-01-13
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2018/01/13/maxwell-binlog/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2018/01/13/maxwell-binlog/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2018/01/13/maxwell-binlog/" class="leancloud_visitors" data-flag-title="自建Binlog订阅服务 —— Maxwell">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h2 id="1-介绍"><a href="#1-介绍" class="headerlink" title="1. 介绍"></a>1. 介绍</h2><p>Maxwell 是java语言编写的能够读取、解析MySQL binlog，将行更新以json格式发送到 Kafka、RabbitMQ、AWS Kinesis、Google Cloud Pub/Sub、文件，有了增量的数据流，可以想象的应用场景实在太多了，如ETL、维护缓存、收集表级别的dml指标、增量到搜索引擎、数据分区迁移、切库binlog回滚方案，等等。</p>
+<p>它还提供其它功能：</p>
+<ul>
+<li>支持<code>SELECT * FROM table</code> 的方式做全量数据初始化</li>
+<li>支持主库发生failover后，自动恢复binlog位置（GTID）</li>
+<li>灵活的对数据进行分区，解决数据倾斜的问题。kafka支持 database, table, column等级别的数据分区</li>
+<li>它的实现方式是伪装成MySQL Server的从库，接收binlog events，然后根据schemas信息拼装，支持ddl,xid,rows等各种event.</li>
+</ul>
+<p>maxwell由 zendesk 开源：<a href="https://github.com/zendesk/maxwell">https://github.com/zendesk/maxwell</a> ，而且维护者相当活跃。</p>
+<p>网上已有人对 Alibaba Cannal, Zendesk Maxwell, Yelp mysql_streamer进行对比，可以了解下：<a href="http://bigdatadecode.club/%E5%AE%9E%E6%97%B6%E6%8A%93%E5%8F%96MySQL%E7%9A%84%E6%9B%B4%E6%96%B0%E6%95%B0%E6%8D%AE%E5%88%B0Hadoop.html">实时抓取MySQL的更新数据到Hadoop</a></p>
+<h3 id="安装"><a href="#安装" class="headerlink" title="安装"></a>安装</h3><p>使用 maxwell 非常简单，只需要jdk环境<br><figure class="highlight maxima"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">yum install -y java-<span class="number">1.8</span>.0-openjdk-<span class="number">1.8</span>.0.121-<span class="number">1.b13</span>.el6.x86_64</div><div class="line"></div><div class="line">curl -sLo - https://github.com/zendesk/maxwell/releases/download/v1.12.0/maxwell-<span class="number">1.12</span>.0.tar.gz \</div><div class="line">       | tar zxvf -</div><div class="line">cd maxwell-<span class="number">1.12</span>.0</div><div class="line"></div><div class="line"># 默认寻找当前目录下的 config.<span class="built_in">properties</span> 配置文件</div></pre></td></tr></table></figure></p>
+<p>要求 mysql server binlog格式是 <code>ROW</code>， row_image 是 <code>FULL</code>。感受一下输出结果<br><figure class="highlight xquery"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div></pre></td><td class="code"><pre><div class="line">mysql&gt; <span class="keyword">update</span> test.e set m = <span class="number">5.444</span>, c = now(<span class="number">3</span>) <span class="keyword">where</span> id = <span class="number">1</span>;</div><div class="line">&#123;</div><div class="line">   <span class="string">"database"</span>:<span class="string">"test"</span>,</div><div class="line">   <span class="string">"table"</span>:<span class="string">"e"</span>,</div><div class="line">   <span class="string">"type"</span>:<span class="string">"update"</span>,</div><div class="line">   <span class="string">"ts"</span>:<span class="number">1477053234</span>,</div><div class="line">   <span class="string">"commit"</span>: true,</div><div class="line">   ...</div><div class="line">   <span class="string">"data"</span>:&#123;</div><div class="line">      <span class="string">"id"</span>:<span class="number">1</span>,</div><div class="line">      <span class="string">"m"</span>:<span class="number">5.444</span>,</div><div class="line">      <span class="string">"c"</span>:<span class="string">"2016-10-21 05:33:54.631000"</span>,</div><div class="line">      <span class="string">"comment"</span>:<span class="string">"I am a creature of light."</span></div><div class="line">   &#125;,</div><div class="line">   <span class="string">"old"</span>:&#123;</div><div class="line">      <span class="string">"m"</span>:<span class="number">4.2341</span>,</div><div class="line">      <span class="string">"c"</span>:<span class="string">"2016-10-21 05:33:37.523000"</span></div><div class="line">   &#125;</div><div class="line">&#125;</div><div class="line"></div><div class="line">mysql&gt; create table test.e ( ... )</div><div class="line">&#123;</div><div class="line">   <span class="string">"type"</span>:<span class="string">"table-create"</span>,</div><div class="line">   <span class="string">"database"</span>:<span class="string">"test"</span>,</div><div class="line">   <span class="string">"table"</span>:<span class="string">"e"</span>,</div><div class="line">   <span class="string">"def"</span>:&#123;</div><div class="line">      <span class="string">"database"</span>:<span class="string">"test"</span>,</div><div class="line">      <span class="string">"charset"</span>:<span class="string">"utf8mb4"</span>,</div><div class="line">      <span class="string">"table"</span>:<span class="string">"e"</span>,</div><div class="line">      <span class="string">"columns"</span>:[</div><div class="line">         &#123;<span class="string">"type"</span>:<span class="string">"int"</span>, <span class="string">"name"</span>:<span class="string">"id"</span>, <span class="string">"signed"</span>:true&#125;,</div><div class="line">         &#123;<span class="string">"type"</span>:<span class="string">"double"</span>, <span class="string">"name"</span>:<span class="string">"m"</span>&#125;,</div><div class="line">         &#123;<span class="string">"type"</span>:<span class="string">"timestamp"</span>, <span class="string">"name"</span>:<span class="string">"c"</span>, <span class="string">"column-length"</span>:<span class="number">6</span>&#125;,</div><div class="line">         &#123;<span class="string">"type"</span>:<span class="string">"varchar"</span>, <span class="string">"name"</span>:<span class="string">"comment"</span>, <span class="string">"charset"</span>:<span class="string">"latin1"</span>&#125;</div><div class="line">      ],</div><div class="line">      <span class="string">"primary-key"</span>:[</div><div class="line">         <span class="string">"id"</span></div><div class="line">      ]</div><div class="line">   &#125;,</div><div class="line">   <span class="string">"ts"</span>:<span class="number">1477053126000</span>,</div><div class="line">   <span class="string">"sql"</span>:<span class="string">"create table test.e ( id int(10) not null primary key auto_increment, m double, c timestamp(6), comment varchar(255) charset 'latin1' )"</span>,</div><div class="line">   <span class="string">"position"</span>:<span class="string">"master.000006:800050"</span></div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p><code>data</code>是 After image, <code>old</code> 是 Before image。 insert 只有后镜像，delete只有前镜像（<code>data</code>）<br><code>type</code>是语句类型：<code>insert</code>, <code>update</code>, <code>delete</code>, <code>database-create</code>, <code>database-alter</code>, <code>database-drop</code>, <code>table-create</code>, <code>table-alter</code>, <code>table-drop</code> 。</p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2018/01/13/maxwell-binlog/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2018/01/06/rabbitmq-introduce/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2018/01/06/rabbitmq-introduce/" itemprop="url">
+                  RabbitMQ 入门
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2018-01-06T15:32:49+08:00">
+                2018-01-06
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MQ/" itemprop="url" rel="index">
+                    <span itemprop="name">MQ</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2018/01/06/rabbitmq-introduce/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2018/01/06/rabbitmq-introduce/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2018/01/06/rabbitmq-introduce/" class="leancloud_visitors" data-flag-title="RabbitMQ 入门">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>rabbitmq可以用一本书取讲，这里只是介绍一些使用过程中，常用到的基本的知识点。<br>官方文档覆盖的内容，非常全面：<a href="http://www.rabbitmq.com/documentation.html">http://www.rabbitmq.com/documentation.html</a> 。</p>
+<h2 id="1-介绍"><a href="#1-介绍" class="headerlink" title="1. 介绍"></a>1. 介绍</h2><p>RabbitMQ，即消息队列系统，它是一款开源消息队列中间件，采用Erlang语言开发，RabbitMQ是AMQP(Advanced Message Queueing Protocol)的标准实现。</p>
+<p>AMQP是一个公开发布的异步消息的规范，是提供统一消息服务的应用层标准高级消息队列协议，为面向消息的中间件设计.消息中间件主要用于组件之间的解耦，消息的发送者无需知道消息使用者的存在，反之亦然。</p>
+<p><a href="https://www.rabbitmq.com/tutorials/amqp-concepts.html">https://www.rabbitmq.com/tutorials/amqp-concepts.html</a></p>
+<p>相对于JMS(Java Message Service)规范来说，JMS使用的是特定语言的APIs，而消息格式可自由定义，而AMQP对消息的格式和传输是有要求的，但实现不会受操作系统、开发语言以及平台等的限制。</p>
+<p>JMS和AMQP还有一个较大的区别：JMS有队列(Queues)和主题(Topics)两种消息传递模型，发送到 JMS队列 的消息最多只能被一个Client消费，发送到 JMS主题 的消息可能会被多个Clients消费；AMQP只有队列(Queues)，队列的消息只能被单个接受者消费，发送者并不直接把消息发送到队列中，而是发送到Exchange中，该Exchage会与一个或多个队列绑定，能够实现与JMS队列和主题同样的功能。</p>
+<p>另外还有一种 MQTT协议，意为消息队列遥测传输，是IBM开发的一个即时通讯协议。由于其维护一个长连接以轻量级低消耗著称，所以常用于移动端消息推送服务开发。MQTT是基于TCP的应用层协议封装，实现了异步Pub/Sub，在物联网（IoT）应用广泛。</p>
+<p>RabbitMQ可通过库、插件的形式，支持JMS和MQTT协议。参考：<a href="http://geek.csdn.net/news/detail/71894">http://geek.csdn.net/news/detail/71894</a></p>
+<h3 id="1-1-主要概念"><a href="#1-1-主要概念" class="headerlink" title="1.1 主要概念"></a>1.1 主要概念</h3><p><img src="https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_MRG/2/html-single/Messaging_Programming_Reference/images/1083.png" alt=""></p>
+<ol>
+<li><p>Broker<br>接收和分发消息的应用，RabbitMQ Server就是Message Broker</p>
+</li>
+<li><p>Exchange<br>message到达broker的第一站，根据分发规则，匹配查询表中的routing key，分发消息到queue中去。常用的类型有：direct, topic, fanout。<br>如果没有队列绑定到exchange上，那么该exchange上的消息都会被丢弃，因为它不存储消息又不知道该怎么处理消息。</p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2018/01/06/rabbitmq-introduce/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/11/02/mysql_schemasync/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -661,555 +1209,11 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/10/17/mysql-big-trx-lock-case/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2017/10/17/mysql-big-trx-lock-case/" itemprop="url">
-                  “大”事务引起的锁等待分析案例
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-10-17T16:32:49+08:00">
-                2017-10-17
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2017/10/17/mysql-big-trx-lock-case/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2017/10/17/mysql-big-trx-lock-case/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2017/10/17/mysql-big-trx-lock-case/" class="leancloud_visitors" data-flag-title="“大”事务引起的锁等待分析案例">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <h1 id="1-现象"><a href="#1-现象" class="headerlink" title="1. 现象"></a>1. 现象</h1><p>生产环境数据库在某一刻突然发现大量活跃连接，而且大部分状态是 <code>updating</code> 。问题出现在周六上午，持续了大概三四分钟，得益于我们自己的快照程序，拿到了当时现场的的processlist, 锁等待关系，innodb status 信息：(经过脱敏处理)</p>
-<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-bigtrx-lockinfo.png" alt="mysql-bigtrx-lockinfo.png"><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql-bigtrx-processlist.png" alt="mysql-bigtrx-processlist.png"></p>
-<p>innodb_status.txt片段：<br><a href="https://gist.coding.net/u/seanlook/d6ad649f81c64e23a25f3a980c44a1fe">var_mydb_snapshot.html</a> （也可以通过 pt-stalk 收集）</p>
-<p>首先在 Lock Waits Info 一节，看到每行的trx_id(事务)的role分为 Blocker(引起阻塞的线程) 与 Blockee（被阻塞者）；最后一列 blocking_trx_id 在role是Blockee时才有值，代表谁阻塞了当前事务。<br>根据上面的关系，可以得出以下结论：</p>
-<ol>
-<li>事务 <strong>19705811640</strong> 运行了231s，阻塞了19706118937、19706124453、19706124752，而这些事务都在做同一个UPDATE语句</li>
-<li>被锁定的记录是 mydb.mytable1表的主键索引值为 5317885 行</li>
-<li>事务 19706124752 既被阻塞，也阻塞了别人19706125253</li>
-<li>不难发现 <strong>19705811640</strong> 应该最先运行的事务，且对其它事务产生了链式阻塞，它的thread_id是 9898630，来源IP</li>
-</ol>
-<p>但是当你兴冲冲的找到引起阻塞的事务 19705811640 在做什么事情时，发现它没有任何sql的信息，lock info以及processlist里面都是None。那么有哪些情况会导致在会话是活跃的，但sql的内容为空：</p>
-<ol>
-<li>执行show processlist的时候，刚好在事务里面两个sql的中间</li>
-<li>sql已经执行完成，但长时间没有提交</li>
-</ol>
-<h1 id="2-初步分析"><a href="#2-初步分析" class="headerlink" title="2. 初步分析"></a>2. 初步分析</h1><p>其实这个现象已经遇到过很多次了，第1个原因常发生在 大量单条记录更新 的情况，一个sql在一个事务里循环执行10000次，即使每条都很快，但大部分时间都在网络传输上，（可以改成批量的形式）。在本案例基本上能确定的是第2个原因：事务开启之后，sql也执行了，但中间又做别的事情去了。那么怎样才能知道这个事务是什么内容呢？两个方向去找：</p>
-<ol>
-<li>从来源ip上的应用程序的日志里分析</li>
-<li>binlog里面分析</li>
-</ol>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2017/10/17/mysql-big-trx-lock-case/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/10/13/mysql-table_open_cache_file_limits/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2017/10/13/mysql-table_open_cache_file_limits/" itemprop="url">
-                  table_open_cache 与 table_definition_cache 对MySQL(内存)的影响
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-10-13T16:32:49+08:00">
-                2017-10-13
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2017/10/13/mysql-table_open_cache_file_limits/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2017/10/13/mysql-table_open_cache_file_limits/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2017/10/13/mysql-table_open_cache_file_limits/" class="leancloud_visitors" data-flag-title="table_open_cache 与 table_definition_cache 对MySQL(内存)的影响">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <h1 id="1-现象，内存使用大"><a href="#1-现象，内存使用大" class="headerlink" title="1. 现象，内存使用大"></a>1. 现象，内存使用大</h1><p>首先说一下最近遇到的一个现象，因为分库的缘故，单实例里面的表的数量增加了20倍，总数将近达到10000个。在开发环境明显感觉到执行简单查询都很慢，在processlist里面看到状态 opening table 达到好几秒但数据库并没有什么负载。本能的想到应该要加大 <code>table_open_cache</code>，可是加大后发现MySQL刚启动 RES 就占用了2.5G内存，之前才500-600M的样子。</p>
-<p>只是将 <code>table_open_cache</code> 从默认的2000，增加到10000（先不论这个值合不合理），就独占了2G的内存，这对于生产环境内存浪费是不可接受的。还好，关于这个问题的讨论有不少，感兴趣的话可以阅读 <a href="https://bugs.mysql.com/bug.php?id=68287">#bug 68287</a>, <a href="https://bugs.mysql.com/bug.php?id=68514">#bug 68514</a>, <a href="https://www.percona.com/forums/questions-discussions/mysql-and-percona-server/percona-server-5-6/12015-percona-5-6-14-56-very-high-memory-usage">12015-percona-5-6-14-56-very-high-memory-usage</a>。</p>
-<p>Oracle官方工程师并不认为这是个bug，导致初始化分配这么多内存的原因是，<strong>开启了 Performance_Schema</strong> 。P_S测量数据库的性能指标，需要提前一次性分配内存，而不是随着数据库运行逐渐申请内存。</p>
-<p>下表是不同参数组合下内存占用的测试结果：<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/mysql_table_cache_1.png" alt=""></p>
-<p>（注：可以通过这个来查看PFS里面哪些占内存比较多，<code>mysql -hxxxx -Pxxx -uxx -pxx -e &quot;show engine performance_schema status&quot;|grep memory|sort -nr -k3 |head</code> ）</p>
-<p>对于 table_open_cache 设置的非常大的情况下，即使还有许多cache多余，但P_S都需要分配这个数量的内存。解决这个内存大的问题有3个方向：</p>
-<ol>
-<li>table_open_cache, table_definition_cache, max_connections 设置合理</li>
-<li>关闭 performance_schema</li>
-<li>保持 PFS 开启，关闭测量 max_table_instances和max_table_handles  <ul>
-<li>performance_schema_max_table_instances: 最大测量多少个表对象<br>对应 (pfs_table_share).memory，我的环境里固定 277600000 bytes</li>
-<li>performance_schema_max_table_handles: 最大打开表的总数<br>对应(pfs_table).memory，随着 table_open_cache 的增大而增大</li>
-</ul>
-</li>
-</ol>
-<p>关闭的方法是在my.cnf里面设置以上变量为 0 。默认是 -1 ，表示 autosize，即根据 table_open_cache/table_def_cache/max_connections 的值自动设置，相关代码 <code>pfs_autosize.cc</code>：<br><figure class="highlight php"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line">PFS_sizing_data *estimate_hints(PFS_global_param *param)</div><div class="line">&#123;</div><div class="line">  <span class="keyword">if</span> ((param-&gt;m_hints.m_max_connections &lt;= MAX_CONNECTIONS_DEFAULT) &amp;&amp;</div><div class="line">      (param-&gt;m_hints.m_table_definition_cache &lt;= TABLE_DEF_CACHE_DEFAULT) &amp;&amp;</div><div class="line">      (param-&gt;m_hints.m_table_open_cache &lt;= TABLE_OPEN_CACHE_DEFAULT))</div><div class="line">  &#123;</div><div class="line">    <span class="comment">/* The my.cnf used is either unchanged, or lower than factory defaults. */</span></div><div class="line">    <span class="keyword">return</span> &amp; small_data;</div><div class="line">  &#125;</div><div class="line"></div><div class="line">  <span class="keyword">if</span> ((param-&gt;m_hints.m_max_connections &lt;= MAX_CONNECTIONS_DEFAULT * <span class="number">2</span>) &amp;&amp;</div><div class="line">      (param-&gt;m_hints.m_table_definition_cache &lt;= TABLE_DEF_CACHE_DEFAULT * <span class="number">2</span>) &amp;&amp;</div><div class="line">      (param-&gt;m_hints.m_table_open_cache &lt;= TABLE_OPEN_CACHE_DEFAULT * <span class="number">2</span>))</div><div class="line">  &#123;</div><div class="line">    <span class="comment">/* Some defaults have been increased, to "moderate" values. */</span></div><div class="line">    <span class="keyword">return</span> &amp; medium_data;</div><div class="line">  &#125;</div><div class="line"></div><div class="line">  <span class="comment">/* Looks like a server in production. */</span></div><div class="line">  <span class="keyword">return</span> &amp; large_data;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>在阿里RDS中，performance_schema_max<em>*</em>系列变量不能单独disable，只能全局关闭PFS。这里我们尝试寻求一个合理table_cache的范围。<br>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2017/10/13/mysql-table_open_cache_file_limits/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/09/23/rds_disk_io_troubleshooting/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2017/09/23/rds_disk_io_troubleshooting/" itemprop="url">
-                  MySQL实例阻塞分析一例(线程statistics状态)
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-09-23T16:32:49+08:00">
-                2017-09-23
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2017/09/23/rds_disk_io_troubleshooting/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2017/09/23/rds_disk_io_troubleshooting/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2017/09/23/rds_disk_io_troubleshooting/" class="leancloud_visitors" data-flag-title="MySQL实例阻塞分析一例(线程statistics状态)">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <h1 id="1-现象"><a href="#1-现象" class="headerlink" title="1. 现象"></a>1. 现象</h1><p>某日下午下班后低峰期，现网MySQL一个库突然报出大量慢sql，状态是 <code>statistics</code>，但是过后拿这些sql去执行的时候，实际很快。处于 statistics 状态的线程有个特征：查询的都是视图，但看监控那个时间段并没有明显的update/detele/insert。通过我们的快照程序，去分析当时的 innodb status，发现如下信息：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div></pre></td><td class="code"><pre><div class="line">SEMAPHORES</div><div class="line"><span class="comment">----------</span></div><div class="line">OS WAIT ARRAY INFO: reservation count 17208994</div><div class="line"><span class="comment">--Thread 139964610234112 has waited at srv0srv.cc line 2132 for 14.00 seconds the semaphore:</span></div><div class="line">X-<span class="keyword">lock</span> (wait_ex) <span class="keyword">on</span> RW-latch <span class="keyword">at</span> <span class="number">0x1635a00</span> created <span class="keyword">in</span> <span class="keyword">file</span> dict0dict.cc line <span class="number">900</span></div><div class="line">a writer (<span class="keyword">thread</span> <span class="keyword">id</span> <span class="number">139964610234112</span>) has reserved it <span class="keyword">in</span> <span class="keyword">mode</span> <span class="keyword">wait</span> exclusive</div><div class="line"><span class="built_in">number</span> <span class="keyword">of</span> readers <span class="number">1</span>, waiters flag <span class="number">0</span>, lock_word: ffffffffffffffff</div><div class="line"><span class="keyword">Last</span> <span class="keyword">time</span> <span class="keyword">read</span> <span class="keyword">locked</span> <span class="keyword">in</span> <span class="keyword">file</span> row0purge.cc line <span class="number">720</span></div><div class="line"><span class="keyword">Last</span> <span class="keyword">time</span> write <span class="keyword">locked</span> <span class="keyword">in</span> <span class="keyword">file</span> /home/<span class="keyword">admin</span>/<span class="number">146</span>_20161018140650857_13830810_code/rpm_workspace/<span class="keyword">storage</span>/innobase/srv/srv0srv.cc line <span class="number">2132</span></div><div class="line">OS <span class="keyword">WAIT</span> <span class="built_in">ARRAY</span> INFO: signal <span class="keyword">count</span> <span class="number">256984450</span></div><div class="line"><span class="keyword">Mutex</span> spin waits <span class="number">626367674</span>, rounds <span class="number">2776951802</span>, OS waits <span class="number">1973672</span></div><div class="line">RW-<span class="keyword">shared</span> spins <span class="number">149944457</span>, rounds <span class="number">1650148561</span>, OS waits <span class="number">3972058</span></div><div class="line">RW-excl spins <span class="number">72090467</span>, rounds <span class="number">2017802579</span>, OS waits <span class="number">11148264</span></div><div class="line">Spin rounds per <span class="keyword">wait</span>: <span class="number">4.43</span> <span class="keyword">mutex</span>, <span class="number">11.01</span> RW-<span class="keyword">shared</span>, <span class="number">27.99</span> RW-excl</div><div class="line">...</div><div class="line"><span class="keyword">FILE</span> I/O</div><div class="line"><span class="comment">--------</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">0</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">insert</span> buffer <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">1</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">log</span> <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">2</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">read</span> <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">3</span> state: doing <span class="keyword">file</span> i/o (<span class="keyword">read</span> <span class="keyword">thread</span>) ev <span class="keyword">set</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">4</span> state: waiting <span class="keyword">for</span> i/o request (<span class="keyword">read</span> <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">5</span> state: doing <span class="keyword">file</span> i/o (<span class="keyword">read</span> <span class="keyword">thread</span>) ev <span class="keyword">set</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">6</span> state: doing <span class="keyword">file</span> i/o (write <span class="keyword">thread</span>) ev <span class="keyword">set</span></div><div class="line">I/O <span class="keyword">thread</span> <span class="number">7</span> state: waiting <span class="keyword">for</span> i/o request (write <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">8</span> state: waiting <span class="keyword">for</span> i/o request (write <span class="keyword">thread</span>)</div><div class="line">I/O <span class="keyword">thread</span> <span class="number">9</span> state: waiting <span class="keyword">for</span> i/o request (write <span class="keyword">thread</span>)</div><div class="line">Pending <span class="keyword">normal</span> aio <span class="keyword">reads</span>: <span class="number">18</span> [<span class="number">0</span>, <span class="number">12</span>, <span class="number">0</span>, <span class="number">6</span>] , aio writes: <span class="number">1</span> [<span class="number">1</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>] ,</div><div class="line">ibuf aio <span class="keyword">reads</span>: <span class="number">0</span>, <span class="keyword">log</span> i/o<span class="string">'s: 0, sync i/o'</span>s: <span class="number">0</span></div><div class="line">Pending flushes (fsync) <span class="keyword">log</span>: <span class="number">0</span>; buffer pool: 0</div><div class="line">1346747614 OS file reads, 2869418806 OS file writes, 524616747 OS fsyncs</div><div class="line">22 pending preads, 1 pending pwrites</div><div class="line">6.00 reads/s, 16384 avg bytes/read, 0.00 writes/s, 0.00 fsyncs/s</div><div class="line">...</div><div class="line">ROW OPERATIONS</div><div class="line"><span class="comment">--------------</span></div><div class="line">0 queries inside InnoDB, 0 queries in queue</div><div class="line">38 read views open inside InnoDB</div><div class="line">Main thread process no. 34414, id 139964610234112, state: enforcing dict <span class="keyword">cache</span> <span class="keyword">limit</span></div><div class="line"><span class="built_in">Number</span> <span class="keyword">of</span> <span class="keyword">rows</span> inserted <span class="number">2546811699</span>, <span class="keyword">updated</span> <span class="number">1708150459</span>, deleted <span class="number">1004154696</span>, <span class="keyword">read</span> <span class="number">413168628410</span></div><div class="line"><span class="number">0.00</span> inserts/s, <span class="number">0.00</span> updates/s, <span class="number">0.00</span> deletes/s, <span class="number">54.19</span> <span class="keyword">reads</span>/s</div></pre></td></tr></table></figure></p>
-<h1 id="2-分析"><a href="#2-分析" class="headerlink" title="2. 分析"></a>2. 分析</h1><p>从上面的信息知道 Thread 139964610234112 是主线程，在源码 srv0srv.cc:2132 行的地方等待信号14s，这个信号是在 dict0dict.cc:900 地方创建的 RW-latch 排它锁。那么奇怪了，主线程自己在等待自己的互斥锁。<br>由于环境是阿里云的RDS(基于MySQL 5.6.16-log 版本)，拿不到他们的代码，找来 5.6.35 的来看，行号对不上。但好在上段信息的最后面有一个 Main thread state: <code>enforcing dict cache limit</code>，发现在 srv0srv.cc 函数 srv_master_do_active_tasks() 约2137行的位置：</p>
-<figure class="highlight mipsasm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">if (cur_time % SRV_MASTER_DICT_LRU_INTERVAL == <span class="number">0</span>) &#123;</div><div class="line">4srv_main_thread_op_info = <span class="string">"enforcing dict cache limit"</span><span class="comment">;</span></div><div class="line">4srv_master_evict_from_table_cache(<span class="number">50</span>)<span class="comment">;</span></div><div class="line">4MONITOR_INC_TIME_IN_MICRO_SECS(</div><div class="line">44MONITOR_SRV_DICT_LRU_MICROSECOND, counter_time)<span class="comment">;</span></div><div class="line">&#125;</div></pre></td></tr></table></figure>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2017/09/23/rds_disk_io_troubleshooting/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
   <nav class="pagination">
-    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><span class="space">&hellip;</span><a class="page-number" href="/page/23/">23</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right"></i></a>
+    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><span class="space">&hellip;</span><a class="page-number" href="/page/24/">24</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right"></i></a>
   </nav>
 
 
@@ -1254,7 +1258,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">113</span>
+                <span class="site-state-item-count">116</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -1265,7 +1269,7 @@
             
             <div class="site-state-item site-state-categories">
               <a href="/categories/index.html">
-                <span class="site-state-item-count">23</span>
+                <span class="site-state-item-count">24</span>
                 <span class="site-state-item-name">categories</span>
               </a>
             </div>
@@ -1276,7 +1280,7 @@
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">122</span>
+                <span class="site-state-item-count">125</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>
@@ -1345,7 +1349,7 @@
         <div class="copyright" >
   
   &copy;  2014 - 
-  <span itemprop="copyrightYear">2017</span>
+  <span itemprop="copyrightYear">2018</span>
   <span class="with-love">
     <i class="fa fa-heart"></i>
   </span>

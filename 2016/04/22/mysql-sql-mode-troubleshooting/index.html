@@ -489,6 +489,15 @@
 <h2 id="3-设置-sql-mode"><a href="#3-设置-sql-mode" class="headerlink" title="3. 设置 sql_mode"></a>3. 设置 sql_mode</h2><p><strong>查看</strong><br><figure class="highlight mel"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">查看当前连接会话的sql模式：</div><div class="line"></div><div class="line">mysql&gt; <span class="keyword">select</span> @@session.sql_mode;</div><div class="line">或者从环境变量里取</div><div class="line">mysql&gt; show variables like <span class="string">"sql_mode"</span>;</div><div class="line"></div><div class="line"></div><div class="line">查看全局sql_mode设置：</div><div class="line">mysql&gt; <span class="keyword">select</span> @@<span class="keyword">global</span>.sql_mode;</div><div class="line"></div><div class="line">只设置<span class="keyword">global</span>，需要重新连接进来才会生效</div></pre></td></tr></table></figure></p>
 <p><strong>设置</strong><br><figure class="highlight gams"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line">形式如</div><div class="line">mysql&gt; <span class="keyword">set</span> sql_mode=<span class="string">''</span>;</div><div class="line">mysql&gt; <span class="keyword">set</span> global <span class="comment">sql_mode=</span><span class="comment">'NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES'</span>;</div><div class="line"></div><div class="line"></div><div class="line">如果是自定义的模式组合，可以像下面这样</div><div class="line"></div><div class="line">Adding only one mode to sql_mode without removing existing ones:</div><div class="line">mysql&gt; <span class="keyword">SET</span> sql_mode=(SELECT <span class="comment">CONCAT(@@sql_mode,</span><span class="comment">',&lt;mode_to_add&gt;'</span><span class="comment">))</span>;</div><div class="line"></div><div class="line">Removing only a specific mode from sql_mode without removing others:</div><div class="line">mysql&gt; <span class="keyword">SET</span> sql_mode=(SELECT <span class="comment">REPLACE(@@sql_mode,</span><span class="comment">'&lt;mode_to_remove&gt;'</span><span class="comment">,</span><span class="comment">''</span><span class="comment">))</span>;</div></pre></td></tr></table></figure></p>
 <p>配置文件里面设置<code>sql-mode=&quot;&quot;</code> 。</p>
+<h2 id="一个有趣的试验"><a href="#一个有趣的试验" class="headerlink" title="一个有趣的试验"></a>一个有趣的试验</h2><p>updated: 2017-12-10</p>
+<p>现网做数据迁移测试时报另一个错误，原由是这样的：一个1.8亿的表里面，因为某种原因需要把字段定义null改为not null，避免下游服务（如ES）处理特殊数据时异常情况。但这是一个并发dml非常高又达到100多G的大表，online ddl针对这种修改字段类型简直束手无策，pt-osc也慢的很。</p>
+<p>刚好有一个做数据迁移的契机，原本打算在新库上把字段改好，再通过dts或类似的数据迁移工具，同步过去。在非严格模式下，原本是null的值也会变成0或’’，但还是报错了：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">set</span> sql_mode=<span class="string">''</span>;  <span class="comment">-- 置为非严格模式</span></div><div class="line"><span class="keyword">insert</span> <span class="keyword">into</span> t(<span class="keyword">id</span>, a) <span class="keyword">values</span>(<span class="number">1</span>, <span class="literal">null</span>);</div><div class="line">[Err] 1048 - Column 'a' cannot be null</div><div class="line"></div><div class="line">然而</div><div class="line"><span class="keyword">insert</span> <span class="keyword">into</span> t(<span class="keyword">id</span>, a) <span class="keyword">values</span>(<span class="number">1</span>, <span class="literal">null</span>),(<span class="number">2</span>, <span class="literal">null</span>),;</div><div class="line">Affected rows: 2</div></pre></td></tr></table></figure></p>
+<p>找到官方文档上的原话，可以解释：</p>
+<blockquote>
+<p>If you are not using strict mode, then whenever you insert an “incorrect” value into a column, such as a NULL into a NOT NULL column or a too-large numeric value into a numeric column, MySQL sets the column to the “best possible value” instead of producing an error</p>
+<p>If you try to store NULL into a column that doesn’t take NULL values, an error occurs for single-row INSERT statements. For multiple-row INSERT statements or for INSERT INTO … SELECT statements, MySQL Server stores the implicit default value for the column data type</p>
+</blockquote>
+<p>非严格模式下，<em>单行</em>插入 null 到 not null 列，会失败；多行插入则只是warning。规则是这样，也就无需解释。</p>
 <h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><ul>
 <li><a href="https://dev.mysql.com/doc/refman/5.6/en/sql-mode.html#sql-mode-strict" target="_blank" rel="external">MySQL manual sql-mode</a></li>
 <li><a href="http://xstarcd.github.io/wiki/MySQL/MySQL-sql-mode.html" target="_blank" rel="external">mysql的sql_mode合理设置</a></li>
@@ -649,7 +658,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">113</span>
+                <span class="site-state-item-count">116</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -660,7 +669,7 @@
             
             <div class="site-state-item site-state-categories">
               <a href="/categories/index.html">
-                <span class="site-state-item-count">23</span>
+                <span class="site-state-item-count">24</span>
                 <span class="site-state-item-name">categories</span>
               </a>
             </div>
@@ -671,7 +680,7 @@
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">122</span>
+                <span class="site-state-item-count">125</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>
@@ -733,7 +742,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-MySQL莫名变成了-Strict-SQL-Mode"><span class="nav-text">1. MySQL莫名变成了 Strict SQL Mode</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-sql-mode-常用值说明"><span class="nav-text">2. sql_mode 常用值说明</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-设置-sql-mode"><span class="nav-text">3. 设置 sql_mode</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#参考"><span class="nav-text">参考</span></a></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-MySQL莫名变成了-Strict-SQL-Mode"><span class="nav-text">1. MySQL莫名变成了 Strict SQL Mode</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-sql-mode-常用值说明"><span class="nav-text">2. sql_mode 常用值说明</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-设置-sql-mode"><span class="nav-text">3. 设置 sql_mode</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#一个有趣的试验"><span class="nav-text">一个有趣的试验</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#参考"><span class="nav-text">参考</span></a></li></ol></div>
             
 
           </div>
@@ -756,7 +765,7 @@
         <div class="copyright" >
   
   &copy;  2014 - 
-  <span itemprop="copyrightYear">2017</span>
+  <span itemprop="copyrightYear">2018</span>
   <span class="with-love">
     <i class="fa fa-heart"></i>
   </span>

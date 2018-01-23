@@ -1,0 +1,1192 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="en">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="mysql,binlog," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0" />
+
+
+
+
+
+
+<meta name="description" content="1. 介绍Maxwell 是java语言编写的能够读取、解析MySQL binlog，将行更新以json格式发送到 Kafka、RabbitMQ、AWS Kinesis、Google Cloud Pub/Sub、文件，有了增量的数据流，可以想象的应用场景实在太多了，如ETL、维护缓存、收集表级别的dml指标、增量到搜索引擎、数据分区迁移、切库binlog回滚方案，等等。
+它还提供其它功能：
+
+支持">
+<meta property="og:type" content="article">
+<meta property="og:title" content="自建Binlog订阅服务 —— Maxwell">
+<meta property="og:url" content="http://seanlook.com/2018/01/13/maxwell-binlog/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="1. 介绍Maxwell 是java语言编写的能够读取、解析MySQL binlog，将行更新以json格式发送到 Kafka、RabbitMQ、AWS Kinesis、Google Cloud Pub/Sub、文件，有了增量的数据流，可以想象的应用场景实在太多了，如ETL、维护缓存、收集表级别的dml指标、增量到搜索引擎、数据分区迁移、切库binlog回滚方案，等等。
+它还提供其它功能：
+
+支持">
+<meta property="og:updated_time" content="2018-01-13T07:32:49.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="自建Binlog订阅服务 —— Maxwell">
+<meta name="twitter:description" content="1. 介绍Maxwell 是java语言编写的能够读取、解析MySQL binlog，将行更新以json格式发送到 Kafka、RabbitMQ、AWS Kinesis、Google Cloud Pub/Sub、文件，有了增量的数据流，可以想象的应用场景实在太多了，如ETL、维护缓存、收集表级别的dml指标、增量到搜索引擎、数据分区迁移、切库binlog回滚方案，等等。
+它还提供其它功能：
+
+支持">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post","offset":12,"offset_float":0,"b2t":false,"scrollpercent":false},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: 'WNWHBKUL26',
+      apiKey: 'cec5cc7d455c77d448433aa60f989766',
+      indexName: 'seanlook',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://seanlook.com/2018/01/13/maxwell-binlog/"/>
+
+
+
+
+
+  <title> 自建Binlog订阅服务 —— Maxwell | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s95.cnzz.com/z_stat.php?id=1253513173&web_id=1253513173" language="JavaScript"></script>
+  </div>
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Sean's Notes</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">Stay hungry, stay foolish.</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            About
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocapitalize="off" autocomplete="off" autocorrect="off"
+             placeholder="Searching..." spellcheck="false"
+             type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2018/01/13/maxwell-binlog/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                自建Binlog订阅服务 —— Maxwell
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2018-01-13T15:32:49+08:00">
+                2018-01-13
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2018/01/13/maxwell-binlog/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2018/01/13/maxwell-binlog/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2018/01/13/maxwell-binlog/" class="leancloud_visitors" data-flag-title="自建Binlog订阅服务 —— Maxwell">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h2 id="1-介绍"><a href="#1-介绍" class="headerlink" title="1. 介绍"></a>1. 介绍</h2><p>Maxwell 是java语言编写的能够读取、解析MySQL binlog，将行更新以json格式发送到 Kafka、RabbitMQ、AWS Kinesis、Google Cloud Pub/Sub、文件，有了增量的数据流，可以想象的应用场景实在太多了，如ETL、维护缓存、收集表级别的dml指标、增量到搜索引擎、数据分区迁移、切库binlog回滚方案，等等。</p>
+<p>它还提供其它功能：</p>
+<ul>
+<li>支持<code>SELECT * FROM table</code> 的方式做全量数据初始化</li>
+<li>支持主库发生failover后，自动恢复binlog位置（GTID）</li>
+<li>灵活的对数据进行分区，解决数据倾斜的问题。kafka支持 database, table, column等级别的数据分区</li>
+<li>它的实现方式是伪装成MySQL Server的从库，接收binlog events，然后根据schemas信息拼装，支持ddl,xid,rows等各种event.</li>
+</ul>
+<p>maxwell由 zendesk 开源：<a href="https://github.com/zendesk/maxwell" target="_blank" rel="external">https://github.com/zendesk/maxwell</a> ，而且维护者相当活跃。</p>
+<p>网上已有人对 Alibaba Cannal, Zendesk Maxwell, Yelp mysql_streamer进行对比，可以了解下：<a href="http://bigdatadecode.club/%E5%AE%9E%E6%97%B6%E6%8A%93%E5%8F%96MySQL%E7%9A%84%E6%9B%B4%E6%96%B0%E6%95%B0%E6%8D%AE%E5%88%B0Hadoop.html" target="_blank" rel="external">实时抓取MySQL的更新数据到Hadoop</a></p>
+<h3 id="安装"><a href="#安装" class="headerlink" title="安装"></a>安装</h3><p>使用 maxwell 非常简单，只需要jdk环境<br><figure class="highlight maxima"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">yum install -y java-<span class="number">1.8</span>.0-openjdk-<span class="number">1.8</span>.0.121-<span class="number">1.b13</span>.el6.x86_64</div><div class="line"></div><div class="line">curl -sLo - https://github.com/zendesk/maxwell/releases/download/v1.12.0/maxwell-<span class="number">1.12</span>.0.tar.gz \</div><div class="line">       | tar zxvf -</div><div class="line">cd maxwell-<span class="number">1.12</span>.0</div><div class="line"></div><div class="line"># 默认寻找当前目录下的 config.<span class="built_in">properties</span> 配置文件</div></pre></td></tr></table></figure></p>
+<p>要求 mysql server binlog格式是 <code>ROW</code>， row_image 是 <code>FULL</code>。感受一下输出结果<br><figure class="highlight xquery"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div></pre></td><td class="code"><pre><div class="line">mysql&gt; <span class="keyword">update</span> test.e set m = <span class="number">5.444</span>, c = now(<span class="number">3</span>) <span class="keyword">where</span> id = <span class="number">1</span>;</div><div class="line">&#123;</div><div class="line">   <span class="string">"database"</span>:<span class="string">"test"</span>,</div><div class="line">   <span class="string">"table"</span>:<span class="string">"e"</span>,</div><div class="line">   <span class="string">"type"</span>:<span class="string">"update"</span>,</div><div class="line">   <span class="string">"ts"</span>:<span class="number">1477053234</span>,</div><div class="line">   <span class="string">"commit"</span>: true,</div><div class="line">   ...</div><div class="line">   <span class="string">"data"</span>:&#123;</div><div class="line">      <span class="string">"id"</span>:<span class="number">1</span>,</div><div class="line">      <span class="string">"m"</span>:<span class="number">5.444</span>,</div><div class="line">      <span class="string">"c"</span>:<span class="string">"2016-10-21 05:33:54.631000"</span>,</div><div class="line">      <span class="string">"comment"</span>:<span class="string">"I am a creature of light."</span></div><div class="line">   &#125;,</div><div class="line">   <span class="string">"old"</span>:&#123;</div><div class="line">      <span class="string">"m"</span>:<span class="number">4.2341</span>,</div><div class="line">      <span class="string">"c"</span>:<span class="string">"2016-10-21 05:33:37.523000"</span></div><div class="line">   &#125;</div><div class="line">&#125;</div><div class="line"></div><div class="line">mysql&gt; create table test.e ( ... )</div><div class="line">&#123;</div><div class="line">   <span class="string">"type"</span>:<span class="string">"table-create"</span>,</div><div class="line">   <span class="string">"database"</span>:<span class="string">"test"</span>,</div><div class="line">   <span class="string">"table"</span>:<span class="string">"e"</span>,</div><div class="line">   <span class="string">"def"</span>:&#123;</div><div class="line">      <span class="string">"database"</span>:<span class="string">"test"</span>,</div><div class="line">      <span class="string">"charset"</span>:<span class="string">"utf8mb4"</span>,</div><div class="line">      <span class="string">"table"</span>:<span class="string">"e"</span>,</div><div class="line">      <span class="string">"columns"</span>:[</div><div class="line">         &#123;<span class="string">"type"</span>:<span class="string">"int"</span>, <span class="string">"name"</span>:<span class="string">"id"</span>, <span class="string">"signed"</span>:true&#125;,</div><div class="line">         &#123;<span class="string">"type"</span>:<span class="string">"double"</span>, <span class="string">"name"</span>:<span class="string">"m"</span>&#125;,</div><div class="line">         &#123;<span class="string">"type"</span>:<span class="string">"timestamp"</span>, <span class="string">"name"</span>:<span class="string">"c"</span>, <span class="string">"column-length"</span>:<span class="number">6</span>&#125;,</div><div class="line">         &#123;<span class="string">"type"</span>:<span class="string">"varchar"</span>, <span class="string">"name"</span>:<span class="string">"comment"</span>, <span class="string">"charset"</span>:<span class="string">"latin1"</span>&#125;</div><div class="line">      ],</div><div class="line">      <span class="string">"primary-key"</span>:[</div><div class="line">         <span class="string">"id"</span></div><div class="line">      ]</div><div class="line">   &#125;,</div><div class="line">   <span class="string">"ts"</span>:<span class="number">1477053126000</span>,</div><div class="line">   <span class="string">"sql"</span>:<span class="string">"create table test.e ( id int(10) not null primary key auto_increment, m double, c timestamp(6), comment varchar(255) charset 'latin1' )"</span>,</div><div class="line">   <span class="string">"position"</span>:<span class="string">"master.000006:800050"</span></div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p><code>data</code>是 After image, <code>old</code> 是 Before image。 insert 只有后镜像，delete只有前镜像（<code>data</code>）<br><code>type</code>是语句类型：<code>insert</code>, <code>update</code>, <code>delete</code>, <code>database-create</code>, <code>database-alter</code>, <code>database-drop</code>, <code>table-create</code>, <code>table-alter</code>, <code>table-drop</code> 。</p>
+<a id="more"></a>
+<h2 id="基本配置"><a href="#基本配置" class="headerlink" title="基本配置"></a>基本配置</h2><p>config.properties 配置文件里面的所有选项，都可以在启动 maxweill <code>./bin/maxwell</code> 是指定，覆盖配置文件的内容。这里只讲一些常用的。</p>
+<h3 id="mysql-options"><a href="#mysql-options" class="headerlink" title="mysql options"></a>mysql options</h3><ul>
+<li>host<br>指定从哪个地址的mysql获取binlog</li>
+<li>replication_host<br>如果指定了 <code>replication_host</code>，那么它是真正的binlog来源的mysql server地址，而那么上面的<code>host</code>用于存放maxwell表结构和binlog位置的地址。<br>将两者分开，可以避免 replication_user 往生产库里写数据。</li>
+<li><p>schema_host<br>从哪个host获取表结构。binlog里面没有字段信息，所以maxwell需要从数据库查出schema，存起来。<br>schema_host一般用不到，但在binlog-proxy场景下就很实用。比如要将已经离线的binlog通过maxwell生成json流，于是自建一个mysql server里面没有结构，只用于发送binlog，此时表机构就可以制动从 <code>schema_host</code> 获取。</p>
+</li>
+<li><p>gtid_mode<br>如果 mysql server 启用了GTID，maxwell也可以基于gtid取event。如果mysql server发生failover，maxwell不需要手动指定newfile:postion</p>
+</li>
+</ul>
+<p>正常情况下，replication_host 和 schema_host都不需要指定，只有一个 <code>--host</code>。</p>
+<ul>
+<li>schema_database<br>使用这个db来存放 maxwell 需要的表，比如要复制的databases, tables, columns, postions, heartbeats.</li>
+</ul>
+<h3 id="filtering"><a href="#filtering" class="headerlink" title="filtering"></a>filtering</h3><ul>
+<li>include_dbs<br>只发送binlog里面这些databases的变更，以<code>,</code>号分隔，中间不要包含空格。<br>也支持java风格的正则，如 <code>include_tables=db1,/db\\d+/</code>，表示 db1, db2, db3…这样的。（下面的filter都支持这种regex）<br>提示：这里的dbs指定的是真实db。比如binlog里面可能 <code>use db1</code> 但 <code>update db2.ttt</code>，那么maxwell生成的json <code>database</code> 内容是db2。</li>
+<li>exclude_dbs<br>排除指定的这些 databbases</li>
+<li>include_tables<br>只发送这些表的数据变更。不只需要指定 database.</li>
+<li>exclude_tables<br>排除指定的这些表</li>
+<li>exclude_columns<br>不输出这些字段。如果字段名在row中不存在，则忽略这个filter。</li>
+<li><p>include_column_values<br>1.12.0新引入的过滤项。只输出满足 column=values 的行，比如 <code>include_column_values=bar=x,foo=y</code>，如果有<code>bar</code>字段，那么只输出值为<code>x</code>的行，如果有<code>foo</code>字段，那么只输出值为<code>y</code>的行。<br>如果没有对应字段，如只有<code>bar=x</code>没有<code>foo</code>字段，那么也成立。（即不是 或，也不是 与）</p>
+</li>
+<li><p>blacklist_dbs<br>一般不用。<code>blacklist_dbs</code>字面上难以与<code>exclude_dbs</code> 分开，官网的说明也是模棱两可。<br>从代码里面看出的意思是，屏蔽指定的这些dbs,tables的<strong>结构变更</strong>，与行变更过滤，没有关系。它应对的场景是，某个表上频繁的有ddl，比如truncate。</p>
+</li>
+</ul>
+<p>因为往往我们只需要观察部分表的变更，所以要注意这些 include 与 exclude 的关系，记住三点：</p>
+<ol>
+<li>只要 include 有值，那么不在include里面的都排除</li>
+<li>只要在 exclude 里面的，都排除</li>
+<li>其它都正常输出</li>
+</ol>
+<p>举个比较极端的例子：<br><figure class="highlight nix"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># database: db1,db2,db3,mydb</span></div><div class="line">① <span class="attr">include_dbs=db1,/db\\d+/</span></div><div class="line">② <span class="attr">exclude_dbs=db2</span></div><div class="line">③ <span class="attr">inlcude_tables=t1,t2,t3</span></div><div class="line">④ <span class="attr">exclude_tables=t3</span></div></pre></td></tr></table></figure></p>
+<p>配置了 include_dbs，那么mydb不在里面，所以排除；<br>配置了 exclude_dbs，那么db2排除。剩下db1,db3<br>同样对 tables，剩下t1,t2<br>所以db1.t1, db1.t2, db3.t1, db3.t2是筛选后剩下可输出的。如果没有指定include_dbs，那么mydb.t1也可以输出。</p>
+<h3 id="formatting"><a href="#formatting" class="headerlink" title="formatting"></a>formatting</h3><ul>
+<li>output_ddl<br>是否在输出的json流中，包含ddl语句。<strong>默认 false</strong>  </li>
+<li>output_binlog_position<br>是否在输出的json流中，包含binlog filename:postion。默认 false</li>
+<li>output_commit_info<br>是否在输出的json流里面，包含 commit 和 xid 信息。默认 true<br>比如一个事物里，包含多个表的变更，或一个表上多条数据的变更，那么他们都具有相同的 xid，最后一个row event输出 commit:true 字段。这有利于消费者实现 事务回放，而不仅仅是行级别的回放。</li>
+<li>output_thread_id<br>同样，binlog里面也包含了 thread_id ，可以包含在输出中。默认 false<br>消费者可以用它来实现更粗粒度的事务回放。还有一个场景是用户审计，用户每次登陆之后将登陆ip、登陆时间、用户名、thread_id记录到一个表中，可轻松根据thread_id关联到binlog里面这条记录是哪个用户修改的。</li>
+</ul>
+<h3 id="monitoring"><a href="#monitoring" class="headerlink" title="monitoring"></a>monitoring</h3><p>如果是长时间运行的maxwell，添加monitor配置，maxwell提供了http api返回监控数据。</p>
+<h3 id="其它"><a href="#其它" class="headerlink" title="其它"></a>其它</h3><ul>
+<li>init_position<br>手动指定maxwell要从哪个binlog，哪个位置开始。指定的格式<code>FILE:POSITION:HEARTBEAT</code>。只支持在启动maxwell的命令指定，比如 <code>--init_postion=mysql-bin.0000456:4:0</code>。<br>maxwell 默认从连接上mysql server的当前位置开始解析，如果指定 init_postion，要确保文件确实存在，如果binlog已经被purge掉了，可能需要想其它办法。见 <a href="xx">Binlog可视化搜索：实现类似阿里RDS数据追踪功能</a></li>
+</ul>
+<h2 id="2-选择合适的生产者"><a href="#2-选择合适的生产者" class="headerlink" title="2. 选择合适的生产者"></a>2. 选择合适的生产者</h2><p>Maxwell是将binlog解析成json这种比较通用的格式，那么要去用它可以选择输出到哪里，比如Kafka, rabbitmq, file等，总之送到消息队列里去。每种 Producer 有自己对应的选项。</p>
+<h3 id="2-1-file"><a href="#2-1-file" class="headerlink" title="2.1 file"></a>2.1 file</h3><figure class="highlight ini"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="attr">producer</span>=file</div><div class="line"><span class="attr">output_file</span>=/tmp/mysql_binlog_data.log</div></pre></td></tr></table></figure>
+<p>比较简单，直接指定输出到哪个文件<code>output_file</code>。有什么日志收集系统，可以直接从这里拿。</p>
+<h3 id="2-2-rabbitmq"><a href="#2-2-rabbitmq" class="headerlink" title="2.2 rabbitmq"></a>2.2 rabbitmq</h3><p>rabbitmq 是非常流行的一个AMQP协议的消息队列服务，相关介绍请参考 <a href="xx">rabbitmq入门</a><br><figure class="highlight ini"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line"><span class="attr">producer</span>=rabbitmq</div><div class="line"></div><div class="line"><span class="attr">rabbitmq_host</span>=<span class="number">10.81</span>.<span class="number">50.120</span></div><div class="line"><span class="attr">rabbitmq_user</span>=admin</div><div class="line"><span class="attr">rabbitmq_pass</span>=admin</div><div class="line"><span class="attr">rabbitmq_virtual_host</span>=/crm0</div><div class="line"><span class="attr">rabbitmq_exchange</span>=maxwell.crm</div><div class="line"><span class="attr">rabbitmq_exchange_type</span>=topic</div><div class="line"><span class="attr">rabbitmq_exchange_durable</span>=<span class="literal">true</span></div><div class="line"><span class="attr">rabbitmq_exchange_autodelete</span>=<span class="literal">false</span></div><div class="line"><span class="attr">rabbitmq_routing_key_template</span>=%db%.%table%</div></pre></td></tr></table></figure></p>
+<p>上面的参数都很容易理解，1.12.0版本新加入<code>rabbitmq_message_persistent</code>控制发布消息持久化的参数。<br><code>rabbitmq_routing_key_template</code>是按照 db.tbl 的格式指定 routing_key，在创建队列时，可以根据不同的表进入不同的队列，提高并行消费而不乱序的能力。</p>
+<p>因为rabbitmq搭建起来非常简单，所以我习惯用这个。</p>
+<h3 id="2-3-kafka"><a href="#2-3-kafka" class="headerlink" title="2.3 kafka"></a>2.3 kafka</h3><p>kafka是maxwell支持最完善的一个producer，并且内置了 多个版本的 kafka client(0.8.2.2, 0.9.0.1, 0.10.0.1, 0.10.2.1 or 0.11.0.1)，默认 <code>kafka_version=0.11.0.1</code><br><figure class="highlight vala"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div></pre></td><td class="code"><pre><div class="line">producer=kafka</div><div class="line"></div><div class="line"><span class="meta"># 指定kafka brokers 地址</span></div><div class="line">kafka.bootstrap.servers=hosta:<span class="number">9092</span>,hostb:<span class="number">9092</span></div><div class="line"></div><div class="line"><span class="meta"># kafka主题可以是固定的，可以是 `maxwell_%&#123;database&#125;_%&#123;table&#125;` 这种按表去自动创建的动态topic</span></div><div class="line">kafka_topic=maxwell</div><div class="line"></div><div class="line"><span class="meta"># ddl单独使用的topic</span></div><div class="line">ddl_kafka_topic=maxwell_ddl</div><div class="line"></div><div class="line"><span class="meta"># kafka和kenesis都支持分区，可以选择根据 database, table, primary_key, 或者column的值去做partition</span></div><div class="line"><span class="meta"># maxwell默认使用database，在启动的时候会去检查是否topic是否有足够多数量的partitions，所以要提前创建好</span></div><div class="line"><span class="meta">#  bin/kafka-topics.sh --zookeeper ZK_HOST:2181 --create \</span></div><div class="line"><span class="meta">#                      --topic maxwell --partitions 20 --replication-factor 2</span></div><div class="line">producer_partition_by=database</div><div class="line"></div><div class="line"><span class="meta"># 如果指定了 producer_partition_by=column, 就需要指定下面两个参数</span></div><div class="line"><span class="meta"># 根据user_id,create_date两列的值去分区，partition_key形如 1178532016-10-10 18:29:04</span></div><div class="line">producer_partition_columns=user_id,create_date</div><div class="line"><span class="meta"># 如果不存在user_id或create_date，则按照database分区:</span></div><div class="line">producer_partition_by_fallback=database</div></pre></td></tr></table></figure></p>
+<p>maxwell会读取<code>kafka.</code>开头的参数，设置到连接参数里，比如<code>kafka.acks=1</code>,<code>kafka.retries=3</code>等</p>
+<h3 id="2-4-redis"><a href="#2-4-redis" class="headerlink" title="2.4 redis"></a>2.4 redis</h3><p>redis也有简单的发布订阅(<code>pub/sub</code>)功能<br><figure class="highlight ini"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="attr">producer</span>=redis</div><div class="line"></div><div class="line"><span class="attr">redis_host</span>=<span class="number">10.47</span>.<span class="number">95.171</span></div><div class="line"><span class="attr">redis_port</span>=<span class="number">6379</span></div><div class="line"><span class="comment"># redis_auth=redis_auth</span></div><div class="line"><span class="attr">redis_database</span>=<span class="number">0</span></div><div class="line"><span class="attr">redis_pub_channel</span>=maxwell</div></pre></td></tr></table></figure></p>
+<p>但是试用一番之后，发现如果订阅没有连上去的话，所有pub的消息是会丢失的。所以最好使用<code>push/pop</code>去实现。</p>
+<h2 id="3-注意事项"><a href="#3-注意事项" class="headerlink" title="3. 注意事项"></a>3. 注意事项</h2><p>下面的是在使用过程中遇到的一些小问题，做下总结。</p>
+<h3 id="timestamp-column"><a href="#timestamp-column" class="headerlink" title="timestamp column"></a>timestamp column</h3><p>maxwell对时间类型（datetime, timestamp, date）都是当做字符串处理的，这也是为了保证数据一致(比如<code>0000-00-00 00:00:00</code>这样的时间在timestamp里是非法的，但mysql却认，解析成java或者python类型就是null/None)。</p>
+<p>如果MySQL表上的字段是 timestamp 类型，是有时区的概念，binlog解析出来的是标准UTC时间，但用户看到的是本地时间。比如 <code>f_create_time timestamp</code> 创建时间是北京时间<code>2018-01-05 21:01:01</code>，那么mysql实际存储的是<code>2018-01-05 13:01:01</code>，binlog里面也是这个时间字符串。如果不做消费者不做时区转换，会少8个小时。被这个狠狠坑了一把。</p>
+<p>与其每个客户端都要考虑这个问题，我觉得更合理的做法是提供时区参数，然后maxwell自动处理时区问题，否则要么客户端先需要知道哪些列是timestamp类型，或者连接上原库缓存上这些类型。</p>
+<h3 id="binary-column"><a href="#binary-column" class="headerlink" title="binary column"></a>binary column</h3><p>maxwell可以处理binary类型的列，如<code>blob</code>、<code>varbinary</code>，它的做法就是对二进制列使用 base64_encode，当做字符串输出到json。消费者拿到这个列数据后，不能直接拼装，需要 base64_decode。</p>
+<h3 id="表结构不同步"><a href="#表结构不同步" class="headerlink" title="表结构不同步"></a>表结构不同步</h3><p>如果是拿比较老的binlog，放到新的mysql server上去用maxwell拉去，有可能表结构已经发生了变化，比如binlog里面字段比 schema_host 里面的字段多一个。目前这种情况没有发现异常，比如阿里RDS默认会为 无主键无唯一索引的表，增加一个<code>__##alibaba_rds_rowid##__</code>，在 show create table 和 schema里面都看不到这个隐藏主键，但binlog里面会有，同步到从库。</p>
+<p>另外我们有通过git去管理结构版本，如果真有这种场景，也可以应对。</p>
+<h3 id="大事务binlog"><a href="#大事务binlog" class="headerlink" title="大事务binlog"></a>大事务binlog</h3><p>当一个事物产生的binlog量非常大的时候，比如迁移日表数据，maxwell为了控制内存使用，会自动将处理不过来的binlog放到文件系统<br><figure class="highlight armasm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line"><span class="symbol">Using</span> kafka version: <span class="number">0</span>.<span class="number">11</span>.<span class="number">0</span>.<span class="number">1</span></div><div class="line"><span class="number">21</span>:<span class="number">16</span>:<span class="number">07</span>,<span class="number">109</span> WARN  MaxwellMetrics - Metrics will not <span class="keyword">be </span>exposed: metricsReportingType not configured.</div><div class="line"><span class="number">21</span>:<span class="number">16</span>:<span class="number">07</span>,<span class="number">380</span> <span class="meta">INFO</span>  SchemaStoreSchema - Creating maxwell database</div><div class="line"><span class="number">21</span>:<span class="number">16</span>:<span class="number">07</span>,<span class="number">540</span> <span class="meta">INFO</span>  Maxwell - Maxwell v?? is <span class="keyword">booting </span>(RabbitmqProducer), starting at Position[<span class="keyword">BinlogPosition[mysql-bin.006235:24980714],</span></div><div class="line"><span class="symbol">lastHeartbeat</span><span class="number">=0</span>]</div><div class="line"><span class="number">21</span>:<span class="number">16</span>:<span class="number">07</span>,<span class="number">649</span> <span class="meta">INFO</span>  AbstractSchemaStore - Maxwell is capturing initial schema</div><div class="line"><span class="number">21</span>:<span class="number">16</span>:<span class="number">08</span>,<span class="number">267</span> <span class="meta">INFO</span>  <span class="keyword">BinlogConnectorReplicator </span>- Setting initial <span class="keyword">binlog </span>pos to: mysql-<span class="keyword">bin.006235:24980714</span></div><div class="line"><span class="number">21</span>:<span class="number">16</span>:<span class="number">08</span>,<span class="number">324</span> <span class="meta">INFO</span>  <span class="keyword">BinaryLogClient </span>- Connected to rm-xxxxxxxxxxx.mysql.rds.aliyuncs.com:<span class="number">3306</span> at mysql-<span class="keyword">bin.006235/24980714 </span>(sid:<span class="number">637</span></div><div class="line"><span class="number">9</span>, cid:<span class="number">9182598</span>)</div><div class="line"><span class="number">21</span>:<span class="number">16</span>:<span class="number">08</span>,<span class="number">325</span> <span class="meta">INFO</span>  <span class="keyword">BinlogConnectorLifecycleListener </span>- <span class="keyword">Binlog </span>connected.</div><div class="line"><span class="number">03</span>:<span class="number">15</span>:<span class="number">36</span>,<span class="number">104</span> <span class="meta">INFO</span>  ListWithDiskBuffer - Overflowed in-memory <span class="keyword">buffer, </span>spilling over into /tmp/maxwell7935334910787514257events</div><div class="line"><span class="number">03</span>:<span class="number">17</span>:<span class="number">14</span>,<span class="number">880</span> <span class="meta">INFO</span>  ListWithDiskBuffer - Overflowed in-memory <span class="keyword">buffer, </span>spilling over into /tmp/maxwell3143086481692829045events</div></pre></td></tr></table></figure></p>
+<p>但是遇到另外一个问题，overflow随后就出现异常<code>EventDataDeserializationException: Failed to deserialize data of EventHeaderV4</code>，当我另起一个maxwell指点之前的binlog postion开始解析，却有没有抛异常。事后的数据也表明并没有数据丢失。</p>
+<p>问题产生的原因还不明，Caused by: java.net.SocketException: Connection reset，感觉像读取 binlog 流的时候还没读取到完整的event，异常关闭了连接。这个问题比较顽固，github上面类似问题都没有达到明确的解决。（这也从侧面告诉我们，大表数据迁移，也要批量进行，不要一个insert into .. select 搞定）</p>
+<figure class="highlight roboconf"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div></pre></td><td class="code"><pre><div class="line">03:18:20,586 INFO  ListWithDiskBuffer - Overflowed in-memory buffer, spilling over into /tmp/maxwell5229190074667071141events</div><div class="line">03:19:31,289 WARN  BinlogConnectorLifecycleListener - Communication failure.</div><div class="line">com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializationException: Failed to deserialize data of EventHeaderV4&#123;<span class="attribute">time</span></div><div class="line">stamp=1514920657000, eventType=WRITE_ROWS, serverId=2115082720, headerLength=19, dataLength=8155, nextPosition=520539918, flags=0&#125;</div><div class="line">        at com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer.deserializeEventData(EventDeserializer.java:216) ~[mys</div><div class="line">ql-binlog-connector-java-0.13.0<span class="variable">.jar</span>:0.13.0]</div><div class="line">        at com<span class="variable">.github</span><span class="variable">.shyiko</span><span class="variable">.mysql</span><span class="variable">.binlog</span><span class="variable">.event</span><span class="variable">.deserialization</span><span class="variable">.EventDeserializer</span><span class="variable">.nextEvent</span>(EventDeserializer<span class="variable">.java</span>:184) ~[mysql-binlog-c</div><div class="line">onnector-java-0.13.0<span class="variable">.jar</span>:0.13.0]</div><div class="line">        at com<span class="variable">.github</span><span class="variable">.shyiko</span><span class="variable">.mysql</span><span class="variable">.binlog</span><span class="variable">.BinaryLogClient</span><span class="variable">.listenForEventPackets</span>(BinaryLogClient<span class="variable">.java</span>:890) [mysql-binlog-connector-java-0</div><div class="line">.13.0<span class="variable">.jar</span>:0.13.0]</div><div class="line">        at com<span class="variable">.github</span><span class="variable">.shyiko</span><span class="variable">.mysql</span><span class="variable">.binlog</span><span class="variable">.BinaryLogClient</span><span class="variable">.connect</span>(BinaryLogClient<span class="variable">.java</span>:559) [mysql-binlog-connector-java-0.13.0<span class="variable">.jar</span>:0.13</div><div class="line">.0]</div><div class="line">        at com<span class="variable">.github</span><span class="variable">.shyiko</span><span class="variable">.mysql</span><span class="variable">.binlog</span><span class="variable">.BinaryLogClient</span>$7<span class="variable">.run</span>(BinaryLogClient<span class="variable">.java</span>:793) [mysql-binlog-connector-java-0.13.0<span class="variable">.jar</span>:0.13.0</div><div class="line">]</div><div class="line">        at java<span class="variable">.lang</span><span class="variable">.Thread</span><span class="variable">.run</span>(Thread<span class="variable">.java</span>:745) [?:1.8.0_121]</div><div class="line">Caused by: java<span class="variable">.net</span><span class="variable">.SocketException</span>: Connection reset</div><div class="line">        at java<span class="variable">.net</span><span class="variable">.SocketInputStream</span><span class="variable">.read</span>(SocketInputStream<span class="variable">.java</span>:210) ~[?:1.8.0_121]</div><div class="line">        at java<span class="variable">.net</span><span class="variable">.SocketInputStream</span><span class="variable">.read</span>(SocketInputStream<span class="variable">.java</span>:141) ~[?:1.8.0_121]</div><div class="line">        at com<span class="variable">.github</span><span class="variable">.shyiko</span><span class="variable">.mysql</span><span class="variable">.binlog</span><span class="variable">.io</span><span class="variable">.BufferedSocketInputStream</span><span class="variable">.read</span>(BufferedSocketInputStream<span class="variable">.java</span>:51) ~[mysql-binlog-connector-</div><div class="line">java-0.13.0<span class="variable">.jar</span>:0.13.0]</div><div class="line">        at com<span class="variable">.github</span><span class="variable">.shyiko</span><span class="variable">.mysql</span><span class="variable">.binlog</span><span class="variable">.io</span><span class="variable">.ByteArrayInputStream</span><span class="variable">.readWithinBlockBoundaries</span>(ByteArrayInputStream<span class="variable">.java</span>:202) ~[mysql-binlo</div><div class="line">g-connector-java-0.13.0<span class="variable">.jar</span>:0.13.0]</div><div class="line">        at com<span class="variable">.github</span><span class="variable">.shyiko</span><span class="variable">.mysql</span><span class="variable">.binlog</span><span class="variable">.io</span><span class="variable">.ByteArrayInputStream</span><span class="variable">.read</span>(ByteArrayInputStream<span class="variable">.java</span>:184) ~[mysql-binlog-connector-java-0.13</div><div class="line">.0<span class="variable">.jar</span>:0.13.0]</div><div class="line">        at com<span class="variable">.github</span><span class="variable">.shyiko</span><span class="variable">.mysql</span><span class="variable">.binlog</span><span class="variable">.io</span><span class="variable">.ByteArrayInputStream</span><span class="variable">.readInteger</span>(ByteArrayInputStream<span class="variable">.java</span>:46) ~[mysql-binlog-connector-jav</div><div class="line">a-0.13.0<span class="variable">.jar</span>:0.13.0]</div><div class="line">        at com<span class="variable">.github</span><span class="variable">.shyiko</span><span class="variable">.mysql</span><span class="variable">.binlog</span><span class="variable">.event</span><span class="variable">.deserialization</span><span class="variable">.AbstractRowsEventDataDeserializer</span><span class="variable">.deserializeLong</span>(AbstractRowsEventDataD</div><div class="line">eserializer<span class="variable">.java</span>:212) ~[mysql-binlog-connector-java-0.13.0<span class="variable">.jar</span>:0.13.0]</div><div class="line">        at com<span class="variable">.github</span><span class="variable">.shyiko</span><span class="variable">.mysql</span><span class="variable">.binlog</span><span class="variable">.event</span><span class="variable">.deserialization</span><span class="variable">.AbstractRowsEventDataDeserializer</span><span class="variable">.deserializeCell</span>(AbstractRowsEventDataD</div><div class="line">eserializer<span class="variable">.java</span>:150) ~[mysql-binlog-connector-java-0.13.0<span class="variable">.jar</span>:0.13.0]</div><div class="line">        at com<span class="variable">.github</span><span class="variable">.shyiko</span><span class="variable">.mysql</span><span class="variable">.binlog</span><span class="variable">.event</span><span class="variable">.deserialization</span><span class="variable">.AbstractRowsEventDataDeserializer</span><span class="variable">.deserializeRow</span>(AbstractRowsEventDataDeserializer<span class="variable">.java</span>:132) ~[mysql-binlog-connector-java-0.13.0<span class="variable">.jar</span>:0.13.0]</div><div class="line">        at com<span class="variable">.github</span><span class="variable">.shyiko</span><span class="variable">.mysql</span><span class="variable">.binlog</span><span class="variable">.event</span><span class="variable">.deserialization</span><span class="variable">.WriteRowsEventDataDeserializer</span><span class="variable">.deserializeRows</span>(WriteRowsEventDataDeserializer<span class="variable">.java</span>:64) ~[mysql-binlog-connector-java-0.13.0<span class="variable">.jar</span>:0.13.0]</div><div class="line">        at com<span class="variable">.github</span><span class="variable">.shyiko</span><span class="variable">.mysql</span><span class="variable">.binlog</span><span class="variable">.event</span><span class="variable">.deserialization</span><span class="variable">.WriteRowsEventDataDeserializer</span><span class="variable">.deserialize</span>(WriteRowsEventDataDeserializer<span class="variable">.java</span>:56) ~[mysql-binlog-connector-java-0.13.0<span class="variable">.jar</span>:0.13.0]</div><div class="line">        at com<span class="variable">.github</span><span class="variable">.shyiko</span><span class="variable">.mysql</span><span class="variable">.binlog</span><span class="variable">.event</span><span class="variable">.deserialization</span><span class="variable">.WriteRowsEventDataDeserializer</span><span class="variable">.deserialize</span>(WriteRowsEventDataDeserializer<span class="variable">.java</span>:32) ~[mysql-binlog-connector-java-0.13.0<span class="variable">.jar</span>:0.13.0]</div><div class="line">        at com<span class="variable">.github</span><span class="variable">.shyiko</span><span class="variable">.mysql</span><span class="variable">.binlog</span><span class="variable">.event</span><span class="variable">.deserialization</span><span class="variable">.EventDeserializer</span><span class="variable">.deserializeEventData</span>(EventDeserializer<span class="variable">.java</span>:210) ~[mysql-binlog-connector-java-0.13.0<span class="variable">.jar</span>:0.13.0]</div><div class="line">        ... 5 more</div><div class="line">03:19:31,514 INFO  BinlogConnectorLifecycleListener - Binlog disconnected.</div><div class="line">03:19:31,590 WARN  BinlogConnectorReplicator - replicator stopped at position: mysql-bin.006236:520531744 -- restarting</div><div class="line">03:19:31,595 INFO  BinaryLogClient - Connected to rm-xxxxxx<span class="variable">.mysql</span><span class="variable">.rds</span><span class="variable">.aliyuncs</span><span class="variable">.com</span>:3306 at mysql-bin.006236/520531744 (sid:6379, cid:9220521)</div></pre></td></tr></table></figure>
+<h3 id="tableMapCache"><a href="#tableMapCache" class="headerlink" title="tableMapCache"></a>tableMapCache</h3><p>前面讲过，如果我只想获取某几个表的binlog变更，需要用 <code>include_tables</code> 来过滤，但如果mysql server上现在删了一个表t1，但我的binlog是从昨天开始读取，被删的那个表t1在maxwell启动的时候是拉取不到表结构的。然后昨天的binlog里面有 t1 的变更，因为找不到表结构给来组装成json，会抛异常。</p>
+<p>手动在 maxwell.tables/columns 里面插入记录是可行的。但这个问题的根本是，maxwell在binlog过滤的时候，只在处理row_event的时候，而对 tableMapCache 要求binlog里面的所有表都要有。</p>
+<p>自己提交了一个commit，可以在做 tableMapCache 的时候也仅要求缓存 include_dbs/tables 这些表： <a href="https://github.com/seanlook/maxwell/commit/2618b70303078bf910a1981b69943cca75ee04fb" target="_blank" rel="external">https://github.com/seanlook/maxwell/commit/2618b70303078bf910a1981b69943cca75ee04fb</a></p>
+<h3 id="提高消费性能"><a href="#提高消费性能" class="headerlink" title="提高消费性能"></a>提高消费性能</h3><p>再用rabbitmq时，routing_key 是 <code>%db%.%table%</code>，但某些表产生的binlog增量非常大，就会导致各队列消息量很不平均，目前因为还没做到事务xid或者thread_id级别的并发回放，所以最小队列粒度也是表，尽量单独放一个队列，其它数据量小的合在一起。</p>
+<h2 id="4-实践案例-——-分库增量迁移数据"><a href="#4-实践案例-——-分库增量迁移数据" class="headerlink" title="4. 实践案例 —— 分库增量迁移数据"></a>4. 实践案例 —— 分库增量迁移数据</h2><p><strong>参考</strong></p>
+<ul>
+<li></li>
+</ul>
+<hr>
+<p>原文连接地址：<a href="http://seanlook.com/2018/01/13/maxwell-binlog/">http://seanlook.com/2018/01/13/maxwell-binlog/</a></p>
+<hr>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+  <div style="padding: 10px 0; margin: 20px auto; width: 90%; text-align: center;">
+    <div>支持可请我喝杯茶 ^_- (上限10个铜板)</div>
+    <button id="rewardButton" disable="enable" onclick="var qr = document.getElementById('QR'); if (qr.style.display === 'none') {qr.style.display='block';} else {qr.style.display='none'}">
+      <span>赏</span>
+    </button>
+    <div id="QR" style="display: none;">
+      
+      
+        <div id="alipay" style="display: inline-block">
+          <img id="alipay_qr" src="/images/reward_alipay_seanlook.jpg" alt="seanlook Alipay"/>
+          <p>支付宝打赏</p>
+        </div>
+      
+    </div>
+  </div>
+
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/mysql/" rel="tag"># mysql</a>
+          
+            <a href="/tags/binlog/" rel="tag"># binlog</a>
+          
+        </div>
+      
+
+      
+        
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2018/01/06/rabbitmq-introduce/" rel="next" title="RabbitMQ 入门">
+                <i class="fa fa-chevron-left"></i> RabbitMQ 入门
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2018/01/14/rabbitmq-maxwell-consumer/" rel="prev" title="基于MySQL binlog增量数据同步方案(maxwell+rabbimt+pydbsync)">
+                基于MySQL binlog增量数据同步方案(maxwell+rabbimt+pydbsync) <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div id="disqus_thread">
+        <noscript>
+          Please enable JavaScript to view the
+          <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a>
+        </noscript>
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+           
+              <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+          
+        </div>
+        <nav class="site-state motion-element">
+
+          
+            <div class="site-state-item site-state-posts">
+              <a href="/archives">
+                <span class="site-state-item-count">116</span>
+                <span class="site-state-item-name">posts</span>
+              </a>
+            </div>
+          
+
+          
+            
+            
+            <div class="site-state-item site-state-categories">
+              <a href="/categories/index.html">
+                <span class="site-state-item-count">24</span>
+                <span class="site-state-item-name">categories</span>
+              </a>
+            </div>
+          
+
+          
+            
+            
+            <div class="site-state-item site-state-tags">
+              <a href="/tags/index.html">
+                <span class="site-state-item-count">125</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+        
+
+
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-介绍"><span class="nav-text">1. 介绍</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#安装"><span class="nav-text">安装</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#基本配置"><span class="nav-text">基本配置</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#mysql-options"><span class="nav-text">mysql options</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#filtering"><span class="nav-text">filtering</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#formatting"><span class="nav-text">formatting</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#monitoring"><span class="nav-text">monitoring</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#其它"><span class="nav-text">其它</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-选择合适的生产者"><span class="nav-text">2. 选择合适的生产者</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-file"><span class="nav-text">2.1 file</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-rabbitmq"><span class="nav-text">2.2 rabbitmq</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-kafka"><span class="nav-text">2.3 kafka</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-redis"><span class="nav-text">2.4 redis</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-注意事项"><span class="nav-text">3. 注意事项</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#timestamp-column"><span class="nav-text">timestamp column</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#binary-column"><span class="nav-text">binary column</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#表结构不同步"><span class="nav-text">表结构不同步</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#大事务binlog"><span class="nav-text">大事务binlog</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#tableMapCache"><span class="nav-text">tableMapCache</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#提高消费性能"><span class="nav-text">提高消费性能</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-实践案例-——-分库增量迁移数据"><span class="nav-text">4. 实践案例 —— 分库增量迁移数据</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2018</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+
+        
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.0"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.0"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.0"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  
+
+    
+      <script id="dsq-count-scr" src="https://seanlook.disqus.com/count.js" async></script>
+    
+
+    
+      <script type="text/javascript">
+        var disqus_config = function () {
+          this.page.url = 'http://seanlook.com/2018/01/13/maxwell-binlog/';
+          this.page.identifier = '2018/01/13/maxwell-binlog/';
+          this.page.title = '自建Binlog订阅服务 —— Maxwell';
+        };
+        var d = document, s = d.createElement('script');
+        s.src = 'https://seanlook.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', '' + +new Date());
+        (d.head || d.body).appendChild(s);
+      </script>
+    
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+      search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.popup').toggle();
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+      $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = $( "entry", xmlResponse ).map(function() {
+            return {
+              title: $( "title", this ).text(),
+              content: $("content",this).text(),
+              url: $( "url" , this).text()
+            };
+          }).get();
+          var $input = document.getElementById(search_id);
+          var $resultContent = document.getElementById(content_id);
+          $input.addEventListener('input', function(){
+            var matchcounts = 0;
+            var str='<ul class=\"search-result-list\">';
+            var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+            $resultContent.innerHTML = "";
+            if (this.value.trim().length > 1) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var content_index = [];
+                var data_title = data.title.trim().toLowerCase();
+                var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                var data_url = decodeURIComponent(data.url);
+                var index_title = -1;
+                var index_content = -1;
+                var first_occur = -1;
+                // only match artiles with not empty titles and contents
+                if(data_title != '') {
+                  keywords.forEach(function(keyword, i) {
+                    index_title = data_title.indexOf(keyword);
+                    index_content = data_content.indexOf(keyword);
+                    if( index_title >= 0 || index_content >= 0 ){
+                      isMatch = true;
+                      if (i == 0) {
+                        first_occur = index_content;
+                      }
+                    }
+
+                  });
+                }
+                // show search results
+                if (isMatch) {
+                  matchcounts += 1;
+                  str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                  var content = data.content.trim().replace(/<[^>]+>/g,"");
+                  if (first_occur >= 0) {
+                    // cut out 100 characters
+                    var start = first_occur - 20;
+                    var end = first_occur + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if(start == 0){
+                      end = 50;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    var match_content = content.substring(start, end);
+                    // highlight all keywords
+                    keywords.forEach(function(keyword){
+                      var regS = new RegExp(keyword, "gi");
+                      match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                    });
+
+                    str += "<p class=\"search-result\">" + match_content +"...</p>"
+                  }
+                  str += "</li>";
+                }
+              })};
+            str += "</ul>";
+            if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+            if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+            $resultContent.innerHTML = str;
+          });
+          proceedsearch();
+        }
+      });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.1.js"></script>
+  <script>AV.initialize("NliJVBn0857TMk5HYrIRt5wp-gzGzoHsz", "jB9B4QG8Rm8YP04RQqnsKy5M");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
