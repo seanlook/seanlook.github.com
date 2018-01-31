@@ -436,16 +436,31 @@
 
       
         
-          
-          MySQL Binlog 里面记录了每行数据的变更，开发有时候需要根据这些变更的时间、中间值去查问题，是bug导致的，还是用户操作引发的。然而原始binlog内容不利于检索，有段时间使用阿里RDS企业版DMS数据追踪的功能，也能完成这个工作，甚至生成回滚sql，后由于收费以及容量不够的缘故，放弃不用。
-本文所介绍的就是基于外面开源的各类组件，整合起来，达到类似数据追踪的功能 —— binlog 可视化。功能类似：10分钟搭建MySQL Binlog分析+可视化方案
-1. 主要技术
-docker使用容器来实现资源的申请和释放，毕竟这类检索binlog内容的需求不多。本文基于阿里云的容器服务。  
-
-maxwell从mysql server获取binlog和字段信息，组装成json流。建议先阅读 http://seanlook.com/2018/01/13/maxwell-binlog/官网：http://maxwells-daemon.io/  
-
-graylog代替ELK技术栈的日志收集、处理、展示平台。社区版够用，需要自行安装，也可以把 graylog 换成 ELK stack。官网
-          ...
+          <p>MySQL Binlog 里面记录了每行数据的变更，开发有时候需要根据这些变更的时间、中间值去查问题，是bug导致的，还是用户操作引发的。然而原始binlog内容不利于检索，有段时间使用阿里RDS企业版DMS数据追踪的功能，也能完成这个工作，甚至生成回滚sql，后由于收费以及容量不够的缘故，放弃不用。</p>
+<p>本文所介绍的就是基于外面开源的各类组件，整合起来，达到类似数据追踪的功能 —— binlog 可视化。<br>功能类似：<a href="https://yq.aliyun.com/articles/338423">10分钟搭建MySQL Binlog分析+可视化方案</a></p>
+<h2 id="1-主要技术"><a href="#1-主要技术" class="headerlink" title="1. 主要技术"></a>1. 主要技术</h2><ul>
+<li><p>docker<br>使用容器来实现资源的申请和释放，毕竟这类检索binlog内容的需求不多。<br>本文基于阿里云的容器服务。  </p>
+</li>
+<li><p>maxwell<br>从mysql server获取binlog和字段信息，组装成json流。建议先阅读 <a href="http://seanlook.com/2018/01/13/maxwell-binlog/">http://seanlook.com/2018/01/13/maxwell-binlog/</a><br>官网：<a href="http://maxwells-daemon.io/">http://maxwells-daemon.io/</a>  </p>
+</li>
+<li><p>graylog<br>代替ELK技术栈的日志收集、处理、展示平台。社区版够用，需要自行安装，也可以把 graylog 换成 ELK stack。<br>官网：<a href="https://www.graylog.org/">https://www.graylog.org/</a>  </p>
+</li>
+<li><p>nxlog<br>nxlog 是用 C 语言写的一个开源日志收集处理软件，它是一个模块化、多线程、高性能的日志管理解决方案，支持多平台。<br>参考：<a href="http://blog.csdn.net/weixin_29477879/article/details/52183746">http://blog.csdn.net/weixin_29477879/article/details/52183746</a>  </p>
+</li>
+<li><p>rabbitmq<br>一款开源消息队列中间件，采用Erlang语言开发，RabbitMQ是AMQP(Advanced Message Queueing Protocol)的标准实现。建议先阅读 <a href="http://seanlook.com/2018/01/06/rabbitmq-introduce/">http://seanlook.com/2018/01/06/rabbitmq-introduce/</a> 。<br>你也可以把消息队列换成kafka。</p>
+</li>
+</ul>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/maxwell-graylog.png" alt="maxwell-graylog.png"></p>
+<h2 id="2-使用说明"><a href="#2-使用说明" class="headerlink" title="2. 使用说明"></a>2. 使用说明</h2><h3 id="2-1-举例"><a href="#2-1-举例" class="headerlink" title="2.1 举例"></a>2.1 举例</h3><blockquote>
+<p>查看 some3 库 2018-01-22 13:00:00 ~ 2018-01-22 13:00:00 之间，表 t_ecsome_detail 的binlog变化，graylog根据AMQP协议从rabbitmq取binlog json流</p>
+</blockquote>
+<p>提前创建一个 Swarm容器集群，名字叫 maxwell。<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/compose-template.png" alt="compose-template.png"></p>
+<p>在【编排模板】里选择 <em>maxwell-graylog-rabbitmq</em>，【创建应用】下一步修改编排模板：<br>（只修改 environment 里面的变量值）<br><figure class="highlight less"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div></pre></td><td class="code"><pre><div class="line"><span class="attribute">mysql-binlogsvr</span>:</div><div class="line">  <span class="attribute">image</span>: registry-vpc.cn-hangzhou.aliyuncs.com/workec/<span class="attribute">mysql_binlogsvr</span>:<span class="number">1.1</span>.<span class="number">3</span></div><div class="line">  <span class="attribute">volumes</span>:</div><div class="line">    - <span class="attribute">maxwellgraylog_db_data</span>:/var/lib/mysql</div><div class="line">  <span class="attribute">environment</span>:</div><div class="line">    <span class="attribute">DBINSTANCE_ID</span>: rm-bp19t9it7c2998633</div><div class="line">    <span class="attribute">START_TIME</span>: <span class="string">'2018-01-22 13:00:00'</span></div><div class="line">    <span class="attribute">END_TIME</span>: <span class="string">'2018-01-22 14:00:00'</span></div><div class="line">    <span class="attribute">ACCESS_ID</span>: LTAIXKHm0v6ob5P4</div><div class="line">    <span class="attribute">ACCESS_SECRET</span>: F7g***************Nll19no</div><div class="line">    <span class="attribute">MYSQL_ROOT_PASSWORD</span>: strongpassword</div><div class="line"></div><div class="line"><span class="attribute">maxwell-svr</span>:</div><div class="line">  <span class="attribute">image</span>: registry-vpc.cn-hangzhou.aliyuncs.com/workec/<span class="attribute">maxwell_graylog</span>:<span class="number">1.1</span>.<span class="number">3</span></div><div class="line">  <span class="attribute">depends_on</span>:</div><div class="line">    - mysql-binlogsvr</div><div class="line">  <span class="attribute">environment</span>:</div><div class="line">    <span class="attribute">producer</span>: rabbitmq</div><div class="line">    <span class="attribute">MYSQL_HOST</span>:</div><div class="line">    <span class="attribute">MYSQL_USER</span>:</div><div class="line">    <span class="attribute">MYSQL_PASSWORD</span>:</div><div class="line">    <span class="attribute">MYSQL_HOST_GIT</span>: db_some_shard3</div><div class="line">    <span class="attribute">include_dbs</span>:</div><div class="line">    <span class="attribute">include_tables</span>: t_ecsome_detail</div><div class="line">    <span class="attribute">include_column_values</span>:</div><div class="line">    <span class="attribute">init_position</span>:</div><div class="line">    <span class="attribute">rabbitmq_host</span>: <span class="number">10.81</span>.xx.xxx</div><div class="line">    <span class="attribute">rabbitmq_virtual_host</span>: /maxwell</div><div class="line">    <span class="attribute">rabbitmq_user</span>: admin</div><div class="line">    <span class="attribute">rabbitmq_pass</span>: admin</div><div class="line">    <span class="attribute">kafka_server</span>:</div><div class="line">    <span class="attribute">kafka_producer_partition_by</span>: database</div><div class="line">    <span class="attribute">MAXWELL_OPTS</span>:</div><div class="line">  <span class="attribute">volumes</span>:</div><div class="line">    - <span class="attribute">maxwellgraylog_db_data</span>:/var/lib/mysql</div><div class="line">  <span class="attribute">links</span>:</div><div class="line">    - <span class="attribute">mysql-binlogsvr</span>:mysql_binlogsvr</div></pre></td></tr></table></figure></p>
+<h3 id="2-2-变量-参数说明："><a href="#2-2-变量-参数说明：" class="headerlink" title="2.2 变量/参数说明："></a>2.2 变量/参数说明：</h3><ul>
+<li><code>DBINSTANCE_ID</code><br>需要分析哪个实例的binlog。必须提供  </li>
+<li><code>ACCESS_ID</code>, <code>ACCESS_SECRET</code><br>从OSS下载该实例binlog的key，这个key的用户需要RDS的读权限。必须提供  </li>
+<li><code>START_TIME</code>, <code>END_TIME</code><br>需要分析 binlog 大致位于哪个时间段。请尽可能的精确，如果时间范围过大，可能耗时非常久。3个binlog入完graylog大约6分钟。不能保持示例默认的值<br>如果你想从 <code>MYSQL_HOST</code> 直接在线拉取binlog，则不要设置设置 START_TIME 和 END_TIME，程序会一致从当前位置持续读取。  </li>
+<li><code>MYSQL_ROOT_PASSWORD</code><br>mysql binlogsvr 的root的密码。默认为 strongpassword
           <!--noindex-->
           <div class="post-button text-center">
             <a class="btn" href="/2018/01/25/maxwell-graylog/#more" rel="contents">

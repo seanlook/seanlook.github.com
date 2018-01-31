@@ -30,10 +30,8 @@
 <li><code>DBINSTANCE_ID</code><br>需要分析哪个实例的binlog。必须提供  </li>
 <li><code>ACCESS_ID</code>, <code>ACCESS_SECRET</code><br>从OSS下载该实例binlog的key，这个key的用户需要RDS的读权限。必须提供  </li>
 <li><code>START_TIME</code>, <code>END_TIME</code><br>需要分析 binlog 大致位于哪个时间段。请尽可能的精确，如果时间范围过大，可能耗时非常久。3个binlog入完graylog大约6分钟。不能保持示例默认的值<br>如果你想从 <code>MYSQL_HOST</code> 直接在线拉取binlog，则不要设置设置 START_TIME 和 END_TIME，程序会一致从当前位置持续读取。  </li>
-<li><p><code>MYSQL_ROOT_PASSWORD</code><br>mysql binlogsvr 的root的密码。默认为 strongpassword  </p>
-</li>
-<li><p><code>producer</code><br>指定maxwell产生的binlog json流输出到哪里，完整的支持<code>file</code>, <code>rabbitmq</code>, <code>kafka</code>  </p>
-</li>
+<li><code>MYSQL_ROOT_PASSWORD</code><br>mysql binlogsvr 的root的密码。默认为 strongpassword  <a id="more"></a></li>
+<li><code>producer</code><br>指定maxwell产生的binlog json流输出到哪里，完整的支持<code>file</code>, <code>rabbitmq</code>, <code>kafka</code>  </li>
 <li><code>MYSQL_HOST</code>, <code>MYSQL_USER</code>, <code>MYSQL_PASSWORD</code><br>它在两种情况下使用：  <ol>
 <li>前面的<code>START_TIME</code>、<code>END_TIME</code>留空，这里的 MYSQL_HOST 代表的是maxwell直接连接的地址，持续获取binlog。maxwell的 schema_database 也在这个库上(monitor，用户需要有读写这个db的权限)  </li>
 <li>前面的<code>START_TIME</code>、<code>END_TIME</code>有值，并且没有设置 <code>MYSQL_HOST_GIT</code>，那么 MYSQL_HOST 代表的是从这个地址拉取表结构，相当于maxwell的 schema_host 地址（当然获取binlog还是从 mysql_binlogsvr ）  </li>
