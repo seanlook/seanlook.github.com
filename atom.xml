@@ -24,7 +24,8 @@
     
     <content type="html"><![CDATA[<p>MySQL Binlog 里面记录了每行数据的变更，开发有时候需要根据这些变更的时间、中间值去查问题，是bug导致的，还是用户操作引发的。然而原始binlog内容不利于检索，有段时间使用阿里RDS企业版DMS数据追踪的功能，也能完成这个工作，甚至生成回滚sql，后由于收费以及容量不够的缘故，放弃不用。</p>
 <p>本文所介绍的就是基于外面开源的各类组件，整合起来，达到类似数据追踪的功能 —— binlog 可视化。<br>功能类似：<a href="https://yq.aliyun.com/articles/338423" target="_blank" rel="external">10分钟搭建MySQL Binlog分析+可视化方案</a></p>
-<h2 id="1-主要技术"><a href="#1-主要技术" class="headerlink" title="1. 主要技术"></a>1. 主要技术</h2><ul>
+<h2 id="1-主要技术"><a href="#1-主要技术" class="headerlink" title="1. 主要技术"></a>1. 主要技术</h2><p>项目地址： <a href="https://github.com/seanlook/maxwell-graylog" target="_blank" rel="external">https://github.com/seanlook/maxwell-graylog</a></p>
+<ul>
 <li><p>docker<br>使用容器来实现资源的申请和释放，毕竟这类检索binlog内容的需求不多。<br>本文基于阿里云的容器服务。  </p>
 </li>
 <li><p>maxwell<br>从mysql server获取binlog和字段信息，组装成json流。建议先阅读 <a href="http://seanlook.com/2018/01/13/maxwell-binlog/">http://seanlook.com/2018/01/13/maxwell-binlog/</a><br>官网：<a href="http://maxwells-daemon.io/" target="_blank" rel="external">http://maxwells-daemon.io/</a>  </p>
@@ -142,10 +143,14 @@
 <li>lockfile 存在：mysql server 已经初始化  </li>
 <li>lockfile 内容为0：mysql server 作为binlogsvr  </li>
 <li>lockfile 内容为2: binlog已经下载完成。避免重启容器导致重复下载binlog  </li>
-<li>lockfile 内容为1：该容器无用，因为判断 START_TIME 和 END_TIME 为空。实际上表示后续maxwell  拉取，是直接从原 MYSQL_HOST 读取，不需要该binlogsvr<br>lockfile 里面的值会被 maxwell 容器读取，以便决定工作模式  </li>
-<li><code>download_binlog.py</code><br>从阿里OSS下载binlog，需要提供 DBINSTANCE_ID 和 时间界限。<br>requirements.txt：python环境依赖  </li>
-<li><code>mysql_3306.cnf</code><br>binlogsvr的启动配置文件</li>
+<li>lockfile 内容为1：该容器无用，因为判断 START_TIME 和 END_TIME 为空。实际上表示后续maxwell  拉取，是直接从原 MYSQL_HOST 读取，不需要该binlogsvr<br>lockfile 里面的值会被 maxwell 容器读取，以便决定工作模式</li>
 </ul>
+</li>
+</ul>
+<ul>
+<li><p><code>download_binlog.py</code><br>从阿里OSS下载binlog，需要提供 DBINSTANCE_ID 和 时间界限。<br>requirements.txt：python环境依赖</p>
+</li>
+<li><p><code>mysql_3306.cnf</code><br>binlogsvr的启动配置文件</p>
 </li>
 </ul>
 <h3 id="4-2-Dockerfile-maxwell"><a href="#4-2-Dockerfile-maxwell" class="headerlink" title="4.2 Dockerfile.maxwell"></a>4.2 Dockerfile.maxwell</h3><p>  maxwell服务容器，主版本1.12.0，加上修改了点内容：<a href="https://github.com/seanlook/maxwell" target="_blank" rel="external">https://github.com/seanlook/maxwell</a>  </p>
@@ -167,13 +172,13 @@
 <li>在容器启动的时候，也可以直接指定 init_postion ，优先生效。<br><code>lockfile=/var/lib/mysql/initialized_maxwell.lock</code> 表示已经通过 init_postion 启动，如果重启maxwell容器，应该从上次停止的地方继续。</li>
 </ul>
 <p>容器启动时，可以指定 producer 为 file, rabbitmq, kafka，根据对应的生产者，应该设置子选项。见后文。  </p>
-<ul>
-<li><code>maxwell-retrive-tablemeta.sh</code><br>从git拉取所需要的表结构，并用 myloader 工具导入到 binlogsvr 。<br>因为考虑到需求通常要过滤表，所以这里也这会在 binlogsvr 创建需要的表结构。<br>如果指定了 <code>MYSQL_HOST_GIT_COMMIT</code>，可以拉取git上历史表结构。<br><code>id_rsa</code>：文件是拉起表结构用的 ssh key。 </li>
-</ul>
 </li>
 </ul>
 <ul>
-<li><code>maxwell-src-1.12.0.tar.gz</code>:<br>已下载的maxwell包，会通过maven编译。  </li>
+<li><p><code>maxwell-retrive-tablemeta.sh</code><br>从git拉取所需要的表结构，并用 myloader 工具导入到 binlogsvr 。<br>因为考虑到需求通常要过滤表，所以这里也这会在 binlogsvr 创建需要的表结构。<br>如果指定了 <code>MYSQL_HOST_GIT_COMMIT</code>，可以拉取git上历史表结构。<br><code>id_rsa</code>：文件是拉起表结构用的 ssh key。 </p>
+</li>
+<li><p><code>maxwell-src-1.12.0.tar.gz</code>:<br>已下载的maxwell包，会通过maven编译。  </p>
+</li>
 </ul>
 <h3 id="4-3-Dockerfile-nxlog"><a href="#4-3-Dockerfile-nxlog" class="headerlink" title="4.3 Dockerfile.nxlog"></a>4.3 Dockerfile.nxlog</h3><p>  在 <code>producer=file</code> 时，maxwell产生的binlog stream 是文件，要把文件放到 graylog 用到 nxlog 。<br>  它也会挂在 db_data，读取 <code>output_file=/var/lib/mysql/maxwell_binlog_stream.json.log</code> 内容，发送到 graylog server 。  </p>
 <ul>
@@ -181,9 +186,10 @@
 <li><code>graylog_maxwell_gelf_port</code>: 在graylog提前配置好的接收maxwell数据的端口  </li>
 <li><p><code>graylog_maxwell_source_collector</code>: 对应graylog的 collector id.<br>配置graylog 方法见后文。  </p>
 </li>
-<li><p><code>nxlog-entrypoint.sh</code><br>容器入口。主要是对 /etc/nxlog/nxlog.conf 进行变量替换。<br>提示：也会读取 <code>/var/lib/mysql/maxwell_instance_id</code> 里面由 mysql_binlogsvr 传递过来的 instance_id 作为 message 的一部分。  </p>
+<li><p><code>nxlog-entrypoint.sh</code><br>容器入口。主要是对 /etc/nxlog/nxlog.conf 进行变量替换。<br>提示：也会读取 <code>/var/lib/mysql/maxwell_instance_id</code> 里面由 mysql_binlogsvr 传递过来的 instance_id 作为 message 的一部分</p>
 </li>
-<li><code>nxlog.conf</code><br>nxlog的配置文件模板，用于替换成上面的变量。  </li>
+<li><p><code>nxlog.conf</code><br>nxlog的配置文件模板，用于替换成上面的变量。  </p>
+</li>
 </ul>
 <h3 id="4-4-Dockerfile-rabbitmq"><a href="#4-4-Dockerfile-rabbitmq" class="headerlink" title="4.4 Dockerfile.rabbitmq"></a>4.4 Dockerfile.rabbitmq</h3><p>  在 <code>producer=rabbitmq</code> 时，maxwell需要 rabbitmq server 作为队列。<br>  这里提供两种使用方法：  </p>
 <ul>
@@ -204,7 +210,8 @@
     
       &lt;p&gt;MySQL Binlog 里面记录了每行数据的变更，开发有时候需要根据这些变更的时间、中间值去查问题，是bug导致的，还是用户操作引发的。然而原始binlog内容不利于检索，有段时间使用阿里RDS企业版DMS数据追踪的功能，也能完成这个工作，甚至生成回滚sql，后由于收费以及容量不够的缘故，放弃不用。&lt;/p&gt;
 &lt;p&gt;本文所介绍的就是基于外面开源的各类组件，整合起来，达到类似数据追踪的功能 —— binlog 可视化。&lt;br&gt;功能类似：&lt;a href=&quot;https://yq.aliyun.com/articles/338423&quot;&gt;10分钟搭建MySQL Binlog分析+可视化方案&lt;/a&gt;&lt;/p&gt;
-&lt;h2 id=&quot;1-主要技术&quot;&gt;&lt;a href=&quot;#1-主要技术&quot; class=&quot;headerlink&quot; title=&quot;1. 主要技术&quot;&gt;&lt;/a&gt;1. 主要技术&lt;/h2&gt;&lt;ul&gt;
+&lt;h2 id=&quot;1-主要技术&quot;&gt;&lt;a href=&quot;#1-主要技术&quot; class=&quot;headerlink&quot; title=&quot;1. 主要技术&quot;&gt;&lt;/a&gt;1. 主要技术&lt;/h2&gt;&lt;p&gt;项目地址： &lt;a href=&quot;https://github.com/seanlook/maxwell-graylog&quot;&gt;https://github.com/seanlook/maxwell-graylog&lt;/a&gt;&lt;/p&gt;
+&lt;ul&gt;
 &lt;li&gt;&lt;p&gt;docker&lt;br&gt;使用容器来实现资源的申请和释放，毕竟这类检索binlog内容的需求不多。&lt;br&gt;本文基于阿里云的容器服务。  &lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;&lt;p&gt;maxwell&lt;br&gt;从mysql server获取binlog和字段信息，组装成json流。建议先阅读 &lt;a href=&quot;http://seanlook.com/2018/01/13/maxwell-binlog/&quot;&gt;http://seanlook.com/2018/01/13/maxwell-binlog/&lt;/a&gt;&lt;br&gt;官网：&lt;a href=&quot;http://maxwells-daemon.io/&quot;&gt;http://maxwells-daemon.io/&lt;/a&gt;  &lt;/p&gt;
