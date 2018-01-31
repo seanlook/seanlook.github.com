@@ -487,7 +487,7 @@
 <li>其它并发执行的事务插入出现 duplicate-key error</li>
 </ol>
 <figure class="highlight gradle"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">第<span class="number">1</span>点 (create t2 select * <span class="keyword">from</span> t1)</div><div class="line">Tx1: insert <span class="keyword">into</span> t1(c2) select c2 <span class="keyword">from</span> t2；  -- 先执行</div><div class="line">Tx2: INSERT <span class="keyword">INTO</span> t1 (c1,c2) VALUES (<span class="number">1</span>,<span class="string">'a'</span>), (<span class="keyword">NULL</span>,<span class="string">'b'</span>), (<span class="number">5</span>,<span class="string">'c'</span>), (<span class="keyword">NULL</span>,<span class="string">'d'</span>);  -- 后 并发执行</div><div class="line"></div><div class="line">在交叉模式下，Tx1事务插入的数据行会与 Tx1 交叉出现。</div><div class="line">注：如果 Tx1 改成 insert <span class="keyword">into</span> t1 select * <span class="keyword">from</span> t2 ，那么 Tx2 执行极有可能会报 duplicate-key error，与下面第<span class="number">2</span>点所说的重复键是不一样的</div><div class="line"></div><div class="line">第<span class="number">2</span>点</div><div class="line">mysql&gt; truncate table t1; ALTER TABLE t1 AUTO_INCREMENT <span class="number">5</span>;  -- 复原</div><div class="line">mysql&gt; INSERT <span class="keyword">INTO</span> t1 (c1,c2) VALUES (<span class="number">1</span>,<span class="string">'a'</span>), (<span class="keyword">NULL</span>,<span class="string">'b'</span>), (<span class="number">5</span>,<span class="string">'c'</span>), (<span class="keyword">NULL</span>,<span class="string">'d'</span>);</div><div class="line">ERROR <span class="number">1062</span> (<span class="number">23000</span>): Duplicate entry <span class="string">'5'</span> <span class="keyword">for</span> key <span class="string">'PRIMARY'</span></div></pre></td></tr></table></figure>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>上面说了这么多，那么自增模式到底该怎么选择呢？其实很简单，目前数据库默认的 traditional 即 <code>innodb_autoinc_lock_mode=1</code> 就是最好的模式，一般业务生产库不会有 <code>insert into ... select ...</code>或者 load data infile 这样的维护动作。（提示：即使晚上有数据迁移任务，也不要通过这样的形式进行）</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>上面说了这么多，那么自增模式到底该怎么选择呢？其实很简单，目前数据库默认的 consecutive 即 <code>innodb_autoinc_lock_mode=1</code> 就是最好的模式，一般业务生产库不会有 <code>insert into ... select ...</code>或者 load data infile 这样的维护动作。（提示：即使晚上有数据迁移任务，也不要通过这样的形式进行）</p>
 <p><code>innodb_autoinc_lock_mode=2</code> 可以提高获取表自增id的并发能力（性能），但是除非出现上面演示的 duplicate-key 特殊用法情形，不会像网上所说的获取到相同key导致重复的问题。但是如果binlog在 RBR 格式下不建议使用，可能出现主从数据不一致。还有就是能够容忍gap的存在，以及多个语句insert的自增值交叉。</p>
 <p>参考： <a href="https://dev.mysql.com/doc/refman/5.6/en/innodb-auto-increment-handling.html" target="_blank" rel="external">https://dev.mysql.com/doc/refman/5.6/en/innodb-auto-increment-handling.html</a></p>
 <p>下篇分析遇到过的 MySQL 自增主键相关的具体问题。</p>
@@ -645,7 +645,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">116</span>
+                <span class="site-state-item-count">117</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>

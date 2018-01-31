@@ -316,6 +316,178 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/04/11/oracle_db_autostart_with_linux/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2015/04/11/oracle_db_autostart_with_linux/" itemprop="url">
+                  配置 Oracle 11gR2 在 CentOS6 上开机自启动
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-04-11T15:21:25+08:00">
+                2015-04-11
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Oracle/" itemprop="url" rel="index">
+                    <span itemprop="name">Oracle</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2015/04/11/oracle_db_autostart_with_linux/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2015/04/11/oracle_db_autostart_with_linux/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2015/04/11/oracle_db_autostart_with_linux/" class="leancloud_visitors" data-flag-title="配置 Oracle 11gR2 在 CentOS6 上开机自启动">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h2 id="修改配置"><a href="#修改配置" class="headerlink" title="修改配置"></a>修改配置</h2><p>要达到oracle随开机自启动，一般使用11g自带的dbstart脚本：<code>$ORACLE_HOME/bin/dbstart</code>，但要先修改<code>/etc/oratab</code>的内容，将N改成Y，表示允许实例自启动，假如有2个实例要启动，再写一行：<br><figure class="highlight groovy"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ vi <span class="regexp">/etc/</span>oratab</div><div class="line"><span class="string">EXCRMPROD:</span><span class="regexp">/db/</span>oracle<span class="regexp">/product/</span><span class="number">11.2</span><span class="number">.0</span>/<span class="string">db_1:</span>Y</div></pre></td></tr></table></figure></p>
+<p>然后在oracle用户下执行<code>$ORACLE_HOME/bin/dbstart</code>即可启动，日志被记录在<code>$ORACLE_HOME/startup.log</code>。但是，默认情况<code>dbstart</code>和<code>dbshut</code>脚本不能自动启动或关闭监听，所以也要加以修改：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">$ vi /db/oracle/product/11.2.0/db_1/bin/dbstart</div><div class="line"><span class="comment">## 找到下面的代码(约第80行)，在实际脚本代码的前面</span></div><div class="line"><span class="comment"># First argument is used to bring up Oracle Net Listener</span></div><div class="line">ORACLE_HOME_LISTNER=<span class="variable">$1</span></div><div class="line"><span class="comment">## 将此处的 ORACLE_HOME_LISTNER=$1 修改为 ORACLE_HOME_LISTNER=$ORACLE_HOME</span></div><div class="line"><span class="keyword">if</span> [ ! <span class="variable">$ORACLE_HOME_LISTNER</span> ] ; <span class="keyword">then</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"ORACLE_HOME_LISTNER is not SET, unable to auto-start Oracle Net Listener"</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"Usage: <span class="variable">$0</span> ORACLE_HOME"</span></div><div class="line"><span class="keyword">else</span></div><div class="line">LOG=<span class="variable">$ORACLE_HOME_LISTNER</span>/listener.log</div></pre></td></tr></table></figure></p>
+<p>同样也修改dbshut脚本（约第50行）：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line">$ vi /db/oracle/product/11.2.0/db_1/bin/dbshut</div><div class="line"></div><div class="line"><span class="comment"># The this to bring down Oracle Net Listener</span></div><div class="line">ORACLE_HOME_LISTNER=<span class="variable">$ORACLE_HOME</span></div><div class="line"><span class="keyword">if</span> [ ! <span class="variable">$ORACLE_HOME_LISTNER</span> ] ; <span class="keyword">then</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"ORACLE_HOME_LISTNER is not SET, unable to auto-stop Oracle Net Listener"</span></div><div class="line"><span class="built_in">echo</span> <span class="string">"Usage: <span class="variable">$0</span> ORACLE_HOME"</span></div><div class="line"><span class="keyword">else</span></div><div class="line">LOG=<span class="variable">$ORACLE_HOME_LISTNER</span>/listener.log</div></pre></td></tr></table></figure></p>
+<h2 id="开机启动"><a href="#开机启动" class="headerlink" title="开机启动"></a>开机启动</h2><p>这两个脚本在执行时会自动去搜索<code>/etc/oratab</code>文件的内容，将这两个命令分别加入开机启动和关闭脚本里。</p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2015/04/11/oracle_db_autostart_with_linux/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/04/05/vmware-vcenter-vconverter/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1013,179 +1185,6 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/03/02/rpm-yum-recover/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/03/02/rpm-yum-recover/" itemprop="url">
-                  rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-03-02T01:21:25+08:00">
-                2015-03-02
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Linux/" itemprop="url" rel="index">
-                    <span itemprop="name">Linux</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2015/03/02/rpm-yum-recover/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2015/03/02/rpm-yum-recover/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2015/03/02/rpm-yum-recover/" class="leancloud_visitors" data-flag-title="rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <h1 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h1><p>在 CentOS 6.4 x86_64 上无论通过yum或rpm安装软件时，出现以下错误：<br><figure class="highlight subunit"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">yum install glibc-devel</div><div class="line">...</div><div class="line"><span class="keyword">error: </span>rpmts_HdrFromFdno: Header V3 RSA/SHA1 Signature, key ID c105b9de: BAD</div><div class="line">...</div><div class="line">Problem opening package *.el6.x86_64.rpm</div></pre></td></tr></table></figure></p>
-<h2 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h2><p><code>rpm -ivh</code>单独去安装软件也提示上面的错误。<code>rpm -qa</code> 无法列出系统中安装过的软件包，但许多库文件和软件命令是存在的。也尝试过<code>rpm --rebuilddb</code>来重建数据库，但情况依然没有得到改善（centos官网说千万不要在系统broken的情况下rebuilddb，不然有可能变成destroy）</p>
-<p>由上面的推断可知问题出现在rpm这个软件包管理工具本身，但此时又无法通过rpm来重新安装自己，所以只能找到具体是什么因素导致的。好在官网的这篇较新的文章正好就是解决该BUG：<a href="https://www.centos.org/forums/viewtopic.php?p=214791&amp;f=13#p214791">WARNING: nss-softokn-3.14.3-19.el6_6 updates may be broken</a> ：</p>
-<p>大致是说当你使用<code>yum update</code>去更新你的系统时，<code>nss-softokn</code>、<code>nss-softokn-freebl</code>和其它软件一起都得到更新，所以不会有问题。但如果单独去更新某一个软件，如<code>yum update nss-softokn</code>或<code>yum install &lt;software&gt;</code>引起它的依赖包也升级，使得<code>nss-softokn</code>和<code>nss-softokn-freebl</code>版本不匹配，就会导致 rpm/yum 全面停止工作，表现就是上面的<code>key .. BAD</code>。</p>
-<h2 id="解决"><a href="#解决" class="headerlink" title="解决"></a>解决</h2><p>解决起来也很方便，首先你可以通过<code>cat /var/log/messages|grep nss</code>看到<code>nss-softokn-freebl</code>的版本：<br><figure class="highlight less"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"># <span class="selector-tag">cat</span> /<span class="selector-tag">var</span>/<span class="selector-tag">log</span>/<span class="selector-tag">messages</span>|<span class="selector-tag">grep</span> <span class="selector-tag">nss-softokn</span></div><div class="line"><span class="selector-tag">Mar</span>  <span class="selector-tag">2</span> <span class="selector-tag">09</span><span class="selector-pseudo">:56</span><span class="selector-pseudo">:18</span> <span class="selector-tag">poprod</span> <span class="selector-tag">yum</span><span class="selector-attr">[14920]</span>: <span class="selector-tag">Updated</span>: <span class="selector-tag">nss-softokn-3</span><span class="selector-class">.14</span><span class="selector-class">.3-19</span><span class="selector-class">.el6_6</span><span class="selector-class">.x86_64</span></div><div class="line"><span class="selector-tag">Mar</span>  <span class="selector-tag">2</span> <span class="selector-tag">14</span><span class="selector-pseudo">:43</span><span class="selector-pseudo">:29</span> <span class="selector-tag">poprod</span> <span class="selector-tag">yum</span><span class="selector-attr">[33040]</span>: <span class="selector-tag">Installed</span>: <span class="selector-tag">nss-softokn-freebl-3</span><span class="selector-class">.14</span><span class="selector-class">.3-19</span><span class="selector-class">.el6_6</span><span class="selector-class">.x86_64</span></div><div class="line"><span class="selector-tag">Mar</span>  <span class="selector-tag">2</span> <span class="selector-tag">14</span><span class="selector-pseudo">:44</span><span class="selector-pseudo">:14</span> <span class="selector-tag">poprod</span> <span class="selector-tag">yum</span><span class="selector-attr">[33047]</span>: <span class="selector-tag">Installed</span>: <span class="selector-tag">nss-softokn-freebl-3</span><span class="selector-class">.14</span><span class="selector-class">.3-19</span><span class="selector-class">.el6_6</span><span class="selector-class">.x86_64</span></div><div class="line">...</div></pre></td></tr></table></figure></p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2015/03/02/rpm-yum-recover/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -1235,7 +1234,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">116</span>
+                <span class="site-state-item-count">117</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>

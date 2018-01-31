@@ -316,6 +316,179 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/03/02/rpm-yum-recover/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2015/03/02/rpm-yum-recover/" itemprop="url">
+                  rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-03-02T01:21:25+08:00">
+                2015-03-02
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index">
+                    <span itemprop="name">Linux</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2015/03/02/rpm-yum-recover/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2015/03/02/rpm-yum-recover/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2015/03/02/rpm-yum-recover/" class="leancloud_visitors" data-flag-title="rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <h1 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h1><p>在 CentOS 6.4 x86_64 上无论通过yum或rpm安装软件时，出现以下错误：<br><figure class="highlight subunit"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">yum install glibc-devel</div><div class="line">...</div><div class="line"><span class="keyword">error: </span>rpmts_HdrFromFdno: Header V3 RSA/SHA1 Signature, key ID c105b9de: BAD</div><div class="line">...</div><div class="line">Problem opening package *.el6.x86_64.rpm</div></pre></td></tr></table></figure></p>
+<h2 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h2><p><code>rpm -ivh</code>单独去安装软件也提示上面的错误。<code>rpm -qa</code> 无法列出系统中安装过的软件包，但许多库文件和软件命令是存在的。也尝试过<code>rpm --rebuilddb</code>来重建数据库，但情况依然没有得到改善（centos官网说千万不要在系统broken的情况下rebuilddb，不然有可能变成destroy）</p>
+<p>由上面的推断可知问题出现在rpm这个软件包管理工具本身，但此时又无法通过rpm来重新安装自己，所以只能找到具体是什么因素导致的。好在官网的这篇较新的文章正好就是解决该BUG：<a href="https://www.centos.org/forums/viewtopic.php?p=214791&amp;f=13#p214791">WARNING: nss-softokn-3.14.3-19.el6_6 updates may be broken</a> ：</p>
+<p>大致是说当你使用<code>yum update</code>去更新你的系统时，<code>nss-softokn</code>、<code>nss-softokn-freebl</code>和其它软件一起都得到更新，所以不会有问题。但如果单独去更新某一个软件，如<code>yum update nss-softokn</code>或<code>yum install &lt;software&gt;</code>引起它的依赖包也升级，使得<code>nss-softokn</code>和<code>nss-softokn-freebl</code>版本不匹配，就会导致 rpm/yum 全面停止工作，表现就是上面的<code>key .. BAD</code>。</p>
+<h2 id="解决"><a href="#解决" class="headerlink" title="解决"></a>解决</h2><p>解决起来也很方便，首先你可以通过<code>cat /var/log/messages|grep nss</code>看到<code>nss-softokn-freebl</code>的版本：<br><figure class="highlight less"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"># <span class="selector-tag">cat</span> /<span class="selector-tag">var</span>/<span class="selector-tag">log</span>/<span class="selector-tag">messages</span>|<span class="selector-tag">grep</span> <span class="selector-tag">nss-softokn</span></div><div class="line"><span class="selector-tag">Mar</span>  <span class="selector-tag">2</span> <span class="selector-tag">09</span><span class="selector-pseudo">:56</span><span class="selector-pseudo">:18</span> <span class="selector-tag">poprod</span> <span class="selector-tag">yum</span><span class="selector-attr">[14920]</span>: <span class="selector-tag">Updated</span>: <span class="selector-tag">nss-softokn-3</span><span class="selector-class">.14</span><span class="selector-class">.3-19</span><span class="selector-class">.el6_6</span><span class="selector-class">.x86_64</span></div><div class="line"><span class="selector-tag">Mar</span>  <span class="selector-tag">2</span> <span class="selector-tag">14</span><span class="selector-pseudo">:43</span><span class="selector-pseudo">:29</span> <span class="selector-tag">poprod</span> <span class="selector-tag">yum</span><span class="selector-attr">[33040]</span>: <span class="selector-tag">Installed</span>: <span class="selector-tag">nss-softokn-freebl-3</span><span class="selector-class">.14</span><span class="selector-class">.3-19</span><span class="selector-class">.el6_6</span><span class="selector-class">.x86_64</span></div><div class="line"><span class="selector-tag">Mar</span>  <span class="selector-tag">2</span> <span class="selector-tag">14</span><span class="selector-pseudo">:44</span><span class="selector-pseudo">:14</span> <span class="selector-tag">poprod</span> <span class="selector-tag">yum</span><span class="selector-attr">[33047]</span>: <span class="selector-tag">Installed</span>: <span class="selector-tag">nss-softokn-freebl-3</span><span class="selector-class">.14</span><span class="selector-class">.3-19</span><span class="selector-class">.el6_6</span><span class="selector-class">.x86_64</span></div><div class="line">...</div></pre></td></tr></table></figure></p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2015/03/02/rpm-yum-recover/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/02/28/baidu-complain/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1078,188 +1251,6 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2015/01/22/openldap_ldif_example/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2015/01/22/openldap_ldif_example/" itemprop="url">
-                  LDIF修改ldap记录或配置示例
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2015-01-22T01:21:25+08:00">
-                2015-01-22
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Linux/" itemprop="url" rel="index">
-                    <span itemprop="name">Linux</span>
-                  </a>
-                </span>
-
-                
-                
-                  , 
-                
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Linux/OpenLDAP/" itemprop="url" rel="index">
-                    <span itemprop="name">OpenLDAP</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2015/01/22/openldap_ldif_example/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2015/01/22/openldap_ldif_example/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2015/01/22/openldap_ldif_example/" class="leancloud_visitors" data-flag-title="LDIF修改ldap记录或配置示例">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <p>可以说LDIF文件是OpenLDAP操作数据或修改配置的一切来源，下面是实际通过客户端工具操作的具体示例。（openldap安装及配置过程见<a href="http://seanlook.com/2015/01/21/openldap-install-guide-ssl/">这里</a>）。</p>
-<h3 id="1-添加组织或条目"><a href="#1-添加组织或条目" class="headerlink" title="1. 添加组织或条目"></a>1. 添加组织或条目</h3><p>创建一个Marketing部门，添加一个dn记录：<br><figure class="highlight ldif"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># cat add_entry.ldif</span></div><div class="line"><span class="attribute">dn</span>: ou=Marketing, dc=example,dc=com</div><div class="line"><span class="attribute">changetype</span>: add</div><div class="line"><span class="attribute">objectclass</span>: top</div><div class="line"><span class="attribute">objectclass</span>: organizationalUnit</div><div class="line"><span class="attribute">ou</span>: Marketing</div><div class="line"></div><div class="line"><span class="attribute">dn</span>: cn=Pete Minsky,ou=Marketing,dc=example,dc=com</div><div class="line"><span class="attribute">changetype</span>: add</div><div class="line"><span class="attribute">objectclass</span>: person</div><div class="line"><span class="attribute">objectclass</span>: organizationalPerson</div><div class="line"><span class="attribute">objectclass</span>: inetOrgPerson</div><div class="line"><span class="attribute">cn</span>: Pete Minsky</div><div class="line"><span class="attribute">sn</span>: Pete</div><div class="line"><span class="attribute">ou</span>: Marketing</div><div class="line"><span class="attribute">description</span>: sb, sx</div><div class="line"><span class="attribute">description</span>: sx</div><div class="line"><span class="attribute">uid</span>: pminsky</div></pre></td></tr></table></figure></p>
-<figure class="highlight autoit"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta"># ldapmodify -xWD <span class="string">'cn=admin,dc=example,dc=com'</span> -f add_entry.ldif</span></div><div class="line"></div><div class="line">或去掉changetype后</div><div class="line"><span class="meta"># ldapmodify -a -xWD <span class="string">'cn=admin,dc=example,dc=com'</span> -f add_entry.ldif</span></div><div class="line"><span class="meta"># ldapadd -xWD <span class="string">'cn=admin,dc=example,dc=com'</span> -f add.ldif</span></div></pre></td></tr></table></figure>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2015/01/22/openldap_ldif_example/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -1309,7 +1300,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">116</span>
+                <span class="site-state-item-count">117</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>

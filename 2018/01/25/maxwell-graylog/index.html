@@ -1,0 +1,1284 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="en">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+  
+
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="mysql,binlog," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0" />
+
+
+
+
+
+
+<meta name="description" content="MySQL Binlog 里面记录了每行数据的变更，开发有时候需要根据这些变更的时间、中间值去查问题，是bug导致的，还是用户操作引发的。然而原始binlog内容不利于检索，有段时间使用阿里RDS企业版DMS数据追踪的功能，也能完成这个工作，甚至生成回滚sql，后由于收费以及容量不够的缘故，放弃不用。
+本文所介绍的就是基于外面开源的各类组件，整合起来，达到类似数据追踪的功能 —— binlog 可">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Binlog可视化搜索：实现类似阿里RDS数据追踪功能">
+<meta property="og:url" content="http://seanlook.com/2018/01/25/maxwell-graylog/index.html">
+<meta property="og:site_name" content="Sean's Notes">
+<meta property="og:description" content="MySQL Binlog 里面记录了每行数据的变更，开发有时候需要根据这些变更的时间、中间值去查问题，是bug导致的，还是用户操作引发的。然而原始binlog内容不利于检索，有段时间使用阿里RDS企业版DMS数据追踪的功能，也能完成这个工作，甚至生成回滚sql，后由于收费以及容量不够的缘故，放弃不用。
+本文所介绍的就是基于外面开源的各类组件，整合起来，达到类似数据追踪的功能 —— binlog 可">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/maxwell-graylog.png">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/compose-template.png">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/maxwell-binlog-container.png">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/graylog-fileinput.png">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/graylog-fileinput-create.png">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/graylog-nxlog-config.png">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/graylog-nxlog-output.png">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/graylog-nxlog-input.png">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/maxwell-graylog-message.png">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/maxwell-graylog-rabbitmq.png">
+<meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/maxwell-graylog-quickvalue.png">
+<meta property="og:updated_time" content="2018-01-25T07:32:49.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Binlog可视化搜索：实现类似阿里RDS数据追踪功能">
+<meta name="twitter:description" content="MySQL Binlog 里面记录了每行数据的变更，开发有时候需要根据这些变更的时间、中间值去查问题，是bug导致的，还是用户操作引发的。然而原始binlog内容不利于检索，有段时间使用阿里RDS企业版DMS数据追踪的功能，也能完成这个工作，甚至生成回滚sql，后由于收费以及容量不够的缘故，放弃不用。
+本文所介绍的就是基于外面开源的各类组件，整合起来，达到类似数据追踪的功能 —— binlog 可">
+<meta name="twitter:image" content="http://7q5fot.com1.z0.glb.clouddn.com/maxwell-graylog.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post","offset":12,"offset_float":0,"b2t":false,"scrollpercent":false},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: 'WNWHBKUL26',
+      apiKey: 'cec5cc7d455c77d448433aa60f989766',
+      indexName: 'seanlook',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://seanlook.com/2018/01/25/maxwell-graylog/"/>
+
+
+
+
+
+  <title> Binlog可视化搜索：实现类似阿里RDS数据追踪功能 | Sean's Notes </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+
+
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+  <div style="display: none;">
+    <script src="//s95.cnzz.com/z_stat.php?id=1253513173&web_id=1253513173" language="JavaScript"></script>
+  </div>
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Sean's Notes</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">Stay hungry, stay foolish.</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            About
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocapitalize="off" autocomplete="off" autocorrect="off"
+             placeholder="Searching..." spellcheck="false"
+             type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2018/01/25/maxwell-graylog/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                Binlog可视化搜索：实现类似阿里RDS数据追踪功能
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2018-01-25T15:32:49+08:00">
+                2018-01-25
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2018/01/25/maxwell-graylog/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2018/01/25/maxwell-graylog/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2018/01/25/maxwell-graylog/" class="leancloud_visitors" data-flag-title="Binlog可视化搜索：实现类似阿里RDS数据追踪功能">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>MySQL Binlog 里面记录了每行数据的变更，开发有时候需要根据这些变更的时间、中间值去查问题，是bug导致的，还是用户操作引发的。然而原始binlog内容不利于检索，有段时间使用阿里RDS企业版DMS数据追踪的功能，也能完成这个工作，甚至生成回滚sql，后由于收费以及容量不够的缘故，放弃不用。</p>
+<p>本文所介绍的就是基于外面开源的各类组件，整合起来，达到类似数据追踪的功能 —— binlog 可视化。<br>功能类似：<a href="https://yq.aliyun.com/articles/338423" target="_blank" rel="external">10分钟搭建MySQL Binlog分析+可视化方案</a></p>
+<h2 id="1-主要技术"><a href="#1-主要技术" class="headerlink" title="1. 主要技术"></a>1. 主要技术</h2><ul>
+<li><p>docker<br>使用容器来实现资源的申请和释放，毕竟这类检索binlog内容的需求不多。<br>本文基于阿里云的容器服务。  </p>
+</li>
+<li><p>maxwell<br>从mysql server获取binlog和字段信息，组装成json流。建议先阅读 <a href="http://seanlook.com/2018/01/13/maxwell-binlog/">http://seanlook.com/2018/01/13/maxwell-binlog/</a><br>官网：<a href="http://maxwells-daemon.io/" target="_blank" rel="external">http://maxwells-daemon.io/</a>  </p>
+</li>
+<li><p>graylog<br>代替ELK技术栈的日志收集、处理、展示平台。社区版够用，需要自行安装，也可以把 graylog 换成 ELK stack。<br>官网：<a href="https://www.graylog.org/" target="_blank" rel="external">https://www.graylog.org/</a>  </p>
+</li>
+<li><p>nxlog<br>nxlog 是用 C 语言写的一个开源日志收集处理软件，它是一个模块化、多线程、高性能的日志管理解决方案，支持多平台。<br>参考：<a href="http://blog.csdn.net/weixin_29477879/article/details/52183746" target="_blank" rel="external">http://blog.csdn.net/weixin_29477879/article/details/52183746</a>  </p>
+</li>
+<li><p>rabbitmq<br>一款开源消息队列中间件，采用Erlang语言开发，RabbitMQ是AMQP(Advanced Message Queueing Protocol)的标准实现。建议先阅读 <a href="http://seanlook.com/2018/01/06/rabbitmq-introduce/">http://seanlook.com/2018/01/06/rabbitmq-introduce/</a> 。<br>你也可以把消息队列换成kafka。</p>
+</li>
+</ul>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/maxwell-graylog.png" alt="maxwell-graylog.png"></p>
+<h2 id="2-使用说明"><a href="#2-使用说明" class="headerlink" title="2. 使用说明"></a>2. 使用说明</h2><h3 id="2-1-举例"><a href="#2-1-举例" class="headerlink" title="2.1 举例"></a>2.1 举例</h3><blockquote>
+<p>查看 some3 库 2018-01-22 13:00:00 ~ 2018-01-22 13:00:00 之间，表 t_ecsome_detail 的binlog变化，graylog根据AMQP协议从rabbitmq取binlog json流</p>
+</blockquote>
+<p>提前创建一个 Swarm容器集群，名字叫 maxwell。<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/compose-template.png" alt="compose-template.png"></p>
+<p>在【编排模板】里选择 <em>maxwell-graylog-rabbitmq</em>，【创建应用】下一步修改编排模板：<br>（只修改 environment 里面的变量值）<br><figure class="highlight less"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div></pre></td><td class="code"><pre><div class="line"><span class="attribute">mysql-binlogsvr</span>:</div><div class="line">  <span class="attribute">image</span>: registry-vpc.cn-hangzhou.aliyuncs.com/workec/<span class="attribute">mysql_binlogsvr</span>:<span class="number">1.1</span>.<span class="number">3</span></div><div class="line">  <span class="attribute">volumes</span>:</div><div class="line">    - <span class="attribute">maxwellgraylog_db_data</span>:/var/lib/mysql</div><div class="line">  <span class="attribute">environment</span>:</div><div class="line">    <span class="attribute">DBINSTANCE_ID</span>: rm-bp19t9it7c2998633</div><div class="line">    <span class="attribute">START_TIME</span>: <span class="string">'2018-01-22 13:00:00'</span></div><div class="line">    <span class="attribute">END_TIME</span>: <span class="string">'2018-01-22 14:00:00'</span></div><div class="line">    <span class="attribute">ACCESS_ID</span>: LTAIXKHm0v6ob5P4</div><div class="line">    <span class="attribute">ACCESS_SECRET</span>: F7g***************Nll19no</div><div class="line">    <span class="attribute">MYSQL_ROOT_PASSWORD</span>: strongpassword</div><div class="line"></div><div class="line"><span class="attribute">maxwell-svr</span>:</div><div class="line">  <span class="attribute">image</span>: registry-vpc.cn-hangzhou.aliyuncs.com/workec/<span class="attribute">maxwell_graylog</span>:<span class="number">1.1</span>.<span class="number">3</span></div><div class="line">  <span class="attribute">depends_on</span>:</div><div class="line">    - mysql-binlogsvr</div><div class="line">  <span class="attribute">environment</span>:</div><div class="line">    <span class="attribute">producer</span>: rabbitmq</div><div class="line">    <span class="attribute">MYSQL_HOST</span>:</div><div class="line">    <span class="attribute">MYSQL_USER</span>:</div><div class="line">    <span class="attribute">MYSQL_PASSWORD</span>:</div><div class="line">    <span class="attribute">MYSQL_HOST_GIT</span>: db_some_shard3</div><div class="line">    <span class="attribute">include_dbs</span>:</div><div class="line">    <span class="attribute">include_tables</span>: t_ecsome_detail</div><div class="line">    <span class="attribute">include_column_values</span>:</div><div class="line">    <span class="attribute">init_position</span>:</div><div class="line">    <span class="attribute">rabbitmq_host</span>: <span class="number">10.81</span>.xx.xxx</div><div class="line">    <span class="attribute">rabbitmq_virtual_host</span>: /maxwell</div><div class="line">    <span class="attribute">rabbitmq_user</span>: admin</div><div class="line">    <span class="attribute">rabbitmq_pass</span>: admin</div><div class="line">    <span class="attribute">kafka_server</span>:</div><div class="line">    <span class="attribute">kafka_producer_partition_by</span>: database</div><div class="line">    <span class="attribute">MAXWELL_OPTS</span>:</div><div class="line">  <span class="attribute">volumes</span>:</div><div class="line">    - <span class="attribute">maxwellgraylog_db_data</span>:/var/lib/mysql</div><div class="line">  <span class="attribute">links</span>:</div><div class="line">    - <span class="attribute">mysql-binlogsvr</span>:mysql_binlogsvr</div></pre></td></tr></table></figure></p>
+<h3 id="2-2-变量-参数说明："><a href="#2-2-变量-参数说明：" class="headerlink" title="2.2 变量/参数说明："></a>2.2 变量/参数说明：</h3><ul>
+<li><code>DBINSTANCE_ID</code><br>需要分析哪个实例的binlog。必须提供  </li>
+<li><code>ACCESS_ID</code>, <code>ACCESS_SECRET</code><br>从OSS下载该实例binlog的key，这个key的用户需要RDS的读权限。必须提供  </li>
+<li><code>START_TIME</code>, <code>END_TIME</code><br>需要分析 binlog 大致位于哪个时间段。请尽可能的精确，如果时间范围过大，可能耗时非常久。3个binlog入完graylog大约6分钟。不能保持示例默认的值<br>如果你想从 <code>MYSQL_HOST</code> 直接在线拉取binlog，则不要设置设置 START_TIME 和 END_TIME，程序会一致从当前位置持续读取。  </li>
+<li><p><code>MYSQL_ROOT_PASSWORD</code><br>mysql binlogsvr 的root的密码。默认为 strongpassword  </p>
+</li>
+<li><p><code>producer</code><br>指定maxwell产生的binlog json流输出到哪里，完整的支持<code>file</code>, <code>rabbitmq</code>, <code>kafka</code>  </p>
+</li>
+<li><code>MYSQL_HOST</code>, <code>MYSQL_USER</code>, <code>MYSQL_PASSWORD</code><br>它在两种情况下使用：  <ol>
+<li>前面的<code>START_TIME</code>、<code>END_TIME</code>留空，这里的 MYSQL_HOST 代表的是maxwell直接连接的地址，持续获取binlog。maxwell的 schema_database 也在这个库上(monitor，用户需要有读写这个db的权限)  </li>
+<li>前面的<code>START_TIME</code>、<code>END_TIME</code>有值，并且没有设置 <code>MYSQL_HOST_GIT</code>，那么 MYSQL_HOST 代表的是从这个地址拉取表结构，相当于maxwell的 schema_host 地址（当然获取binlog还是从 mysql_binlogsvr ）  </li>
+</ol>
+</li>
+<li><code>MYSQL_HOST_GIT</code>, <code>MYSQL_HOST_GIT_COMMIT</code><br>从git仓库拉取表结构信息，<code>MYSQL_HOST_GIT</code>指定仓库里面实例目录名，<code>MYSQL_HOST_GIT_COMMIT</code>可以满足指定某个 提交 时候的表机构版本。在 START_TIME, END_TIME 有设置的情况下才有效。<br>仓库见：<a href="http://seanlook.com/2016/11/28/mysql-schema-gather-structure/">http://seanlook.com/2016/11/28/mysql-schema-gather-structure/</a></li>
+<li><code>rabbitmq_host</code>, <code>rabbitmq_virtual_host</code>, <code>rabbitmq_user</code>, <code>rabbitmq_pass</code>, <code>rabbitmq_exchange_type</code><br>在 producer=rabbitmq 才有效。这些rabbitmq_xxx选项，与maxwell配置文件里面的完全相同  </li>
+<li>过滤选项<br><code>include_dbs</code>, <code>include_tables</code>, <code>include_column_values</code><br>与maxwell配置文件里面的完全相同。这里没有列出 exclude_xxx 相关过滤项，如果要指定，请使用 <code>MAXWELL_OPTS</code><br><code>exclude_columns</code>，去除哪些列是值不予展示，可用于脱敏。<br>支持的值参考maxwell的配置文件里面正则说明。  </li>
+<li><code>kafka_server</code><br>在 rabbitmq=kafka 时有效。对应 maxwell 的 <code>kafka.bootstrap.servers</code> 选项<br>其它选项如果要指定，可以使用<code>MAXWELL_OPTS</code>  </li>
+<li><code>MAXWELL_OPTS</code><br>因为现有 environment 变量没有覆盖所有的maxwell选项，所有其它选项可以直接像 maxwell 命令行参数一样，指定在 <code>MAXWELL_OPTS</code> 里面。</li>
+</ul>
+<p>创建完后，可以看到两个容器：<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/maxwell-binlog-container.png" alt="maxwell-binlog-container.png"></p>
+<p>其中 <code>maxwell-svr</code> 在等待 mysql_binlogsvr 就绪:<br><figure class="highlight coq"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">maxwell-graylog-rabbitmq-some3_maxwell-svr_1 | <span class="type">2018</span><span class="number">-01</span><span class="number">-26</span>T11:<span class="number">58</span>:<span class="number">08.424411112</span>Z waiting <span class="keyword">for</span> mysql_binlogsvr prepared</div><div class="line">maxwell-graylog-rabbitmq-some3_maxwell-svr_1 | <span class="type">2018</span><span class="number">-01</span><span class="number">-26</span>T11:<span class="number">58</span>:<span class="number">28.427993770</span>Z waiting <span class="keyword">for</span> mysql_binlogsvr prepared</div><div class="line">maxwell-graylog-rabbitmq-some3_maxwell-svr_1 | <span class="type">2018</span><span class="number">-01</span><span class="number">-26</span>T11:<span class="number">58</span>:<span class="number">48.431136523</span>Z binlog download is done, wait more seconds <span class="keyword">for</span> mysql_binlogsvr ready</div></pre></td></tr></table></figure></p>
+<p><code>mysql-binlogsvr</code> 在初始化 mysql server 的数据，下载binlog。完成的标志是在 <code>/var/lib/mysql/initialized.lock</code>里面写入 1 或 2，来通知 maxwell-svr。（1和2的意义见下面的Dockerfile说明）<br>在 <code>maxwell-svr</code> 日志里面看到 <code>INFO  BinlogConnectorLifecycleListener - Binlog connected.</code> 字样，表示已经在binlog往外推。</p>
+<p>此时在 graylog 里面就可以看到输出内容了: <a href="http://graylog.workec.com:3003/search?q=gl2_source_input%3A5a655c3ba002a0526615062a&amp;relative=0" target="_blank" rel="external">http://graylog.workec.com:3003/search?q=gl2_source_input%3A5a655c3ba002a0526615062a&amp;relative=0</a></p>
+<p>处理速度大概在 10000msg/s，在graylog里面没有看到新数据进来，就代表分析完成。<br>现在比较麻烦的地方在于，处理完结束后，销毁容器容易，但前面创建的持久存储卷，阿里云的容器服务并不会删除本地的卷，它所提供的存储推荐是 OSS,NAS,云盘 这些存储服务，然后要为它单独创建子账号，单独对某个盘、bucket授权，十分麻烦。</p>
+<p>本地卷并不能自动的删除，如果下次启动这个binlog分析服务，因为挂在的是同样的 db_data，里面已经有脏数据，所以需要<strong>手动删除</strong> 主机上的 <code>rm -rf /var/lib/docker/volumes/maxwellgraylog_db_data/_data/*</code></p>
+<h3 id="2-3-其它编排模板"><a href="#2-3-其它编排模板" class="headerlink" title="2.3 其它编排模板"></a>2.3 其它编排模板</h3><p>上面的示例，是基于 <code>maxwell-graylog-rabbitmq</code> 的编排模板，已经自定义了一下compose模板：</p>
+<ul>
+<li><p><code>maxwell-graylog-rabbitmq</code><br>依赖于外部 rabbitmq server，需要明确指定 <code>rabbitmq_host</code> 等信息。<br>第一次使用，通过<code>rabbitmq-init-for-maxwell.sh</code>去初始化 maxwell-graylog 所需要的exchange,queue等。</p>
+</li>
+<li><p><code>maxwell-graylog-rabbitmq-nodeps</code><br>会比上面的多起一个容器： rabbitmq-server，但是它的数据要通过容器集群的LB，才能被外面的graylog服务消费。<br>它的 <code>rabbitmq_host</code>被指定为<code>maxwell-rabbitmq-server</code> (container link)</p>
+</li>
+<li><p><code>maxwell-graylog-file</code><br>不适用消息队列，直接写入文件，通过 nxlog 将数据推到 graylog，所以会多出一个 nxlog 容器<br>多出三个 environment variabeles:  </p>
+<ul>
+<li><code>graylogserver</code><br>nxlog将“日志”上报的 graylog server 地址  </li>
+<li><code>graylog_maxwell_gelf_port</code><br>graylog 节点为接收这个消息监听的端口 (NXlog Outputs)  </li>
+<li><code>graylog_maxwell_source_collector</code><br>graylog 为这个消息定义好的collecter名字 （collecter是graylog的入口，在它之上定义流转、拆解、存储等流程）</li>
+</ul>
+<p>graylog的配置方法和搜索使用，见后文。</p>
+</li>
+<li><p><code>maxwell-graylog-kafka</code><br>使用 kafka 作为消息队列。需要指定现有的 kafka_server 。<br>这个编排模板，没有提供很详细的实现，请结合 <code>MAXWELL_OPTS</code> 使用。</p>
+</li>
+</ul>
+<p>提示：</p>
+<ol>
+<li>在使用时，如果容器启动失败，观察日志后，一般可以放心的直接重启容器，已做良好的修复处理。  </li>
+<li>选择哪个模板和设置什么变量值，主要考虑两个因素：从哪里获取binlog，maxwell将binlog生产到哪里</li>
+</ol>
+<h3 id="2-4-docker-compose-yml"><a href="#2-4-docker-compose-yml" class="headerlink" title="2.4 docker-compose.yml"></a>2.4 docker-compose.yml</h3><p>阿里云的编排模板，与标准的 docker compose 并不完全一样。在 docker-compose 目录中，提供了6种编排方案，可使用自建的docker平台来做。<br>4个容器和变量的组合，应对不同的场景：</p>
+<ul>
+<li><p><strong>docker-compose.file.yml</strong><br>启动 mysql-binlogsvr, maxwell-svr, nxlog-svr 三个容器，binlog数据写入file。</p>
+</li>
+<li><p><strong>docker-compose.file-schema.yml</strong><br>启动 mysql-binlogsvr, maxwell-svr, nxlog-svr 三个容器，binlog数据写入file。<br>表结构从 schema_host 获取，而不是git仓库。monitor用户需要 REPLICATION SLAVE, REPLICATION CLIENT 权限。</p>
+</li>
+<li><p><strong>docker-compose.rabbitmq.yml</strong><br>启动 mysql-binlogsvr, maxwell-svr 两个容器，binlog数据写入现有rabbitmq。</p>
+</li>
+<li><p><strong>docker-compose.rabbitmq-nodeps.yml</strong><br>启动 mysql-binlogsvr, maxwell-svr, rabbitmq-server 三个容器，binlog数据写入rabbitmq容器。<br>不依赖外部rabbitmq。</p>
+</li>
+<li><p><strong>docker-compose.rabbitmq-nobinlog-svr.yml</strong><br>启动 mysql-binlogsvr, maxwell-svr, rabbitmq-server 三个容器，binlog数据写入rabbitmq容器。<br>mysql-binlogsvr启动后会停止，这里直接从 MYSQL_HOST 在线持续拉取binlog，用户需要能够读取表结构的权限。</p>
+</li>
+<li><p><strong>docker-compose.kafka.yml</strong><br>启动 mysql-binlogsvr, maxwell-svr 两个容器，binlog数据写入现有kafka。</p>
+</li>
+</ul>
+<p>也可以逐个启动容器，不适用 docker-compose.yml。各个容器详情见后文。</p>
+<h2 id="3-graylog配置和使用"><a href="#3-graylog配置和使用" class="headerlink" title="3. graylog配置和使用"></a>3. graylog配置和使用</h2><p>生成的binlog json流要在graylog里面可视化展示，还需要对graylog设置。下面分别以 file 和 rabbitmq 的输出为例。</p>
+<h3 id="3-1-Input-file"><a href="#3-1-Input-file" class="headerlink" title="3.1 Input: file"></a>3.1 Input: file</h3><p>上面已经通过 maxwell容器 将数据写入了 <code>output_file</code>=<code>/var/lib/mysql/maxwell_binlog_stream.json.log</code>，又通过 nxlog容器 tail监控这个日志文件。</p>
+<ol>
+<li><strong>创建一个 GELF TCP Input</strong><br>[System / Inputs] -&gt; [Inputs]<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/graylog-fileinput.png" alt="graylog-fileinput.png"></li>
+</ol>
+<p><img src="http://7q5fot.com1.z0.glb.clouddn.com/graylog-fileinput-create.png" alt="graylog-fileinput-create.png"></p>
+<p>勾选 Global 表示所有的 graylog 集群节点，都可以接收这个日志，Port： <code>12201</code> 便是监听的端口。前文编排模板里面要求提供的参数 <code>graylogserver</code> 和 <code>graylog_maxwell_gelf_port</code>，就是从这来的。</p>
+<p>那么 Collecter <code>graylog_maxwell_source_collector</code> 呢，可以任意设置一个字符串。在标准的 graylog 配置流程里面，collecter 就是一个 nxlog 进程，一般一台机器就一个 nxlog，所以collecter对应的其实是收集日志的机器。</p>
+<p>nxlog 是一个单独的组件，与graylog没多大关系，而为了将两者整合在一起，需要 graylog-sidecar 来下发 nxlog 的配置，告诉它日志目录在哪、怎么读取日志。</p>
+<p>所以我们的docker容器只需要nxlog进程，不需要graylog-sidecar来交代配置，也就不需要在graylog Web界面配置NXLog Outputs/Inputs，而是直接通过变量传递来完成 nxlog.conf 模板的配置。</p>
+<p>下面的过程实际是不需要的，只是为了理解如何生成 nxlog.conf。</p>
+<ol>
+<li>Create configuration<br>给这个 configuration 设置 <code>tags</code> 例如<code>maxwell_binlog</code>。<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/graylog-nxlog-config.png" alt="graylog-nxlog-config.png"></li>
+</ol>
+<p>graylog-sidecar 会把 tag 打给某个机器(collecter)，告诉nxlog或其他收集组件，当前机器有哪几种日志需要收集</p>
+<ol>
+<li><p>编写 NXLog Outputs<br>相当于 nxlog.conf 中 <code>&lt;Output&gt;</code>部分，Host、Port 即第1步里面的graylog接收binlog json流而监听的地址和端口。<br>Type选择 <code>[NXLog]GELF TCP output</code>。<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/graylog-nxlog-output.png" alt="graylog-nxlog-output.png"></p>
+</li>
+<li><p>编写 NXLog Inputs<br>相当于 nxlog.conf 中 <code>&lt;Input&gt;</code>部分，这里指定日志输入来源于<strong>文件</strong>,<code>Type</code>选择<code>[NXLog]file input</code><br><img src="http://7q5fot.com1.z0.glb.clouddn.com/graylog-nxlog-input.png" alt="graylog-nxlog-input.png"></p>
+</li>
+</ol>
+<p><code>Forward to</code> 设置刚才创建的 Output<br><code>File</code>，要收集的日志路径为<code>/var/lib/mysql/maxwell_binlog_stream.json.log</code><br><code>Pool Interval</code>，即检查日志文件的间隔时间。剩下的保持默认</p>
+<ol>
+<li><strong>使用 JSON extractor 解析message</strong><br>经过上面几步，启动maxwell和nxlog服务/容器之后，在graylog的 WebUI 上找到第1步建的Input，就可以看到有日志进来了。<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/maxwell-graylog-message.png" alt="maxwell-graylog-message.png"></li>
+</ol>
+<p>选择任意一个message，[Create extractor for field message] -&gt; [JSON]，将json数据解压出来，存储，便可以快速根据字段名来搜索binlog内容。</p>
+<h3 id="3-2-Input-rabbitmq"><a href="#3-2-Input-rabbitmq" class="headerlink" title="3.2 Input: rabbitmq"></a>3.2 Input: rabbitmq</h3><p>使用rabbitmq更简单，不需要nxlog，直接在第1步里，把新建<code>GELF TCP</code>改成<code>Raw/Plaintext AMQP</code>。<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/maxwell-graylog-rabbitmq.png" alt="maxwell-graylog-rabbitmq.png"></p>
+<p>需要填写的就是AMQP协议里broker, port, user, exchange, queue, routing_key。<br>就可以在binlog里面，可视化看到binlog内容了。</p>
+<h3 id="3-3-在graylog里面搜索binlog日志"><a href="#3-3-在graylog里面搜索binlog日志" class="headerlink" title="3.3 在graylog里面搜索binlog日志"></a>3.3 在graylog里面搜索binlog日志</h3><p>搜索语法：<a href="http://docs.graylog.org/en/2.4/pages/queries.html" target="_blank" rel="external">http://docs.graylog.org/en/2.4/pages/queries.html</a></p>
+<p>例如，查看 t_ecsome_detail 表中 f_some_id=1242036566 在给定时间内的变化过程：<br><figure class="highlight avrasm"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"><span class="symbol">gl2_source_input:</span><span class="number">5</span>a38cc9bd56c001305aaefc0 <span class="keyword">AND</span> data_f_some_id: <span class="number">1242036566</span> <span class="keyword">OR</span> old_f_some_id: <span class="number">1242036566</span></div></pre></td></tr></table></figure></p>
+<p>例如使用Quick values功能，快速得到全国各地区对t_ecsome_detail表的操作量：<br><figure class="highlight ada"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">gl2_source_input:<span class="number">5</span>a38cc9bd56c001305aaefc0 <span class="keyword">AND</span> <span class="keyword">NOT</span> data_f_company_region: <span class="number">0</span></div></pre></td></tr></table></figure></p>
+<p>我们有做db分库，查看各个分库下的请求量数据是不是平均的，database: quick value：<br><img src="http://7q5fot.com1.z0.glb.clouddn.com/maxwell-graylog-quickvalue.png" alt="maxwell-graylog-quickvalue.png"></p>
+<h2 id="4-容器镜像说明：Dockerfile"><a href="#4-容器镜像说明：Dockerfile" class="headerlink" title="4. 容器镜像说明：Dockerfile"></a>4. 容器镜像说明：Dockerfile</h2><p>本节是关于细节实现的部分，与上面的介绍会略有重复。</p>
+<h3 id="4-1-Dockerfile-binlogsvr"><a href="#4-1-Dockerfile-binlogsvr" class="headerlink" title="4.1 Dockerfile.binlogsvr"></a>4.1 Dockerfile.binlogsvr</h3><p>承载 binlog 的mysql server服务。<br>它首先根据提供的数据库实例信息、日期时间信息，去OSS拉取已经上传的binlog到本地，修改 <code>mysql-bin.index</code>文件，提供binlog来源。<br>因为容器停止或者销毁后，内部的数据也随之丢失，所以需要一个主机上的目录来挂在到容器中，做数据的持久化，我们把这个数据卷命名为 db_data 。</p>
+<ul>
+<li><code>binlogsvr-entrypoint.sh</code><br>容器入口。因为 mysql server 启动第一次都要进行初始化，假如容器启动失败，再次启动时不需要再次初始化。<br>脚本内通过 <code>lockfile=/var/lib/mysql/initialized.lock</code> 区分三种工作模式：  <ul>
+<li>lockfile 存在：mysql server 已经初始化  </li>
+<li>lockfile 内容为0：mysql server 作为binlogsvr  </li>
+<li>lockfile 内容为2: binlog已经下载完成。避免重启容器导致重复下载binlog  </li>
+<li>lockfile 内容为1：该容器无用，因为判断 START_TIME 和 END_TIME 为空。实际上表示后续maxwell  拉取，是直接从原 MYSQL_HOST 读取，不需要该binlogsvr<br>lockfile 里面的值会被 maxwell 容器读取，以便决定工作模式  </li>
+<li><code>download_binlog.py</code><br>从阿里OSS下载binlog，需要提供 DBINSTANCE_ID 和 时间界限。<br>requirements.txt：python环境依赖  </li>
+<li><code>mysql_3306.cnf</code><br>binlogsvr的启动配置文件</li>
+</ul>
+</li>
+</ul>
+<h3 id="4-2-Dockerfile-maxwell"><a href="#4-2-Dockerfile-maxwell" class="headerlink" title="4.2 Dockerfile.maxwell"></a>4.2 Dockerfile.maxwell</h3><p>  maxwell服务容器，主版本1.12.0，加上修改了点内容：<a href="https://github.com/seanlook/maxwell" target="_blank" rel="external">https://github.com/seanlook/maxwell</a>  </p>
+<ul>
+<li><p><code>maxwell-entrypoint.sh</code><br>容器入口。会等待 mysql_binlogsvr 初始化完成，maxwell的结构、postion等信息存放在binlogsvr的 monitor 库。  </p>
+<ul>
+<li><code>work_mode=1</code>: 直接从 <code>MYSQL_HOST</code> 拉取binlog，不需要binlogsvr，可以实现持续读取现网的binlog  </li>
+<li><code>work_mode=0</code>: 从 mysql_binlogsvr 拉取binlog<br>该模式下因为 binlogsvr 里并没有maxwell需要的表结构，支持两种方法： <ul>
+<li>如果设置了 <code>MYSQL_HOST_GIT</code>，表示从我们的git仓库里面拉取表结构  </li>
+<li>否则从 <code>MYSQL_HOST</code> 拉取表结构，对应maxwell变量 <code>schema_host</code> 。即这个时候的 MYSQL_HOST 不是指定binlog来源，而是表结构来源。  </li>
+<li>如果都没设置，异常退出  </li>
+</ul>
+</li>
+</ul>
+<p>maxwell启动时需要指定 init_position，即从binlog_svr哪个binlog位置开始拉取：  </p>
+<ul>
+<li>如果从直接从原数据库实例拉取，则指定为最新的binlog起始点；  </li>
+<li>如果为 binlogsvr 拉取，则指定为下载的binlog最小的那个binlog起始点；  </li>
+<li>在容器启动的时候，也可以直接指定 init_postion ，优先生效。<br><code>lockfile=/var/lib/mysql/initialized_maxwell.lock</code> 表示已经通过 init_postion 启动，如果重启maxwell容器，应该从上次停止的地方继续。</li>
+</ul>
+<p>容器启动时，可以指定 producer 为 file, rabbitmq, kafka，根据对应的生产者，应该设置子选项。见后文。  </p>
+<ul>
+<li><code>maxwell-retrive-tablemeta.sh</code><br>从git拉取所需要的表结构，并用 myloader 工具导入到 binlogsvr 。<br>因为考虑到需求通常要过滤表，所以这里也这会在 binlogsvr 创建需要的表结构。<br>如果指定了 <code>MYSQL_HOST_GIT_COMMIT</code>，可以拉取git上历史表结构。<br><code>id_rsa</code>：文件是拉起表结构用的 ssh key。 </li>
+</ul>
+</li>
+</ul>
+<ul>
+<li><code>maxwell-src-1.12.0.tar.gz</code>:<br>已下载的maxwell包，会通过maven编译。  </li>
+</ul>
+<h3 id="4-3-Dockerfile-nxlog"><a href="#4-3-Dockerfile-nxlog" class="headerlink" title="4.3 Dockerfile.nxlog"></a>4.3 Dockerfile.nxlog</h3><p>  在 <code>producer=file</code> 时，maxwell产生的binlog stream 是文件，要把文件放到 graylog 用到 nxlog 。<br>  它也会挂在 db_data，读取 <code>output_file=/var/lib/mysql/maxwell_binlog_stream.json.log</code> 内容，发送到 graylog server 。  </p>
+<ul>
+<li><code>graylogserver</code>: graylog server 地址  </li>
+<li><code>graylog_maxwell_gelf_port</code>: 在graylog提前配置好的接收maxwell数据的端口  </li>
+<li><p><code>graylog_maxwell_source_collector</code>: 对应graylog的 collector id.<br>配置graylog 方法见后文。  </p>
+</li>
+<li><p><code>nxlog-entrypoint.sh</code><br>容器入口。主要是对 /etc/nxlog/nxlog.conf 进行变量替换。<br>提示：也会读取 <code>/var/lib/mysql/maxwell_instance_id</code> 里面由 mysql_binlogsvr 传递过来的 instance_id 作为 message 的一部分。  </p>
+</li>
+<li><code>nxlog.conf</code><br>nxlog的配置文件模板，用于替换成上面的变量。  </li>
+</ul>
+<h3 id="4-4-Dockerfile-rabbitmq"><a href="#4-4-Dockerfile-rabbitmq" class="headerlink" title="4.4 Dockerfile.rabbitmq"></a>4.4 Dockerfile.rabbitmq</h3><p>  在 <code>producer=rabbitmq</code> 时，maxwell需要 rabbitmq server 作为队列。<br>  这里提供两种使用方法：  </p>
+<ul>
+<li>如果已经有现成的 rabbitmq ，则自己创建 vhost, exchange, user，需要提供的内容见 <code>rabbitmq-init-formaxwell.sh</code>  </li>
+<li><p>如果没有rabbitmq，则通过这个 Dockerfile 创建 rabbitmq server container  </p>
+</li>
+<li><p><code>rabbitmq-entrypoint.sh</code><br>容器入口。只是为了调用 <code>rabbitmq-init-formaxwell.sh</code>，在rabbitmq起来后，创建 <code>--vhost=/maxwell --username=admin --password=admin</code>,<code>exchange=maxwell.binlog queue=maxwell_binlog binding_key=#</code> 给maxwell和graylog使用。<br>在后台通过 <a href="https://github.com/vishnubob/wait-for-it" target="_blank" rel="external"><code>wait-for-it.sh</code></a> 来同步等待 rabbitmq ok.  </p>
+</li>
+</ul>
+<h3 id="4-5-build-image"><a href="#4-5-build-image" class="headerlink" title="4.5 build image"></a>4.5 build image</h3><figure class="highlight stylus"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line">docker build -f Dockerfile<span class="selector-class">.binlogsvr</span> . -t registry-vpc<span class="selector-class">.cn-hangzhou</span><span class="selector-class">.aliyuncs</span><span class="selector-class">.com</span>/workec/mysql_binlogsvr:<span class="number">1.1</span>.<span class="number">3</span></div><div class="line">docker build -f Dockerfile<span class="selector-class">.maxwell</span> . -t registry-vpc<span class="selector-class">.cn-hangzhou</span><span class="selector-class">.aliyuncs</span><span class="selector-class">.com</span>/workec/maxwell_graylog:<span class="number">1.1</span>.<span class="number">3</span></div><div class="line">docker build -f Dockerfile<span class="selector-class">.nxlog</span> . -t registry-vpc<span class="selector-class">.cn-hangzhou</span><span class="selector-class">.aliyuncs</span><span class="selector-class">.com</span>/workec/maxwell_nxlog:<span class="number">0.4</span>.<span class="number">3</span></div><div class="line">docker build -f Dockerfile<span class="selector-class">.rabbitmq</span> . -t registry-vpc<span class="selector-class">.cn-hangzhou</span><span class="selector-class">.aliyuncs</span><span class="selector-class">.com</span>/workec/maxwell_rabbitmq:<span class="number">0.4</span>.<span class="number">3</span></div><div class="line"></div><div class="line">docker push registry-vpc<span class="selector-class">.cn-hangzhou</span><span class="selector-class">.aliyuncs</span><span class="selector-class">.com</span>/workec/mysql_binlogsvr:<span class="number">1.1</span>.<span class="number">3</span></div><div class="line">docker push registry-vpc<span class="selector-class">.cn-hangzhou</span><span class="selector-class">.aliyuncs</span><span class="selector-class">.com</span>/workec/maxwell_graylog:<span class="number">1.1</span>.<span class="number">3</span></div><div class="line">docker push registry-vpc<span class="selector-class">.cn-hangzhou</span><span class="selector-class">.aliyuncs</span><span class="selector-class">.com</span>/workec/maxwell_nxlog:<span class="number">0.4</span>.<span class="number">3</span></div><div class="line">docker push registry-vpc<span class="selector-class">.cn-hangzhou</span><span class="selector-class">.aliyuncs</span><span class="selector-class">.com</span>/workec/maxwell_rabbitmq:<span class="number">0.4</span>.<span class="number">3</span></div></pre></td></tr></table></figure>
+<p><strong>参考</strong></p>
+<hr>
+<p>原文连接地址：<a href="http://seanlook.com/2018/01/25/maxwell-graylog/">http://seanlook.com/2018/01/25/maxwell-graylog/</a></p>
+<hr>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+  <div style="padding: 10px 0; margin: 20px auto; width: 90%; text-align: center;">
+    <div>支持可请我喝杯茶 ^_- (上限10个铜板)</div>
+    <button id="rewardButton" disable="enable" onclick="var qr = document.getElementById('QR'); if (qr.style.display === 'none') {qr.style.display='block';} else {qr.style.display='none'}">
+      <span>赏</span>
+    </button>
+    <div id="QR" style="display: none;">
+      
+      
+        <div id="alipay" style="display: inline-block">
+          <img id="alipay_qr" src="/images/reward_alipay_seanlook.jpg" alt="seanlook Alipay"/>
+          <p>支付宝打赏</p>
+        </div>
+      
+    </div>
+  </div>
+
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/mysql/" rel="tag"># mysql</a>
+          
+            <a href="/tags/binlog/" rel="tag"># binlog</a>
+          
+        </div>
+      
+
+      
+        
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2018/01/14/rabbitmq-maxwell-consumer/" rel="next" title="基于MySQL binlog增量数据同步方案(maxwell+rabbimt+pydbsync)">
+                <i class="fa fa-chevron-left"></i> 基于MySQL binlog增量数据同步方案(maxwell+rabbimt+pydbsync)
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div id="disqus_thread">
+        <noscript>
+          Please enable JavaScript to view the
+          <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a>
+        </noscript>
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar_sean.jpg"
+               alt="seanlook" />
+          <p class="site-author-name" itemprop="name">seanlook</p>
+           
+              <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
+          
+        </div>
+        <nav class="site-state motion-element">
+
+          
+            <div class="site-state-item site-state-posts">
+              <a href="/archives">
+                <span class="site-state-item-count">117</span>
+                <span class="site-state-item-name">posts</span>
+              </a>
+            </div>
+          
+
+          
+            
+            
+            <div class="site-state-item site-state-categories">
+              <a href="/categories/index.html">
+                <span class="site-state-item-count">24</span>
+                <span class="site-state-item-name">categories</span>
+              </a>
+            </div>
+          
+
+          
+            
+            
+            <div class="site-state-item site-state-tags">
+              <a href="/tags/index.html">
+                <span class="site-state-item-count">125</span>
+                <span class="site-state-item-name">tags</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/seanlook" target="_blank" title="github">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  github
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  weibo
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+        
+
+
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-主要技术"><span class="nav-text">1. 主要技术</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-使用说明"><span class="nav-text">2. 使用说明</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-举例"><span class="nav-text">2.1 举例</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-变量-参数说明："><span class="nav-text">2.2 变量/参数说明：</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-其它编排模板"><span class="nav-text">2.3 其它编排模板</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-docker-compose-yml"><span class="nav-text">2.4 docker-compose.yml</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-graylog配置和使用"><span class="nav-text">3. graylog配置和使用</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-Input-file"><span class="nav-text">3.1 Input: file</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-Input-rabbitmq"><span class="nav-text">3.2 Input: rabbitmq</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-在graylog里面搜索binlog日志"><span class="nav-text">3.3 在graylog里面搜索binlog日志</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-容器镜像说明：Dockerfile"><span class="nav-text">4. 容器镜像说明：Dockerfile</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-Dockerfile-binlogsvr"><span class="nav-text">4.1 Dockerfile.binlogsvr</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-Dockerfile-maxwell"><span class="nav-text">4.2 Dockerfile.maxwell</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-Dockerfile-nxlog"><span class="nav-text">4.3 Dockerfile.nxlog</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-Dockerfile-rabbitmq"><span class="nav-text">4.4 Dockerfile.rabbitmq</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-build-image"><span class="nav-text">4.5 build image</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2014 - 
+  <span itemprop="copyrightYear">2018</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">seanlook</span>
+</div>
+
+
+<div class="powered-by">
+  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+
+        
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
+
+  
+  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.0"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.0"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.0"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  
+
+    
+      <script id="dsq-count-scr" src="https://seanlook.disqus.com/count.js" async></script>
+    
+
+    
+      <script type="text/javascript">
+        var disqus_config = function () {
+          this.page.url = 'http://seanlook.com/2018/01/25/maxwell-graylog/';
+          this.page.identifier = '2018/01/25/maxwell-graylog/';
+          this.page.title = 'Binlog可视化搜索：实现类似阿里RDS数据追踪功能';
+        };
+        var d = document, s = d.createElement('script');
+        s.src = 'https://seanlook.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', '' + +new Date());
+        (d.head || d.body).appendChild(s);
+      </script>
+    
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+      search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.popup').toggle();
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+      $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = $( "entry", xmlResponse ).map(function() {
+            return {
+              title: $( "title", this ).text(),
+              content: $("content",this).text(),
+              url: $( "url" , this).text()
+            };
+          }).get();
+          var $input = document.getElementById(search_id);
+          var $resultContent = document.getElementById(content_id);
+          $input.addEventListener('input', function(){
+            var matchcounts = 0;
+            var str='<ul class=\"search-result-list\">';
+            var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+            $resultContent.innerHTML = "";
+            if (this.value.trim().length > 1) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var content_index = [];
+                var data_title = data.title.trim().toLowerCase();
+                var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                var data_url = decodeURIComponent(data.url);
+                var index_title = -1;
+                var index_content = -1;
+                var first_occur = -1;
+                // only match artiles with not empty titles and contents
+                if(data_title != '') {
+                  keywords.forEach(function(keyword, i) {
+                    index_title = data_title.indexOf(keyword);
+                    index_content = data_content.indexOf(keyword);
+                    if( index_title >= 0 || index_content >= 0 ){
+                      isMatch = true;
+                      if (i == 0) {
+                        first_occur = index_content;
+                      }
+                    }
+
+                  });
+                }
+                // show search results
+                if (isMatch) {
+                  matchcounts += 1;
+                  str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                  var content = data.content.trim().replace(/<[^>]+>/g,"");
+                  if (first_occur >= 0) {
+                    // cut out 100 characters
+                    var start = first_occur - 20;
+                    var end = first_occur + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if(start == 0){
+                      end = 50;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    var match_content = content.substring(start, end);
+                    // highlight all keywords
+                    keywords.forEach(function(keyword){
+                      var regS = new RegExp(keyword, "gi");
+                      match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                    });
+
+                    str += "<p class=\"search-result\">" + match_content +"...</p>"
+                  }
+                  str += "</li>";
+                }
+              })};
+            str += "</ul>";
+            if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+            if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+            $resultContent.innerHTML = str;
+          });
+          proceedsearch();
+        }
+      });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.1.js"></script>
+  <script>AV.initialize("NliJVBn0857TMk5HYrIRt5wp-gzGzoHsz", "jB9B4QG8Rm8YP04RQqnsKy5M");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

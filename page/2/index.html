@@ -316,6 +316,179 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/10/26/mysql-bad-plan-order_by-limit/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2017/10/26/mysql-bad-plan-order_by-limit/" itemprop="url">
+                  MySQL order by limit 走错索引(range->indexscan)
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-10-26T15:32:49+08:00">
+                2017-10-26
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2017/10/26/mysql-bad-plan-order_by-limit/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2017/10/26/mysql-bad-plan-order_by-limit/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2017/10/26/mysql-bad-plan-order_by-limit/" class="leancloud_visitors" data-flag-title="MySQL order by limit 走错索引(range->indexscan)">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>生产库遇到过好几例本文要讨论的案例，而且比较棘手。简而言之，有类似这样的查询 <code>SELECT * FROM t1 where t1.f2&gt;1 and t2.f2&lt;100 order by t1.id</code>，id是主键，条件里面有个range查询，就会造成优化器是选择主键，还是选择filesort问题，有些特殊情况就会选错索引，比如为了回避内存排序，选择了主键扫描，导致原本走范围过滤再sort 500ms勉强可以结束的查询，5分钟不出结果。</p>
+<p>下面具体来这个案例。</p>
+<h1 id="1-背景"><a href="#1-背景" class="headerlink" title="1. 背景"></a>1. 背景</h1><p>阿里云RDS，5.6.16-log。<br>表 d_ec_someextend.t_tbl_test_time_08:<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="string">`t_tbl_test_time_08`</span> (</div><div class="line">  <span class="string">`f_some_id`</span> <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">unsigned</span> <span class="keyword">DEFAULT</span> <span class="string">'0'</span>,</div><div class="line">  <span class="string">`f_qiye_id`</span> <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">DEFAULT</span> <span class="string">'0'</span>,</div><div class="line">  <span class="string">`f_type`</span> tinyint(<span class="number">3</span>) <span class="keyword">DEFAULT</span> <span class="string">'0'</span> <span class="keyword">COMMENT</span> <span class="string">'有效联系类型 1: QQ联系，2:拨打电话，3:发送邮件，4:发送短信，5:添加跟进记录，6:拜访客户，7:EC联系，8:更新客户阶段'</span>,</div><div class="line">  <span class="string">`f_contact_time`</span> <span class="keyword">timestamp</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">'1970-01-01 16:00:01'</span>,</div><div class="line">  <span class="keyword">UNIQUE</span> <span class="keyword">KEY</span> <span class="string">`some_qiye_type`</span> (<span class="string">`f_some_id`</span>,<span class="string">`f_qiye_id`</span>,<span class="string">`f_type`</span>),</div><div class="line">  <span class="keyword">KEY</span> <span class="string">`f_contact_time`</span> (<span class="string">`f_contact_time`</span>)</div><div class="line">) <span class="keyword">ENGINE</span>=<span class="keyword">InnoDB</span> <span class="keyword">DEFAULT</span> <span class="keyword">CHARSET</span>=utf8mb4;</div></pre></td></tr></table></figure></p>
+<p>表索引信息：<br><figure class="highlight gherkin"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div></pre></td><td class="code"><pre><div class="line">mysql&gt; show table status like <span class="string">"t_tbl_test_time_08"</span>;</div><div class="line">+-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+</div><div class="line">|<span class="string"> Name                  </span>|<span class="string"> Engine </span>|<span class="string"> Version </span>|<span class="string"> Row_format </span>|<span class="string"> Rows     </span>|<span class="string"> Avg_row_length </span>|<span class="string"> Data_length </span>|<span class="string"> Max_data_length </span>|<span class="string"> Index_length </span>|<span class="string"> Data_free </span>|<span class="string"> Auto_increment </span>|<span class="string"> Create_time         </span>|<span class="string"> Update_time </span>|<span class="string"> Check_time </span>|<span class="string"> Collation          </span>|<span class="string"> Checksum </span>|<span class="string"> Create_options </span>|<span class="string"> Comment </span>|<span class="string"> Block_format </span>|</div><div class="line">+-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+</div><div class="line">|<span class="string"> t_tbl_test_time_08 </span>|<span class="string"> InnoDB </span>|<span class="string">      10 </span>|<span class="string"> Compact    </span>|<span class="string"> 19264318 </span>|<span class="string">             45 </span>|<span class="string">   882900992 </span>|<span class="string">               0 </span>|<span class="string">   2176843776 </span>|<span class="string"> 752877568 </span>|<span class="string"> NULL           </span>|<span class="string"> 2017-10-25 20:27:08 </span>|<span class="string"> NULL        </span>|<span class="string"> NULL       </span>|<span class="string"> utf8mb4_general_ci </span>|<span class="string"> NULL     </span>|<span class="string">                </span>|<span class="string">         </span>|<span class="string"> Original     </span>|</div><div class="line">+-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+</div><div class="line">1 row in set</div><div class="line"> </div><div class="line">mysql&gt; show index from t_tbl_test_time_08;</div><div class="line">+--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+</div><div class="line">|<span class="string"> Table              </span>|<span class="string"> Non_unique </span>|<span class="string"> Key_name        </span>|<span class="string"> Seq_in_index </span>|<span class="string"> Column_name    </span>|<span class="string"> Collation </span>|<span class="string"> Cardinality </span>|<span class="string"> Sub_part </span>|<span class="string"> Packed </span>|<span class="string"> Null </span>|<span class="string"> Index_type </span>|<span class="string"> Comment </span>|<span class="string"> Index_comment </span>|</div><div class="line">+--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+</div><div class="line">|<span class="string"> t_tbl_test_time_08 </span>|<span class="string">          0 </span>|<span class="string"> some_qiye_type  </span>|<span class="string">            1 </span>|<span class="string"> f_some_id      </span>|<span class="string"> A         </span>|<span class="string">    19264318 </span>|<span class="string"> NULL     </span>|<span class="string"> NULL   </span>|<span class="string"> YES  </span>|<span class="string"> BTREE      </span>|<span class="string">         </span>|<span class="string">               </span>|</div><div class="line">|<span class="string"> t_tbl_test_time_08 </span>|<span class="string">          0 </span>|<span class="string"> some_qiye_type  </span>|<span class="string">            2 </span>|<span class="string"> f_qiye_id      </span>|<span class="string"> A         </span>|<span class="string">    19264318 </span>|<span class="string"> NULL     </span>|<span class="string"> NULL   </span>|<span class="string"> YES  </span>|<span class="string"> BTREE      </span>|<span class="string">         </span>|<span class="string">               </span>|</div><div class="line">|<span class="string"> t_tbl_test_time_08 </span>|<span class="string">          0 </span>|<span class="string"> some_qiye_type  </span>|<span class="string">            3 </span>|<span class="string"> f_type         </span>|<span class="string"> A         </span>|<span class="string">    19264318 </span>|<span class="string"> NULL     </span>|<span class="string"> NULL   </span>|<span class="string"> YES  </span>|<span class="string"> BTREE      </span>|<span class="string">         </span>|<span class="string">               </span>|</div><div class="line">|<span class="string"> t_tbl_test_time_08 </span>|<span class="string">          1 </span>|<span class="string"> f_contact_time  </span>|<span class="string">            1 </span>|<span class="string"> f_contact_time </span>|<span class="string"> A         </span>|<span class="string">     9632159 </span>|<span class="string"> NULL     </span>|<span class="string"> NULL   </span>|<span class="string"> YES  </span>|<span class="string"> BTREE      </span>|<span class="string">         </span>|<span class="string">               </span>|</div><div class="line">+--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+</div><div class="line">4 rows in set</div></pre></td></tr></table></figure></p>
+<p><strong>问题查询：</strong><br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">select</span> f_some_id <span class="keyword">from</span> d_ec_some1.t_tbl_test_time_08</div><div class="line"><span class="keyword">where</span> f_qiye_id=<span class="number">5077665</span> <span class="keyword">and</span> f_type=<span class="number">9</span></div><div class="line"><span class="keyword">and</span> f_contact_time &gt; <span class="string">'2017-10-17 14:23:49'</span> <span class="keyword">and</span> f_contact_time &lt; <span class="string">'2017-10-17 14:23:53'</span></div><div class="line"><span class="keyword">order</span> <span class="keyword">by</span> f_some_id <span class="keyword">limit</span> <span class="number">300</span></div></pre></td></tr></table></figure></p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2017/10/26/mysql-bad-plan-order_by-limit/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/10/17/mysql-big-trx-lock-case/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1034,184 +1207,6 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2017/08/29/blog_migrate_gentie163_disqus/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2017/08/29/blog_migrate_gentie163_disqus/" itemprop="url">
-                  网易云跟帖迁移评论到disqus
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-08-29T16:32:49+08:00">
-                2017-08-29
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2017/08/29/blog_migrate_gentie163_disqus/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2017/08/29/blog_migrate_gentie163_disqus/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2017/08/29/blog_migrate_gentie163_disqus/" class="leancloud_visitors" data-flag-title="网易云跟帖迁移评论到disqus">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          早前折腾博客的时候，在众多评论系统中选择了多说，用了2年结果多说倒闭了，也算是影响了网络上众多的站点。
-于是在16年的时候把评论换成了网易云跟帖，以为有网易这个靠山，体验虽然差点但是不会轻易关闭。云跟帖还提供了从多说直接导入的工具，随意旧的评论直接弄过来了。
-可谁想不到一年，网易云跟帖也关闭了。
-现在不怎么去折腾博客这玩意了，往里面写写东西才是王道，所以就决定直接把评论系统换成国外的 disqus，总不至于国内种种原因关闭了，代价就是要懂得科学上网，考虑博客的受众都是IT同仁，也就只好这样了。
-然而被坑了，网上有许多文章和工具可以从多说迁移到disqus，但是几乎没看到从网易云跟帖迁移到disqus，三者导出的评论格式不一样。云跟帖导出的是 json，disqus导入是扩展的Wordpress格式。
-在拖了3个月后，找到了从网易云跟帖备份出来的旧评论文件，简单用python转换了一下，现在可以用了。
-WXR格式：https://help.disqus.com/customer/portal/articles/472150-custom-xml-import-format
-转换代码gis
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2017/08/29/blog_migrate_gentie163_disqus/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -1261,7 +1256,7 @@ WXR格式：https://help.disqus.com/customer/portal/articles/472150-custom-xml-i
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">116</span>
+                <span class="site-state-item-count">117</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>

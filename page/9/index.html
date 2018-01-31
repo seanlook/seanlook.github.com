@@ -316,6 +316,181 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/05/13/mysql-innodb-primary_key/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="seanlook">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar_sean.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Sean's Notes">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2016/05/13/mysql-innodb-primary_key/" itemprop="url">
+                  InnoDB表主键设计方案
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-05-13T15:32:49+08:00">
+                2016-05-13
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2016/05/13/mysql-innodb-primary_key/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2016/05/13/mysql-innodb-primary_key/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2016/05/13/mysql-innodb-primary_key/" class="leancloud_visitors" data-flag-title="InnoDB表主键设计方案">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">Visitors </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          
+          关于MySQL InnoDB表的主键设计，有必要从开发规范 http://seanlook.com/2016/05/11/mysql-dev-principle-ec/ 里拿出来，单独展开说一下。InnoDB是一个聚集索引组织表，即行数据是按照聚集索引在物理磁盘上存储的，并且是块状结构，默认一个block是16kB。
+图片来《高性能MySQL》
+首先在设计表结构时，表一定要显式定义主键，自增主键，或者联合主键，或全局ID。（所有与主键，包括其它索引，相关的字段，都要定义为NOT NULL，这是因为如果允许NULL，那么在索引的每条记录上，都要多用一个标记去记录这个列是否是NULL，占用多余的存储空间）
+1. 自增主键特性对于高并发的插入速度较快，因为每次插入新记录，都是在之前记录的右边顺序插入，不需要频繁的分裂。表上要建立多个二级索引时，索引记录都会带上主键，根据主键去定位行数据。自增主键一般是int或bigint型，多个二级索引上面占用的空间较小。
+2. 联合主键特性每次新记录插入，都要寻找到合适的“缝隙”，插入，当插入位置空间不够时，需要做页分裂，这个需要维护成本。二级索引带上的主
+          ...
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2016/05/13/mysql-innodb-primary_key/#more" rel="contents">
+              Read more &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
     <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/05/11/mysql-dev-principle-ec/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1191,182 +1366,6 @@ http://www.iteye.com/topic/1141229
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="http://seanlook.com/2016/04/22/mysql-sql-mode-troubleshooting/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar_sean.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Sean's Notes">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-            
-            
-              
-                
-                <a class="post-title-link" href="/2016/04/22/mysql-sql-mode-troubleshooting/" itemprop="url">
-                  MySQL sql_mode 说明（及处理一起 sql_mode 引发的问题）
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-04-22T16:32:49+08:00">
-                2016-04-22
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index">
-                    <span itemprop="name">MySQL</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2016/04/22/mysql-sql-mode-troubleshooting/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2016/04/22/mysql-sql-mode-troubleshooting/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-             <span id="/2016/04/22/mysql-sql-mode-troubleshooting/" class="leancloud_visitors" data-flag-title="MySQL sql_mode 说明（及处理一起 sql_mode 引发的问题）">
-               <span class="post-meta-divider">|</span>
-               <span class="post-meta-item-icon">
-                 <i class="fa fa-eye"></i>
-               </span>
-               
-                 <span class="post-meta-item-text">Visitors </span>
-               
-                 <span class="leancloud-visitors-count"></span>
-             </span>
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <h2 id="1-MySQL莫名变成了-Strict-SQL-Mode"><a href="#1-MySQL莫名变成了-Strict-SQL-Mode" class="headerlink" title="1. MySQL莫名变成了 Strict SQL Mode"></a>1. MySQL莫名变成了 Strict SQL Mode</h2><p>最近测试组那边反应数据库部分写入失败，app层提示是插入成功，但表里面里面没有产生数据，而两个写入操作的另外一个表有数据。因为 insert 失败在数据库层面是看不出来的，于是找php的同事看下错误信息：</p>
-<figure class="highlight rust"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">[<span class="literal">Err</span>] <span class="number">1364</span> - Field `f_company_id` doesn<span class="symbol">'t</span> have a <span class="keyword">default</span> value</div></pre></td></tr></table></figure>
-<p>很明显2个 insert 操作，第一条成功，第二条失败了，但因为没有控制在一个事务当中，导致app里面依然提示成功，这是客户入库操作，心想如果线上也有这个问题得是多大的代价。</p>
-<p>不说开发的问题，好端端的mysql怎么突然就部分表写入失败呢？根据上面的问题很快能猜到是 sql_mode 问题： NOT NULL 列没有默认值但代码里也没给值，在非严格模式下，int列默认为0，string列默认为’’了，所以不成问题；但在严格模式下，是直接返回失败的。</p>
-<p>一看，果然：<br><figure class="highlight asciidoc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="section">mysql&gt; show variables like "sql_mode";</div><div class="line">+---------------+--------------------------------------------+</span></div><div class="line"><span class="section">| Variable_name | Value                                      |</div><div class="line">+---------------+--------------------------------------------+</span></div><div class="line"><span class="section">| sql_mode      | STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION |</div><div class="line">+---------------+--------------------------------------------+</span></div></pre></td></tr></table></figure></p>
-<p>但是一直是没问题的的，就突然出现了，有谁会去改 sql_mode 呢，生产环境产生这个问题的风险有多大？所以必须揪出来。</p>
-<p>先 <code>set global sql_mode=&#39;&#39;</code> ，让他们用着先（文后会给解决问题根本的办法），同时打开general_log看是哪一个用户有类似设置 sql_mode 命令：<br><figure class="highlight basic"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"><span class="symbol">1134456 </span>Query   SET autocommit=<span class="number">1</span></div><div class="line"><span class="symbol">1134456 </span>Query   Set sql_mode=<span class="comment">'NO_ENGINE_SUBSITUTION,STRICT_TRANS_TABLES'</span></div><div class="line"><span class="symbol">1134457 </span>Connect ecuser@<span class="number">10.0.200.173</span> <span class="keyword">on</span></div><div class="line"><span class="symbol">1134457 </span>Query   /* mysql-connector-java-<span class="number">5.1.35</span> ...</div></pre></td></tr></table></figure></p>
-<p>看出是java组那边哪个框架建立连接的时候使用设置了sql_mode，但这是session级别的，不影响php那边用户的连接。</p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2016/04/22/mysql-sql-mode-troubleshooting/#more" rel="contents">
-              Read more &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <div>
-      
-    </div>
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-
-
-    
   </section>
 
   
@@ -1416,7 +1415,7 @@ http://www.iteye.com/topic/1141229
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">116</span>
+                <span class="site-state-item-count">117</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
