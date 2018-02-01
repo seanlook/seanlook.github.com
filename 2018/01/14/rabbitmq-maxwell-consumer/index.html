@@ -95,20 +95,20 @@
 
 <meta name="description" content="应用场景：同 http://seanlook.com/2017/09/05/mysql-binlog-subscribe-simple-for-dba/ ，但更灵活：
 
-实时同步部分表到另外一个数据库实例比如在轨迹迁库时，将当天表的数据同步到新库，模拟阿里云dms数据传输的功能，相当于在测试环境演练，减少失误。另外还可以从新库反向同步增量数据到老库，解决测试环境多项目测试引起数据库冲突的问题。">
+实时同步部分表到另外一个数据库实例比如在数据库迁库时，将当天表的数据同步到新库，模拟阿里云dms数据传输的功能，相当于在测试环境演练，减少失误。另外还可以从新库反向同步增量数据到老库，解决测试环境多项目测试引起数据库冲突的问题。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="基于MySQL binlog增量数据同步方案(maxwell+rabbimt+pydbsync)">
 <meta property="og:url" content="http://seanlook.com/2018/01/14/rabbitmq-maxwell-consumer/index.html">
 <meta property="og:site_name" content="Sean's Notes">
 <meta property="og:description" content="应用场景：同 http://seanlook.com/2017/09/05/mysql-binlog-subscribe-simple-for-dba/ ，但更灵活：
 
-实时同步部分表到另外一个数据库实例比如在轨迹迁库时，将当天表的数据同步到新库，模拟阿里云dms数据传输的功能，相当于在测试环境演练，减少失误。另外还可以从新库反向同步增量数据到老库，解决测试环境多项目测试引起数据库冲突的问题。">
+实时同步部分表到另外一个数据库实例比如在数据库迁库时，将当天表的数据同步到新库，模拟阿里云dms数据传输的功能，相当于在测试环境演练，减少失误。另外还可以从新库反向同步增量数据到老库，解决测试环境多项目测试引起数据库冲突的问题。">
 <meta property="og:updated_time" content="2018-01-14T07:32:49.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="基于MySQL binlog增量数据同步方案(maxwell+rabbimt+pydbsync)">
 <meta name="twitter:description" content="应用场景：同 http://seanlook.com/2017/09/05/mysql-binlog-subscribe-simple-for-dba/ ，但更灵活：
 
-实时同步部分表到另外一个数据库实例比如在轨迹迁库时，将当天表的数据同步到新库，模拟阿里云dms数据传输的功能，相当于在测试环境演练，减少失误。另外还可以从新库反向同步增量数据到老库，解决测试环境多项目测试引起数据库冲突的问题。">
+实时同步部分表到另外一个数据库实例比如在数据库迁库时，将当天表的数据同步到新库，模拟阿里云dms数据传输的功能，相当于在测试环境演练，减少失误。另外还可以从新库反向同步增量数据到老库，解决测试环境多项目测试引起数据库冲突的问题。">
 
 
 
@@ -439,10 +439,10 @@
       
         <p>应用场景：同 <a href="http://seanlook.com/2017/09/05/mysql-binlog-subscribe-simple-for-dba/">http://seanlook.com/2017/09/05/mysql-binlog-subscribe-simple-for-dba/</a> ，但更灵活：</p>
 <blockquote>
-<p>实时同步部分表到另外一个数据库实例<br>比如在轨迹迁库时，将当天表的数据同步到新库，模拟阿里云dms数据传输的功能，相当于在测试环境演练，减少失误。<br>另外还可以从新库反向同步增量数据到老库，解决测试环境多项目测试引起数据库冲突的问题。  </p>
-<p>正式切库时的回滚措施<br>比如轨迹数据独立项目，切换期间数据写向新库，但如果切换失败需要回滚到老库，就需要把这段时间新增的数据同步回老库（启动消费程序），这就不需要程序段再考虑复杂的回滚设计。</p>
-<p>数据库闪回<br>关于数据库误操作的闪回方案，见文章MySQL根据离线binlog快速闪回 。binlog2sql的 -B 选项可以将sql反向组装，生产回滚sql。如果需要完善的闪回功能，要进一步开发，提高易用性。</p>
-<p>binlog搜索功能<br>目前组内一版的binlog搜索功能，是离线任务处理的方式，好处是不会占用太大空间，缺点是处理时间较长。通过实时binlog解析过滤的方式，入ES可以快速搜索。需要进一步开发完善。<br>结合graylog可以实现阿里云RDS类似的数据追踪功能</p>
+<p>实时同步部分表到另外一个数据库实例<br>比如在数据库迁库时，将当天表的数据同步到新库，模拟阿里云dms数据传输的功能，相当于在测试环境演练，减少失误。<br>另外还可以从新库反向同步增量数据到老库，解决测试环境多项目测试引起数据库冲突的问题。</p>
+<p>正式切库时的回滚措施<br>比如数据库迁移项目，切换期间数据写向新库，但如果切换失败需要回滚到老库，就需要把这段时间新增的数据同步回老库（启动消费程序），这就不需要程序段再考虑复杂的回滚设计。</p>
+<p>数据库闪回<br>关于数据库误操作的闪回方案，见 <a href="http://seanlook.com/2017/03/03/mysql-flashback_use_purged-binlog/">文章MySQL根据离线binlog快速闪回</a> 。<code>binlog2sql</code>的 <code>-B</code> 选项可以将sql反向组装，生产回滚sql。如果需要完善的闪回功能，要进一步开发，提高易用性。</p>
+<p>binlog搜索功能<br>目前组内一版的binlog搜索功能，是离线任务处理的方式，好处是不会占用太大空间，缺点是处理时间较长。通过实时binlog解析过滤的方式，入ES可以快速搜索。需要进一步开发完善。<br>结合graylog可以实现阿里云RDS类似的数据追踪功能。见 <a href="http://seanlook.com/2018/01/25/maxwell-graylog/">http://seanlook.com/2018/01/25/maxwell-graylog/</a> </p>
 </blockquote>
 <p>rabbitmq介绍：<a href="http://seanlook.com/2018/01/06/rabbitmq-introduce/">http://seanlook.com/2018/01/06/rabbitmq-introduce/</a></p>
 <p>maxwell介绍：<a href="http://seanlook.com/2018/01/13/maxwell-binlog/">http://seanlook.com/2018/01/13/maxwell-binlog/</a></p>
