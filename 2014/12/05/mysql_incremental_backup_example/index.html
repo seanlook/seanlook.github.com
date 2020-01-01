@@ -6,15 +6,15 @@
 
 
 <html class="theme-next mist use-motion" lang="en">
-<head>
-  <meta charset="UTF-8"/>
-<meta http-equiv="X-UA-Compatible" content="IE=edge" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<head><meta name="generator" content="Hexo 3.9.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 
 
 
-<meta http-equiv="Cache-Control" content="no-transform" />
-<meta http-equiv="Cache-Control" content="no-siteapp" />
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
 
 
 
@@ -34,7 +34,7 @@
   
     
   
-  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css">
 
 
 
@@ -70,42 +70,41 @@
 
   
 
-<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css">
 
-<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css" />
-
-
-  <meta name="keywords" content="mysql,database,binlog,backup," />
+<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css">
 
 
-
-
-
-  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
-
-
-
-
-  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0" />
+  <meta name="keywords" content="mysql,binlog,database,backup,">
 
 
 
 
 
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml">
 
-<meta name="description" content="小量的数据库可以每天进行完整备份，因为这也用不了多少时间，但当数据库很大时，就不太可能每天进行一次完整备份了，这时候就可以使用增量备份。增量备份的原理就是使用了mysql的binlog日志。本次操作的MySQL版本为5.5.40 for Linux (x86_64)。
-增量备份要确保打开了二进制日志，参考mysql的日志系统：1mysql&amp;gt; show variables like &apos;%log">
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0">
+
+
+
+
+
+
+<meta name="description" content="小量的数据库可以每天进行完整备份，因为这也用不了多少时间，但当数据库很大时，就不太可能每天进行一次完整备份了，这时候就可以使用增量备份。增量备份的原理就是使用了mysql的binlog日志。本次操作的MySQL版本为5.5.40 for Linux (x86_64)。 增量备份要确保打开了二进制日志，参考mysql的日志系统：1mysql&amp;gt; show variables like &apos;%log">
+<meta name="keywords" content="mysql,binlog,database,backup">
 <meta property="og:type" content="article">
 <meta property="og:title" content="MySQL增量备份与恢复实例">
 <meta property="og:url" content="http://seanlook.com/2014/12/05/mysql_incremental_backup_example/index.html">
-<meta property="og:site_name" content="Sean's Notes">
-<meta property="og:description" content="小量的数据库可以每天进行完整备份，因为这也用不了多少时间，但当数据库很大时，就不太可能每天进行一次完整备份了，这时候就可以使用增量备份。增量备份的原理就是使用了mysql的binlog日志。本次操作的MySQL版本为5.5.40 for Linux (x86_64)。
-增量备份要确保打开了二进制日志，参考mysql的日志系统：1mysql&amp;gt; show variables like &apos;%log">
+<meta property="og:site_name" content="Sean&#39;s Notes">
+<meta property="og:description" content="小量的数据库可以每天进行完整备份，因为这也用不了多少时间，但当数据库很大时，就不太可能每天进行一次完整备份了，这时候就可以使用增量备份。增量备份的原理就是使用了mysql的binlog日志。本次操作的MySQL版本为5.5.40 for Linux (x86_64)。 增量备份要确保打开了二进制日志，参考mysql的日志系统：1mysql&amp;gt; show variables like &apos;%log">
+<meta property="og:locale" content="en">
 <meta property="og:updated_time" content="2014-05-01T09:00:46.023Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="MySQL增量备份与恢复实例">
-<meta name="twitter:description" content="小量的数据库可以每天进行完整备份，因为这也用不了多少时间，但当数据库很大时，就不太可能每天进行一次完整备份了，这时候就可以使用增量备份。增量备份的原理就是使用了mysql的binlog日志。本次操作的MySQL版本为5.5.40 for Linux (x86_64)。
-增量备份要确保打开了二进制日志，参考mysql的日志系统：1mysql&amp;gt; show variables like &apos;%log">
+<meta name="twitter:description" content="小量的数据库可以每天进行完整备份，因为这也用不了多少时间，但当数据库很大时，就不太可能每天进行一次完整备份了，这时候就可以使用增量备份。增量备份的原理就是使用了mysql的binlog日志。本次操作的MySQL版本为5.5.40 for Linux (x86_64)。 增量备份要确保打开了二进制日志，参考mysql的日志系统：1mysql&amp;gt; show variables like &apos;%log">
 
 
 
@@ -133,7 +132,7 @@
 
 
 
-  <link rel="canonical" href="http://seanlook.com/2014/12/05/mysql_incremental_backup_example/"/>
+  <link rel="canonical" href="http://seanlook.com/2014/12/05/mysql_incremental_backup_example/">
 
 
 
@@ -189,7 +188,7 @@
     
 
     <div class="custom-logo-site-title">
-      <a href="/"  class="brand" rel="start">
+      <a href="/" class="brand" rel="start">
         <span class="logo-line-before"><i></i></span>
         <span class="site-title">Sean's Notes</span>
         <span class="logo-line-after"><i></i></span>
@@ -219,7 +218,7 @@
         <li class="menu-item menu-item-home">
           <a href="/" rel="section">
             
-              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
             
             Home
           </a>
@@ -229,7 +228,7 @@
         <li class="menu-item menu-item-archives">
           <a href="/archives" rel="section">
             
-              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
             
             Archives
           </a>
@@ -239,7 +238,7 @@
         <li class="menu-item menu-item-tags">
           <a href="/tags" rel="section">
             
-              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
             
             Tags
           </a>
@@ -249,7 +248,7 @@
         <li class="menu-item menu-item-about">
           <a href="/about" rel="section">
             
-              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
             
             About
           </a>
@@ -262,7 +261,7 @@
             <a href="javascript:;" class="popup-trigger">
           
             
-              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
             
             Search
           </a>
@@ -283,9 +282,7 @@
       <i class="fa fa-times-circle"></i>
     </span>
     <div class="local-search-input-wrapper">
-      <input autocapitalize="off" autocomplete="off" autocorrect="off"
-             placeholder="Searching..." spellcheck="false"
-             type="text" id="local-search-input">
+      <input autocapitalize="off" autocomplete="off" autocorrect="off" placeholder="Searching..." spellcheck="false" type="text" id="local-search-input">
     </div>
   </div>
   <div id="local-search-result"></div>
@@ -322,7 +319,7 @@
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
+      <meta itemprop="description" content>
       <meta itemprop="image" content="/images/avatar_sean.jpg">
     </span>
 
@@ -365,7 +362,7 @@
           </span>
 
           
-            <span class="post-category" >
+            <span class="post-category">
             
               <span class="post-meta-divider">|</span>
             
@@ -396,8 +393,7 @@
                   <i class="fa fa-comment-o"></i>
                 </span>
                 <a href="/2014/12/05/mysql_incremental_backup_example/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2014/12/05/mysql_incremental_backup_example/" itemprop="commentCount"></span>
+                  <span class="post-comments-count disqus-comment-count" data-disqus-identifier="2014/12/05/mysql_incremental_backup_example/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -435,23 +431,23 @@
 
       
         <p>小量的数据库可以每天进行完整备份，因为这也用不了多少时间，但当数据库很大时，就不太可能每天进行一次完整备份了，这时候就可以使用增量备份。增量备份的原理就是使用了mysql的binlog日志。<br>本次操作的MySQL版本为<code>5.5.40 for Linux (x86_64)</code>。</p>
-<p>增量备份要确保打开了二进制日志，参考<a href="http://seanlook.com/2014/12/04/mysql_log_binlog/">mysql的日志系统</a>：<br><figure class="highlight gams"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">mysql&gt; show <span class="keyword">variables</span> like <span class="comment">'%log_bin%'</span>;</div></pre></td></tr></table></figure></p>
-<p>首先对pak数据库做一个完整备份：<br><figure class="highlight brainfuck"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"><span class="comment">$</span> <span class="comment">mysqldump</span> <span class="literal">-</span><span class="comment">h</span> <span class="comment">localhost</span> <span class="literal">-</span><span class="comment">upak</span> <span class="literal">-</span><span class="comment">ppwd</span> <span class="literal">-</span><span class="comment">P3306</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">master</span><span class="literal">-</span><span class="comment">data=2</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">single</span><span class="literal">-</span><span class="comment">transaction</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">opt</span> <span class="comment">pak</span> &gt; <span class="comment">pak_bak_full</span><span class="string">.</span><span class="comment">sql</span></div></pre></td></tr></table></figure></p>
+<p>增量备份要确保打开了二进制日志，参考<a href="http://xgknight.com/2014/12/04/mysql_log_binlog/" target="_blank" rel="noopener">mysql的日志系统</a>：<br><figure class="highlight gams"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; show <span class="keyword">variables</span> like <span class="comment">'%log_bin%'</span>;</span><br></pre></td></tr></table></figure></p>
+<p>首先对pak数据库做一个完整备份：<br><figure class="highlight brainfuck"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">$</span> <span class="comment">mysqldump</span> <span class="literal">-</span><span class="comment">h</span> <span class="comment">localhost</span> <span class="literal">-</span><span class="comment">upak</span> <span class="literal">-</span><span class="comment">ppwd</span> <span class="literal">-</span><span class="comment">P3306</span> --<span class="comment">master</span><span class="literal">-</span><span class="comment">data=2</span> --<span class="comment">single</span><span class="literal">-</span><span class="comment">transaction</span> --<span class="comment">opt</span> <span class="comment">pak</span> &gt; <span class="comment">pak_bak_full</span><span class="string">.</span><span class="comment">sql</span></span><br></pre></td></tr></table></figure></p>
 <p>这时候就会得到一个全备文件pak_bak_full.sql。mysqldump操作会导致滚动一次log，假设新的binlog文件是mysql-bin.000002。</p>
 <h3 id="1-模拟插入数据和误操作"><a href="#1-模拟插入数据和误操作" class="headerlink" title="1. 模拟插入数据和误操作"></a>1. 模拟插入数据和误操作</h3><p>a. 在pak库的某个表插入一些数据，然后执行<code>flush logs</code>命令。这时将会产生一个新的二进制日志文件mysql-bin.000003，mysql-bin.000002则保存了全备过后的所有更改，既增加记录的操作也保存在了mysql-bin.00002中。</p>
 <p>b. 再在pak库中的t_user表中增加两条记录，然后误删除t_user表。t_user中增加记录的操作和删除表的操作都记录在mysql-bin.000003中。</p>
-<h3 id="2-开始恢复"><a href="#2-开始恢复" class="headerlink" title="2. 开始恢复"></a>2. 开始恢复</h3><p>恢复过程不要记录日志：<br><figure class="highlight gams"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">mysql &gt; <span class="keyword">set</span> global <span class="comment">sql_log_bin=0</span>;</div></pre></td></tr></table></figure></p>
-<h3 id="3-首先导入全备数据"><a href="#3-首先导入全备数据" class="headerlink" title="3. 首先导入全备数据"></a>3. 首先导入全备数据</h3><figure class="highlight dts"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">$ mysql -h localhost -upak -ppwd <span class="params">&lt; pak_bak_full.sql</span></div><div class="line">或</div><div class="line">mysql&gt; source <span class="meta-keyword">/path/</span>backup/pak_bak_full.sql</div></pre></td></tr></table></figure>
-<p>我们也可以看到全备时的binlog位置：<br><figure class="highlight crmsh"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">head -<span class="number">50</span> backup-file.sql |grep 'CHANGE <span class="literal">MASTER</span>'</div><div class="line">-- CHANGE <span class="keyword">MASTER</span> <span class="title">TO</span> <span class="attr">MASTER_LOG_FILE=</span>'mysql-bin.<span class="number">000001</span>', <span class="attr">MASTER_LOG_POS=</span><span class="number">4321</span>;</div></pre></td></tr></table></figure></p>
-<p>查看当前所在二进制日志中的位置：<br><figure class="highlight crmsh"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">mysql&gt; show <span class="keyword">master</span> <span class="title">status</span>;</div></pre></td></tr></table></figure></p>
+<h3 id="2-开始恢复"><a href="#2-开始恢复" class="headerlink" title="2. 开始恢复"></a>2. 开始恢复</h3><p>恢复过程不要记录日志：<br><figure class="highlight routeros"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql &gt; <span class="builtin-name">set</span> global <span class="attribute">sql_log_bin</span>=0;</span><br></pre></td></tr></table></figure></p>
+<h3 id="3-首先导入全备数据"><a href="#3-首先导入全备数据" class="headerlink" title="3. 首先导入全备数据"></a>3. 首先导入全备数据</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">$</span><span class="bash"> mysql -h localhost -upak -ppwd &lt; pak_bak_full.sql</span></span><br><span class="line">或</span><br><span class="line"><span class="meta">mysql&gt;</span><span class="bash"> <span class="built_in">source</span> /path/backup/pak_bak_full.sql</span></span><br></pre></td></tr></table></figure>
+<p>我们也可以看到全备时的binlog位置：<br><figure class="highlight routeros"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">head -50 backup-file.sql |grep <span class="string">'CHANGE MASTER'</span></span><br><span class="line">-- CHANGE MASTER <span class="keyword">TO</span> <span class="attribute">MASTER_LOG_FILE</span>=<span class="string">'mysql-bin.000001'</span>, <span class="attribute">MASTER_LOG_POS</span>=4321;</span><br></pre></td></tr></table></figure></p>
+<p>查看当前所在二进制日志中的位置：<br><figure class="highlight crmsh"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; show <span class="keyword">master</span> <span class="title">status</span>;</span><br></pre></td></tr></table></figure></p>
 <p>根据上面两个position能大概确定需要完整恢复哪几个binlog文件。</p>
 <a id="more"></a>
-<h3 id="4-恢复mysql-bin-000002"><a href="#4-恢复mysql-bin-000002" class="headerlink" title="4. 恢复mysql-bin.000002"></a>4. 恢复mysql-bin.000002</h3><p>在待恢复的position或时间点以前、全备以后的binlog需要全部恢复，多个文件以空格隔开<br><figure class="highlight crystal"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ mysqlbinlog /var/<span class="class"><span class="keyword">lib</span>/<span class="title">mysql</span>/<span class="title">mysql</span>-<span class="title">bin</span>.000002 | <span class="title">mysql</span> -<span class="title">uroot</span> -<span class="title">p</span></span></div></pre></td></tr></table></figure></p>
+<h3 id="4-恢复mysql-bin-000002"><a href="#4-恢复mysql-bin-000002" class="headerlink" title="4. 恢复mysql-bin.000002"></a>4. 恢复mysql-bin.000002</h3><p>在待恢复的position或时间点以前、全备以后的binlog需要全部恢复，多个文件以空格隔开<br><figure class="highlight crystal"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ mysqlbinlog /var/<span class="class"><span class="keyword">lib</span>/<span class="title">mysql</span>/<span class="title">mysql</span>-<span class="title">bin</span>.000002 | <span class="title">mysql</span> -<span class="title">uroot</span> -<span class="title">p</span></span></span><br></pre></td></tr></table></figure></p>
 <p>此时查询可以得到前两条数据。</p>
 <h3 id="5-恢复部分mysql-bin-000003"><a href="#5-恢复部分mysql-bin-000003" class="headerlink" title="5. 恢复部分mysql-bin.000003"></a>5. 恢复部分mysql-bin.000003</h3><p>这个日志中包括了新增记录和误删表两个部分，我们需要恢复到新增记录之后、误删操作以前的位置。</p>
-<p>如果知道误操作的命令如<code>DROP TABLE</code>，则可以通过下面的方法在binlog文件中找到误操作之前的那个position：<br>（如下面的信息显示，误操作<code>DROP TABLE</code>之前的pos是775，在datetime 141204 15:08:04或pos 882时完成<code>DROP TABLE</code>操作）<br><figure class="highlight crystal"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line">$ mysqlbinlog /var/<span class="class"><span class="keyword">lib</span>/<span class="title">mysql</span>/<span class="title">mysql</span>-<span class="title">bin</span>.000003 |<span class="title">grep</span> -<span class="title">C</span> 5 '<span class="title">DROP</span> <span class="title">TABLE</span>'</span></div><div class="line"><span class="comment">#141204 15:07:05 server id 1  end_log_pos 775 	Xid = 376</span></div><div class="line">COMMIT/*!*<span class="regexp">/;</span></div><div class="line"># at 775</div><div class="line">#141204 15:08:04 server id 1  end_log_pos 882 	Query	thread_id=10	exec_time=0	error_code=0</div><div class="line">SET TIMESTAMP=1417676884/*!*<span class="regexp">/;</span></div><div class="line">DROP TABLE `t_user` /* generated by server *<span class="regexp">/</span></div><div class="line">/*!*<span class="regexp">/;</span></div><div class="line"># at 882</div></pre></td></tr></table></figure></p>
-<p>恢复命令：<br><figure class="highlight arduino"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ mysqlbinlog /var/lib/mysql/mysql-bin<span class="number">.000003</span> --<span class="built_in">stop</span>-<span class="built_in">position</span>=<span class="number">775</span> | mysql -h localhost -uroot -p</div></pre></td></tr></table></figure></p>
-<p>如果position难以确定，但知道需要恢复到的确切（服务器）时间，也可以使用datetime：<br><figure class="highlight awk"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ mysqlbinlog <span class="regexp">/var/</span>lib<span class="regexp">/mysql/my</span>sql-bin.<span class="number">000003</span> --stop-datetime=<span class="string">"2014-12-04 15:08:00"</span> | mysql -uroot -p</div></pre></td></tr></table></figure></p>
+<p>如果知道误操作的命令如<code>DROP TABLE</code>，则可以通过下面的方法在binlog文件中找到误操作之前的那个position：<br>（如下面的信息显示，误操作<code>DROP TABLE</code>之前的pos是775，在datetime 141204 15:08:04或pos 882时完成<code>DROP TABLE</code>操作）<br><figure class="highlight crystal"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">$ mysqlbinlog /var/<span class="class"><span class="keyword">lib</span>/<span class="title">mysql</span>/<span class="title">mysql</span>-<span class="title">bin</span>.000003 |<span class="title">grep</span> -<span class="title">C</span> 5 '<span class="title">DROP</span> <span class="title">TABLE</span>'</span></span><br><span class="line"><span class="comment">#141204 15:07:05 server id 1  end_log_pos 775 	Xid = 376</span></span><br><span class="line">COMMIT/*!*<span class="regexp">/;</span></span><br><span class="line"><span class="regexp"># at 775</span></span><br><span class="line"><span class="regexp">#141204 15:08:04 server id 1  end_log_pos 882 	Query	thread_id=10	exec_time=0	error_code=0</span></span><br><span class="line"><span class="regexp">SET TIMESTAMP=1417676884/</span>*!*<span class="regexp">/;</span></span><br><span class="line"><span class="regexp">DROP TABLE `t_user` /</span>* generated by server *<span class="regexp">/</span></span><br><span class="line"><span class="regexp">/</span>*!*<span class="regexp">/;</span></span><br><span class="line"><span class="regexp"># at 882</span></span><br></pre></td></tr></table></figure></p>
+<p>恢复命令：<br><figure class="highlight arduino"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ mysqlbinlog /var/lib/mysql/mysql-bin<span class="number">.000003</span> --<span class="built_in">stop</span>-<span class="built_in">position</span>=<span class="number">775</span> | mysql -h localhost -uroot -p</span><br></pre></td></tr></table></figure></p>
+<p>如果position难以确定，但知道需要恢复到的确切（服务器）时间，也可以使用datetime：<br><figure class="highlight awk"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ mysqlbinlog <span class="regexp">/var/</span>lib<span class="regexp">/mysql/my</span>sql-bin.<span class="number">000003</span> --stop-datetime=<span class="string">"2014-12-04 15:08:00"</span> | mysql -uroot -p</span><br></pre></td></tr></table></figure></p>
 <p>如果不是误操作导致的，而是迁移数据库，那么不需要position或datetime，使用所有binlog文件增量恢复即可。</p>
 <p>确定恢复成功后记得打开日志记录：</p>
 <pre><code>mysql &gt; set global sql_log_bin=1;
@@ -487,7 +483,7 @@
       
       
         <div id="alipay" style="display: inline-block">
-          <img id="alipay_qr" src="/images/reward_alipay_seanlook.jpg" alt="seanlook Alipay"/>
+          <img id="alipay_qr" src="/images/reward_alipay_seanlook.jpg" alt="seanlook Alipay">
           <p>支付宝打赏</p>
         </div>
       
@@ -511,9 +507,9 @@
           
             <a href="/tags/mysql/" rel="tag"># mysql</a>
           
-            <a href="/tags/database/" rel="tag"># database</a>
-          
             <a href="/tags/binlog/" rel="tag"># binlog</a>
+          
+            <a href="/tags/database/" rel="tag"># database</a>
           
             <a href="/tags/backup/" rel="tag"># backup</a>
           
@@ -595,7 +591,7 @@
 
       
         <ul class="sidebar-nav motion-element">
-          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
             Table of Contents
           </li>
           <li class="sidebar-nav-overview" data-target="site-overview">
@@ -606,9 +602,7 @@
 
       <section class="site-overview sidebar-panel">
         <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
-          <img class="site-author-image" itemprop="image"
-               src="/images/avatar_sean.jpg"
-               alt="seanlook" />
+          <img class="site-author-image" itemprop="image" src="/images/avatar_sean.jpg" alt="seanlook">
           <p class="site-author-name" itemprop="name">seanlook</p>
            
               <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
@@ -619,7 +613,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">117</span>
+                <span class="site-state-item-count">120</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -641,7 +635,7 @@
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">125</span>
+                <span class="site-state-item-count">128</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>
@@ -723,10 +717,10 @@
 
     <footer id="footer" class="footer">
       <div class="footer-inner">
-        <div class="copyright" >
+        <div class="copyright">
   
   &copy;  2014 - 
-  <span itemprop="copyrightYear">2018</span>
+  <span itemprop="copyrightYear">2020</span>
   <span class="with-love">
     <i class="fa fa-heart"></i>
   </span>

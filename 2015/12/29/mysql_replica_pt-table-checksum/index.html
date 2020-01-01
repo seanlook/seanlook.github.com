@@ -6,15 +6,15 @@
 
 
 <html class="theme-next mist use-motion" lang="en">
-<head>
-  <meta charset="UTF-8"/>
-<meta http-equiv="X-UA-Compatible" content="IE=edge" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<head><meta name="generator" content="Hexo 3.9.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 
 
 
-<meta http-equiv="Cache-Control" content="no-transform" />
-<meta http-equiv="Cache-Control" content="no-siteapp" />
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
 
 
 
@@ -34,7 +34,7 @@
   
     
   
-  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css">
 
 
 
@@ -70,42 +70,41 @@
 
   
 
-<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css">
 
-<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css" />
-
-
-  <meta name="keywords" content="mysql,主从复制,percona," />
+<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css">
 
 
-
-
-
-  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
-
-
-
-
-  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0" />
+  <meta name="keywords" content="mysql,主从复制,percona,">
 
 
 
 
 
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml">
 
-<meta name="description" content="公司数据中心从托管机房迁移到阿里云，需要对mysql迁移（Replication）后的数据一致性进行校验，但又不能对生产环境使用造成影响，pt-table-checksum 成为了绝佳也是唯一的检查工具。
-pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、从库的数据是否一致。其原理是在主库执行基于statement的sql语句来生成主库数据块">
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0">
+
+
+
+
+
+
+<meta name="description" content="公司数据中心从托管机房迁移到阿里云，需要对mysql迁移（Replication）后的数据一致性进行校验，但又不能对生产环境使用造成影响，pt-table-checksum 成为了绝佳也是唯一的检查工具。 pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、从库的数据是否一致。其原理是在主库执行基于statement的sql语句来生成主库数据块">
+<meta name="keywords" content="mysql,主从复制,percona">
 <meta property="og:type" content="article">
 <meta property="og:title" content="生产环境使用 pt-table-checksum 检查MySQL数据一致性">
 <meta property="og:url" content="http://seanlook.com/2015/12/29/mysql_replica_pt-table-checksum/index.html">
-<meta property="og:site_name" content="Sean's Notes">
-<meta property="og:description" content="公司数据中心从托管机房迁移到阿里云，需要对mysql迁移（Replication）后的数据一致性进行校验，但又不能对生产环境使用造成影响，pt-table-checksum 成为了绝佳也是唯一的检查工具。
-pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、从库的数据是否一致。其原理是在主库执行基于statement的sql语句来生成主库数据块">
+<meta property="og:site_name" content="Sean&#39;s Notes">
+<meta property="og:description" content="公司数据中心从托管机房迁移到阿里云，需要对mysql迁移（Replication）后的数据一致性进行校验，但又不能对生产环境使用造成影响，pt-table-checksum 成为了绝佳也是唯一的检查工具。 pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、从库的数据是否一致。其原理是在主库执行基于statement的sql语句来生成主库数据块">
+<meta property="og:locale" content="en">
 <meta property="og:updated_time" content="2015-12-28T16:46:23.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="生产环境使用 pt-table-checksum 检查MySQL数据一致性">
-<meta name="twitter:description" content="公司数据中心从托管机房迁移到阿里云，需要对mysql迁移（Replication）后的数据一致性进行校验，但又不能对生产环境使用造成影响，pt-table-checksum 成为了绝佳也是唯一的检查工具。
-pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、从库的数据是否一致。其原理是在主库执行基于statement的sql语句来生成主库数据块">
+<meta name="twitter:description" content="公司数据中心从托管机房迁移到阿里云，需要对mysql迁移（Replication）后的数据一致性进行校验，但又不能对生产环境使用造成影响，pt-table-checksum 成为了绝佳也是唯一的检查工具。 pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、从库的数据是否一致。其原理是在主库执行基于statement的sql语句来生成主库数据块">
 
 
 
@@ -133,7 +132,7 @@ pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、�
 
 
 
-  <link rel="canonical" href="http://seanlook.com/2015/12/29/mysql_replica_pt-table-checksum/"/>
+  <link rel="canonical" href="http://seanlook.com/2015/12/29/mysql_replica_pt-table-checksum/">
 
 
 
@@ -189,7 +188,7 @@ pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、�
     
 
     <div class="custom-logo-site-title">
-      <a href="/"  class="brand" rel="start">
+      <a href="/" class="brand" rel="start">
         <span class="logo-line-before"><i></i></span>
         <span class="site-title">Sean's Notes</span>
         <span class="logo-line-after"><i></i></span>
@@ -219,7 +218,7 @@ pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、�
         <li class="menu-item menu-item-home">
           <a href="/" rel="section">
             
-              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
             
             Home
           </a>
@@ -229,7 +228,7 @@ pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、�
         <li class="menu-item menu-item-archives">
           <a href="/archives" rel="section">
             
-              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
             
             Archives
           </a>
@@ -239,7 +238,7 @@ pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、�
         <li class="menu-item menu-item-tags">
           <a href="/tags" rel="section">
             
-              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
             
             Tags
           </a>
@@ -249,7 +248,7 @@ pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、�
         <li class="menu-item menu-item-about">
           <a href="/about" rel="section">
             
-              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
             
             About
           </a>
@@ -262,7 +261,7 @@ pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、�
             <a href="javascript:;" class="popup-trigger">
           
             
-              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
             
             Search
           </a>
@@ -283,9 +282,7 @@ pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、�
       <i class="fa fa-times-circle"></i>
     </span>
     <div class="local-search-input-wrapper">
-      <input autocapitalize="off" autocomplete="off" autocorrect="off"
-             placeholder="Searching..." spellcheck="false"
-             type="text" id="local-search-input">
+      <input autocapitalize="off" autocomplete="off" autocorrect="off" placeholder="Searching..." spellcheck="false" type="text" id="local-search-input">
     </div>
   </div>
   <div id="local-search-result"></div>
@@ -322,7 +319,7 @@ pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、�
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
+      <meta itemprop="description" content>
       <meta itemprop="image" content="/images/avatar_sean.jpg">
     </span>
 
@@ -365,7 +362,7 @@ pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、�
           </span>
 
           
-            <span class="post-category" >
+            <span class="post-category">
             
               <span class="post-meta-divider">|</span>
             
@@ -396,8 +393,7 @@ pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、�
                   <i class="fa fa-comment-o"></i>
                 </span>
                 <a href="/2015/12/29/mysql_replica_pt-table-checksum/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2015/12/29/mysql_replica_pt-table-checksum/" itemprop="commentCount"></span>
+                  <span class="post-comments-count disqus-comment-count" data-disqus-identifier="2015/12/29/mysql_replica_pt-table-checksum/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -444,11 +440,11 @@ pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、�
 <li>默认当数据库有25个以上的并发查询时，<code>pt-table-checksum</code>会暂停。可以设置 <code>--max-load</code> 选项来设置这个阀值</li>
 <li>当用 Ctrl+C 停止任务后，工具会正常的完成当前 chunk 检测，下次使用 <code>--resume</code> 选项启动可以恢复继续下一个 chunk</li>
 </ol>
-<h2 id="工作过程"><a href="#工作过程" class="headerlink" title="工作过程"></a>工作过程</h2><p>直接看 <a href="http://www.nettedfish.com/blog/2013/06/04/check-replication-consistency-by-pt-table-checksum/" target="_blank" rel="external">nettedfish</a> 的说明：</p>
+<h2 id="工作过程"><a href="#工作过程" class="headerlink" title="工作过程"></a>工作过程</h2><p>直接看 <a href="http://www.nettedfish.com/blog/2013/06/04/check-replication-consistency-by-pt-table-checksum/" target="_blank" rel="noopener">nettedfish</a> 的说明：</p>
 <blockquote>
-<p>1. 连接到主库：pt工具连接到主库，然后自动发现主库的所有从库。默认采用show full processlist来查找从库，但是这只有在主从实例端口相同的情况下才有效。<br>3. 查找主库或者从库是否有复制过滤规则：这是为了安全而默认检查的选项。你可以关闭这个检查，但是这可能导致checksum的sql语句要么不会同步到从库，要么到了从库发现从库没有要被checksum的表，这都会导致从库同步卡库。<br>5. 开始获取表，一个个的计算。<br>6. 如果是表的第一个chunk，那么chunk-size一般为1000；如果不是表的第一个chunk，那么采用19步中分析出的结果。<br>7. 检查表结构，进行数据类型转换等，生成checksum的sql语句。<br>8. 根据表上的索引和数据的分布，选择最合适的split表的方法。<br>9. 开始checksum表。<br>10. 默认在chunk一个表之前，先删除上次这个表相关的计算结果。除非–resume。<br>14. 根据explain的结果，判断chunk的size是否超过了你定义的chunk-size的上限。如果超过了，为了不影响线上性能，这个chunk将被忽略。<br>15. 把要checksum的行加上for update锁，并计算。<br>17-18. 把计算结果存储到master_crc master_count列中。<br>19. 调整下一个chunk的大小。<br>20. 等待从库追上主库。如果没有延迟备份的从库在运行，最好检查所有的从库，如果发现延迟最大的从库延迟超过max-lag秒，pt工具在这里将暂停。<br>21. 如果发现主库的max-load超过某个阈值，pt工具在这里将暂停。<br>22. 继续下一个chunk，直到这个table被chunk完毕。<br>23-24. 等待从库执行完checksum，便于生成汇总的统计结果。每个表汇总并统计一次。<br>25-26. 循环每个表，直到结束。<br>校验结束后，在每个从库上，执行如下的sql语句即可看到是否有主从不一致发生： </p>
 </blockquote>
-<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">select</span> * <span class="keyword">from</span> percona.checksums <span class="keyword">where</span> master_cnt &lt;&gt; this_cnt <span class="keyword">OR</span> master_crc &lt;&gt; this_crc <span class="keyword">OR</span> </div><div class="line"><span class="keyword">ISNULL</span>(master_crc) &lt;&gt; <span class="keyword">ISNULL</span>(this_crc) \G</div></pre></td></tr></table></figure>
+<p>1. 连接到主库：pt工具连接到主库，然后自动发现主库的所有从库。默认采用show full processlist来查找从库，但是这只有在主从实例端口相同的情况下才有效。<br>3. 查找主库或者从库是否有复制过滤规则：这是为了安全而默认检查的选项。你可以关闭这个检查，但是这可能导致checksum的sql语句要么不会同步到从库，要么到了从库发现从库没有要被checksum的表，这都会导致从库同步卡库。<br>5. 开始获取表，一个个的计算。<br>6. 如果是表的第一个chunk，那么chunk-size一般为1000；如果不是表的第一个chunk，那么采用19步中分析出的结果。<br>7. 检查表结构，进行数据类型转换等，生成checksum的sql语句。<br>8. 根据表上的索引和数据的分布，选择最合适的split表的方法。<br>9. 开始checksum表。<br>10. 默认在chunk一个表之前，先删除上次这个表相关的计算结果。除非–resume。<br>14. 根据explain的结果，判断chunk的size是否超过了你定义的chunk-size的上限。如果超过了，为了不影响线上性能，这个chunk将被忽略。<br>15. 把要checksum的行加上for update锁，并计算。<br>17-18. 把计算结果存储到master_crc master_count列中。<br>19. 调整下一个chunk的大小。<br>20. 等待从库追上主库。如果没有延迟备份的从库在运行，最好检查所有的从库，如果发现延迟最大的从库延迟超过max-lag秒，pt工具在这里将暂停。<br>21. 如果发现主库的max-load超过某个阈值，pt工具在这里将暂停。<br>22. 继续下一个chunk，直到这个table被chunk完毕。<br>23-24. 等待从库执行完checksum，便于生成汇总的统计结果。每个表汇总并统计一次。<br>25-26. 循环每个表，直到结束。<br>校验结束后，在每个从库上，执行如下的sql语句即可看到是否有主从不一致发生： </p>
+<figure class="highlight clean"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">select * <span class="keyword">from</span> percona.checksums <span class="keyword">where</span> master_cnt &lt;&gt; this_cnt OR master_crc &lt;&gt; this_crc OR </span><br><span class="line">ISNULL(master_crc) &lt;&gt; ISNULL(this_crc) \G</span><br></pre></td></tr></table></figure>
 <a id="more"></a>
 <h2 id="你需要知道的选项"><a href="#你需要知道的选项" class="headerlink" title="你需要知道的选项"></a>你需要知道的选项</h2><ul>
 <li><p><code>--replicate-check</code>：执行完 checksum 查询在percona.checksums表中，不一定马上查看结果呀 —— yes则马上比较chunk的crc32值并输出DIFFS列，否则不输出。默认yes，如果指定为<code>--noreplicate-check</code>，一般后续使用下面的<code>--replicate-check-only</code>去输出DIFF结果。</p>
@@ -458,7 +454,7 @@ pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、�
 <li><p><code>--nocheck-binlog-format</code>：不检测日志格式。这个选项对于 ROW 模式的复制很重要，因为<code>pt-table-checksum</code>会在 Master和Slave 上设置<code>binlog_format=STATEMENT</code>（确保从库也会执行 checksum SQL），MySQL限制从库是无法设置的，所以假如行复制从库，再作为主库复制出新从库时（A-&gt;B-&gt;C），B的checksums数据将无法传输。（没验证）</p>
 </li>
 <li><p><code>--replicate=</code> 指定 checksum 计算结果存到哪个库表里，如果没有指定，默认是 percona.checksums 。<br>但是我们检查使用的mysql用户一般是没有 create table 权限的，所以你可能需要先手动创建：</p>
-  <figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">CREATE</span> <span class="keyword">DATABASE</span> <span class="keyword">IF</span> <span class="keyword">NOT</span> <span class="keyword">EXISTS</span> percona;</div><div class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="keyword">IF</span> <span class="keyword">NOT</span> <span class="keyword">EXISTS</span> percona.checksums (</div><div class="line">    db <span class="built_in">CHAR</span>(<span class="number">64</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,</div><div class="line">    tbl <span class="built_in">CHAR</span>(<span class="number">64</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,</div><div class="line">    <span class="keyword">chunk</span> <span class="built_in">INT</span> <span class="keyword">NOT</span> <span class="literal">NULL</span>,</div><div class="line">    chunk_time <span class="built_in">FLOAT</span> <span class="literal">NULL</span>,</div><div class="line">    chunk_index <span class="built_in">VARCHAR</span>(<span class="number">200</span>) <span class="literal">NULL</span>,</div><div class="line">    lower_boundary <span class="built_in">TEXT</span> <span class="literal">NULL</span>,</div><div class="line">    upper_boundary <span class="built_in">TEXT</span> <span class="literal">NULL</span>,</div><div class="line">    this_crc <span class="built_in">CHAR</span>(<span class="number">40</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,</div><div class="line">    this_cnt <span class="built_in">INT</span> <span class="keyword">NOT</span> <span class="literal">NULL</span>,</div><div class="line">    master_crc <span class="built_in">CHAR</span>(<span class="number">40</span>) <span class="literal">NULL</span>,</div><div class="line">    master_cnt <span class="built_in">INT</span> <span class="literal">NULL</span>,</div><div class="line">    ts <span class="keyword">TIMESTAMP</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="keyword">CURRENT_TIMESTAMP</span> <span class="keyword">ON</span> <span class="keyword">UPDATE</span> <span class="keyword">CURRENT_TIMESTAMP</span>,</div><div class="line">    PRIMARY <span class="keyword">KEY</span> (db,tbl,<span class="keyword">chunk</span>),</div><div class="line">    <span class="keyword">INDEX</span> ts_db_tbl(ts,db,tbl)</div><div class="line">) <span class="keyword">ENGINE</span>=<span class="keyword">InnoDB</span>;</div></pre></td></tr></table></figure>
+  <figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">DATABASE</span> <span class="keyword">IF</span> <span class="keyword">NOT</span> <span class="keyword">EXISTS</span> percona;</span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="keyword">IF</span> <span class="keyword">NOT</span> <span class="keyword">EXISTS</span> percona.checksums (</span><br><span class="line">    db <span class="built_in">CHAR</span>(<span class="number">64</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,</span><br><span class="line">    tbl <span class="built_in">CHAR</span>(<span class="number">64</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,</span><br><span class="line">    <span class="keyword">chunk</span> <span class="built_in">INT</span> <span class="keyword">NOT</span> <span class="literal">NULL</span>,</span><br><span class="line">    chunk_time <span class="built_in">FLOAT</span> <span class="literal">NULL</span>,</span><br><span class="line">    chunk_index <span class="built_in">VARCHAR</span>(<span class="number">200</span>) <span class="literal">NULL</span>,</span><br><span class="line">    lower_boundary <span class="built_in">TEXT</span> <span class="literal">NULL</span>,</span><br><span class="line">    upper_boundary <span class="built_in">TEXT</span> <span class="literal">NULL</span>,</span><br><span class="line">    this_crc <span class="built_in">CHAR</span>(<span class="number">40</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,</span><br><span class="line">    this_cnt <span class="built_in">INT</span> <span class="keyword">NOT</span> <span class="literal">NULL</span>,</span><br><span class="line">    master_crc <span class="built_in">CHAR</span>(<span class="number">40</span>) <span class="literal">NULL</span>,</span><br><span class="line">    master_cnt <span class="built_in">INT</span> <span class="literal">NULL</span>,</span><br><span class="line">    ts <span class="built_in">TIMESTAMP</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="keyword">CURRENT_TIMESTAMP</span> <span class="keyword">ON</span> <span class="keyword">UPDATE</span> <span class="keyword">CURRENT_TIMESTAMP</span>,</span><br><span class="line">    PRIMARY <span class="keyword">KEY</span> (db,tbl,<span class="keyword">chunk</span>),</span><br><span class="line">    <span class="keyword">INDEX</span> ts_db_tbl(ts,db,tbl)</span><br><span class="line">) <span class="keyword">ENGINE</span>=<span class="keyword">InnoDB</span>;</span><br></pre></td></tr></table></figure>
 </li>
 </ul>
 <p>生产环境中数据库用户权限一般都是有严格管理的，假如连接用户是<code>repl_user</code>（即直接用复制用户来检查），它应该额外赋予对其它库的 SELECT ，LOCK TABLES 权限，如果后续要用 pt-table-sync 就就需要写权限了。对percona库有写权限：</p>
@@ -480,7 +476,7 @@ GRANT SELECT,LOCK TABLES,PROCESS,SUPER on *.* to repl_user@&apos;%&apos;;
 <li><p><code>--tables=</code>，<code>-t</code>：要检查的表，逗号分隔。如果要检查的表分布在不同的db中，可以用<code>--tables=dbname1.table1,dbnamd2.table2</code>的形式。同理有<code>--tables-regex</code>，<code>--ignore-tables</code>，<code>--ignore-tables-regex</code>。<code>--replicate</code>指定的checksum表始终会被过滤。</p>
 </li>
 <li><p><code>--recursion-method</code>：发现从库的方式。pt-table-checksum 默认可以在主库的 <code>processlist</code> 中找到从库复制进程，从而识别出有哪些从库，但如果使用是非标准3306端口，会导致找不到从库信息。此时就会自动采用<code>host</code>方式，但需要提前在从库 my.cnf 里面配置<code>report_host</code>、<code>report_port</code>信息，如：</p>
-<figure class="highlight ini"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="attr">report_host</span> = MASTER_HOST</div><div class="line"><span class="attr">report_port</span> = <span class="number">13306</span></div></pre></td></tr></table></figure>
+<figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">report_host</span> = MASTER_HOST</span><br><span class="line"><span class="attr">report_port</span> = <span class="number">13306</span></span><br></pre></td></tr></table></figure>
 </li>
 </ul>
 <p>最终极的办法是<code>dsn</code>，dsn指定的是某个表（如 percona.dsns ），表行记录是改主库的（多个）从库的连接信息。适用以下任一情形：</p>
@@ -495,13 +491,13 @@ GRANT SELECT,LOCK TABLES,PROCESS,SUPER on *.* to repl_user@&apos;%&apos;;
 <ol>
 <li>标准端口3306，只检查某一个库的关键表</li>
 <li>一主一从，binlog<strong>不</strong>是ROW模式</li>
-<li>同网段复制，percona_tk@’192.168.5.%’ 具备该有的权限：<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">GRANT</span> ALL PRIVILEGEES <span class="keyword">on</span> repl_user.* <span class="keyword">to</span> repl_user@<span class="string">'192.168.5.%'</span> <span class="keyword">IDENTIFIED</span> <span class="keyword">BY</span> <span class="string">'repl_pass'</span>;</div><div class="line"><span class="keyword">GRANT</span> <span class="keyword">SELECT</span>,<span class="keyword">LOCK</span> <span class="keyword">TABLES</span>,PROCESS,SUPER <span class="keyword">on</span> *.* <span class="keyword">to</span> repl_user@<span class="string">'192.168.5.%'</span>;</div></pre></td></tr></table></figure>
+<li>同网段复制，percona_tk@’192.168.5.%’ 具备该有的权限：<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">GRANT</span> <span class="keyword">ALL</span> PRIVILEGEES <span class="keyword">on</span> repl_user.* <span class="keyword">to</span> repl_user@<span class="string">'192.168.5.%'</span> <span class="keyword">IDENTIFIED</span> <span class="keyword">BY</span> <span class="string">'repl_pass'</span>;</span><br><span class="line"><span class="keyword">GRANT</span> <span class="keyword">SELECT</span>,<span class="keyword">LOCK</span> <span class="keyword">TABLES</span>,PROCESS,SUPER <span class="keyword">on</span> *.* <span class="keyword">to</span> repl_user@<span class="string">'192.168.5.%'</span>;</span><br></pre></td></tr></table></figure>
 </li>
 </ol>
-<p>这是最简单的方式，把要连接和检查的信息交代就行了：<br><figure class="highlight gams"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"># pt-<span class="keyword">table</span>-checksum <span class="comment">h=MASTER_HOST,u=repl_user,p=</span><span class="comment">'repl_pass'</span><span class="comment">,P=3306 \</span></div><div class="line">--databases=d_ts_profile --tables=t_user,t_user_detail,t_user_group --nocheck-replication-filters</div></pre></td></tr></table></figure></p>
+<p>这是最简单的方式，把要连接和检查的信息交代就行了：<br><figure class="highlight routeros"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># pt-table-checksum h=MASTER_HOST,u=repl_user,p='repl_pass',P=3306 \</span></span><br><span class="line"><span class="attribute">--databases</span>=d_ts_profile <span class="attribute">--tables</span>=t_user,t_user_detail,t_user_group --nocheck-replication-filters</span><br></pre></td></tr></table></figure></p>
 <p>如果是首次运行，会在主库自动创建 percona.checksums 表。</p>
 <p>输出结果：</p>
-<figure class="highlight tap"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">Replica lag is<span class="number"> 2307 </span>seconds on mysql-5.  Waiting.</div><div class="line">Checksumming d_ts_profile.t_user_account:   3% 54:48 remain</div><div class="line">            TS ERRORS  DIFFS     ROWS  CHUNKS SKIPPED    TIME TABLE</div><div class="line">12-18T16:07:48     <span class="number"> 0 </span>    <span class="number"> 0 </span> <span class="number"> 313641 </span>     <span class="number"> 9 </span>     <span class="number"> 0 </span>146.417 d_ts_profile.t_user</div><div class="line">12-18T16:08:00     <span class="number"> 0 </span>    <span class="number"> 0 </span> <span class="number"> 397734 </span>    <span class="number"> 12 </span>     <span class="number"> 0 </span> 11.747 d_ts_profile.t_user_detail</div><div class="line">12-18T16:08:24     <span class="number"> 0 </span>    <span class="number"> 0 </span><span class="number"> 1668327 </span>    <span class="number"> 20 </span>     <span class="number"> 0 </span> 23.941 d_ts_profile.t_user_group</div></pre></td></tr></table></figure>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="string">Replica</span> <span class="string">lag</span> <span class="string">is</span> <span class="number">2307</span> <span class="string">seconds</span> <span class="string">on</span> <span class="string">mysql-5.</span>  <span class="string">Waiting.</span></span><br><span class="line"><span class="attr">Checksumming d_ts_profile.t_user_account:</span>   <span class="number">3</span><span class="string">%</span> <span class="number">54</span><span class="string">:48</span> <span class="string">remain</span></span><br><span class="line">            <span class="string">TS</span> <span class="string">ERRORS</span>  <span class="string">DIFFS</span>     <span class="string">ROWS</span>  <span class="string">CHUNKS</span> <span class="string">SKIPPED</span>    <span class="string">TIME</span> <span class="string">TABLE</span></span><br><span class="line"><span class="number">12</span><span class="string">-18T16:07:48</span>      <span class="number">0</span>      <span class="number">0</span>   <span class="number">313641</span>       <span class="number">9</span>       <span class="number">0</span> <span class="number">146.417</span> <span class="string">d_ts_profile.t_user</span></span><br><span class="line"><span class="number">12</span><span class="string">-18T16:08:00</span>      <span class="number">0</span>      <span class="number">0</span>   <span class="number">397734</span>      <span class="number">12</span>       <span class="number">0</span>  <span class="number">11.747</span> <span class="string">d_ts_profile.t_user_detail</span></span><br><span class="line"><span class="number">12</span><span class="string">-18T16:08:24</span>      <span class="number">0</span>      <span class="number">0</span>  <span class="number">1668327</span>      <span class="number">20</span>       <span class="number">0</span>  <span class="number">23.941</span> <span class="string">d_ts_profile.t_user_group</span></span><br></pre></td></tr></table></figure>
 <ul>
 <li>TS ：完成检查的时间戳。</li>
 <li>ERRORS ：检查时候发生错误和警告的数量。 </li>
@@ -521,36 +517,36 @@ GRANT SELECT,LOCK TABLES,PROCESS,SUPER on *.* to repl_user@&apos;%&apos;;
 </ol>
 <p>最优的方式就是dsn指定从库了。在从库或从库同网段主机里装上 percona-toolkit。</p>
 <p>在DSN_DBHOST 数据库实例上创建DSNs表：</p>
-<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">create</span> <span class="keyword">database</span> percona;</div><div class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="string">`percona`</span>.<span class="string">`dsns`</span> (</div><div class="line"><span class="string">`id`</span> <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span> AUTO_INCREMENT,</div><div class="line"><span class="string">`parent_id`</span> <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">DEFAULT</span> <span class="literal">NULL</span>,</div><div class="line"><span class="string">`dsn`</span> <span class="built_in">varchar</span>(<span class="number">255</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,</div><div class="line">PRIMARY <span class="keyword">KEY</span> (<span class="string">`id`</span>)</div><div class="line">);</div><div class="line"></div><div class="line"><span class="keyword">GRANT</span> ALL PRIVILEGEES <span class="keyword">on</span> percona.* <span class="keyword">to</span> percona_tk@<span class="string">'PTCHECK_HOST'</span> <span class="keyword">IDENTIFIED</span> <span class="keyword">BY</span> <span class="string">'percona_pass'</span>;</div></pre></td></tr></table></figure>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">create</span> <span class="keyword">database</span> percona;</span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="string">`percona`</span>.<span class="string">`dsns`</span> (</span><br><span class="line"><span class="string">`id`</span> <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span> AUTO_INCREMENT,</span><br><span class="line"><span class="string">`parent_id`</span> <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">DEFAULT</span> <span class="literal">NULL</span>,</span><br><span class="line"><span class="string">`dsn`</span> <span class="built_in">varchar</span>(<span class="number">255</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,</span><br><span class="line">PRIMARY <span class="keyword">KEY</span> (<span class="string">`id`</span>)</span><br><span class="line">);</span><br><span class="line"></span><br><span class="line"><span class="keyword">GRANT</span> <span class="keyword">ALL</span> PRIVILEGEES <span class="keyword">on</span> percona.* <span class="keyword">to</span> percona_tk@<span class="string">'PTCHECK_HOST'</span> <span class="keyword">IDENTIFIED</span> <span class="keyword">BY</span> <span class="string">'percona_pass'</span>;</span><br></pre></td></tr></table></figure>
 <p>如果有多个实例要检查，可以创建多个类似的dsns表。上面的percona_tk用户只是用来访问dsn库。插入从库信息：</p>
-<figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">use</span> percona;</div><div class="line"><span class="keyword">insert</span> <span class="keyword">into</span> dsns(dsn) <span class="keyword">values</span>(<span class="string">'h=REPLICA_HOST,P=3306,u=repl_user,p=repl_pass'</span>);</div></pre></td></tr></table></figure>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">use</span> percona;</span><br><span class="line"><span class="keyword">insert</span> <span class="keyword">into</span> dsns(dsn) <span class="keyword">values</span>(<span class="string">'h=REPLICA_HOST,P=3306,u=repl_user,p=repl_pass'</span>);</span><br></pre></td></tr></table></figure>
 <p>DSNs记录 dsn 列格式如 <code>h=REPLICA_HOST,u=repl_user,p=repl_pass</code></p>
 <p>在 PTCHECK_HOST 上执行检查命令：</p>
-<figure class="highlight oxygene"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"># pt-table-checksum --replicate=percona.checksums --nocheck-replication-filters --no-check-binlog-format \</div><div class="line">h=MASTER_HOST,u=repl_user,p=<span class="string">'repl_pass'</span>,P=<span class="number">13306</span> --databases-regex=d_ts.* \</div><div class="line">--recursion-<span class="function"><span class="keyword">method</span> <span class="title">dsn</span>=<span class="title">h</span>=<span class="title">DSN_DBHOST</span>,<span class="title">u</span>=<span class="title">percona_tk</span>,<span class="title">p</span>='<span class="title">percona_pass</span>',<span class="title">P</span>=3306,<span class="title">D</span>=<span class="title">percona</span>,<span class="title">t</span>=<span class="title">dsn</span></span></div></pre></td></tr></table></figure>
+<figure class="highlight oxygene"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"># pt-table-checksum --replicate=percona.checksums --nocheck-replication-filters --no-check-binlog-format \</span><br><span class="line">h=MASTER_HOST,u=repl_user,p=<span class="string">'repl_pass'</span>,P=<span class="number">13306</span> --databases-regex=d_ts.* \</span><br><span class="line">--recursion-<span class="function"><span class="keyword">method</span> <span class="title">dsn</span>=<span class="title">h</span>=<span class="title">DSN_DBHOST</span>,<span class="title">u</span>=<span class="title">percona_tk</span>,<span class="title">p</span>='<span class="title">percona_pass</span>',<span class="title">P</span>=3306,<span class="title">D</span>=<span class="title">percona</span>,<span class="title">t</span>=<span class="title">dsn</span></span></span><br></pre></td></tr></table></figure>
 <p>选项的意思就不多说了。</p>
 <p>检测完如果一致，其实是求个心安，特别是在做数据迁移的时候。如果不一致，那就需要借助 <code>pt-table-sync</code> 工具了，不作介绍。</p>
 <h2 id="常见错误"><a href="#常见错误" class="headerlink" title="常见错误"></a>常见错误</h2><ol>
 <li><p>Diffs cannot be detected because no slaves were found<br>不能自动找到从库，确认processlist或host或dsns方式用对了。</p>
 </li>
-<li><p>Cannot connect to h=slave1.<em>*</em>.com,p=…,u=percona_user<br>可以在<code>pt-table-checksum</code>命令前加<code>PTDEBUG=1</code>来看详细的执行过程，如端口、用户名、权限错误。</p>
+<li><p>Cannot connect to h=slave1.***.com,p=…,u=percona_user<br>可以在<code>pt-table-checksum</code>命令前加<code>PTDEBUG=1</code>来看详细的执行过程，如端口、用户名、权限错误。</p>
 </li>
 <li><p>Waiting for the –replicate table to replicate to XXX<br>问题出在 percona.checksums 表在从库不存在，根本原因是没有从主库同步过来，所以看一下从库是否延迟严重。</p>
 </li>
 <li><p>Pausing because Threads_running=25<br>反复打印出类似上面停止检查的信息。这是因为当前数据库正在运行的线程数大于默认25，pt-table-checksum 为了减少对库的压力暂停检查了。等数据库压力过了就好了，或者也可以直接 Ctrl+C 终端，下一次加上<code>--resume</code>继续执行，或者加大<code>--max-load=</code>值。</p>
 </li>
 <li><p>字符集问题</p>
-<figure class="highlight markdown"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">Error checksumming table Error executing checksum query: DBD::mysql::st execute failed: Illegal mix of collations</div><div class="line">12-17T14:48:04 Error checksumming table d<span class="emphasis">_ec_</span>cs.t<span class="emphasis">_online_</span>cs: Error executing checksum query: </div><div class="line">DBD::mysql::st execute failed: Illegal mix of collations for operation 'concat_ws' [for Statement </div><div class="line">"REPLACE INTO <span class="code">`percona`</span>.<span class="code">`ali_checksum`</span> (db, tbl, chunk, chunk<span class="emphasis">_index, lower_</span>boundary, upper<span class="emphasis">_boundary, this_</span>cnt, this<span class="emphasis">_crc) SELECT ?, ?, ?, ?, ?, ?, COUNT(*) AS cnt, COALESCE(LOWER(CONV(BIT_</span>XOR(CAST(CRC32(CONCAT<span class="emphasis">_WS('#', `f_</span>cs<span class="emphasis">_id`, `f_</span>corp<span class="emphasis">_id`, `f_</span>valid<span class="code">`, `</span>f<span class="emphasis">_show_</span>name<span class="code">`, `</span>f<span class="emphasis">_online_</span>msg<span class="code">`, `</span>f<span class="emphasis">_offline_</span>msg<span class="code">`, `</span>f<span class="emphasis">_show_</span>mobile<span class="code">`, `</span>f<span class="emphasis">_group_</span>id<span class="code">`, `</span>f<span class="emphasis">_qq`, `f_</span>show<span class="emphasis">_qq`, `f_</span>msn<span class="code">`, `</span>f<span class="emphasis">_show_</span>msn<span class="code">`, `</span>f<span class="emphasis">_sms_</span>online<span class="code">`, `</span>f<span class="emphasis">_scheme`, `f_</span>tel<span class="code">`, `</span>f<span class="emphasis">_telno`, `f_</span>show<span class="emphasis">_tel`, `f_</span>contact<span class="code">`, `</span>f<span class="emphasis">_mobile`, `f_</span>position<span class="code">`, `</span>f<span class="emphasis">_other1`, `f_</span>other2<span class="code">`, `</span>f<span class="emphasis">_other_</span>text1<span class="code">`, `</span>f<span class="emphasis">_other_</span>text2<span class="code">`, `</span>f<span class="emphasis">_email`, `f_</span>qq<span class="emphasis">_first`, `f_</span>qq<span class="emphasis">_first_</span>type<span class="code">`, `</span>f<span class="emphasis">_aids_</span>open<span class="code">`, `</span>f<span class="emphasis">_aids_</span>qq<span class="code">`, `</span>f<span class="emphasis">_aids_</span>crmqq<span class="code">`, `</span>f<span class="emphasis">_aids_</span>yahoo<span class="code">`, `</span>f<span class="emphasis">_aids_</span>skype<span class="code">`, `</span>f<span class="emphasis">_aids_</span>aliww<span class="code">`, `</span>f<span class="emphasis">_aids_</span>msn<span class="code">`, `</span>f<span class="emphasis">_aids_</span>alibaba<span class="code">`, `</span>f<span class="emphasis">_aids_</span>alitrade<span class="code">`, CONCAT(ISNULL(`</span>f<span class="emphasis">_show_</span>name<span class="code">`), ISNULL(`</span>f<span class="emphasis">_group_</span>id<span class="code">`), ISNULL(`</span>f<span class="emphasis">_qq`), ISNULL(`f_</span>show<span class="emphasis">_qq`), ISNULL(`f_</span>sms<span class="emphasis">_online`), ISNULL(`f_</span>other<span class="emphasis">_text1`), ISNULL(`f_</span>other<span class="emphasis">_text2`), ISNULL(`f_</span>email<span class="code">`)) )) AS UNSIGNED)), 10, 16)), 0) AS crc FROM `</span>d<span class="emphasis">_ec_</span>cs<span class="code">`.`</span>t<span class="emphasis">_online_</span>cs` </div><div class="line">/<span class="emphasis">*checksum table*</span>/" with ParamValues: 0='d<span class="emphasis">_ts_</span>profile', 1='t<span class="emphasis">_user_</span>account', 2=1, 3=undef, 4=undef, 5=undef] at /usr/bin/pt-table-checksum line 10520.</div></pre></td></tr></table></figure>
+<figure class="highlight n1ql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Error checksumming table Error executing checksum query: DBD::mysql::st execute failed: Illegal mix of collations</span><br><span class="line">12-17T14:48:04 Error checksumming table d_ec_cs.t_online_cs: Error executing checksum query: </span><br><span class="line">DBD::mysql::st execute failed: Illegal mix of collations for operation 'concat_ws' [for Statement </span><br><span class="line">"REPLACE INTO `percona`.`ali_checksum` (db, tbl, chunk, chunk_index, lower_boundary, upper_boundary, this_cnt, this_crc) <span class="keyword">SELECT</span> ?, ?, ?, ?, ?, ?, <span class="built_in">COUNT</span>(*) <span class="keyword">AS</span> cnt, COALESCE(<span class="built_in">LOWER</span>(CONV(BIT_XOR(<span class="keyword">CAST</span>(CRC32(CONCAT_WS(<span class="string">'#'</span>, <span class="symbol">`f_cs_id`</span>, <span class="symbol">`f_corp_id`</span>, <span class="symbol">`f_valid`</span>, <span class="symbol">`f_show_name`</span>, <span class="symbol">`f_online_msg`</span>, <span class="symbol">`f_offline_msg`</span>, <span class="symbol">`f_show_mobile`</span>, <span class="symbol">`f_group_id`</span>, <span class="symbol">`f_qq`</span>, <span class="symbol">`f_show_qq`</span>, <span class="symbol">`f_msn`</span>, <span class="symbol">`f_show_msn`</span>, <span class="symbol">`f_sms_online`</span>, <span class="symbol">`f_scheme`</span>, <span class="symbol">`f_tel`</span>, <span class="symbol">`f_telno`</span>, <span class="symbol">`f_show_tel`</span>, <span class="symbol">`f_contact`</span>, <span class="symbol">`f_mobile`</span>, <span class="symbol">`f_position`</span>, <span class="symbol">`f_other1`</span>, <span class="symbol">`f_other2`</span>, <span class="symbol">`f_other_text1`</span>, <span class="symbol">`f_other_text2`</span>, <span class="symbol">`f_email`</span>, <span class="symbol">`f_qq_first`</span>, <span class="symbol">`f_qq_first_type`</span>, <span class="symbol">`f_aids_open`</span>, <span class="symbol">`f_aids_qq`</span>, <span class="symbol">`f_aids_crmqq`</span>, <span class="symbol">`f_aids_yahoo`</span>, <span class="symbol">`f_aids_skype`</span>, <span class="symbol">`f_aids_aliww`</span>, <span class="symbol">`f_aids_msn`</span>, <span class="symbol">`f_aids_alibaba`</span>, <span class="symbol">`f_aids_alitrade`</span>, CONCAT(ISNULL(<span class="symbol">`f_show_name`</span>), ISNULL(<span class="symbol">`f_group_id`</span>), ISNULL(<span class="symbol">`f_qq`</span>), ISNULL(<span class="symbol">`f_show_qq`</span>), ISNULL(<span class="symbol">`f_sms_online`</span>), ISNULL(<span class="symbol">`f_other_text1`</span>), ISNULL(<span class="symbol">`f_other_text2`</span>), ISNULL(<span class="symbol">`f_email`</span>)) )) <span class="keyword">AS</span> UNSIGNED)), <span class="number">10</span>, <span class="number">16</span>)), <span class="number">0</span>) <span class="keyword">AS</span> crc <span class="keyword">FROM</span> <span class="symbol">`d_ec_cs`</span>.<span class="symbol">`t_online_cs`</span> </span><br><span class="line"><span class="comment">/*checksum table*/</span><span class="string">" with ParamValues: 0='d_ts_profile', 1='t_user_account', 2=1, 3=undef, 4=undef, 5=undef] at /usr/bin/pt-table-checksum line 10520.</span></span><br></pre></td></tr></table></figure>
 </li>
 </ol>
-<p>是个bug，暂时无法解决，<a href="https://bugs.launchpad.net/percona-toolkit/+bug/1427552" target="_blank" rel="external">Illegal mix of collations for operation ‘concat_ws’</a>。</p>
+<p>是个bug，暂时无法解决，<a href="https://bugs.launchpad.net/percona-toolkit/+bug/1427552" target="_blank" rel="noopener">Illegal mix of collations for operation ‘concat_ws’</a>。</p>
 <h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><ul>
-<li><a href="https://www.percona.com/doc/percona-toolkit/2.2/pt-table-checksum.html" target="_blank" rel="external">pt-table-checksum</a></li>
-<li><a href="http://www.nettedfish.com/blog/2013/06/04/check-replication-consistency-by-pt-table-checksum/" target="_blank" rel="external">用pt-table-checksum校验数据一致性</a></li>
-<li><a href="http://blog.csdn.net/melody_mr/article/details/45224249" target="_blank" rel="external">使用pt-table-checksum及pt-table-sync校验复制一致性详细介绍</a></li>
-<li><a href="http://imysql.com/2015/04/19/mysql-faq-pt-table-checksum-use-case.shtml" target="_blank" rel="external">Pausing because Threads_running=0</a></li>
+<li><a href="https://www.percona.com/doc/percona-toolkit/2.2/pt-table-checksum.html" target="_blank" rel="noopener">pt-table-checksum</a></li>
+<li><a href="http://www.nettedfish.com/blog/2013/06/04/check-replication-consistency-by-pt-table-checksum/" target="_blank" rel="noopener">用pt-table-checksum校验数据一致性</a></li>
+<li><a href="http://blog.csdn.net/melody_mr/article/details/45224249" target="_blank" rel="noopener">使用pt-table-checksum及pt-table-sync校验复制一致性详细介绍</a></li>
+<li><a href="http://imysql.com/2015/04/19/mysql-faq-pt-table-checksum-use-case.shtml" target="_blank" rel="noopener">Pausing because Threads_running=0</a></li>
 </ul>
 <hr>
-<p>本文链接地址：<a href="http://seanlook.com/2015/12/29/mysql_replica_pt-table-checksum/">http://seanlook.com/2015/12/29/mysql_replica_pt-table-checksum/</a></p>
+<p>本文链接地址：<a href="http://xgknight.com/2015/12/29/mysql_replica_pt-table-checksum/" target="_blank" rel="noopener">http://xgknight.com/2015/12/29/mysql_replica_pt-table-checksum/</a></p>
 <hr>
 
       
@@ -575,7 +571,7 @@ GRANT SELECT,LOCK TABLES,PROCESS,SUPER on *.* to repl_user@&apos;%&apos;;
       
       
         <div id="alipay" style="display: inline-block">
-          <img id="alipay_qr" src="/images/reward_alipay_seanlook.jpg" alt="seanlook Alipay"/>
+          <img id="alipay_qr" src="/images/reward_alipay_seanlook.jpg" alt="seanlook Alipay">
           <p>支付宝打赏</p>
         </div>
       
@@ -681,7 +677,7 @@ GRANT SELECT,LOCK TABLES,PROCESS,SUPER on *.* to repl_user@&apos;%&apos;;
 
       
         <ul class="sidebar-nav motion-element">
-          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
             Table of Contents
           </li>
           <li class="sidebar-nav-overview" data-target="site-overview">
@@ -692,9 +688,7 @@ GRANT SELECT,LOCK TABLES,PROCESS,SUPER on *.* to repl_user@&apos;%&apos;;
 
       <section class="site-overview sidebar-panel">
         <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
-          <img class="site-author-image" itemprop="image"
-               src="/images/avatar_sean.jpg"
-               alt="seanlook" />
+          <img class="site-author-image" itemprop="image" src="/images/avatar_sean.jpg" alt="seanlook">
           <p class="site-author-name" itemprop="name">seanlook</p>
            
               <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
@@ -705,7 +699,7 @@ GRANT SELECT,LOCK TABLES,PROCESS,SUPER on *.* to repl_user@&apos;%&apos;;
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">117</span>
+                <span class="site-state-item-count">120</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -727,7 +721,7 @@ GRANT SELECT,LOCK TABLES,PROCESS,SUPER on *.* to repl_user@&apos;%&apos;;
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">125</span>
+                <span class="site-state-item-count">128</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>
@@ -809,10 +803,10 @@ GRANT SELECT,LOCK TABLES,PROCESS,SUPER on *.* to repl_user@&apos;%&apos;;
 
     <footer id="footer" class="footer">
       <div class="footer-inner">
-        <div class="copyright" >
+        <div class="copyright">
   
   &copy;  2014 - 
-  <span itemprop="copyrightYear">2018</span>
+  <span itemprop="copyrightYear">2020</span>
   <span class="with-love">
     <i class="fa fa-heart"></i>
   </span>

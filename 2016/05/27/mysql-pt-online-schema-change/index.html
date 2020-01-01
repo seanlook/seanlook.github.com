@@ -6,15 +6,15 @@
 
 
 <html class="theme-next mist use-motion" lang="en">
-<head>
-  <meta charset="UTF-8"/>
-<meta http-equiv="X-UA-Compatible" content="IE=edge" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<head><meta name="generator" content="Hexo 3.9.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 
 
 
-<meta http-equiv="Cache-Control" content="no-transform" />
-<meta http-equiv="Cache-Control" content="no-siteapp" />
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
 
 
 
@@ -34,7 +34,7 @@
   
     
   
-  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css" />
+  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css">
 
 
 
@@ -70,43 +70,42 @@
 
   
 
-<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css">
 
-<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css" />
-
-
-  <meta name="keywords" content="mysql,Percona-toolkit," />
+<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css">
 
 
-
-
-
-  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml" />
-
-
-
-
-  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0" />
+  <meta name="keywords" content="mysql,Percona-toolkit,">
 
 
 
 
 
+  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml">
 
-<meta name="description" content="如果正在看这篇文章，相信你已经知道自己的需求了。
-在 mysql 5.5 版本以前，修改表结构如添加索引、修改列，需要锁表，期间不能写入，对于大表这简直是灾难。从5.5特别是5.6里，情况有了好转，支持Online DDL，相关介绍见 这篇文章，而我在实际alter table过程中还是会引起 data meta lock 问题。pt-online-schema-change是Percona-to">
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0">
+
+
+
+
+
+
+<meta name="description" content="如果正在看这篇文章，相信你已经知道自己的需求了。 在 mysql 5.5 版本以前，修改表结构如添加索引、修改列，需要锁表，期间不能写入，对于大表这简直是灾难。从5.5特别是5.6里，情况有了好转，支持Online DDL，相关介绍见 这篇文章，而我在实际alter table过程中还是会引起 data meta lock 问题。pt-online-schema-change是Percona-to">
+<meta name="keywords" content="mysql,Percona-toolkit">
 <meta property="og:type" content="article">
 <meta property="og:title" content="pt-online-schema-change使用说明、限制与比较">
 <meta property="og:url" content="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/index.html">
-<meta property="og:site_name" content="Sean's Notes">
-<meta property="og:description" content="如果正在看这篇文章，相信你已经知道自己的需求了。
-在 mysql 5.5 版本以前，修改表结构如添加索引、修改列，需要锁表，期间不能写入，对于大表这简直是灾难。从5.5特别是5.6里，情况有了好转，支持Online DDL，相关介绍见 这篇文章，而我在实际alter table过程中还是会引起 data meta lock 问题。pt-online-schema-change是Percona-to">
+<meta property="og:site_name" content="Sean&#39;s Notes">
+<meta property="og:description" content="如果正在看这篇文章，相信你已经知道自己的需求了。 在 mysql 5.5 版本以前，修改表结构如添加索引、修改列，需要锁表，期间不能写入，对于大表这简直是灾难。从5.5特别是5.6里，情况有了好转，支持Online DDL，相关介绍见 这篇文章，而我在实际alter table过程中还是会引起 data meta lock 问题。pt-online-schema-change是Percona-to">
+<meta property="og:locale" content="en">
 <meta property="og:image" content="http://7q5fot.com1.z0.glb.clouddn.com/DDLFlow1.png">
 <meta property="og:updated_time" content="2016-05-27T08:32:49.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="pt-online-schema-change使用说明、限制与比较">
-<meta name="twitter:description" content="如果正在看这篇文章，相信你已经知道自己的需求了。
-在 mysql 5.5 版本以前，修改表结构如添加索引、修改列，需要锁表，期间不能写入，对于大表这简直是灾难。从5.5特别是5.6里，情况有了好转，支持Online DDL，相关介绍见 这篇文章，而我在实际alter table过程中还是会引起 data meta lock 问题。pt-online-schema-change是Percona-to">
+<meta name="twitter:description" content="如果正在看这篇文章，相信你已经知道自己的需求了。 在 mysql 5.5 版本以前，修改表结构如添加索引、修改列，需要锁表，期间不能写入，对于大表这简直是灾难。从5.5特别是5.6里，情况有了好转，支持Online DDL，相关介绍见 这篇文章，而我在实际alter table过程中还是会引起 data meta lock 问题。pt-online-schema-change是Percona-to">
 <meta name="twitter:image" content="http://7q5fot.com1.z0.glb.clouddn.com/DDLFlow1.png">
 
 
@@ -135,7 +134,7 @@
 
 
 
-  <link rel="canonical" href="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/"/>
+  <link rel="canonical" href="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/">
 
 
 
@@ -191,7 +190,7 @@
     
 
     <div class="custom-logo-site-title">
-      <a href="/"  class="brand" rel="start">
+      <a href="/" class="brand" rel="start">
         <span class="logo-line-before"><i></i></span>
         <span class="site-title">Sean's Notes</span>
         <span class="logo-line-after"><i></i></span>
@@ -221,7 +220,7 @@
         <li class="menu-item menu-item-home">
           <a href="/" rel="section">
             
-              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
             
             Home
           </a>
@@ -231,7 +230,7 @@
         <li class="menu-item menu-item-archives">
           <a href="/archives" rel="section">
             
-              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
             
             Archives
           </a>
@@ -241,7 +240,7 @@
         <li class="menu-item menu-item-tags">
           <a href="/tags" rel="section">
             
-              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
             
             Tags
           </a>
@@ -251,7 +250,7 @@
         <li class="menu-item menu-item-about">
           <a href="/about" rel="section">
             
-              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
             
             About
           </a>
@@ -264,7 +263,7 @@
             <a href="javascript:;" class="popup-trigger">
           
             
-              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
             
             Search
           </a>
@@ -285,9 +284,7 @@
       <i class="fa fa-times-circle"></i>
     </span>
     <div class="local-search-input-wrapper">
-      <input autocapitalize="off" autocomplete="off" autocorrect="off"
-             placeholder="Searching..." spellcheck="false"
-             type="text" id="local-search-input">
+      <input autocapitalize="off" autocomplete="off" autocorrect="off" placeholder="Searching..." spellcheck="false" type="text" id="local-search-input">
     </div>
   </div>
   <div id="local-search-result"></div>
@@ -324,7 +321,7 @@
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="seanlook">
-      <meta itemprop="description" content="">
+      <meta itemprop="description" content>
       <meta itemprop="image" content="/images/avatar_sean.jpg">
     </span>
 
@@ -367,7 +364,7 @@
           </span>
 
           
-            <span class="post-category" >
+            <span class="post-category">
             
               <span class="post-meta-divider">|</span>
             
@@ -398,8 +395,7 @@
                   <i class="fa fa-comment-o"></i>
                 </span>
                 <a href="/2016/05/27/mysql-pt-online-schema-change/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2016/05/27/mysql-pt-online-schema-change/" itemprop="commentCount"></span>
+                  <span class="post-comments-count disqus-comment-count" data-disqus-identifier="2016/05/27/mysql-pt-online-schema-change/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -437,7 +433,7 @@
 
       
         <p>如果正在看这篇文章，相信你已经知道自己的需求了。</p>
-<p>在 mysql 5.5 版本以前，修改表结构如添加索引、修改列，需要锁表，期间不能写入，对于大表这简直是灾难。从5.5特别是5.6里，情况有了好转，支持Online DDL，相关介绍见 <a href="http://seanlook.com/2016/05/24/mysql-online-ddl-concept">这篇文章</a>，而我在实际alter table过程中还是会引起 data meta lock 问题。pt-online-schema-change是Percona-toolkit一员，通过改进原生ddl的方式，达到不锁表在线修改表结构。</p>
+<p>在 mysql 5.5 版本以前，修改表结构如添加索引、修改列，需要锁表，期间不能写入，对于大表这简直是灾难。从5.5特别是5.6里，情况有了好转，支持Online DDL，相关介绍见 <a href="http://xgknight.com/2016/05/24/mysql-online-ddl-concept" target="_blank" rel="noopener">这篇文章</a>，而我在实际alter table过程中还是会引起 data meta lock 问题。pt-online-schema-change是Percona-toolkit一员，通过改进原生ddl的方式，达到不锁表在线修改表结构。</p>
 <h2 id="1-pt-osc工作过程"><a href="#1-pt-osc工作过程" class="headerlink" title="1. pt-osc工作过程"></a>1. pt-osc工作过程</h2><ol>
 <li>创建一个和要执行 alter 操作的表一样的新的空表结构(是alter之前的结构)</li>
 <li>在新表执行alter table 语句（速度应该很快）</li>
@@ -476,7 +472,7 @@
 </li>
 </ul>
 <h2 id="3-使用疑惑（限制）"><a href="#3-使用疑惑（限制）" class="headerlink" title="3. 使用疑惑（限制）"></a>3. 使用疑惑（限制）</h2><h3 id="3-1-原表上不能有触发器存在"><a href="#3-1-原表上不能有触发器存在" class="headerlink" title="3.1 原表上不能有触发器存在"></a>3.1 原表上不能有触发器存在</h3><p>这个很容易理解，pt-osc会在原表上创建3个触发器，而一个表上不能同时有2个相同类型的触发器，为简单通用起见，只能一棍子打死。<br>所以如果要让它支持有触发器存在的表也是可以实现的，思路就是：先找到原表触发器定义；重写原表触发器；最后阶段将原表触发器定义应用到新表。</p>
-<h3 id="3-2-通过触发器写数据到临时新表，会不会出现数据不一致或异常"><a href="#3-2-通过触发器写数据到临时新表，会不会出现数据不一致或异常" class="headerlink" title="3.2 通过触发器写数据到临时新表，会不会出现数据不一致或异常"></a>3.2 通过触发器写数据到临时新表，会不会出现数据不一致或异常</h3><p>这其实是我的一个顾虑，因为如果update t1，触发update t2，但这条数据还没copy到t2，不就有异常了吗？后台通过打开general_log，看到它创建的触发器：<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line">    6165 Query     <span class="keyword">CREATE</span> <span class="keyword">TRIGGER</span> <span class="string">`pt_osc_confluence_sbtest3_del`</span> <span class="keyword">AFTER</span> <span class="keyword">DELETE</span> <span class="keyword">ON</span> <span class="string">`confluence`</span>.<span class="string">`sbtest3`</span> </div><div class="line">        <span class="keyword">FOR</span> <span class="keyword">EACH</span> <span class="keyword">ROW</span> <span class="keyword">DELETE</span> <span class="keyword">IGNORE</span> <span class="keyword">FROM</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> <span class="keyword">WHERE</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span>.<span class="string">`id`</span> &lt;=&gt; OLD.<span class="string">`id`</span></div><div class="line">    <span class="number">6165</span> <span class="keyword">Query</span>     <span class="keyword">CREATE</span> <span class="keyword">TRIGGER</span> <span class="string">`pt_osc_confluence_sbtest3_upd`</span> <span class="keyword">AFTER</span> <span class="keyword">UPDATE</span> <span class="keyword">ON</span> <span class="string">`confluence`</span>.<span class="string">`sbtest3`</span> </div><div class="line">        <span class="keyword">FOR</span> <span class="keyword">EACH</span> <span class="keyword">ROW</span> <span class="keyword">REPLACE</span> <span class="keyword">INTO</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> (<span class="string">`id`</span>, <span class="string">`k`</span>, <span class="string">`c`</span>, <span class="string">`pad`</span>) <span class="keyword">VALUES</span> (NEW.<span class="string">`id`</span>, NEW.<span class="string">`k`</span>, NEW.<span class="string">`c`</span>, NEW.<span class="string">`pad`</span>)</div><div class="line">    <span class="number">6165</span> <span class="keyword">Query</span>     <span class="keyword">CREATE</span> <span class="keyword">TRIGGER</span> <span class="string">`pt_osc_confluence_sbtest3_ins`</span> <span class="keyword">AFTER</span> <span class="keyword">INSERT</span> <span class="keyword">ON</span> <span class="string">`confluence`</span>.<span class="string">`sbtest3`</span> </div><div class="line">        <span class="keyword">FOR</span> <span class="keyword">EACH</span> <span class="keyword">ROW</span> <span class="keyword">REPLACE</span> <span class="keyword">INTO</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> (<span class="string">`id`</span>, <span class="string">`k`</span>, <span class="string">`c`</span>, <span class="string">`pad`</span>) <span class="keyword">VALUES</span> (NEW.<span class="string">`id`</span>, NEW.<span class="string">`k`</span>, NEW.<span class="string">`c`</span>, NEW.<span class="string">`pad`</span>)</div><div class="line"></div><div class="line">并且copy操作是：</div><div class="line"></div><div class="line">    <span class="number">6165</span> <span class="keyword">Query</span>     <span class="keyword">INSERT</span> <span class="keyword">LOW_PRIORITY</span> <span class="keyword">IGNORE</span> <span class="keyword">INTO</span> <span class="string">`confluence`</span>.<span class="string">`_sbtest3_new`</span> (<span class="string">`id`</span>, <span class="string">`k`</span>, <span class="string">`c`</span>, <span class="string">`pad`</span>) </div><div class="line">         <span class="keyword">SELECT</span> <span class="string">`id`</span>, <span class="string">`k`</span>, <span class="string">`c`</span>, <span class="string">`pad`</span> <span class="keyword">FROM</span> <span class="string">`confluence`</span>.<span class="string">`sbtest3`</span> <span class="keyword">FORCE</span> <span class="keyword">INDEX</span>(<span class="string">`PRIMARY`</span>) <span class="keyword">WHERE</span> ((<span class="string">`id`</span> &gt;= <span class="string">'4692805'</span>)) <span class="keyword">AND</span> ((<span class="string">`id`</span> &lt;= <span class="string">'4718680'</span>)) </div><div class="line">        <span class="keyword">LOCK</span> <span class="keyword">IN</span> <span class="keyword">SHARE</span> <span class="keyword">MODE</span> <span class="comment">/*pt-online-schema-change 46459 copy nibble*/</span></div></pre></td></tr></table></figure></p>
+<h3 id="3-2-通过触发器写数据到临时新表，会不会出现数据不一致或异常"><a href="#3-2-通过触发器写数据到临时新表，会不会出现数据不一致或异常" class="headerlink" title="3.2 通过触发器写数据到临时新表，会不会出现数据不一致或异常"></a>3.2 通过触发器写数据到临时新表，会不会出现数据不一致或异常</h3><p>这其实是我的一个顾虑，因为如果update t1，触发update t2，但这条数据还没copy到t2，不就有异常了吗？后台通过打开general_log，看到它创建的触发器：<br><figure class="highlight n1ql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">    6165 Query     <span class="keyword">CREATE</span> <span class="keyword">TRIGGER</span> <span class="symbol">`pt_osc_confluence_sbtest3_del`</span> AFTER <span class="keyword">DELETE</span> <span class="keyword">ON</span> <span class="symbol">`confluence`</span>.<span class="symbol">`sbtest3`</span> </span><br><span class="line">        <span class="keyword">FOR</span> <span class="keyword">EACH</span> ROW <span class="keyword">DELETE</span> <span class="keyword">IGNORE</span> <span class="keyword">FROM</span> <span class="symbol">`confluence`</span>.<span class="symbol">`_sbtest3_new`</span> <span class="keyword">WHERE</span> <span class="symbol">`confluence`</span>.<span class="symbol">`_sbtest3_new`</span>.<span class="symbol">`id`</span> &lt;=&gt; OLD.<span class="symbol">`id`</span></span><br><span class="line">    <span class="number">6165</span> Query     <span class="keyword">CREATE</span> <span class="keyword">TRIGGER</span> <span class="symbol">`pt_osc_confluence_sbtest3_upd`</span> AFTER <span class="keyword">UPDATE</span> <span class="keyword">ON</span> <span class="symbol">`confluence`</span>.<span class="symbol">`sbtest3`</span> </span><br><span class="line">        <span class="keyword">FOR</span> <span class="keyword">EACH</span> ROW <span class="built_in">REPLACE</span> <span class="keyword">INTO</span> <span class="symbol">`confluence`</span>.<span class="symbol">`_sbtest3_new`</span> (<span class="symbol">`id`</span>, <span class="symbol">`k`</span>, <span class="symbol">`c`</span>, <span class="symbol">`pad`</span>) <span class="keyword">VALUES</span> (NEW.<span class="symbol">`id`</span>, NEW.<span class="symbol">`k`</span>, NEW.<span class="symbol">`c`</span>, NEW.<span class="symbol">`pad`</span>)</span><br><span class="line">    <span class="number">6165</span> Query     <span class="keyword">CREATE</span> <span class="keyword">TRIGGER</span> <span class="symbol">`pt_osc_confluence_sbtest3_ins`</span> AFTER <span class="keyword">INSERT</span> <span class="keyword">ON</span> <span class="symbol">`confluence`</span>.<span class="symbol">`sbtest3`</span> </span><br><span class="line">        <span class="keyword">FOR</span> <span class="keyword">EACH</span> ROW <span class="built_in">REPLACE</span> <span class="keyword">INTO</span> <span class="symbol">`confluence`</span>.<span class="symbol">`_sbtest3_new`</span> (<span class="symbol">`id`</span>, <span class="symbol">`k`</span>, <span class="symbol">`c`</span>, <span class="symbol">`pad`</span>) <span class="keyword">VALUES</span> (NEW.<span class="symbol">`id`</span>, NEW.<span class="symbol">`k`</span>, NEW.<span class="symbol">`c`</span>, NEW.<span class="symbol">`pad`</span>)</span><br><span class="line"></span><br><span class="line">并且copy操作是：</span><br><span class="line"></span><br><span class="line">    <span class="number">6165</span> Query     <span class="keyword">INSERT</span> LOW_PRIORITY <span class="keyword">IGNORE</span> <span class="keyword">INTO</span> <span class="symbol">`confluence`</span>.<span class="symbol">`_sbtest3_new`</span> (<span class="symbol">`id`</span>, <span class="symbol">`k`</span>, <span class="symbol">`c`</span>, <span class="symbol">`pad`</span>) </span><br><span class="line">         <span class="keyword">SELECT</span> <span class="symbol">`id`</span>, <span class="symbol">`k`</span>, <span class="symbol">`c`</span>, <span class="symbol">`pad`</span> <span class="keyword">FROM</span> <span class="symbol">`confluence`</span>.<span class="symbol">`sbtest3`</span> <span class="keyword">FORCE</span> <span class="keyword">INDEX</span>(<span class="symbol">`PRIMARY`</span>) <span class="keyword">WHERE</span> ((<span class="symbol">`id`</span> &gt;= <span class="string">'4692805'</span>)) <span class="keyword">AND</span> ((<span class="symbol">`id`</span> &lt;= <span class="string">'4718680'</span>)) </span><br><span class="line">        LOCK <span class="keyword">IN</span> SHARE MODE <span class="comment">/*pt-online-schema-change 46459 copy nibble*/</span></span><br></pre></td></tr></table></figure></p>
 <p>在原表上update，新临时表上是replace into整行数据，所以达到有则更新，无则插入。同时配合后面的 insert ignore，保证这条数据不会因为重复而失败。</p>
 <h3 id="3-3-为什么外键那么特殊"><a href="#3-3-为什么外键那么特殊" class="headerlink" title="3.3 为什么外键那么特殊"></a>3.3 为什么外键那么特殊</h3><p>假设 <em>t1</em> 是要修改的表，<em>t2</em> 有外键依赖于 <em>t1</em>，<em>_t1_new</em> 是 alter <em>t1</em> 产生的新临时表。<br>这里的外键不是看t1上是否存在外键，而是作为子表的 t2。主要问题在 rename t1 时，t1“不存在”导致t2的外键认为参考失败，不允许rename。<br>pt-osc提供<code>--alter-foreign-keys-method</code>选项来决定怎么处理这种情况：</p>
 <ul>
@@ -507,31 +503,31 @@
 <p><img src="http://7q5fot.com1.z0.glb.clouddn.com/DDLFlow1.png" alt="DDL flow"></p>
 <h2 id="5-示例"><a href="#5-示例" class="headerlink" title="5. 示例"></a>5. 示例</h2><ul>
 <li><p><strong>添加新列</strong><br>完整输出过程</p>
-<figure class="highlight autohotkey"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div></pre></td><td class="code"><pre><div class="line">[root@ssd-<span class="number">34</span> sysbench]# pt-online-schema-change --user=user --password=password --host=<span class="number">10.0</span>.<span class="number">201.34</span>  --alter <span class="string">"ADD COLUMN f_id int default 0"</span> D=confluence,t=sbtest3 --print --execute</div><div class="line">No slaves found.  See --recursion-method <span class="keyword">if</span> host ssd-<span class="number">34</span> has slaves.</div><div class="line"><span class="literal">Not</span> checking slave lag because no slaves were found <span class="literal">and</span> --check-slave-lag was <span class="literal">not</span> specified.</div><div class="line"><span class="symbol">Operation, tries, wait:</span></div><div class="line">  analyze_table, <span class="number">10</span>, <span class="number">1</span></div><div class="line">  copy_rows, <span class="number">10</span>, <span class="number">0.25</span></div><div class="line">  create_triggers, <span class="number">10</span>, <span class="number">1</span></div><div class="line">  drop_triggers, <span class="number">10</span>, <span class="number">1</span></div><div class="line">  swap_tables, <span class="number">10</span>, <span class="number">1</span></div><div class="line">  update_foreign_keys, <span class="number">10</span>, <span class="number">1</span></div><div class="line">Altering `confluence`.`sbtest3`...</div><div class="line">Creating new table...         ==&gt; 创建新表</div><div class="line">CREATE TABLE `confluence`.`_sbtest3_new` (</div><div class="line">  `id` int(<span class="number">10</span>) unsigned <span class="literal">NOT</span> NULL AUTO_INCREMENT,</div><div class="line">  `k` int(<span class="number">10</span>) unsigned <span class="literal">NOT</span> NULL DEFAULT '<span class="number">0</span>',</div><div class="line">  `c` char(<span class="number">120</span>) COLLATE utf8_bin <span class="literal">NOT</span> NULL DEFAULT '',</div><div class="line">  `pad` char(<span class="number">60</span>) COLLATE utf8_bin <span class="literal">NOT</span> NULL DEFAULT '',</div><div class="line">  PRIMARY KEY (`id`),</div><div class="line">  KEY `k_3` (`k`)</div><div class="line">) ENGINE=InnoDB AUTO_INCREMENT=<span class="number">5000001</span> DEFAULT CHARSET=utf8 COLLATE=utf8_bin MAX_ROWS=<span class="number">1000000</span></div><div class="line">Created new table confluence._sbtest3_new OK.</div><div class="line">Altering new table...         ==&gt; 使用ddl修改新表结构</div><div class="line">ALTER TABLE `confluence`.`_sbtest3_new` ADD COLUMN f_id int default <span class="number">0</span></div><div class="line">Altered `confluence`.`_sbtest3_new` OK.</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">54</span>:<span class="number">23</span> Creating triggers...   ==&gt; 在旧表上创建<span class="number">3</span>个触发器</div><div class="line">CREATE TRIGGER `pt_osc_confluence_sbtest3_del` AFTER DELETE ON `confluence`.`sbtest3` FOR EACH ROW </div><div class="line">    DELETE IGNORE FROM `confluence`.`_sbtest3_new` WHERE `confluence`.`_sbtest3_new`.`id` &lt;=&gt; OLD.`id`</div><div class="line">CREATE TRIGGER `pt_osc_confluence_sbtest3_upd` AFTER UPDATE ON `confluence`.`sbtest3` FOR EACH ROW </div><div class="line">    REPLACE INTO `confluence`.`_sbtest3_new` (`id`, `k`, `c`, `pad`) VALUES (NEW.`id`, NEW.`k`, NEW.`c`, NEW.`pad`)</div><div class="line">CREATE TRIGGER `pt_osc_confluence_sbtest3_ins` AFTER INSERT ON `confluence`.`sbtest3` FOR EACH ROW </div><div class="line">    REPLACE INTO `confluence`.`_sbtest3_new` (`id`, `k`, `c`, `pad`) VALUES (NEW.`id`, NEW.`k`, NEW.`c`, NEW.`pad`)</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">54</span>:<span class="number">23</span> Created triggers OK.</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">54</span>:<span class="number">23</span> Copying approximately <span class="number">4485573</span> rows...  ==&gt; 分块拷贝数据到新表</div><div class="line">INSERT LOW_PRIORITY IGNORE INTO `confluence`.`_sbtest3_new` (`id`, `k`, `c`, `pad`) </div><div class="line">  SELECT `id`, `k`, `c`, `pad` FROM `confluence`.`sbtest3` FORCE INDEX(`PRIMARY`) WHERE ((`id` &gt;= ?)) <span class="literal">AND</span> ((`id` &lt;= ?)) </div><div class="line">  LOCK IN SHARE MODE /*pt-online-schema-change <span class="number">44155</span> copy nibble*/</div><div class="line">SELECT /*!<span class="number">40001</span> SQL_NO_CACHE */ `id` FROM `confluence`.`sbtest3` FORCE INDEX(`PRIMARY`) WHERE ((`id` &gt;= ?)) ORDER BY `id` LIMIT ?, <span class="number">2</span> /*next chunk boundary*/</div><div class="line"><span class="symbol">Copying `confluence`.`sbtest3`:  36% 00:</span><span class="number">52</span> remain</div><div class="line"><span class="symbol">Copying `confluence`.`sbtest3`:  69% 00:</span><span class="number">26</span> remain</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">56</span>:<span class="number">01</span> Copied rows OK.</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">56</span>:<span class="number">01</span> Analyzing new table...</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">56</span>:<span class="number">01</span> Swapping tables...  ==&gt; 交换新旧表</div><div class="line">RENAME TABLE `confluence`.`sbtest3` TO `confluence`.`_sbtest3_old`, `confluence`.`_sbtest3_new` TO `confluence`.`sbtest3`</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">56</span>:<span class="number">01</span> Swapped original <span class="literal">and</span> new tables OK.</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">56</span>:<span class="number">01</span> Dropping old table...  ==&gt; 删除旧表</div><div class="line">DROP TABLE <span class="keyword">IF</span> EXISTS `confluence`.`_sbtest3_old`</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">56</span>:<span class="number">02</span> Dropped old table `confluence`.`_sbtest3_old` OK.</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">56</span>:<span class="number">02</span> Dropping triggers...</div><div class="line">DROP TRIGGER <span class="keyword">IF</span> EXISTS `confluence`.`pt_osc_confluence_sbtest3_del`;</div><div class="line">DROP TRIGGER <span class="keyword">IF</span> EXISTS `confluence`.`pt_osc_confluence_sbtest3_upd`;</div><div class="line">DROP TRIGGER <span class="keyword">IF</span> EXISTS `confluence`.`pt_osc_confluence_sbtest3_ins`;</div><div class="line"><span class="number">2016</span>-<span class="number">05</span>-<span class="number">24</span>T20:<span class="number">56</span>:<span class="number">02</span> Dropped triggers OK.</div><div class="line">Successfully altered `confluence`.`sbtest3`.</div></pre></td></tr></table></figure>
+<figure class="highlight n1ql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br></pre></td><td class="code"><pre><span class="line">[root@ssd-34 sysbench]# pt-online-schema-change --user=user --password=password --host=10.<span class="number">0.201</span><span class="number">.34</span>  --<span class="keyword">alter</span> <span class="string">"ADD COLUMN f_id int default 0"</span> D=confluence,t=sbtest3 --print --<span class="keyword">execute</span></span><br><span class="line">No slaves found.  See --recursion-method <span class="keyword">if</span> host ssd<span class="number">-34</span> has slaves.</span><br><span class="line"><span class="keyword">Not</span> checking slave lag because no slaves were found <span class="keyword">and</span> --check-slave-lag was <span class="keyword">not</span> specified.</span><br><span class="line">Operation, tries, wait:</span><br><span class="line">  analyze_table, <span class="number">10</span>, <span class="number">1</span></span><br><span class="line">  copy_rows, <span class="number">10</span>, <span class="number">0.25</span></span><br><span class="line">  create_triggers, <span class="number">10</span>, <span class="number">1</span></span><br><span class="line">  drop_triggers, <span class="number">10</span>, <span class="number">1</span></span><br><span class="line">  swap_tables, <span class="number">10</span>, <span class="number">1</span></span><br><span class="line">  update_foreign_keys, <span class="number">10</span>, <span class="number">1</span></span><br><span class="line">Altering <span class="symbol">`confluence`</span>.<span class="symbol">`sbtest3`</span>...</span><br><span class="line">Creating new table...         ==&gt; 创建新表</span><br><span class="line"><span class="keyword">CREATE</span> TABLE <span class="symbol">`confluence`</span>.<span class="symbol">`_sbtest3_new`</span> (</span><br><span class="line">  <span class="symbol">`id`</span> int(<span class="number">10</span>) unsigned <span class="keyword">NOT</span> <span class="literal">NULL</span> AUTO_INCREMENT,</span><br><span class="line">  <span class="symbol">`k`</span> int(<span class="number">10</span>) unsigned <span class="keyword">NOT</span> <span class="literal">NULL</span> DEFAULT <span class="string">'0'</span>,</span><br><span class="line">  <span class="symbol">`c`</span> char(<span class="number">120</span>) <span class="keyword">COLLATE</span> utf8_bin <span class="keyword">NOT</span> <span class="literal">NULL</span> DEFAULT <span class="string">''</span>,</span><br><span class="line">  <span class="symbol">`pad`</span> char(<span class="number">60</span>) <span class="keyword">COLLATE</span> utf8_bin <span class="keyword">NOT</span> <span class="literal">NULL</span> DEFAULT <span class="string">''</span>,</span><br><span class="line">  <span class="keyword">PRIMARY</span> <span class="keyword">KEY</span> (<span class="symbol">`id`</span>),</span><br><span class="line">  <span class="keyword">KEY</span> <span class="symbol">`k_3`</span> (<span class="symbol">`k`</span>)</span><br><span class="line">) ENGINE=InnoDB AUTO_INCREMENT=<span class="number">5000001</span> DEFAULT CHARSET=utf8 <span class="keyword">COLLATE</span>=utf8_bin MAX_ROWS=<span class="number">1000000</span></span><br><span class="line">Created new table confluence._sbtest3_new OK.</span><br><span class="line">Altering new table...         ==&gt; 使用ddl修改新表结构</span><br><span class="line"><span class="keyword">ALTER</span> TABLE <span class="symbol">`confluence`</span>.<span class="symbol">`_sbtest3_new`</span> ADD COLUMN f_id int default <span class="number">0</span></span><br><span class="line">Altered <span class="symbol">`confluence`</span>.<span class="symbol">`_sbtest3_new`</span> OK.</span><br><span class="line"><span class="number">2016</span><span class="number">-05</span><span class="number">-24</span>T20:<span class="number">54</span>:<span class="number">23</span> Creating triggers...   ==&gt; 在旧表上创建<span class="number">3</span>个触发器</span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TRIGGER</span> <span class="symbol">`pt_osc_confluence_sbtest3_del`</span> AFTER <span class="keyword">DELETE</span> <span class="keyword">ON</span> <span class="symbol">`confluence`</span>.<span class="symbol">`sbtest3`</span> <span class="keyword">FOR</span> <span class="keyword">EACH</span> ROW </span><br><span class="line">    <span class="keyword">DELETE</span> <span class="keyword">IGNORE</span> <span class="keyword">FROM</span> <span class="symbol">`confluence`</span>.<span class="symbol">`_sbtest3_new`</span> <span class="keyword">WHERE</span> <span class="symbol">`confluence`</span>.<span class="symbol">`_sbtest3_new`</span>.<span class="symbol">`id`</span> &lt;=&gt; OLD.<span class="symbol">`id`</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TRIGGER</span> <span class="symbol">`pt_osc_confluence_sbtest3_upd`</span> AFTER <span class="keyword">UPDATE</span> <span class="keyword">ON</span> <span class="symbol">`confluence`</span>.<span class="symbol">`sbtest3`</span> <span class="keyword">FOR</span> <span class="keyword">EACH</span> ROW </span><br><span class="line">    <span class="built_in">REPLACE</span> <span class="keyword">INTO</span> <span class="symbol">`confluence`</span>.<span class="symbol">`_sbtest3_new`</span> (<span class="symbol">`id`</span>, <span class="symbol">`k`</span>, <span class="symbol">`c`</span>, <span class="symbol">`pad`</span>) <span class="keyword">VALUES</span> (NEW.<span class="symbol">`id`</span>, NEW.<span class="symbol">`k`</span>, NEW.<span class="symbol">`c`</span>, NEW.<span class="symbol">`pad`</span>)</span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TRIGGER</span> <span class="symbol">`pt_osc_confluence_sbtest3_ins`</span> AFTER <span class="keyword">INSERT</span> <span class="keyword">ON</span> <span class="symbol">`confluence`</span>.<span class="symbol">`sbtest3`</span> <span class="keyword">FOR</span> <span class="keyword">EACH</span> ROW </span><br><span class="line">    <span class="built_in">REPLACE</span> <span class="keyword">INTO</span> <span class="symbol">`confluence`</span>.<span class="symbol">`_sbtest3_new`</span> (<span class="symbol">`id`</span>, <span class="symbol">`k`</span>, <span class="symbol">`c`</span>, <span class="symbol">`pad`</span>) <span class="keyword">VALUES</span> (NEW.<span class="symbol">`id`</span>, NEW.<span class="symbol">`k`</span>, NEW.<span class="symbol">`c`</span>, NEW.<span class="symbol">`pad`</span>)</span><br><span class="line"><span class="number">2016</span><span class="number">-05</span><span class="number">-24</span>T20:<span class="number">54</span>:<span class="number">23</span> Created triggers OK.</span><br><span class="line"><span class="number">2016</span><span class="number">-05</span><span class="number">-24</span>T20:<span class="number">54</span>:<span class="number">23</span> Copying approximately <span class="number">4485573</span> rows...  ==&gt; 分块拷贝数据到新表</span><br><span class="line"><span class="keyword">INSERT</span> LOW_PRIORITY <span class="keyword">IGNORE</span> <span class="keyword">INTO</span> <span class="symbol">`confluence`</span>.<span class="symbol">`_sbtest3_new`</span> (<span class="symbol">`id`</span>, <span class="symbol">`k`</span>, <span class="symbol">`c`</span>, <span class="symbol">`pad`</span>) </span><br><span class="line">  <span class="keyword">SELECT</span> <span class="symbol">`id`</span>, <span class="symbol">`k`</span>, <span class="symbol">`c`</span>, <span class="symbol">`pad`</span> <span class="keyword">FROM</span> <span class="symbol">`confluence`</span>.<span class="symbol">`sbtest3`</span> <span class="keyword">FORCE</span> <span class="keyword">INDEX</span>(<span class="symbol">`PRIMARY`</span>) <span class="keyword">WHERE</span> ((<span class="symbol">`id`</span> &gt;= ?)) <span class="keyword">AND</span> ((<span class="symbol">`id`</span> &lt;= ?)) </span><br><span class="line">  LOCK <span class="keyword">IN</span> SHARE MODE <span class="comment">/*pt-online-schema-change 44155 copy nibble*/</span></span><br><span class="line"><span class="keyword">SELECT</span> <span class="comment">/*!40001 SQL_NO_CACHE */</span> <span class="symbol">`id`</span> <span class="keyword">FROM</span> <span class="symbol">`confluence`</span>.<span class="symbol">`sbtest3`</span> <span class="keyword">FORCE</span> <span class="keyword">INDEX</span>(<span class="symbol">`PRIMARY`</span>) <span class="keyword">WHERE</span> ((<span class="symbol">`id`</span> &gt;= ?)) <span class="keyword">ORDER</span> <span class="keyword">BY</span> <span class="symbol">`id`</span> <span class="keyword">LIMIT</span> ?, <span class="number">2</span> <span class="comment">/*next chunk boundary*/</span></span><br><span class="line">Copying <span class="symbol">`confluence`</span>.<span class="symbol">`sbtest3`</span>:  <span class="number">36</span>% <span class="number">00</span>:<span class="number">52</span> remain</span><br><span class="line">Copying <span class="symbol">`confluence`</span>.<span class="symbol">`sbtest3`</span>:  <span class="number">69</span>% <span class="number">00</span>:<span class="number">26</span> remain</span><br><span class="line"><span class="number">2016</span><span class="number">-05</span><span class="number">-24</span>T20:<span class="number">56</span>:<span class="number">01</span> Copied rows OK.</span><br><span class="line"><span class="number">2016</span><span class="number">-05</span><span class="number">-24</span>T20:<span class="number">56</span>:<span class="number">01</span> Analyzing new table...</span><br><span class="line"><span class="number">2016</span><span class="number">-05</span><span class="number">-24</span>T20:<span class="number">56</span>:<span class="number">01</span> Swapping tables...  ==&gt; 交换新旧表</span><br><span class="line"><span class="keyword">RENAME</span> TABLE <span class="symbol">`confluence`</span>.<span class="symbol">`sbtest3`</span> <span class="keyword">TO</span> <span class="symbol">`confluence`</span>.<span class="symbol">`_sbtest3_old`</span>, <span class="symbol">`confluence`</span>.<span class="symbol">`_sbtest3_new`</span> <span class="keyword">TO</span> <span class="symbol">`confluence`</span>.<span class="symbol">`sbtest3`</span></span><br><span class="line"><span class="number">2016</span><span class="number">-05</span><span class="number">-24</span>T20:<span class="number">56</span>:<span class="number">01</span> Swapped original <span class="keyword">and</span> new tables OK.</span><br><span class="line"><span class="number">2016</span><span class="number">-05</span><span class="number">-24</span>T20:<span class="number">56</span>:<span class="number">01</span> Dropping old table...  ==&gt; 删除旧表</span><br><span class="line"><span class="keyword">DROP</span> TABLE <span class="keyword">IF</span> <span class="keyword">EXISTS</span> <span class="symbol">`confluence`</span>.<span class="symbol">`_sbtest3_old`</span></span><br><span class="line"><span class="number">2016</span><span class="number">-05</span><span class="number">-24</span>T20:<span class="number">56</span>:<span class="number">02</span> Dropped old table <span class="symbol">`confluence`</span>.<span class="symbol">`_sbtest3_old`</span> OK.</span><br><span class="line"><span class="number">2016</span><span class="number">-05</span><span class="number">-24</span>T20:<span class="number">56</span>:<span class="number">02</span> Dropping triggers...</span><br><span class="line"><span class="keyword">DROP</span> <span class="keyword">TRIGGER</span> <span class="keyword">IF</span> <span class="keyword">EXISTS</span> <span class="symbol">`confluence`</span>.<span class="symbol">`pt_osc_confluence_sbtest3_del`</span>;</span><br><span class="line"><span class="keyword">DROP</span> <span class="keyword">TRIGGER</span> <span class="keyword">IF</span> <span class="keyword">EXISTS</span> <span class="symbol">`confluence`</span>.<span class="symbol">`pt_osc_confluence_sbtest3_upd`</span>;</span><br><span class="line"><span class="keyword">DROP</span> <span class="keyword">TRIGGER</span> <span class="keyword">IF</span> <span class="keyword">EXISTS</span> <span class="symbol">`confluence`</span>.<span class="symbol">`pt_osc_confluence_sbtest3_ins`</span>;</span><br><span class="line">2016-05-24T20:56:02 Dropped triggers OK.</span><br><span class="line">Successfully altered `confluence`.`sbtest3`.</span><br></pre></td></tr></table></figure>
 </li>
 <li><p><strong>修改列类型</strong></p>
-<figure class="highlight haml"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">pt-online-schema-change h=10.0.201.34,P=3306,u=jacky,p=xxx,D=confluence,t=sbtest3 \</div><div class="line">-<span class="ruby">-alter <span class="string">"CHANGE pad f_pad varchar(60) NOT NULL DEFAULT '' "</span> \</span></div><div class="line">-<span class="ruby">-print --dry-run</span></div><div class="line"></div><div class="line">pt-online-schema-change -ujacky -p xxx -h "10.0.201.34" D=confluence,t=sbtest3 \</div><div class="line">-<span class="ruby">-alter <span class="string">"CHANGE pad f_pad varchar(60) NOT NULL DEFAULT '' "</span> \</span></div><div class="line">-<span class="ruby">-execute</span></div></pre></td></tr></table></figure>
+<figure class="highlight routeros"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">pt-online-schema-change <span class="attribute">h</span>=10.0.201.34,P=3306,u=jacky,p=xxx,D=confluence,t=sbtest3 \</span><br><span class="line">--alter <span class="string">"CHANGE pad f_pad varchar(60) NOT NULL DEFAULT '' "</span> \</span><br><span class="line">--<span class="builtin-name">print</span> --dry-run</span><br><span class="line"></span><br><span class="line">pt-online-schema-change -ujacky -p xxx -h <span class="string">"10.0.201.34"</span> <span class="attribute">D</span>=confluence,t=sbtest3 \</span><br><span class="line">--alter <span class="string">"CHANGE pad f_pad varchar(60) NOT NULL DEFAULT '' "</span> \</span><br><span class="line">--execute</span><br></pre></td></tr></table></figure>
 </li>
 <li><p><strong>添加删除索引</strong><br>放后台执行</p>
-<figure class="highlight brainfuck"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="comment">pt</span><span class="literal">-</span><span class="comment">online</span><span class="literal">-</span><span class="comment">schema</span><span class="literal">-</span><span class="comment">change</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">user=user</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">ask</span><span class="literal">-</span><span class="comment">pass</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">host=10</span><span class="string">.</span><span class="comment">0</span><span class="string">.</span><span class="comment">201</span><span class="string">.</span><span class="comment">34</span>  <span class="comment">\</span></div><div class="line"><span class="literal">-</span><span class="literal">-</span><span class="comment">alter</span> <span class="comment">"DROP</span> <span class="comment">KEY</span> <span class="comment">cid</span><span class="string">,</span> <span class="comment">ADD</span> <span class="comment">KEY</span> <span class="comment">idx_corpid_userid(f_corp_id</span><span class="string">,</span><span class="comment">f_user_id)</span> <span class="comment">"</span> <span class="comment">\</span></div><div class="line"><span class="comment">D=confluence</span><span class="string">,</span><span class="comment">t=sbtest3</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">print</span> <span class="literal">-</span><span class="literal">-</span><span class="comment">execute</span></div></pre></td></tr></table></figure>
+<figure class="highlight routeros"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">pt-online-schema-change <span class="attribute">--user</span>=user --ask-pass <span class="attribute">--host</span>=10.0.201.34  \</span><br><span class="line">--alter <span class="string">"DROP KEY cid, ADD KEY idx_corpid_userid(f_corp_id,f_user_id) "</span> \</span><br><span class="line"><span class="attribute">D</span>=confluence,t=sbtest3 --<span class="builtin-name">print</span> --execute</span><br></pre></td></tr></table></figure>
 </li>
 <li><p><strong>修改主键</strong></p>
 </li>
 </ul>
-<p>在我的环境里有不少表设计之初没有自增id，而是采用复合主键，pt-osc 对删除、添加主键会特殊处理，详见 <a href="http://seanlook.com/2016/05/27/mysql-pt-osc-add-primarykey">这里</a> 。</p>
-<h2 id="6-错误处理"><a href="#6-错误处理" class="headerlink" title="6. 错误处理"></a>6. 错误处理</h2><p><strong>1. 存在trigger </strong><br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">[zx@mysql-5 ~]$ pt-online-schema-<span class="keyword">change</span>  -u <span class="keyword">user</span> -p <span class="keyword">password</span> -h <span class="number">10.0</span><span class="number">.200</span><span class="number">.195</span> \</div><div class="line"><span class="comment">--alter="MODIFY COLUMN f_receiver  varchar(128)                                                      NOT NULL DEFAULT '' AFTER f_user_id" --dry-run D=db_name,t=table_name</span></div><div class="line">The <span class="keyword">table</span> <span class="string">`db_name`</span>.<span class="string">`table_name`</span> has triggers.  This tool needs <span class="keyword">to</span> <span class="keyword">create</span> its own <span class="keyword">triggers</span>, so the <span class="keyword">table</span> cannot already have triggers.</div></pre></td></tr></table></figure></p>
+<p>在我的环境里有不少表设计之初没有自增id，而是采用复合主键，pt-osc 对删除、添加主键会特殊处理，详见 <a href="http://xgknight.com/2016/05/27/mysql-pt-osc-add-primarykey" target="_blank" rel="noopener">这里</a> 。</p>
+<h2 id="6-错误处理"><a href="#6-错误处理" class="headerlink" title="6. 错误处理"></a>6. 错误处理</h2><p><strong>1. 存在trigger </strong><br><figure class="highlight routeros"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">[zx@mysql-5 ~]$ pt-online-schema-change  -u<span class="built_in"> user </span>-p password -h 10.0.200.195 \</span><br><span class="line"><span class="attribute">--alter</span>=<span class="string">"MODIFY COLUMN f_receiver  varchar(128)                                                      NOT NULL DEFAULT '' AFTER f_user_id"</span> --dry-<span class="builtin-name">run</span> <span class="attribute">D</span>=db_name,t=table_name</span><br><span class="line">The table `db_name`.`table_name` has triggers.  This<span class="built_in"> tool </span>needs <span class="keyword">to</span> create its own triggers, so the table cannot already have triggers.</span><br></pre></td></tr></table></figure></p>
 <p>表上存在触发器，不适用。</p>
-<p><strong>2. no-version-check  </strong><br><figure class="highlight stata"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">$ pt-online-schema-change -uuser -ppassword --alter <span class="string">"add key id_provice(f_provice)"</span> \</div><div class="line"><span class="keyword">D</span>=db_name,t=tb_name -<span class="keyword">h</span> rdsxxxxxx.mysql.rds.aliyuncs.com</div><div class="line">Can't <span class="keyword">use</span> <span class="keyword">an</span> undefined value <span class="keyword">as</span> <span class="keyword">an</span> ARRAY reference at /usr/bin/pt-online-schema-change <span class="keyword">line</span> 7335.</div></pre></td></tr></table></figure></p>
-<p>这个错误在阿里云RDS上执行时出现的，我以为是我哪里语法写错了，但拿到原生5.6的版本上就没问题了，加上<code>--no-version-check</code>选项就好了，见 <a href="https://help.aliyun.com/knowledge_detail/13098164.html" target="_blank" rel="external">https://help.aliyun.com/knowledge_detail/13098164.html</a> ，没深究，应该是pt去验证mysql server版本的时候从rds拿到的信息不对，导致格式出错。</p>
+<p><strong>2. no-version-check  </strong><br><figure class="highlight stata"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ pt-online-schema-change -uuser -ppassword --alter <span class="string">"add key id_provice(f_provice)"</span> \</span><br><span class="line"><span class="keyword">D</span>=db_name,t=tb_name -<span class="keyword">h</span> rdsxxxxxx.mysql.rds.aliyuncs.com</span><br><span class="line">Can't <span class="keyword">use</span> <span class="keyword">an</span> undefined value <span class="keyword">as</span> <span class="keyword">an</span> ARRAY reference at /usr/bin/pt-online-schema-change <span class="keyword">line</span> 7335.</span><br></pre></td></tr></table></figure></p>
+<p>这个错误在阿里云RDS上执行时出现的，我以为是我哪里语法写错了，但拿到原生5.6的版本上就没问题了，加上<code>--no-version-check</code>选项就好了，见 <a href="https://help.aliyun.com/knowledge_detail/13098164.html" target="_blank" rel="noopener">https://help.aliyun.com/knowledge_detail/13098164.html</a> ，没深究，应该是pt去验证mysql server版本的时候从rds拿到的信息不对，导致格式出错。</p>
 <h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><ul>
-<li><a href="https://www.percona.com/doc/percona-toolkit/2.2/pt-online-schema-change.html" target="_blank" rel="external">refman pt-online-schema-change</a></li>
-<li><a href="https://help.aliyun.com/knowledge_detail/13098164.html" target="_blank" rel="external">RDS MySQL 如何使用 Percona Toolkit</a></li>
-<li><a href="http://www.cnblogs.com/zhoujinyi/p/3491059.html" target="_blank" rel="external">percona-toolkit 之 【pt-online-schema-change】说明</a></li>
-<li><a href="https://www.percona.com/blog/2014/11/18/avoiding-mysql-alter-table-downtime/" target="_blank" rel="external">Avoiding MySQL ALTER table downtime</a></li>
-<li><a href="http://www.imcjd.com/?p=1081" target="_blank" rel="external">MySQL Online DDL和NoSQL Schemaless Design</a></li>
+<li><a href="https://www.percona.com/doc/percona-toolkit/2.2/pt-online-schema-change.html" target="_blank" rel="noopener">refman pt-online-schema-change</a></li>
+<li><a href="https://help.aliyun.com/knowledge_detail/13098164.html" target="_blank" rel="noopener">RDS MySQL 如何使用 Percona Toolkit</a></li>
+<li><a href="http://www.cnblogs.com/zhoujinyi/p/3491059.html" target="_blank" rel="noopener">percona-toolkit 之 【pt-online-schema-change】说明</a></li>
+<li><a href="https://www.percona.com/blog/2014/11/18/avoiding-mysql-alter-table-downtime/" target="_blank" rel="noopener">Avoiding MySQL ALTER table downtime</a></li>
+<li><a href="http://www.imcjd.com/?p=1081" target="_blank" rel="noopener">MySQL Online DDL和NoSQL Schemaless Design</a></li>
 </ul>
 <hr>
-<p>原文链接地址：<a href="http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/">http://seanlook.com/2016/05/27/mysql-pt-online-schema-change/</a></p>
+<p>原文链接地址：<a href="http://xgknight.com/2016/05/27/mysql-pt-online-schema-change/" target="_blank" rel="noopener">http://xgknight.com/2016/05/27/mysql-pt-online-schema-change/</a></p>
 <hr>
 
       
@@ -556,7 +552,7 @@
       
       
         <div id="alipay" style="display: inline-block">
-          <img id="alipay_qr" src="/images/reward_alipay_seanlook.jpg" alt="seanlook Alipay"/>
+          <img id="alipay_qr" src="/images/reward_alipay_seanlook.jpg" alt="seanlook Alipay">
           <p>支付宝打赏</p>
         </div>
       
@@ -593,8 +589,8 @@
         <div class="post-nav">
           <div class="post-nav-next post-nav-item">
             
-              <a href="/2016/05/27/mysql-pt-osc-add-primarykey/" rel="next" title="使用pt-osc修改主键时注意">
-                <i class="fa fa-chevron-left"></i> 使用pt-osc修改主键时注意
+              <a href="/2016/05/24/mysql-online-ddl-concept/" rel="next" title="mysql 5.6 原生Online DDL解析">
+                <i class="fa fa-chevron-left"></i> mysql 5.6 原生Online DDL解析
               </a>
             
           </div>
@@ -603,8 +599,8 @@
 
           <div class="post-nav-prev post-nav-item">
             
-              <a href="/2016/06/11/mysql-advanced-query-tuning-percona/" rel="prev" title="Advanced MySQL Query Tuning .pdf">
-                Advanced MySQL Query Tuning .pdf <i class="fa fa-chevron-right"></i>
+              <a href="/2016/05/27/mysql-pt-osc-add-primarykey/" rel="prev" title="使用pt-osc修改主键时注意">
+                使用pt-osc修改主键时注意 <i class="fa fa-chevron-right"></i>
               </a>
             
           </div>
@@ -660,7 +656,7 @@
 
       
         <ul class="sidebar-nav motion-element">
-          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
             Table of Contents
           </li>
           <li class="sidebar-nav-overview" data-target="site-overview">
@@ -671,9 +667,7 @@
 
       <section class="site-overview sidebar-panel">
         <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
-          <img class="site-author-image" itemprop="image"
-               src="/images/avatar_sean.jpg"
-               alt="seanlook" />
+          <img class="site-author-image" itemprop="image" src="/images/avatar_sean.jpg" alt="seanlook">
           <p class="site-author-name" itemprop="name">seanlook</p>
            
               <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
@@ -684,7 +678,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">117</span>
+                <span class="site-state-item-count">120</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -706,7 +700,7 @@
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">125</span>
+                <span class="site-state-item-count">128</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>
@@ -788,10 +782,10 @@
 
     <footer id="footer" class="footer">
       <div class="footer-inner">
-        <div class="copyright" >
+        <div class="copyright">
   
   &copy;  2014 - 
-  <span itemprop="copyrightYear">2018</span>
+  <span itemprop="copyrightYear">2020</span>
   <span class="with-love">
     <i class="fa fa-heart"></i>
   </span>
