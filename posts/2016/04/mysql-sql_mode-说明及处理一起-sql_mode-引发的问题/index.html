@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>MySQL sql_mode 说明（及处理一起 sql_mode 引发的问题） | Sean Note</title>
+<meta name="keywords" content="mysql, sql_mode">
+<meta name="description" content="1. MySQL莫名变成了 Strict SQL Mode 最近测试组那边反应数据库部分写入失败，app层提示是插入成功，但表里面里面没有产生数据，而两个写入操作的另外一个表有数据。因为 insert 失败在数据库层面是看不出来的，于是找php的同事看下错误信息：
+[Err] 1364 - Field `f_company_id` doesn&#39;t have a default value 很明显2个 insert 操作，第一条成功，第二条失败了，但因为没有控制在一个事务当中，导致app里面依然提示成功，这是客户入库操作，心想如果线上也有这个问题得是多大的代价。
+不说开发的问题，好端端的mysql怎么突然就部分表写入失败呢？根据上面的问题很快能猜到是 sql_mode 问题： NOT NULL 列没有默认值但代码里也没给值，在非严格模式下，int列默认为0，string列默认为&rsquo;&lsquo;了，所以不成问题；但在严格模式下，是直接返回失败的。
+一看，果然：
+mysql&gt; show variables like &#34;sql_mode&#34;; &#43;---------------&#43;--------------------------------------------&#43; | Variable_name | Value | &#43;---------------&#43;--------------------------------------------&#43; | sql_mode | STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION | &#43;---------------&#43;--------------------------------------------&#43; 但是一直是没问题的的，就突然出现了，有谁会去改 sql_mode 呢，生产环境产生这个问题的风险有多大？所以必须揪出来。
+先 set global sql_mode=&#39;&#39; ，让他们用着先（文后会给解决问题根本的办法），同时打开general_log看是哪一个用户有类似设置 sql_mode 命令：
+1134456 Query SET autocommit=1 1134456 Query Set sql_mode=&#39;NO_ENGINE_SUBSITUTION,STRICT_TRANS_TABLES&#39; 1134457 Connect ecuser@10.0.200.173 on 1134457 Query /* mysql-connector-java-5.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2016/04/mysql-sql_mode-%E8%AF%B4%E6%98%8E%E5%8F%8A%E5%A4%84%E7%90%86%E4%B8%80%E8%B5%B7-sql_mode-%E5%BC%95%E5%8F%91%E7%9A%84%E9%97%AE%E9%A2%98/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="MySQL sql_mode 说明（及处理一起 sql_mode 引发的问题）" />
+<meta property="og:description" content="1. MySQL莫名变成了 Strict SQL Mode 最近测试组那边反应数据库部分写入失败，app层提示是插入成功，但表里面里面没有产生数据，而两个写入操作的另外一个表有数据。因为 insert 失败在数据库层面是看不出来的，于是找php的同事看下错误信息：
+[Err] 1364 - Field `f_company_id` doesn&#39;t have a default value 很明显2个 insert 操作，第一条成功，第二条失败了，但因为没有控制在一个事务当中，导致app里面依然提示成功，这是客户入库操作，心想如果线上也有这个问题得是多大的代价。
+不说开发的问题，好端端的mysql怎么突然就部分表写入失败呢？根据上面的问题很快能猜到是 sql_mode 问题： NOT NULL 列没有默认值但代码里也没给值，在非严格模式下，int列默认为0，string列默认为&rsquo;&lsquo;了，所以不成问题；但在严格模式下，是直接返回失败的。
+一看，果然：
+mysql&gt; show variables like &#34;sql_mode&#34;; &#43;---------------&#43;--------------------------------------------&#43; | Variable_name | Value | &#43;---------------&#43;--------------------------------------------&#43; | sql_mode | STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION | &#43;---------------&#43;--------------------------------------------&#43; 但是一直是没问题的的，就突然出现了，有谁会去改 sql_mode 呢，生产环境产生这个问题的风险有多大？所以必须揪出来。
+先 set global sql_mode=&#39;&#39; ，让他们用着先（文后会给解决问题根本的办法），同时打开general_log看是哪一个用户有类似设置 sql_mode 命令：
+1134456 Query SET autocommit=1 1134456 Query Set sql_mode=&#39;NO_ENGINE_SUBSITUTION,STRICT_TRANS_TABLES&#39; 1134457 Connect ecuser@10.0.200.173 on 1134457 Query /* mysql-connector-java-5." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2016/04/mysql-sql_mode-%E8%AF%B4%E6%98%8E%E5%8F%8A%E5%A4%84%E7%90%86%E4%B8%80%E8%B5%B7-sql_mode-%E5%BC%95%E5%8F%91%E7%9A%84%E9%97%AE%E9%A2%98/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2016-04-22T16:32:49+00:00" />
+<meta property="article:modified_time" content="2016-04-22T16:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="MySQL sql_mode 说明（及处理一起 sql_mode 引发的问题）"/>
+<meta name="twitter:description" content="1. MySQL莫名变成了 Strict SQL Mode 最近测试组那边反应数据库部分写入失败，app层提示是插入成功，但表里面里面没有产生数据，而两个写入操作的另外一个表有数据。因为 insert 失败在数据库层面是看不出来的，于是找php的同事看下错误信息：
+[Err] 1364 - Field `f_company_id` doesn&#39;t have a default value 很明显2个 insert 操作，第一条成功，第二条失败了，但因为没有控制在一个事务当中，导致app里面依然提示成功，这是客户入库操作，心想如果线上也有这个问题得是多大的代价。
+不说开发的问题，好端端的mysql怎么突然就部分表写入失败呢？根据上面的问题很快能猜到是 sql_mode 问题： NOT NULL 列没有默认值但代码里也没给值，在非严格模式下，int列默认为0，string列默认为&rsquo;&lsquo;了，所以不成问题；但在严格模式下，是直接返回失败的。
+一看，果然：
+mysql&gt; show variables like &#34;sql_mode&#34;; &#43;---------------&#43;--------------------------------------------&#43; | Variable_name | Value | &#43;---------------&#43;--------------------------------------------&#43; | sql_mode | STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION | &#43;---------------&#43;--------------------------------------------&#43; 但是一直是没问题的的，就突然出现了，有谁会去改 sql_mode 呢，生产环境产生这个问题的风险有多大？所以必须揪出来。
+先 set global sql_mode=&#39;&#39; ，让他们用着先（文后会给解决问题根本的办法），同时打开general_log看是哪一个用户有类似设置 sql_mode 命令：
+1134456 Query SET autocommit=1 1134456 Query Set sql_mode=&#39;NO_ENGINE_SUBSITUTION,STRICT_TRANS_TABLES&#39; 1134457 Connect ecuser@10.0.200.173 on 1134457 Query /* mysql-connector-java-5."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "MySQL sql_mode 说明（及处理一起 sql_mode 引发的问题）",
+      "item": "http://xgknight.com/posts/2016/04/mysql-sql_mode-%E8%AF%B4%E6%98%8E%E5%8F%8A%E5%A4%84%E7%90%86%E4%B8%80%E8%B5%B7-sql_mode-%E5%BC%95%E5%8F%91%E7%9A%84%E9%97%AE%E9%A2%98/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "MySQL sql_mode 说明（及处理一起 sql_mode 引发的问题）",
+  "name": "MySQL sql_mode 说明（及处理一起 sql_mode 引发的问题）",
+  "description": "1. MySQL莫名变成了 Strict SQL Mode 最近测试组那边反应数据库部分写入失败，app层提示是插入成功，但表里面里面没有产生数据，而两个写入操作的另外一个表有数据。因为 insert 失败在数据库层面是看不出来的，于是找php的同事看下错误信息：\n[Err] 1364 - Field `f_company_id` doesn\u0026#39;t have a default value 很明显2个 insert 操作，第一条成功，第二条失败了，但因为没有控制在一个事务当中，导致app里面依然提示成功，这是客户入库操作，心想如果线上也有这个问题得是多大的代价。\n不说开发的问题，好端端的mysql怎么突然就部分表写入失败呢？根据上面的问题很快能猜到是 sql_mode 问题： NOT NULL 列没有默认值但代码里也没给值，在非严格模式下，int列默认为0，string列默认为\u0026rsquo;\u0026lsquo;了，所以不成问题；但在严格模式下，是直接返回失败的。\n一看，果然：\nmysql\u0026gt; show variables like \u0026#34;sql_mode\u0026#34;; +---------------+--------------------------------------------+ | Variable_name | Value | +---------------+--------------------------------------------+ | sql_mode | STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION | +---------------+--------------------------------------------+ 但是一直是没问题的的，就突然出现了，有谁会去改 sql_mode 呢，生产环境产生这个问题的风险有多大？所以必须揪出来。\n先 set global sql_mode='' ，让他们用着先（文后会给解决问题根本的办法），同时打开general_log看是哪一个用户有类似设置 sql_mode 命令：\n1134456 Query SET autocommit=1 1134456 Query Set sql_mode=\u0026#39;NO_ENGINE_SUBSITUTION,STRICT_TRANS_TABLES\u0026#39; 1134457 Connect ecuser@10.0.200.173 on 1134457 Query /* mysql-connector-java-5.",
+  "keywords": [
+    "mysql", "sql_mode"
+  ],
+  "articleBody": "1. MySQL莫名变成了 Strict SQL Mode 最近测试组那边反应数据库部分写入失败，app层提示是插入成功，但表里面里面没有产生数据，而两个写入操作的另外一个表有数据。因为 insert 失败在数据库层面是看不出来的，于是找php的同事看下错误信息：\n[Err] 1364 - Field `f_company_id` doesn't have a default value 很明显2个 insert 操作，第一条成功，第二条失败了，但因为没有控制在一个事务当中，导致app里面依然提示成功，这是客户入库操作，心想如果线上也有这个问题得是多大的代价。\n不说开发的问题，好端端的mysql怎么突然就部分表写入失败呢？根据上面的问题很快能猜到是 sql_mode 问题： NOT NULL 列没有默认值但代码里也没给值，在非严格模式下，int列默认为0，string列默认为’‘了，所以不成问题；但在严格模式下，是直接返回失败的。\n一看，果然：\nmysql\u003e show variables like \"sql_mode\"; +---------------+--------------------------------------------+ | Variable_name | Value | +---------------+--------------------------------------------+ | sql_mode | STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION | +---------------+--------------------------------------------+ 但是一直是没问题的的，就突然出现了，有谁会去改 sql_mode 呢，生产环境产生这个问题的风险有多大？所以必须揪出来。\n先 set global sql_mode='' ，让他们用着先（文后会给解决问题根本的办法），同时打开general_log看是哪一个用户有类似设置 sql_mode 命令：\n1134456 Query SET autocommit=1 1134456 Query Set sql_mode='NO_ENGINE_SUBSITUTION,STRICT_TRANS_TABLES' 1134457 Connect ecuser@10.0.200.173 on 1134457 Query /* mysql-connector-java-5.1.35 ... 看出是java组那边哪个框架建立连接的时候使用设置了sql_mode，但这是session级别的，不影响php那边用户的连接。\n那会是什么原因在 set global 之后又变回strict模式呢，于是想到 mysqld_safe 启动实际是一个保护进程，在mysqld异常停止之后会拉起来，会不会中间有异常导致 mysqld 重启，致使 global 失效？看了mysql错误日志，才想到前些天断过电，所以决定直接改 /etc/my.cnf配置：\n[mysqld] sql_mode=NO_ENGINE_SUBSTITUTION 重启myqld之后，还是STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION，很少遇到my.cnf里面配置不生效的情况。无独有偶，在 stackoverflow上找到同样的问题 how-to-make-sql-mode-no-engine-substitution-permanent-in-mysql-my-cnf ，原因很简单，sql_mode这个选项被其它地方的配置覆盖了。\n了解一下mysql配置文件的加载顺序：\n$ mysqld --help --verbose|grep -A1 -B1 cnf Default options are read from the following files in the given order: /etc/my.cnf /etc/mysql/my.cnf /usr/etc/my.cnf ~/.my.cnf mysql按照上面的顺序加载配置文件，后面的配置项会覆盖前面的。最后终于在 /usr/my.cnf 找到有一条sql_mode=NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES，把这个文件删掉，/etc/my.cnf 里面的就生效了。\n但是目前没能整明白的是，mysql运行这么长时间怎么突然在/usr （MYSQL_BASE）下多个my.cnf，也不像人为创建的。其它实例也没这样的问题。\n类似还出现过一例：存储过程里把 ’’ 传给int型的，严格模式是不允许，而非严格模式只是一个warning。（命令行执行完语句后，show warnings 可看见）\n那么解决这类问题的终极（推荐）办法其实是，考虑到数据的兼容性和准确性，MySQL就应该运行在严格模式下！无论开发环境还是生产环境，否则代码移植到线上可能产生隐藏的问题。\nsql_mode 问题可以很简单，也可以很复杂。曾经在一个交流群里看到有人提到，主从sql_mode设置不一致导致复制异常，这里自己正好全面了解一下几个常用的值，方便以后排除问题多个方向。\n2. sql_mode 常用值说明 官方手册专门有一节介绍 https://dev.mysql.com/doc/refman/5.6/en/sql-mode.html 。 SQL Mode 定义了两个方面：MySQL应支持的SQL语法，以及应该在数据上执行何种确认检查。\nSQL语法支持类 ONLY_FULL_GROUP_BY\n对于GROUP BY聚合操作，如果在SELECT中的列、HAVING或者ORDER BY子句的列，没有在GROUP BY中出现，那么这个SQL是不合法的。是可以理解的，因为不在 group by 的列查出来展示会有矛盾。\n在5.7中默认启用，所以在实施5.6升级到5.7的过程需要注意： Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column '1066export.ebay_order_items.TransactionID' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by ANSI_QUOTES\n启用 ANSI_QUOTES 后，不能用双引号来引用字符串，因为它被解释为识别符，作用与 ` 一样。\n设置它以后，update t set f1=\"\" ...，会报 Unknown column ’’ in ‘field list 这样的语法错误。\nPIPES_AS_CONCAT\n将 || 视为字符串的连接操作符而非 或 运算符，这和Oracle数据库是一样的，也和字符串的拼接函数 CONCAT() 相类似\nNO_TABLE_OPTIONS\n使用 SHOW CREATE TABLE 时不会输出MySQL特有的语法部分，如 ENGINE ，这个在使用 mysqldump 跨DB种类迁移的时候需要考虑。\nNO_AUTO_CREATE_USER\n字面意思不自动创建用户。在给MySQL用户授权时，我们习惯使用 GRANT ... ON ... TO dbuser 顺道一起创建用户。设置该选项后就与oracle操作类似，授权之前必须先建立用户。5.7.7开始也默认了。\n数据检查类\nNO_ZERO_DATE\n认为日期 ‘0000-00-00’ 非法，与是否设置后面的严格模式有关。\n1.如果设置了严格模式，则 NO_ZERO_DATE 自然满足。但如果是 INSERT IGNORE 或 UPDATE IGNORE，‘0000-00-00’依然允许且只显示warning\n2.如果在非严格模式下，设置了NO_ZERO_DATE，效果与上面一样，‘0000-00-00’允许但显示warning；如果没有设置NO_ZERO_DATE，no warning，当做完全合法的值。 3.NO_ZERO_IN_DATE情况与上面类似，不同的是控制日期和天，是否可为 0 ，即 2010-01-00 是否合法。\nNO_ENGINE_SUBSTITUTION\n使用 ALTER TABLE或CREATE TABLE 指定 ENGINE 时， 需要的存储引擎被禁用或未编译，该如何处理。启用NO_ENGINE_SUBSTITUTION时，那么直接抛出错误；不设置此值时，CREATE用默认的存储引擎替代，ATLER不进行更改，并抛出一个 warning .\nSTRICT_TRANS_TABLES 设置它，表示启用严格模式。\n注意 STRICT_TRANS_TABLES 不是几种策略的组合，单独指 INSERT、UPDATE出现少值或无效值该如何处理: 1.前面提到的把 ’’ 传给int，严格模式下非法，若启用非严格模式则变成0，产生一个warning 2.Out Of Range，变成插入最大边界值 3.A value is missing when a new row to be inserted does not contain a value for a non-NULL column that has no explicit DEFAULT clause in its definition\n上面并没有囊括所有的 SQL Mode，选了几个代表性的，详细还是 看手册。\nsql_mode一般来说很少去关注它，没有遇到实际问题之前不会去启停上面的条目。我们常设置的 sql_mode 是 ANSI、STRICT_TRANS_TABLES、TRADITIONAL，ansi和traditional是上面的几种组合。\nANSI：更改语法和行为，使其更符合标准SQL 相当于REAL_AS_FLOAT, PIPES_AS_CONCAT, ANSI_QUOTES, IGNORE_SPACE TRADITIONAL：更像传统SQL数据库系统，该模式的简单描述是当在列中插入不正确的值时“给出错误而不是警告”。 相当于 STRICT_TRANS_TABLES, STRICT_ALL_TABLES, NO_ZERO_IN_DATE, NO_ZERO_DATE, ERROR_FOR_DIVISION_BY_ZERO, NO_AUTO_CREATE_USER, NO_ENGINE_SUBSTITUTION ORACLE：相当于 PIPES_AS_CONCAT, ANSI_QUOTES, IGNORE_SPACE, NO_KEY_OPTIONS, NO_TABLE_OPTIONS, NO_FIELD_OPTIONS, NO_AUTO_CREATE_USER 无论何种mode，产生error之后就意味着单条sql执行失败，对于支持事务的表，则导致当前事务回滚；但如果没有放在事务中执行，或者不支持事务的存储引擎表，则可能导致数据不一致。MySQL认为，相比直接报错终止，数据不一致问题更严重。于是 STRICT_TRANS_TABLES 对非事务表依然尽可能的让写入继续，比如给个\"最合理\"的默认值或截断。而对于 STRICT_ALL_TABLES，如果是单条更新，则不影响，但如果更新的是多条，第一条成功，后面失败则会出现部分更新。\n5.6.6 以后版本默认就是NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES，5.5默认为 ’’ 。\n3. 设置 sql_mode 查看\n查看当前连接会话的sql模式： mysql\u003e select @@session.sql_mode; 或者从环境变量里取 mysql\u003e show variables like \"sql_mode\"; 查看全局sql_mode设置： mysql\u003e select @@global.sql_mode; 只设置global，需要重新连接进来才会生效 设置\n形式如 mysql\u003e set sql_mode=''; mysql\u003e set global sql_mode='NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES'; 如果是自定义的模式组合，可以像下面这样 Adding only one mode to sql_mode without removing existing ones: mysql\u003e SET sql_mode=(SELECT CONCAT(@@sql_mode,',')); Removing only a specific mode from sql_mode without removing others: mysql\u003e SET sql_mode=(SELECT REPLACE(@@sql_mode,'','')); 配置文件里面设置sql-mode=\"\" 。\n一个有趣的试验 updated: 2017-12-10\n现网做数据迁移测试时报另一个错误，原由是这样的：一个1.8亿的表里面，因为某种原因需要把字段定义null改为not null，避免下游服务（如ES）处理特殊数据时异常情况。但这是一个并发dml非常高又达到100多G的大表，online ddl针对这种修改字段类型简直束手无策，pt-osc也慢的很。\n刚好有一个做数据迁移的契机，原本打算在新库上把字段改好，再通过dts或类似的数据迁移工具，同步过去。在非严格模式下，原本是null的值也会变成0或’’，但还是报错了：\nset sql_mode=''; -- 置为非严格模式 insert into t(id, a) values(1, null); [Err] 1048 - Column 'a' cannot be null 然而 insert into t(id, a) values(1, null),(2, null),; Affected rows: 2 找到官方文档上的原话，可以解释：\nIf you are not using strict mode, then whenever you insert an “incorrect” value into a column, such as a NULL into a NOT NULL column or a too-large numeric value into a numeric column, MySQL sets the column to the “best possible value” instead of producing an error\nIf you try to store NULL into a column that doesn’t take NULL values, an error occurs for single-row INSERT statements. For multiple-row INSERT statements or for INSERT INTO … SELECT statements, MySQL Server stores the implicit default value for the column data type\n非严格模式下，单行插入 null 到 not null 列，会失败；多行插入则只是warning。规则是这样，也就无需解释。\n参考 MySQL manual sql-mode mysql的sql_mode合理设置 set-sql-mode-blank-after-upgrading-to-mysql-5-6 MySQL SQL_MODE详解 原文链接地址：http://xgknight.com/2016/04/22/mysql-sql-mode-troubleshooting/\n",
+  "wordCount" : "539",
+  "inLanguage": "en",
+  "datePublished": "2016-04-22T16:32:49Z",
+  "dateModified": "2016-04-22T16:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2016/04/mysql-sql_mode-%E8%AF%B4%E6%98%8E%E5%8F%8A%E5%A4%84%E7%90%86%E4%B8%80%E8%B5%B7-sql_mode-%E5%BC%95%E5%8F%91%E7%9A%84%E9%97%AE%E9%A2%98/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      MySQL sql_mode 说明（及处理一起 sql_mode 引发的问题）
+    </h1>
+    <div class="post-meta"><span title='2016-04-22 16:32:49 +0000 UTC'>April 22, 2016</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><h2 id="1-mysql莫名变成了-strict-sql-mode">1. MySQL莫名变成了 Strict SQL Mode<a hidden class="anchor" aria-hidden="true" href="#1-mysql莫名变成了-strict-sql-mode">#</a></h2>
+<p>最近测试组那边反应数据库部分写入失败，app层提示是插入成功，但表里面里面没有产生数据，而两个写入操作的另外一个表有数据。因为 insert 失败在数据库层面是看不出来的，于是找php的同事看下错误信息：</p>
+<pre tabindex="0"><code>[Err] 1364 - Field `f_company_id` doesn&#39;t have a default value
+</code></pre><p>很明显2个 insert 操作，第一条成功，第二条失败了，但因为没有控制在一个事务当中，导致app里面依然提示成功，这是客户入库操作，心想如果线上也有这个问题得是多大的代价。</p>
+<p>不说开发的问题，好端端的mysql怎么突然就部分表写入失败呢？根据上面的问题很快能猜到是 sql_mode 问题： NOT NULL 列没有默认值但代码里也没给值，在非严格模式下，int列默认为0，string列默认为&rsquo;&lsquo;了，所以不成问题；但在严格模式下，是直接返回失败的。</p>
+<p>一看，果然：</p>
+<pre tabindex="0"><code>mysql&gt; show variables like &#34;sql_mode&#34;;
++---------------+--------------------------------------------+
+| Variable_name | Value                                      |
++---------------+--------------------------------------------+
+| sql_mode      | STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION |
++---------------+--------------------------------------------+
+</code></pre><p>但是一直是没问题的的，就突然出现了，有谁会去改 sql_mode 呢，生产环境产生这个问题的风险有多大？所以必须揪出来。</p>
+<p>先 <code>set global sql_mode=''</code> ，让他们用着先（文后会给解决问题根本的办法），同时打开general_log看是哪一个用户有类似设置 sql_mode 命令：</p>
+<pre tabindex="0"><code>1134456 Query   SET autocommit=1
+1134456 Query   Set sql_mode=&#39;NO_ENGINE_SUBSITUTION,STRICT_TRANS_TABLES&#39;
+1134457 Connect ecuser@10.0.200.173 on
+1134457 Query   /* mysql-connector-java-5.1.35 ...
+</code></pre><p>看出是java组那边哪个框架建立连接的时候使用设置了sql_mode，但这是session级别的，不影响php那边用户的连接。</p>
+<!-- raw HTML omitted -->
+<p>那会是什么原因在 set global 之后又变回strict模式呢，于是想到 mysqld_safe 启动实际是一个保护进程，在mysqld异常停止之后会拉起来，会不会中间有异常导致 mysqld 重启，致使 global 失效？看了mysql错误日志，才想到前些天断过电，所以决定直接改 <code>/etc/my.cnf</code>配置：</p>
+<pre tabindex="0"><code>[mysqld]
+sql_mode=NO_ENGINE_SUBSTITUTION
+</code></pre><p>重启myqld之后，还是<code>STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION</code>，很少遇到my.cnf里面配置不生效的情况。无独有偶，在 stackoverflow上找到同样的问题 <a href="http://stackoverflow.com/questions/28849293/how-to-make-sql-mode-no-engine-substitution-permanent-in-mysql-my-cnf">how-to-make-sql-mode-no-engine-substitution-permanent-in-mysql-my-cnf</a> ，原因很简单，sql_mode这个选项被其它地方的配置覆盖了。</p>
+<p><strong>了解一下mysql配置文件的加载顺序：</strong></p>
+<pre tabindex="0"><code>$ mysqld --help --verbose|grep -A1 -B1 cnf
+Default options are read from the following files in the given order:
+/etc/my.cnf /etc/mysql/my.cnf /usr/etc/my.cnf ~/.my.cnf
+</code></pre><p>mysql按照上面的顺序加载配置文件，后面的配置项会覆盖前面的。最后终于在 <code>/usr/my.cnf</code> 找到有一条<code>sql_mode=NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES</code>，把这个文件删掉，/etc/my.cnf 里面的就生效了。</p>
+<p>但是目前没能整明白的是，mysql运行这么长时间怎么突然在<code>/usr</code> （MYSQL_BASE）下多个my.cnf，也不像人为创建的。其它实例也没这样的问题。</p>
+<p>类似还出现过一例：存储过程里把 &rsquo;&rsquo; 传给int型的，严格模式是不允许，而非严格模式只是一个warning。（命令行执行完语句后，<code>show warnings</code> 可看见）</p>
+<p>那么解决这类问题的终极（推荐）办法其实是，考虑到数据的兼容性和准确性，MySQL就应该运行在严格模式下！无论开发环境还是生产环境，否则代码移植到线上可能产生隐藏的问题。</p>
+<p>sql_mode 问题可以很简单，也可以很复杂。曾经在一个交流群里看到有人提到，主从sql_mode设置不一致导致复制异常，这里自己正好全面了解一下几个常用的值，方便以后排除问题多个方向。</p>
+<h2 id="2-sql_mode-常用值说明">2. sql_mode 常用值说明<a hidden class="anchor" aria-hidden="true" href="#2-sql_mode-常用值说明">#</a></h2>
+<p>官方手册专门有一节介绍 <a href="https://dev.mysql.com/doc/refman/5.6/en/sql-mode.html">https://dev.mysql.com/doc/refman/5.6/en/sql-mode.html</a> 。 SQL Mode 定义了两个方面：MySQL应支持的SQL语法，以及应该在数据上执行何种确认检查。</p>
+<ul>
+<li>SQL语法支持类</li>
+<li><code>ONLY_FULL_GROUP_BY</code><br>
+对于GROUP BY聚合操作，如果在SELECT中的列、HAVING或者ORDER BY子句的列，没有在GROUP BY中出现，那么这个SQL是不合法的。是可以理解的，因为不在 group by 的列查出来展示会有矛盾。<br>
+在5.7中默认启用，所以在实施5.6升级到5.7的过程需要注意：</li>
+</ul>
+<pre tabindex="0"><code> Expression #1 of SELECT list is not in GROUP BY
+clause and contains nonaggregated column
+&#39;1066export.ebay_order_items.TransactionID&#39; which
+is not functionally dependent on columns in GROUP BY
+clause; this is incompatible with sql_mode=only_full_group_by
+</code></pre><ul>
+<li>
+<p><code>ANSI_QUOTES</code><br>
+启用 ANSI_QUOTES 后，不能用双引号来引用字符串，因为它被解释为识别符，作用与 ` 一样。<br>
+设置它以后，<code>update t set f1=&quot;&quot; ...</code>，会报 Unknown column &rsquo;&rsquo; in &lsquo;field list 这样的语法错误。</p>
+</li>
+<li>
+<p><code>PIPES_AS_CONCAT</code><br>
+将 <code>||</code> 视为字符串的连接操作符而非 或 运算符，这和Oracle数据库是一样的，也和字符串的拼接函数 CONCAT() 相类似</p>
+</li>
+<li>
+<p><code>NO_TABLE_OPTIONS</code><br>
+使用 <code>SHOW CREATE TABLE</code> 时不会输出MySQL特有的语法部分，如 <code>ENGINE</code> ，这个在使用 mysqldump 跨DB种类迁移的时候需要考虑。</p>
+</li>
+<li>
+<p><code>NO_AUTO_CREATE_USER</code><br>
+字面意思不自动创建用户。在给MySQL用户授权时，我们习惯使用 <code>GRANT ... ON ... TO dbuser</code> 顺道一起创建用户。设置该选项后就与oracle操作类似，授权之前必须先建立用户。5.7.7开始也默认了。</p>
+</li>
+<li>
+<p>数据检查类</p>
+</li>
+<li>
+<p><code>NO_ZERO_DATE</code><br>
+认为日期 &lsquo;0000-00-00&rsquo; 非法，与是否设置后面的严格模式有关。<br>
+1.如果设置了严格模式，则 NO_ZERO_DATE 自然满足。但如果是 INSERT IGNORE 或 UPDATE IGNORE，&lsquo;0000-00-00&rsquo;依然允许且只显示warning<br>
+2.如果在非严格模式下，设置了<code>NO_ZERO_DATE</code>，效果与上面一样，&lsquo;0000-00-00&rsquo;允许但显示warning；如果没有设置<code>NO_ZERO_DATE</code>，no warning，当做完全合法的值。
+3.<code>NO_ZERO_IN_DATE</code>情况与上面类似，不同的是控制日期和天，是否可为 0 ，即 <code>2010-01-00</code> 是否合法。</p>
+</li>
+<li>
+<p><code>NO_ENGINE_SUBSTITUTION</code><br>
+使用 <code>ALTER TABLE</code>或<code>CREATE TABLE</code> 指定 ENGINE 时， 需要的存储引擎被禁用或未编译，该如何处理。启用<code>NO_ENGINE_SUBSTITUTION</code>时，那么直接抛出错误；不设置此值时，CREATE用默认的存储引擎替代，ATLER不进行更改，并抛出一个 warning .</p>
+</li>
+<li>
+<p><code>STRICT_TRANS_TABLES</code>
+设置它，表示启用严格模式。<br>
+注意 <code>STRICT_TRANS_TABLES</code> 不是几种策略的组合，单独指 <code>INSERT</code>、<code>UPDATE</code>出现少值或无效值该如何处理:
+1.前面提到的把 &rsquo;&rsquo; 传给int，严格模式下非法，若启用非严格模式则变成0，产生一个warning
+2.Out Of Range，变成插入最大边界值
+3.A value is missing when a new row to be inserted does not contain a value for a non-NULL column that has no explicit DEFAULT clause in its definition</p>
+</li>
+</ul>
+<p>上面并没有囊括所有的 SQL Mode，选了几个代表性的，详细还是 <a href="https://mariadb.com/kb/en/mariadb/sql_mode/">看手册</a>。</p>
+<p>sql_mode一般来说很少去关注它，没有遇到实际问题之前不会去启停上面的条目。我们常设置的 sql_mode 是 <code>ANSI</code>、<code>STRICT_TRANS_TABLES</code>、<code>TRADITIONAL</code>，ansi和traditional是上面的几种组合。</p>
+<ul>
+<li><code>ANSI</code>：更改语法和行为，使其更符合标准SQL
+相当于REAL_AS_FLOAT, PIPES_AS_CONCAT, ANSI_QUOTES, IGNORE_SPACE</li>
+<li><code>TRADITIONAL</code>：更像传统SQL数据库系统，该模式的简单描述是当在列中插入不正确的值时“给出错误而不是警告”。
+相当于 STRICT_TRANS_TABLES, STRICT_ALL_TABLES, NO_ZERO_IN_DATE, NO_ZERO_DATE, ERROR_FOR_DIVISION_BY_ZERO, NO_AUTO_CREATE_USER, NO_ENGINE_SUBSTITUTION</li>
+<li><code>ORACLE</code>：相当于 PIPES_AS_CONCAT, ANSI_QUOTES, IGNORE_SPACE, NO_KEY_OPTIONS, NO_TABLE_OPTIONS, NO_FIELD_OPTIONS, NO_AUTO_CREATE_USER</li>
+</ul>
+<p>无论何种mode，产生error之后就意味着单条sql执行失败，对于支持事务的表，则导致当前事务回滚；但如果没有放在事务中执行，或者不支持事务的存储引擎表，则可能导致数据不一致。MySQL认为，相比直接报错终止，数据不一致问题更严重。于是 <code>STRICT_TRANS_TABLES</code> 对非事务表依然尽可能的让写入继续，比如给个&quot;最合理&quot;的默认值或截断。而对于 <code>STRICT_ALL_TABLES</code>，如果是单条更新，则不影响，但如果更新的是多条，第一条成功，后面失败则会出现部分更新。</p>
+<p>5.6.6 以后版本默认就是<code>NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES</code>，5.5默认为 &rsquo;&rsquo; 。</p>
+<h2 id="3-设置-sql_mode">3. 设置 sql_mode<a hidden class="anchor" aria-hidden="true" href="#3-设置-sql_mode">#</a></h2>
+<p><strong>查看</strong></p>
+<pre tabindex="0"><code>查看当前连接会话的sql模式：
+
+mysql&gt; select @@session.sql_mode;
+或者从环境变量里取
+mysql&gt; show variables like &#34;sql_mode&#34;;
+
+
+查看全局sql_mode设置：
+mysql&gt; select @@global.sql_mode;
+
+只设置global，需要重新连接进来才会生效
+</code></pre><p><strong>设置</strong></p>
+<pre tabindex="0"><code>形式如
+mysql&gt; set sql_mode=&#39;&#39;;
+mysql&gt; set global sql_mode=&#39;NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES&#39;;
+
+
+如果是自定义的模式组合，可以像下面这样
+
+Adding only one mode to sql_mode without removing existing ones:
+mysql&gt; SET sql_mode=(SELECT CONCAT(@@sql_mode,&#39;,&lt;mode_to_add&gt;&#39;));
+
+Removing only a specific mode from sql_mode without removing others:
+mysql&gt; SET sql_mode=(SELECT REPLACE(@@sql_mode,&#39;&lt;mode_to_remove&gt;&#39;,&#39;&#39;));
+</code></pre><p>配置文件里面设置<code>sql-mode=&quot;&quot;</code> 。</p>
+<h2 id="一个有趣的试验">一个有趣的试验<a hidden class="anchor" aria-hidden="true" href="#一个有趣的试验">#</a></h2>
+<p>updated: 2017-12-10</p>
+<p>现网做数据迁移测试时报另一个错误，原由是这样的：一个1.8亿的表里面，因为某种原因需要把字段定义null改为not null，避免下游服务（如ES）处理特殊数据时异常情况。但这是一个并发dml非常高又达到100多G的大表，online ddl针对这种修改字段类型简直束手无策，pt-osc也慢的很。</p>
+<p>刚好有一个做数据迁移的契机，原本打算在新库上把字段改好，再通过dts或类似的数据迁移工具，同步过去。在非严格模式下，原本是null的值也会变成0或&rsquo;&rsquo;，但还是报错了：</p>
+<pre tabindex="0"><code>set sql_mode=&#39;&#39;;  -- 置为非严格模式
+insert into t(id, a) values(1, null);
+[Err] 1048 - Column &#39;a&#39; cannot be null
+
+然而
+insert into t(id, a) values(1, null),(2, null),;
+Affected rows: 2
+</code></pre><p>找到官方文档上的原话，可以解释：</p>
+<blockquote>
+<p>If you are not using strict mode, then whenever you insert an “incorrect” value into a column, such as a NULL into a NOT NULL column or a too-large numeric value into a numeric column, MySQL sets the column to the “best possible value” instead of producing an error</p>
+</blockquote>
+<blockquote>
+<p>If you try to store NULL into a column that doesn&rsquo;t take NULL values, an error occurs for single-row INSERT statements. For multiple-row INSERT statements or for INSERT INTO &hellip; SELECT statements, MySQL Server stores the implicit default value for the column data type</p>
+</blockquote>
+<p>非严格模式下，<em>单行</em>插入 null 到 not null 列，会失败；多行插入则只是warning。规则是这样，也就无需解释。</p>
+<h2 id="参考">参考<a hidden class="anchor" aria-hidden="true" href="#参考">#</a></h2>
+<ul>
+<li><a href="https://dev.mysql.com/doc/refman/5.6/en/sql-mode.html#sql-mode-strict">MySQL manual sql-mode</a></li>
+<li><a href="http://xstarcd.github.io/wiki/MySQL/MySQL-sql-mode.html">mysql的sql_mode合理设置</a></li>
+<li><a href="http://dba.stackexchange.com/questions/109053/set-sql-mode-blank-after-upgrading-to-mysql-5-6">set-sql-mode-blank-after-upgrading-to-mysql-5-6</a></li>
+<li><a href="http://blog.itpub.net/29773961/viewspace-1813501/">MySQL SQL_MODE详解</a></li>
+</ul>
+<hr>
+<p>原文链接地址：http://xgknight.com/2016/04/22/mysql-sql-mode-troubleshooting/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/sql_mode/">sql_mode</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

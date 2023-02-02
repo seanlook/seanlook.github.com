@@ -1,992 +1,311 @@
-<!doctype html>
+<!DOCTYPE html>
+<html lang="en" dir="auto">
 
-
-
-  
-
-
-<html class="theme-next mist use-motion" lang="en">
-<head><meta name="generator" content="Hexo 3.9.0">
-  <meta charset="UTF-8">
+<head><meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>schema设计 | Sean Note</title>
+<meta name="keywords" content="">
+<meta name="description" content="">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/tags/schema%E8%AE%BE%E8%AE%A1/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<link rel="alternate" type="application/rss+xml" href="http://xgknight.com/tags/schema%E8%AE%BE%E8%AE%A1/index.xml">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="schema设计" />
+<meta property="og:description" content="" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="http://xgknight.com/tags/schema%E8%AE%BE%E8%AE%A1/" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="schema设计"/>
+<meta name="twitter:description" content=""/>
 
-
-
-<meta http-equiv="Cache-Control" content="no-transform">
-<meta http-equiv="Cache-Control" content="no-siteapp">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  
-  
-    
-  
-  <link href="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet" type="text/css">
-
-
-
-
-  
-  
-  
-  
-
-  
-    
-    
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-    
-    
-    <link href="//fonts.lug.ustc.edu.cn/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
-  
-
-
-
-
-
-
-  
-
-<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.6.2/css/font-awesome.min.css" rel="stylesheet" type="text/css">
-
-<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css">
-
-
-  <meta name="keywords" content="Hexo, seanlook, MySQL">
-
-
-
-
-
-  <link rel="alternate" href="/atom.xml" title="Sean's Notes" type="application/atom+xml">
-
-
-
-
-  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0">
-
-
-
-
-
-
-<meta name="description" content="Stay hungry, stay foolish.">
-<meta property="og:type" content="website">
-<meta property="og:title" content="Sean&#39;s Notes">
-<meta property="og:url" content="http://seanlook.com/tags/schema设计/index.html">
-<meta property="og:site_name" content="Sean&#39;s Notes">
-<meta property="og:description" content="Stay hungry, stay foolish.">
-<meta property="og:locale" content="en">
-<meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Sean&#39;s Notes">
-<meta name="twitter:description" content="Stay hungry, stay foolish.">
-
-
-
-<script type="text/javascript" id="hexo.configurations">
-  var NexT = window.NexT || {};
-  var CONFIG = {
-    root: '/',
-    scheme: 'Mist',
-    sidebar: {"position":"left","display":"post","offset":12,"offset_float":0,"b2t":false,"scrollpercent":false},
-    fancybox: true,
-    motion: true,
-    duoshuo: {
-      userId: '0',
-      author: 'Author'
-    },
-    algolia: {
-      applicationID: 'WNWHBKUL26',
-      apiKey: 'cec5cc7d455c77d448433aa60f989766',
-      indexName: 'seanlook',
-      hits: {"per_page":10},
-      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
-    }
-  };
-</script>
-
-
-
-  <link rel="canonical" href="http://seanlook.com/tags/schema设计/">
-
-
-
-
-
-  <title> Tag: schema设计 | Sean's Notes </title>
 </head>
 
-<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+<body class="list" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
 
-  
-
-
-
-
-
-  <script type="text/javascript">
-    var _hmt = _hmt || [];
-    (function() {
-      var hm = document.createElement("script");
-      hm.src = "https://hm.baidu.com/hm.js?62e026415456b0339db6d3912577a9fa";
-      var s = document.getElementsByTagName("script")[0];
-      s.parentNode.insertBefore(hm, s);
-    })();
-  </script>
-
-
-
-
-
-
-
-  <div style="display: none;">
-    <script src="//s95.cnzz.com/z_stat.php?id=1253513173&web_id=1253513173" language="JavaScript"></script>
-  </div>
-
-
-
-
-
-
-  
-  
-    
-  
-
-  <div class="container sidebar-position-left  ">
-    <div class="headband"></div>
-
-    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
-      <div class="header-inner"><div class="site-brand-wrapper">
-  <div class="site-meta ">
-    
-
-    <div class="custom-logo-site-title">
-      <a href="/" class="brand" rel="start">
-        <span class="logo-line-before"><i></i></span>
-        <span class="site-title">Sean's Notes</span>
-        <span class="logo-line-after"><i></i></span>
-      </a>
-    </div>
-      
-        <p class="site-subtitle">Stay hungry, stay foolish.</p>
-      
-  </div>
-
-  <div class="site-nav-toggle">
-    <button>
-      <span class="btn-bar"></span>
-      <span class="btn-bar"></span>
-      <span class="btn-bar"></span>
-    </button>
-  </div>
-</div>
-
-<nav class="site-nav">
-  
-
-  
-    <ul id="menu" class="menu">
-      
-        
-        <li class="menu-item menu-item-home">
-          <a href="/" rel="section">
-            
-              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
-            
-            Home
-          </a>
-        </li>
-      
-        
-        <li class="menu-item menu-item-archives">
-          <a href="/archives" rel="section">
-            
-              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
-            
-            Archives
-          </a>
-        </li>
-      
-        
-        <li class="menu-item menu-item-tags">
-          <a href="/tags" rel="section">
-            
-              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
-            
-            Tags
-          </a>
-        </li>
-      
-        
-        <li class="menu-item menu-item-about">
-          <a href="/about" rel="section">
-            
-              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
-            
-            About
-          </a>
-        </li>
-      
-
-      
-        <li class="menu-item menu-item-search">
-          
-            <a href="javascript:;" class="popup-trigger">
-          
-            
-              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
-            
-            Search
-          </a>
-        </li>
-      
-    </ul>
-  
-
-  
-    <div class="site-search">
-      
-  <div class="popup search-popup local-search-popup">
-  <div class="local-search-header clearfix">
-    <span class="search-icon">
-      <i class="fa fa-search"></i>
-    </span>
-    <span class="popup-btn-close">
-      <i class="fa fa-times-circle"></i>
-    </span>
-    <div class="local-search-input-wrapper">
-      <input autocapitalize="off" autocomplete="off" autocorrect="off" placeholder="Searching..." spellcheck="false" type="text" id="local-search-input">
-    </div>
-  </div>
-  <div id="local-search-result"></div>
-</div>
-
-
-
-    </div>
-  
-</nav>
-
-
-
- </div>
-    </header>
-
-    <main id="main" class="main">
-      <div class="main-inner">
-        <div class="content-wrap">
-          <div id="content" class="content">
-            
-
-  <div id="posts" class="posts-collapse">
-    <div class="collection-title">
-      <h2>
-        schema设计
-        <small>Tag</small>
-      </h2>
-    </div>
-
-    
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2017/02/17/mysql-autoincrement_2/" itemprop="url">
-              
-                <span itemprop="name">关于MySQL自增主键的几点问题（下）</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated" datetime="2017-02-17T16:32:49+08:00" content="2017-02-17">
-          02-17
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-    
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2017/02/16/mysql-autoincrement/" itemprop="url">
-              
-                <span itemprop="name">关于MySQL自增主键的几点问题（上）</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated" datetime="2017-02-16T16:32:49+08:00" content="2017-02-16">
-          02-16
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-    
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2016/05/18/mysql-blob-row_format/" itemprop="url">
-              
-                <span itemprop="name">InnoDB行格式对text/blob大变长字段的影响</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated" datetime="2016-05-18T16:32:49+08:00" content="2016-05-18">
-          05-18
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-    
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2016/05/05/mysql-type-conversion/" itemprop="url">
-              
-                <span itemprop="name">小心MySQL的隐式类型转换陷阱</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated" datetime="2016-05-05T16:32:49+08:00" content="2016-05-05">
-          05-05
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-    
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2016/04/29/mysql-numeric-int-float/" itemprop="url">
-              
-                <span itemprop="name">MySQL数字类型int与tinyint、float与decimal如何选择</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated" datetime="2016-04-29T16:32:49+08:00" content="2016-04-29">
-          04-29
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-    
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2016/04/28/mysql-char-varchar-set/" itemprop="url">
-              
-                <span itemprop="name">MySQL字符数据类型char与varchar的区别</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated" datetime="2016-04-28T16:32:49+08:00" content="2016-04-28">
-          04-28
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-    
-  </div>
-
-  
-
-
-          </div>
-          
-
-
-          
-
-        </div>
-        
-          
-  
-  <div class="sidebar-toggle">
-    <div class="sidebar-toggle-line-wrap">
-      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
-      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
-      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
-    </div>
-  </div>
-
-  <aside id="sidebar" class="sidebar">
-    <div class="sidebar-inner">
-
-      
-
-      
-
-      <section class="site-overview sidebar-panel sidebar-panel-active">
-        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
-          <img class="site-author-image" itemprop="image" src="/images/avatar_sean.jpg" alt="seanlook">
-          <p class="site-author-name" itemprop="name">seanlook</p>
-           
-              <p class="site-description motion-element" itemprop="description">Stay hungry, stay foolish.</p>
-          
-        </div>
-        <nav class="site-state motion-element">
-
-          
-            <div class="site-state-item site-state-posts">
-              <a href="/archives">
-                <span class="site-state-item-count">120</span>
-                <span class="site-state-item-name">posts</span>
-              </a>
-            </div>
-          
-
-          
-            
-            
-            <div class="site-state-item site-state-categories">
-              <a href="/categories/index.html">
-                <span class="site-state-item-count">24</span>
-                <span class="site-state-item-name">categories</span>
-              </a>
-            </div>
-          
-
-          
-            
-            
-            <div class="site-state-item site-state-tags">
-              <a href="/tags/index.html">
-                <span class="site-state-item-count">128</span>
-                <span class="site-state-item-name">tags</span>
-              </a>
-            </div>
-          
-
-        </nav>
-
-        
-          <div class="feed-link motion-element">
-            <a href="/atom.xml" rel="alternate">
-              <i class="fa fa-rss"></i>
-              RSS
-            </a>
-          </div>
-        
-
-        <div class="links-of-author motion-element">
-          
-            
-              <span class="links-of-author-item">
-                <a href="https://github.com/seanlook" target="_blank" title="github">
-                  
-                    <i class="fa fa-fw fa-globe"></i>
-                  
-                  github
-                </a>
-              </span>
-            
-              <span class="links-of-author-item">
-                <a href="http://weibo.com/zhouxiaozhxi" target="_blank" title="weibo">
-                  
-                    <i class="fa fa-fw fa-globe"></i>
-                  
-                  weibo
-                </a>
-              </span>
-            
-          
-        </div>
-
-        
-        
-
-        
-        
-
-        
-
-
-      </section>
-
-      
-
-      
-
-    </div>
-  </aside>
-
-
-        
-      </div>
-    </main>
-
-    <footer id="footer" class="footer">
-      <div class="footer-inner">
-        <div class="copyright">
-  
-  &copy;  2014 - 
-  <span itemprop="copyrightYear">2020</span>
-  <span class="with-love">
-    <i class="fa fa-heart"></i>
-  </span>
-  <span class="author" itemprop="copyrightHolder">seanlook</span>
-</div>
-
-
-<div class="powered-by">
-  Powered by <a class="theme-link" href="https://hexo.io">Hexo</a>
-</div>
-
-<div class="theme-info">
-  Theme -
-  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
-    NexT.Mist
-  </a>
-</div>
-
-
-        
-
-        
-      </div>
-    </footer>
-
-    
-      <div class="back-to-top">
-        <i class="fa fa-arrow-up"></i>
-        
-      </div>
-    
-
-  </div>
-
-  
-
-<script type="text/javascript">
-  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
-    window.Promise = null;
-  }
 </script>
 
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main"> 
+<header class="page-header">
+  <h1>
+    schema设计
+  </h1>
+</header>
 
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>关于MySQL自增主键的几点问题（下）
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>AUTO-INC waiting 锁等待 这是生产环境出现的现象，某日下午5点业务高峰期，我们的 慢查询快照抓取程序 报出大量线程阻塞，但是1分钟以后就好了。于是分析了当时的 processlist 和 innodb status 现场记录，发现有大量的 AUTO-INC waiting：
+![auto-inc-lock-wait][1]
+当时想这是得多大的并发量，才会导致 AUTO_INCREMENT 列的自增id分配出现性能问题，不太愿意相信这个事实（后面就再也没出现过）。了解一番之后（见 关于MySQLz自增主键问题（上篇）），发现这个表级别的 AUTO-INC lock 就不应该在业务中存在，因为 innodb_autoinc_lock_mode为1，普通业务都是 simple inserts，获取自增id是靠内存里维护的一个互斥量（mutex counter）。
+问题拿到知数堂优化班上课群里讨论过，也只是猜测是不是慢查询多了导致负载高，或者当时磁盘遇到什么物理故障阿里云那边自动恢复了。再后来怀疑是不是因为插入时带了 auto_increment 列的值（我们有个redis incr实现的自增id服务，虽然这一列有 AAUTO_INCREMENT 定义，但实际已经从发号器取id了），会导致锁的性质会变？
+为了弄清这个疑问，特意去看了下mysql源码，发现如果插入的自增值比表当前AUTOINC值要大，是直接update mutex counter：
+看源码的时候也打消了另一个疑虑：show engine innodb status 看到的 AUTO-INC 有没有可能不区分 表级自增锁和互斥量计数器 两种自增方案，只是告诉你自增id获取忙不过来？ 实际不是的，代码里面有明确的定义是 autoinc_lock还是autoinc_mutex：
+// dict0dict.cc : #ifndef UNIV_HOTBACKUP /********************************************************************//** Acquire the autoinc lock. */ UNIV_INTERN void dict_table_autoinc_lock( /*====================*/ dict_table_t*	table)	/*!&lt; in/out: table */ { mutex_enter(&amp;table-&gt;autoinc_mutex); } /********************************************************************//** Unconditionally set the autoinc counter....</p>
+  </div>
+  <footer class="entry-footer"><span title='2017-02-17 16:32:49 +0000 UTC'>February 17, 2017</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 关于MySQL自增主键的几点问题（下）" href="http://xgknight.com/posts/2017/02/%E5%85%B3%E4%BA%8Emysql%E8%87%AA%E5%A2%9E%E4%B8%BB%E9%94%AE%E7%9A%84%E5%87%A0%E7%82%B9%E9%97%AE%E9%A2%98%E4%B8%8B/"></a>
+</article>
 
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>关于MySQL自增主键的几点问题（上）
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>前段时间遇到一个InnoDB表自增锁导致的问题，最近刚好有一个同行网友也问到自增锁的疑问，所以抽空系统的总结一下，这两个问题下篇会有阐述。
+1. 划分三种插入类型 这里区分一下几种插入数据行的类型，便于后面描述：（纯逻辑上的划分）
+“Simple inserts”
+简单插入，就是在处理sql语句的时候，能够提前预估到插入的行数，包括 INSERT / REPLACE 的单行、多行插入，但不含嵌套子查询以及 INSERT ... ON DUPLICATE KEY UPDATE。
+“Bulk inserts”
+本文暂且叫做 大块插入，不能提前预知语句要插入的行数，也就无法知道分配多少个自增值，包括 INSERT ... SELECT, REPLACE ... SELECT, 以及 LOAD DATA 导入语句。InnoDB会每处理一行记录就为 AUTO_INCREMENT 列分配一个值。
+“Mixed-mode inserts”
+混合插入，比如在 “简单插入” 多行记录的时候，有的新行有指定自增值，有的没有，所以获得最坏情况下需要插入的数量，然后一次性分配足够的auto_increment id。比如:
+# c1 是 t1 的 AUTO_INCREMENT 列 INSERT INTO t1 (c1,c2) VALUES (1,&#39;a&#39;), (NULL,&#39;b&#39;), (5,&#39;c&#39;), (NULL,&#39;d&#39;); 又比如 INSERT ... ON DUPLICATE KEY UPDATE，它在 update 阶段有可能分配新的自增id，也可能不会。
+2. 三种自增模式：innodb_autoinc_lock_mode 在以 5.6 版本，自增id累加模式分为：
+** 传统模式**...</p>
+  </div>
+  <footer class="entry-footer"><span title='2017-02-16 16:32:49 +0000 UTC'>February 16, 2017</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 关于MySQL自增主键的几点问题（上）" href="http://xgknight.com/posts/2017/02/%E5%85%B3%E4%BA%8Emysql%E8%87%AA%E5%A2%9E%E4%B8%BB%E9%94%AE%E7%9A%84%E5%87%A0%E7%82%B9%E9%97%AE%E9%A2%98%E4%B8%8A/"></a>
+</article>
 
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>InnoDB行格式对text/blob大变长字段的影响
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>最近在排查现网Text与Blob类型，发现有不少，在《高性能MySQL(第3版)》看到对这两种变长数据类型的处理会涉及到在磁盘上创建临时表，性能开销比较大。于是把影响blob型数据存储方式了解了一下：row_format。
+1. InnoDB的Antelop与Barracuda文件格式 Innodb存储引擎保存记录，是以行的形式存放的（与之对应的是像Google BigTable这种列数据库）。在InnoDB 1.0.x版本之前，InnoDB 存储引擎提供了 Compact 和 Redundant 两种格式来存放行记录数据，这也是目前使用最多的一种格式。Redundant 格式是为兼容之前版本而保留的。
+MySQL 5.1 中的 innodb_plugin 引入了新的文件格式：Barracuda（将以前的行格式 compact 和 redundant 合称为Antelope），该文件格式拥有新的两种行格式：compressed和dynamic。
+在 MySQL 5.6 版本中，默认还是 Compact 行格式，也是目前使用最多的一种 ROW FORMAT。用户可以通过命令 SHOW TABLE STATUS LIKE&#39;table_name&#39; 来查看当前表使用的行格式，其中 row_format 列表示当前所使用的行记录结构类型。
+mysql&gt; show variables like &#34;innodb_file_format&#34;; &#43;--------------------&#43;-----------&#43; | Variable_name | Value | &#43;--------------------&#43;-----------&#43; | innodb_file_format | Barracuda | &#43;--------------------&#43;-----------&#43; 1 row in set mysql&gt; show table status like &#34;tablename%&#34;\G *************************** 1. row *************************** Name: t_rf_compact Engine: InnoDB Version: 10 Row_format: Compact Rows: 4 Avg_row_length: 36864 Data_length: 147456 Max_data_length: 0 Index_length: 0 Data_free: 0 Auto_increment: 7 Create_time: 2016-05-14 20:52:58 Update_time: NULL Check_time: NULL Collation: utf8_general_ci Checksum: NULL Create_options: Comment: 1 row in set (0....</p>
+  </div>
+  <footer class="entry-footer"><span title='2016-05-18 16:32:49 +0000 UTC'>May 18, 2016</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to InnoDB行格式对text/blob大变长字段的影响" href="http://xgknight.com/posts/2016/05/innodb%E8%A1%8C%E6%A0%BC%E5%BC%8F%E5%AF%B9text/blob%E5%A4%A7%E5%8F%98%E9%95%BF%E5%AD%97%E6%AE%B5%E7%9A%84%E5%BD%B1%E5%93%8D/"></a>
+</article>
 
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>小心MySQL的隐式类型转换陷阱
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>1. 隐式类型转换实例 今天生产库上突然出现MySQL线程数告警，IOPS很高，实例会话里面出现许多类似下面的sql：(修改了相关字段和值)
+SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233) 用 explain 看了下扫描行数和索引选择情况：
+mysql&gt;explain SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233); &#43;------&#43;---------------&#43;---------&#43;--------&#43;--------------------------------&#43;---------------&#43;------------&#43;--------&#43;--------&#43;------------------------------------&#43; | id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra | &#43;------&#43;---------------&#43;---------&#43;--------&#43;--------------------------------&#43;---------------&#43;------------&#43;--------&#43;--------&#43;------------------------------------&#43; | 1 | SIMPLE | t_tb1 | ref | uid_type_frid,idx_corpid_qq1id | uid_type_frid | 8 | const | 1386 | Using index condition; Using where | &#43;------&#43;---------------&#43;---------&#43;--------&#43;--------------------------------&#43;---------------&#43;------------&#43;--------&#43;--------&#43;------------------------------------&#43; 共返回 1 行记录,花费 11....</p>
+  </div>
+  <footer class="entry-footer"><span title='2016-05-05 16:32:49 +0000 UTC'>May 5, 2016</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 小心MySQL的隐式类型转换陷阱" href="http://xgknight.com/posts/2016/05/%E5%B0%8F%E5%BF%83mysql%E7%9A%84%E9%9A%90%E5%BC%8F%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E9%99%B7%E9%98%B1/"></a>
+</article>
 
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>MySQL数字类型int与tinyint、float与decimal如何选择
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>最近在准备给开发做一个mysql数据库开发规范方面培训，一步一步来，结合在生产环境发现的数据库方面的问题，从几个常用的数据类型说起。
+int、tinyint与bigint 它们都是（精确）整型数据类型，但是占用字节数和表达的范围不同。首先没有这个表就说不过去了：
+Type Storage Minimum Value Maximum Value (Bytes) (Signed/Unsigned) (Signed/Unsigned) TINYINT 1 -128 127 0 255 SMALLINT 2 -32768 32767 0 65535 MEDIUMINT 3 -8388608 8388607 0 16777215 INT 4 -2147483648 2147483647 0 4294967295 BIGINT 8 -9223372036854775808 9223372036854775807 0 18446744073709551615 只需要知道对应类型占多少字节就能推算出范围了，比如int占 4 bytes,即4*8=32bits，大约10位数字，也能理解为什么int默认显示位数是11。
+遇到比较多的是tinyint和bigint，tinyint一般用于存放status,type这种数值小的数据，不够用时可能会用smallint。bigint一般用于自增主键。
+为了避免数据库被过度设计，布尔、枚举类型也采用tinyint。
+还有一点也是经常被提到的关于 int(M) 中M的理解，int型数据无论是int(4)还是int(11)，都已经占用了 4 bytes 存储空间，M表示的只是显示宽度(display width, max value 255)，并不是定义int的长度。
+例如：
+mysql&gt; CREATE TABLE `tc_integer` ( `f_id` bigint(20) PRIMARY KEY AUTO_INCREMENT, `f_type` tinyint, `f_flag` tinyint(1), `f_num` smallint(5) unsigned ZEROFILL ) ENGINE=InnoDB DEFAULT CHARSET=utf8; mysql&gt; desc tc_integer; &#43;----------------&#43;-------------------------------&#43;------&#43;-----&#43;---------&#43;----------------&#43; | Field | Type | Null | Key | Default | Extra | &#43;----------------&#43;-------------------------------&#43;------&#43;-----&#43;---------&#43;----------------&#43; | f_id | bigint(20) | NO | PRI | NULL | auto_increment | | f_type | tinyint(4) | YES | | NULL | | | f_flag | tinyint(1) | YES | | NULL | | | f_num | smallint(5) unsigned zerofill | YES | | NULL | | &#43;----------------&#43;-------------------------------&#43;------&#43;-----&#43;---------&#43;----------------&#43; 4 rows in set (0....</p>
+  </div>
+  <footer class="entry-footer"><span title='2016-04-29 16:32:49 +0000 UTC'>April 29, 2016</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to MySQL数字类型int与tinyint、float与decimal如何选择" href="http://xgknight.com/posts/2016/04/mysql%E6%95%B0%E5%AD%97%E7%B1%BB%E5%9E%8Bint%E4%B8%8Etinyintfloat%E4%B8%8Edecimal%E5%A6%82%E4%BD%95%E9%80%89%E6%8B%A9/"></a>
+</article>
 
-
-
-  
-
-
-
-
-
-
-  
-  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery/2.1.3/jquery.min.js"></script>
-
-  
-  <script type="text/javascript" src="//cdn.jsdelivr.net/fastclick/1.0.6/fastclick.min.js"></script>
-
-  
-  <script type="text/javascript" src="//cdn.jsdelivr.net/jquery.lazyload/1.9.3/jquery.lazyload.min.js"></script>
-
-  
-  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.min.js"></script>
-
-  
-  <script type="text/javascript" src="//cdn.jsdelivr.net/velocity/1.2.3/velocity.ui.min.js"></script>
-
-  
-  <script type="text/javascript" src="//cdn.jsdelivr.net/fancybox/2.1.5/jquery.fancybox.pack.js"></script>
-
-
-  
-
-
-  <script type="text/javascript" src="/js/src/utils.js?v=5.1.0"></script>
-
-  <script type="text/javascript" src="/js/src/motion.js?v=5.1.0"></script>
-
-
-
-  
-  
-
-  
-
-  
-
-
-  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.0"></script>
-
-
-
-  
-
-
-  
-
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>MySQL字符数据类型char与varchar的区别
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>数据类型差不多是接触mysql一开始就了解的内容，最近遇到几个现象如varchar自动转mediumtext，blob存储性能的问题，不得不回头明确一下关于MySQL常用数据类型的选择。
+mysql手册这里 已经讲的很清楚了。它们都是定义字符串型字段时常用的类型，但它们存储和检索的方式有不同，最大长度和尾部的空格是否保留也有差别。
+char类型是使用固定长度空间进行存储，范围0-255。比如CHAR(30)能放30个字符，存放abcd时，尾部会以空格补齐，实际占用空间 30 * 3bytes (utf8)。检索它的时候尾部空格会被去除。
+char善于存储经常改变的值，或者长度相对固定的值，比如type、ip地址或md5之类的数据，不容易产生碎片。关于它的效率可以参考这里。
+varchar类型保存可变长度字符串，范围0-65535（但受到单行最大64kb的限制）。比如用 varchar(30) 去存放abcd，实际使用5个字节，因为还需要使用额外1个字节来标识字串长度（0-255使用1个字节，超过255需要2个字节）。
+varchar善于存储值的长短不一的列，也是用的最多的一种类型，节省磁盘空间。update时varchar列时，如果新数据比原数据大，数据库需要重新开辟空间，这一点会有性能略有损耗，但innodb引擎下查询效率比char高一点。这也是innodb官方推荐的类型。
+如果存储时真实长度超过了char或者varchar定义的最大长度呢？
+在SQL严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示错误，即插入失败 在SQL非严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示warning，但可以成功 如果尾部要被截断的是空格，无论SQL所处模式，varchar都可以插入成功但提示warning；char也可以插入成功，并且无任何提示 这里特意提到SQL的严格模式，是因为在工作中也遇到过一些坑，参考MySQL的sql_mode严格模式注意点。
+贴上官方的一个表格：
+Value CHAR(4) Storage Required VARCHAR(4) Storage Required &#39;&#39; ’ &#39; 4 bytes &#39;&#39; 1 byte ‘ab’ ‘ab &#39; 4 bytes ‘ab’ 3 bytes ‘abcd’ ‘abcd’ 4 bytes ‘abcd’ 5 bytes ‘abcdefgh’ ‘abcd’ 4 bytes ‘abcd’ 5 bytes 另外，mysql字段值比较时默认是不区分大小写的，这是由于他们的校对规则（一般是 utf8_general_ci）决定的，按字符比较，所以查询时 值尾部 的空格也是被忽略的，除非建表时对列指定 BINARY （校对字符集变成utf8_bin）或者select * from vc where binary v=&#39;ab &#39;;，就会按字节比较，即比较时区分大小写和尾部空格。
+需要注意的是，使用varchar不能因为长度可变就随意分大空间，比如90个字节能放够的列定义成varchar(200)，因为开辟内存时是以200字节进行的，遇到需要filesort或tmp table作业可能会带来不利影响。...</p>
+  </div>
+  <footer class="entry-footer"><span title='2016-04-28 16:32:49 +0000 UTC'>April 28, 2016</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to MySQL字符数据类型char与varchar的区别" href="http://xgknight.com/posts/2016/04/mysql%E5%AD%97%E7%AC%A6%E6%95%B0%E6%8D%AE%E7%B1%BB%E5%9E%8Bchar%E4%B8%8Evarchar%E7%9A%84%E5%8C%BA%E5%88%AB/"></a>
+</article>
+    </main>
     
-      <script id="dsq-count-scr" src="https://seanlook.disqus.com/count.js" async></script>
-    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
 
-    
-
-  
-
-
-
-
-	
-
-
-
-
-
-  
-
-
-
-
-
-  
-
-
-
-
-
-  
-
-
-
-
-
-
-  
-
-  <script type="text/javascript">
-    // Popup Window;
-    var isfetched = false;
-    // Search DB path;
-    var search_path = "search.xml";
-    if (search_path.length == 0) {
-      search_path = "search.xml";
-    }
-    var path = "/" + search_path;
-    // monitor main search box;
-
-    function proceedsearch() {
-      $("body")
-        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
-        .css('overflow', 'hidden');
-      $('.popup').toggle();
-    }
-    // search function;
-    var searchFunc = function(path, search_id, content_id) {
-      'use strict';
-      $.ajax({
-        url: path,
-        dataType: "xml",
-        async: true,
-        success: function( xmlResponse ) {
-          // get the contents from search data
-          isfetched = true;
-          $('.popup').detach().appendTo('.header-inner');
-          var datas = $( "entry", xmlResponse ).map(function() {
-            return {
-              title: $( "title", this ).text(),
-              content: $("content",this).text(),
-              url: $( "url" , this).text()
-            };
-          }).get();
-          var $input = document.getElementById(search_id);
-          var $resultContent = document.getElementById(content_id);
-          $input.addEventListener('input', function(){
-            var matchcounts = 0;
-            var str='<ul class=\"search-result-list\">';
-            var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
-            $resultContent.innerHTML = "";
-            if (this.value.trim().length > 1) {
-              // perform local searching
-              datas.forEach(function(data) {
-                var isMatch = false;
-                var content_index = [];
-                var data_title = data.title.trim().toLowerCase();
-                var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
-                var data_url = decodeURIComponent(data.url);
-                var index_title = -1;
-                var index_content = -1;
-                var first_occur = -1;
-                // only match artiles with not empty titles and contents
-                if(data_title != '') {
-                  keywords.forEach(function(keyword, i) {
-                    index_title = data_title.indexOf(keyword);
-                    index_content = data_content.indexOf(keyword);
-                    if( index_title >= 0 || index_content >= 0 ){
-                      isMatch = true;
-                      if (i == 0) {
-                        first_occur = index_content;
-                      }
-                    }
-
-                  });
-                }
-                // show search results
-                if (isMatch) {
-                  matchcounts += 1;
-                  str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
-                  var content = data.content.trim().replace(/<[^>]+>/g,"");
-                  if (first_occur >= 0) {
-                    // cut out 100 characters
-                    var start = first_occur - 20;
-                    var end = first_occur + 80;
-                    if(start < 0){
-                      start = 0;
-                    }
-                    if(start == 0){
-                      end = 50;
-                    }
-                    if(end > content.length){
-                      end = content.length;
-                    }
-                    var match_content = content.substring(start, end);
-                    // highlight all keywords
-                    keywords.forEach(function(keyword){
-                      var regS = new RegExp(keyword, "gi");
-                      match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
-                    });
-
-                    str += "<p class=\"search-result\">" + match_content +"...</p>"
-                  }
-                  str += "</li>";
-                }
-              })};
-            str += "</ul>";
-            if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
-            if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
-            $resultContent.innerHTML = str;
-          });
-          proceedsearch();
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
         }
-      });}
+    }
 
-    // handle and trigger popup window;
-    $('.popup-trigger').click(function(e) {
-      e.stopPropagation();
-      if (isfetched == false) {
-        searchFunc(path, 'local-search-input', 'local-search-result');
-      } else {
-        proceedsearch();
-      };
-    });
-
-    $('.popup-btn-close').click(function(e){
-      $('.popup').hide();
-      $(".local-search-pop-overlay").remove();
-      $('body').css('overflow', '');
-    });
-    $('.popup').click(function(e){
-      e.stopPropagation();
-    });
-  </script>
-
-
-
-
-
-  
-
-  
-  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.1.js"></script>
-  <script>AV.initialize("NliJVBn0857TMk5HYrIRt5wp-gzGzoHsz", "jB9B4QG8Rm8YP04RQqnsKy5M");</script>
-  <script>
-    function showTime(Counter) {
-      var query = new AV.Query(Counter);
-      var entries = [];
-      var $visitors = $(".leancloud_visitors");
-
-      $visitors.each(function () {
-        entries.push( $(this).attr("id").trim() );
-      });
-
-      query.containedIn('url', entries);
-      query.find()
-        .done(function (results) {
-          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
-
-          if (results.length === 0) {
-            $visitors.find(COUNT_CONTAINER_REF).text(0);
-            return;
-          }
-
-          for (var i = 0; i < results.length; i++) {
-            var item = results[i];
-            var url = item.get('url');
-            var time = item.get('time');
-            var element = document.getElementById(url);
-
-            $(element).find(COUNT_CONTAINER_REF).text(time);
-          }
-          for(var i = 0; i < entries.length; i++) {
-            var url = entries[i];
-            var element = document.getElementById(url);
-            var countSpan = $(element).find(COUNT_CONTAINER_REF);
-            if( countSpan.text() == '') {
-              countSpan.text(0);
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
             }
-          }
-        })
-        .fail(function (object, error) {
-          console.log("Error: " + error.code + " " + error.message);
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
         });
-    }
-
-    function addCount(Counter) {
-      var $visitors = $(".leancloud_visitors");
-      var url = $visitors.attr('id').trim();
-      var title = $visitors.attr('data-flag-title').trim();
-      var query = new AV.Query(Counter);
-
-      query.equalTo("url", url);
-      query.find({
-        success: function(results) {
-          if (results.length > 0) {
-            var counter = results[0];
-            counter.fetchWhenSave(true);
-            counter.increment("time");
-            counter.save(null, {
-              success: function(counter) {
-                var $element = $(document.getElementById(url));
-                $element.find('.leancloud-visitors-count').text(counter.get('time'));
-              },
-              error: function(counter, error) {
-                console.log('Failed to save Visitor num, with error message: ' + error.message);
-              }
-            });
-          } else {
-            var newcounter = new Counter();
-            /* Set ACL */
-            var acl = new AV.ACL();
-            acl.setPublicReadAccess(true);
-            acl.setPublicWriteAccess(true);
-            newcounter.setACL(acl);
-            /* End Set ACL */
-            newcounter.set("title", title);
-            newcounter.set("url", url);
-            newcounter.set("time", 1);
-            newcounter.save(null, {
-              success: function(newcounter) {
-                var $element = $(document.getElementById(url));
-                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
-              },
-              error: function(newcounter, error) {
-                console.log('Failed to create');
-              }
-            });
-          }
-        },
-        error: function(error) {
-          console.log('Error:' + error.code + " " + error.message);
-        }
-      });
-    }
-
-    $(function() {
-      var Counter = AV.Object.extend("Counter");
-      if ($('.leancloud_visitors').length == 1) {
-        addCount(Counter);
-      } else if ($('.post-title-link').length > 1) {
-        showTime(Counter);
-      }
     });
-  </script>
 
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
 
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
 
-  
-
-  
-
-  
-
+</script>
 </body>
+
 </html>

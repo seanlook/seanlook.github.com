@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>MySQL order by limit 走错索引(range-&gt;indexscan) | Sean Note</title>
+<meta name="keywords" content="mysql, 优化">
+<meta name="description" content="生产库遇到过好几例本文要讨论的案例，而且比较棘手。简而言之，有类似这样的查询 SELECT * FROM t1 where t1.f2&gt;1 and t2.f2&lt;100 order by t1.id，id是主键，条件里面有个range查询，就会造成优化器是选择主键，还是选择filesort问题，有些特殊情况就会选错索引，比如为了回避内存排序，选择了主键扫描，导致原本走范围过滤再sort 500ms勉强可以结束的查询，5分钟不出结果。
+下面具体来这个案例。
+1. 背景 阿里云RDS，5.6.16-log。 表 d_ec_someextend.t_tbl_test_time_08:
+CREATE TABLE `t_tbl_test_time_08` ( `f_some_id` int(11) unsigned DEFAULT &#39;0&#39;, `f_qiye_id` int(11) DEFAULT &#39;0&#39;, `f_type` tinyint(3) DEFAULT &#39;0&#39; COMMENT &#39;有效联系类型 1: QQ联系，2:拨打电话，3:发送邮件，4:发送短信，5:添加跟进记录，6:拜访客户，7:EC联系，8:更新客户阶段&#39;, `f_contact_time` timestamp NULL DEFAULT &#39;1970-01-01 16:00:01&#39;, UNIQUE KEY `some_qiye_type` (`f_some_id`,`f_qiye_id`,`f_type`), KEY `f_contact_time` (`f_contact_time`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4; 表索引信息：
+mysql&gt; show table status like &#34;t_tbl_test_time_08&#34;; &#43;-----------------------&#43;--------&#43;---------&#43;------------&#43;----------&#43;----------------&#43;-------------&#43;-----------------&#43;--------------&#43;-----------&#43;----------------&#43;---------------------&#43;-------------&#43;------------&#43;--------------------&#43;----------&#43;----------------&#43;---------&#43;--------------&#43; | Name | Engine | Version | Row_format | Rows | Avg_row_length | Data_length | Max_data_length | Index_length | Data_free | Auto_increment | Create_time | Update_time | Check_time | Collation | Checksum | Create_options | Comment | Block_format | &#43;-----------------------&#43;--------&#43;---------&#43;------------&#43;----------&#43;----------------&#43;-------------&#43;-----------------&#43;--------------&#43;-----------&#43;----------------&#43;---------------------&#43;-------------&#43;------------&#43;--------------------&#43;----------&#43;----------------&#43;---------&#43;--------------&#43; | t_tbl_test_time_08 | InnoDB | 10 | Compact | 19264318 | 45 | 882900992 | 0 | 2176843776 | 752877568 | NULL | 2017-10-25 20:27:08 | NULL | NULL | utf8mb4_general_ci | NULL | | | Original | &#43;-----------------------&#43;--------&#43;---------&#43;------------&#43;----------&#43;----------------&#43;-------------&#43;-----------------&#43;--------------&#43;-----------&#43;----------------&#43;---------------------&#43;-------------&#43;------------&#43;--------------------&#43;----------&#43;----------------&#43;---------&#43;--------------&#43; 1 row in set mysql&gt; show index from t_tbl_test_time_08; &#43;--------------------&#43;------------&#43;-----------------&#43;--------------&#43;----------------&#43;-----------&#43;-------------&#43;----------&#43;--------&#43;------&#43;------------&#43;---------&#43;---------------&#43; | Table | Non_unique | Key_name | Seq_in_index | Column_name | Collation | Cardinality | Sub_part | Packed | Null | Index_type | Comment | Index_comment | &#43;--------------------&#43;------------&#43;-----------------&#43;--------------&#43;----------------&#43;-----------&#43;-------------&#43;----------&#43;--------&#43;------&#43;------------&#43;---------&#43;---------------&#43; | t_tbl_test_time_08 | 0 | some_qiye_type | 1 | f_some_id | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 0 | some_qiye_type | 2 | f_qiye_id | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 0 | some_qiye_type | 3 | f_type | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 1 | f_contact_time | 1 | f_contact_time | A | 9632159 | NULL | NULL | YES | BTREE | | | &#43;--------------------&#43;------------&#43;-----------------&#43;--------------&#43;----------------&#43;-----------&#43;-------------&#43;----------&#43;--------&#43;------&#43;------------&#43;---------&#43;---------------&#43; 4 rows in set 问题查询：">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2017/10/mysql-order-by-limit-%E8%B5%B0%E9%94%99%E7%B4%A2%E5%BC%95range-indexscan/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="MySQL order by limit 走错索引(range-&gt;indexscan)" />
+<meta property="og:description" content="生产库遇到过好几例本文要讨论的案例，而且比较棘手。简而言之，有类似这样的查询 SELECT * FROM t1 where t1.f2&gt;1 and t2.f2&lt;100 order by t1.id，id是主键，条件里面有个range查询，就会造成优化器是选择主键，还是选择filesort问题，有些特殊情况就会选错索引，比如为了回避内存排序，选择了主键扫描，导致原本走范围过滤再sort 500ms勉强可以结束的查询，5分钟不出结果。
+下面具体来这个案例。
+1. 背景 阿里云RDS，5.6.16-log。 表 d_ec_someextend.t_tbl_test_time_08:
+CREATE TABLE `t_tbl_test_time_08` ( `f_some_id` int(11) unsigned DEFAULT &#39;0&#39;, `f_qiye_id` int(11) DEFAULT &#39;0&#39;, `f_type` tinyint(3) DEFAULT &#39;0&#39; COMMENT &#39;有效联系类型 1: QQ联系，2:拨打电话，3:发送邮件，4:发送短信，5:添加跟进记录，6:拜访客户，7:EC联系，8:更新客户阶段&#39;, `f_contact_time` timestamp NULL DEFAULT &#39;1970-01-01 16:00:01&#39;, UNIQUE KEY `some_qiye_type` (`f_some_id`,`f_qiye_id`,`f_type`), KEY `f_contact_time` (`f_contact_time`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4; 表索引信息：
+mysql&gt; show table status like &#34;t_tbl_test_time_08&#34;; &#43;-----------------------&#43;--------&#43;---------&#43;------------&#43;----------&#43;----------------&#43;-------------&#43;-----------------&#43;--------------&#43;-----------&#43;----------------&#43;---------------------&#43;-------------&#43;------------&#43;--------------------&#43;----------&#43;----------------&#43;---------&#43;--------------&#43; | Name | Engine | Version | Row_format | Rows | Avg_row_length | Data_length | Max_data_length | Index_length | Data_free | Auto_increment | Create_time | Update_time | Check_time | Collation | Checksum | Create_options | Comment | Block_format | &#43;-----------------------&#43;--------&#43;---------&#43;------------&#43;----------&#43;----------------&#43;-------------&#43;-----------------&#43;--------------&#43;-----------&#43;----------------&#43;---------------------&#43;-------------&#43;------------&#43;--------------------&#43;----------&#43;----------------&#43;---------&#43;--------------&#43; | t_tbl_test_time_08 | InnoDB | 10 | Compact | 19264318 | 45 | 882900992 | 0 | 2176843776 | 752877568 | NULL | 2017-10-25 20:27:08 | NULL | NULL | utf8mb4_general_ci | NULL | | | Original | &#43;-----------------------&#43;--------&#43;---------&#43;------------&#43;----------&#43;----------------&#43;-------------&#43;-----------------&#43;--------------&#43;-----------&#43;----------------&#43;---------------------&#43;-------------&#43;------------&#43;--------------------&#43;----------&#43;----------------&#43;---------&#43;--------------&#43; 1 row in set mysql&gt; show index from t_tbl_test_time_08; &#43;--------------------&#43;------------&#43;-----------------&#43;--------------&#43;----------------&#43;-----------&#43;-------------&#43;----------&#43;--------&#43;------&#43;------------&#43;---------&#43;---------------&#43; | Table | Non_unique | Key_name | Seq_in_index | Column_name | Collation | Cardinality | Sub_part | Packed | Null | Index_type | Comment | Index_comment | &#43;--------------------&#43;------------&#43;-----------------&#43;--------------&#43;----------------&#43;-----------&#43;-------------&#43;----------&#43;--------&#43;------&#43;------------&#43;---------&#43;---------------&#43; | t_tbl_test_time_08 | 0 | some_qiye_type | 1 | f_some_id | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 0 | some_qiye_type | 2 | f_qiye_id | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 0 | some_qiye_type | 3 | f_type | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 1 | f_contact_time | 1 | f_contact_time | A | 9632159 | NULL | NULL | YES | BTREE | | | &#43;--------------------&#43;------------&#43;-----------------&#43;--------------&#43;----------------&#43;-----------&#43;-------------&#43;----------&#43;--------&#43;------&#43;------------&#43;---------&#43;---------------&#43; 4 rows in set 问题查询：" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2017/10/mysql-order-by-limit-%E8%B5%B0%E9%94%99%E7%B4%A2%E5%BC%95range-indexscan/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2017-10-26T15:32:49+00:00" />
+<meta property="article:modified_time" content="2017-10-26T15:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="MySQL order by limit 走错索引(range-&gt;indexscan)"/>
+<meta name="twitter:description" content="生产库遇到过好几例本文要讨论的案例，而且比较棘手。简而言之，有类似这样的查询 SELECT * FROM t1 where t1.f2&gt;1 and t2.f2&lt;100 order by t1.id，id是主键，条件里面有个range查询，就会造成优化器是选择主键，还是选择filesort问题，有些特殊情况就会选错索引，比如为了回避内存排序，选择了主键扫描，导致原本走范围过滤再sort 500ms勉强可以结束的查询，5分钟不出结果。
+下面具体来这个案例。
+1. 背景 阿里云RDS，5.6.16-log。 表 d_ec_someextend.t_tbl_test_time_08:
+CREATE TABLE `t_tbl_test_time_08` ( `f_some_id` int(11) unsigned DEFAULT &#39;0&#39;, `f_qiye_id` int(11) DEFAULT &#39;0&#39;, `f_type` tinyint(3) DEFAULT &#39;0&#39; COMMENT &#39;有效联系类型 1: QQ联系，2:拨打电话，3:发送邮件，4:发送短信，5:添加跟进记录，6:拜访客户，7:EC联系，8:更新客户阶段&#39;, `f_contact_time` timestamp NULL DEFAULT &#39;1970-01-01 16:00:01&#39;, UNIQUE KEY `some_qiye_type` (`f_some_id`,`f_qiye_id`,`f_type`), KEY `f_contact_time` (`f_contact_time`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4; 表索引信息：
+mysql&gt; show table status like &#34;t_tbl_test_time_08&#34;; &#43;-----------------------&#43;--------&#43;---------&#43;------------&#43;----------&#43;----------------&#43;-------------&#43;-----------------&#43;--------------&#43;-----------&#43;----------------&#43;---------------------&#43;-------------&#43;------------&#43;--------------------&#43;----------&#43;----------------&#43;---------&#43;--------------&#43; | Name | Engine | Version | Row_format | Rows | Avg_row_length | Data_length | Max_data_length | Index_length | Data_free | Auto_increment | Create_time | Update_time | Check_time | Collation | Checksum | Create_options | Comment | Block_format | &#43;-----------------------&#43;--------&#43;---------&#43;------------&#43;----------&#43;----------------&#43;-------------&#43;-----------------&#43;--------------&#43;-----------&#43;----------------&#43;---------------------&#43;-------------&#43;------------&#43;--------------------&#43;----------&#43;----------------&#43;---------&#43;--------------&#43; | t_tbl_test_time_08 | InnoDB | 10 | Compact | 19264318 | 45 | 882900992 | 0 | 2176843776 | 752877568 | NULL | 2017-10-25 20:27:08 | NULL | NULL | utf8mb4_general_ci | NULL | | | Original | &#43;-----------------------&#43;--------&#43;---------&#43;------------&#43;----------&#43;----------------&#43;-------------&#43;-----------------&#43;--------------&#43;-----------&#43;----------------&#43;---------------------&#43;-------------&#43;------------&#43;--------------------&#43;----------&#43;----------------&#43;---------&#43;--------------&#43; 1 row in set mysql&gt; show index from t_tbl_test_time_08; &#43;--------------------&#43;------------&#43;-----------------&#43;--------------&#43;----------------&#43;-----------&#43;-------------&#43;----------&#43;--------&#43;------&#43;------------&#43;---------&#43;---------------&#43; | Table | Non_unique | Key_name | Seq_in_index | Column_name | Collation | Cardinality | Sub_part | Packed | Null | Index_type | Comment | Index_comment | &#43;--------------------&#43;------------&#43;-----------------&#43;--------------&#43;----------------&#43;-----------&#43;-------------&#43;----------&#43;--------&#43;------&#43;------------&#43;---------&#43;---------------&#43; | t_tbl_test_time_08 | 0 | some_qiye_type | 1 | f_some_id | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 0 | some_qiye_type | 2 | f_qiye_id | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 0 | some_qiye_type | 3 | f_type | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 1 | f_contact_time | 1 | f_contact_time | A | 9632159 | NULL | NULL | YES | BTREE | | | &#43;--------------------&#43;------------&#43;-----------------&#43;--------------&#43;----------------&#43;-----------&#43;-------------&#43;----------&#43;--------&#43;------&#43;------------&#43;---------&#43;---------------&#43; 4 rows in set 问题查询："/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "MySQL order by limit 走错索引(range-\u003eindexscan)",
+      "item": "http://xgknight.com/posts/2017/10/mysql-order-by-limit-%E8%B5%B0%E9%94%99%E7%B4%A2%E5%BC%95range-indexscan/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "MySQL order by limit 走错索引(range-\u003eindexscan)",
+  "name": "MySQL order by limit 走错索引(range-\u003eindexscan)",
+  "description": "生产库遇到过好几例本文要讨论的案例，而且比较棘手。简而言之，有类似这样的查询 SELECT * FROM t1 where t1.f2\u0026gt;1 and t2.f2\u0026lt;100 order by t1.id，id是主键，条件里面有个range查询，就会造成优化器是选择主键，还是选择filesort问题，有些特殊情况就会选错索引，比如为了回避内存排序，选择了主键扫描，导致原本走范围过滤再sort 500ms勉强可以结束的查询，5分钟不出结果。\n下面具体来这个案例。\n1. 背景 阿里云RDS，5.6.16-log。 表 d_ec_someextend.t_tbl_test_time_08:\nCREATE TABLE `t_tbl_test_time_08` ( `f_some_id` int(11) unsigned DEFAULT \u0026#39;0\u0026#39;, `f_qiye_id` int(11) DEFAULT \u0026#39;0\u0026#39;, `f_type` tinyint(3) DEFAULT \u0026#39;0\u0026#39; COMMENT \u0026#39;有效联系类型 1: QQ联系，2:拨打电话，3:发送邮件，4:发送短信，5:添加跟进记录，6:拜访客户，7:EC联系，8:更新客户阶段\u0026#39;, `f_contact_time` timestamp NULL DEFAULT \u0026#39;1970-01-01 16:00:01\u0026#39;, UNIQUE KEY `some_qiye_type` (`f_some_id`,`f_qiye_id`,`f_type`), KEY `f_contact_time` (`f_contact_time`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4; 表索引信息：\nmysql\u0026gt; show table status like \u0026#34;t_tbl_test_time_08\u0026#34;; +-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+ | Name | Engine | Version | Row_format | Rows | Avg_row_length | Data_length | Max_data_length | Index_length | Data_free | Auto_increment | Create_time | Update_time | Check_time | Collation | Checksum | Create_options | Comment | Block_format | +-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+ | t_tbl_test_time_08 | InnoDB | 10 | Compact | 19264318 | 45 | 882900992 | 0 | 2176843776 | 752877568 | NULL | 2017-10-25 20:27:08 | NULL | NULL | utf8mb4_general_ci | NULL | | | Original | +-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+ 1 row in set mysql\u0026gt; show index from t_tbl_test_time_08; +--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+ | Table | Non_unique | Key_name | Seq_in_index | Column_name | Collation | Cardinality | Sub_part | Packed | Null | Index_type | Comment | Index_comment | +--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+ | t_tbl_test_time_08 | 0 | some_qiye_type | 1 | f_some_id | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 0 | some_qiye_type | 2 | f_qiye_id | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 0 | some_qiye_type | 3 | f_type | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 1 | f_contact_time | 1 | f_contact_time | A | 9632159 | NULL | NULL | YES | BTREE | | | +--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+ 4 rows in set 问题查询：",
+  "keywords": [
+    "mysql", "优化"
+  ],
+  "articleBody": "生产库遇到过好几例本文要讨论的案例，而且比较棘手。简而言之，有类似这样的查询 SELECT * FROM t1 where t1.f2\u003e1 and t2.f2\u003c100 order by t1.id，id是主键，条件里面有个range查询，就会造成优化器是选择主键，还是选择filesort问题，有些特殊情况就会选错索引，比如为了回避内存排序，选择了主键扫描，导致原本走范围过滤再sort 500ms勉强可以结束的查询，5分钟不出结果。\n下面具体来这个案例。\n1. 背景 阿里云RDS，5.6.16-log。 表 d_ec_someextend.t_tbl_test_time_08:\nCREATE TABLE `t_tbl_test_time_08` ( `f_some_id` int(11) unsigned DEFAULT '0', `f_qiye_id` int(11) DEFAULT '0', `f_type` tinyint(3) DEFAULT '0' COMMENT '有效联系类型 1: QQ联系，2:拨打电话，3:发送邮件，4:发送短信，5:添加跟进记录，6:拜访客户，7:EC联系，8:更新客户阶段', `f_contact_time` timestamp NULL DEFAULT '1970-01-01 16:00:01', UNIQUE KEY `some_qiye_type` (`f_some_id`,`f_qiye_id`,`f_type`), KEY `f_contact_time` (`f_contact_time`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4; 表索引信息：\nmysql\u003e show table status like \"t_tbl_test_time_08\"; +-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+ | Name | Engine | Version | Row_format | Rows | Avg_row_length | Data_length | Max_data_length | Index_length | Data_free | Auto_increment | Create_time | Update_time | Check_time | Collation | Checksum | Create_options | Comment | Block_format | +-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+ | t_tbl_test_time_08 | InnoDB | 10 | Compact | 19264318 | 45 | 882900992 | 0 | 2176843776 | 752877568 | NULL | 2017-10-25 20:27:08 | NULL | NULL | utf8mb4_general_ci | NULL | | | Original | +-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+ 1 row in set mysql\u003e show index from t_tbl_test_time_08; +--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+ | Table | Non_unique | Key_name | Seq_in_index | Column_name | Collation | Cardinality | Sub_part | Packed | Null | Index_type | Comment | Index_comment | +--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+ | t_tbl_test_time_08 | 0 | some_qiye_type | 1 | f_some_id | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 0 | some_qiye_type | 2 | f_qiye_id | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 0 | some_qiye_type | 3 | f_type | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 1 | f_contact_time | 1 | f_contact_time | A | 9632159 | NULL | NULL | YES | BTREE | | | +--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+ 4 rows in set 问题查询：\nselect f_some_id from d_ec_some1.t_tbl_test_time_08 where f_qiye_id=5077665 and f_type=9 and f_contact_time \u003e '2017-10-17 14:23:49' and f_contact_time \u003c '2017-10-17 14:23:53' order by f_some_id limit 300 该表的其它查询：\nSELECT `c`.`f_some_id`, max(f_contact_time) AS `time` FROM `d_ec_some`.`t_some_relation` AS `r` LEFT JOIN `d_ec_someextend`.`t_tbl_test_time_10` AS `c` ON c.f_some_id=r.f_some_id AND c.f_type in(1,2,3,4,5,6,7) WHERE (r.f_qiye_id='4047065' and r.f_user_id='4047064' and c.f_some_id is not null) GROUP BY `f_some_id` ORDER BY `time` desc LIMIT 20 -- group-by, order-by select f_some_id, f_type, f_contact_time from d_ec_some1.t_tbl_test_time_08 where f_qiye_id = 1181333 and f_type \u003e 0 and f_type \u003c 11 and f_some_id \u003e 263047293 and f_some_id \u003c 780306437 order by f_some_id -- 分页 2. explain 问题查询执行计划：\nmysql\u003e explain extended select f_some_id from d_ec_some1.t_tbl_test_time_08 where f_qiye_id=5077665 and f_type=9 and f_contact_time \u003e '2017-10-17 14:23:49' and f_contact_time \u003c '2017-10-17 14:23:53' order by f_some_id limit 300; +----+-------------+-----------------------+-------+----------------+---------------+---------+------+-------+----------+-------------+ | id | select_type | table | type | possible_keys | key | key_len | ref | rows | filtered | Extra | +----+-------------+-----------------------+-------+----------------+---------------+---------+------+-------+----------+-------------+ | 1 | SIMPLE | t_tbl_test_time_08 | index | f_contact_time | some_qiye_type | 12 | NULL | 16032 | 2248.49 | Using where | +----+-------------+-----------------------+-------+----------------+---------------+---------+------+-------+----------+-------------+ 1 row in set -- 指定一个索引 mysql\u003e explain extended select f_some_id from d_ec_some1.t_tbl_test_time_08 use index(f_contact_time) where f_qiye_id=5077665 and f_type=9 and f_contact_time \u003e '2017-10-17 14:23:49' and f_contact_time \u003c '2017-10-17 14:23:53' order by f_some_id limit 300; +----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+----------+---------------------------------------------------------------+ | id | select_type | table | type | possible_keys | key | key_len | ref | rows | filtered | Extra | +----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+----------+---------------------------------------------------------------+ | 1 | SIMPLE | t_tbl_test_time_08 | range | f_contact_time | f_contact_time | 5 | NULL | 360478 | 100 | Using index condition; Using where; Using MRR; Using filesort | +----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+----------+---------------------------------------------------------------+ 1 row in set 解释： 第一个explain结果里面，type=index，表示 full index scan。注意这里看到的 index 不代表“查询用到索引了”。全索引扫描比全表扫描并不好到拿去，甚至更慢（因为随机IO）。是否用到正确的索引要看key那一列: some_qiye_type 索引定义是 (f_some_id,f_qiye_id,f_type)，从key_len=12看得出这三列都用上了（12=4+5+3）。但实际这个执行计划需要200多秒。\n第二个explain，在sql里面指定了 use index(f_contact_time)，依据是where条件里面f_contact_time的范围固定4s，猜想数据量不会很大，过滤效果会比较好。 解释器结果，type=range，表示是个范围查找(“范围”涵盖的种类不止\u003c/\u003e)，使用的索引是 f_contact_time(f_contact_time)。Extra列:\nUsing index condition: 用到了索引下推特性。Using where是回表拿数据。关于ICP见文后参考。 Using MRR: 用到了 Multi-Range Read 优化特性。mysql在通过二级索引范围查找的时候，得到的记录在物理上是无序的，为了减少去获取数据的随机IO，它会在内存缓冲区里面先根据rowid快速排序，然后顺序IO去拉取数据。（这个缓冲区大小参数由 read_rnd_buffer_size 控制） Using filesort: 需要内存排序。对应 order by f_some_id rows扫描虽然36w行，比前面的 16032 要多，但这个执行计划实际运行只需要0.7s，要快将近300倍。\n但MySQL优化器默认选择了第一个更慢的执行计划，它的理由是走 some_qiye_type 索引不需要内存排序，候选的 f_contact_time 被淘汰。mysql是基于cost的，所以在想是不是有什么参数可以改变optimizer的行为，让它filesort。 （这里提一下，这类查询该表上非常多，绝大部分都走的是 f_contact_time，偶尔会有几条走some_qiye_type。这种执行计划不稳定的查询，实际带来的风险是会很高的，可能会拖垮db）\n这里我们祭出优化sql的两大法宝：profiling和optimizer_trace，来尝试找出是什么因素。\nprofiling：可以定位出sql从接受到返回结果，时间都耗在哪里 optimizer_trace: 跟踪优化器的成本评估过程，可以情况的看到它如何从多个候选索引里，做出选择 3. profiling 先来看两种查询计划 profiling 的结果。\nprofiling 默认\nmysql\u003e set profiling=1; mysql\u003e select f_some_id from d_ec_some1.t_tbl_test_time_08 where f_qiye_id=5077665 and f_type=9 and f_contact_time \u003e '2017-10-17 14:23:49' and f_contact_time \u003c '2017-10-17 14:23:53' order by f_some_id limit 300; mysql\u003e show profile block io,cpu for query 1; +----------------------+------------+------------+------------+--------------+---------------+ | Status | Duration | CPU_user | CPU_system | Block_ops_in | Block_ops_out | +----------------------+------------+------------+------------+--------------+---------------+ | starting | 0.000121 | 0 | 0 | 0 | 0 | | checking permissions | 3.2E-5 | 0 | 0 | 0 | 0 | | Opening tables | 3.7E-5 | 0 | 0 | 0 | 0 | | init | 4.2E-5 | 0 | 0 | 0 | 0 | | System lock | 2.9E-5 | 0 | 0 | 0 | 0 | | optimizing | 3.3E-5 | 0 | 0 | 0 | 0 | | statistics | 0.005796 | 0 | 0.000999 | 448 | 0 | | preparing | 4.3E-5 | 0 | 0 | 0 | 0 | | Sorting result | 2.8E-5 | 0 | 0 | 0 | 0 | | executing | 2.7E-5 | 0 | 0 | 0 | 0 | | Sending data | 172.824522 | 189.040262 | 2.441629 | 1504928 | 6896 | | end | 8.3E-5 | 0 | 0 | 0 | 0 | | query end | 3E-5 | 0 | 0 | 0 | 0 | | closing tables | 3.3E-5 | 0 | 0 | 0 | 0 | | freeing items | 7E-5 | 0 | 0 | 0 | 0 | | logging slow query | 3.1E-5 | 0 | 0 | 0 | 0 | | Opening tables | 3.4E-5 | 0 | 0 | 0 | 0 | | System lock | 7E-5 | 0 | 0 | 0 | 8 | | cleaning up | 9.5E-5 | 0 | 0 | 0 | 0 | +----------------------+------------+------------+------------+--------------+---------------+ 19 rows in set mysql\u003e show status like \"Handler%\"; +----------------------------+---------+ | Variable_name | Value | +----------------------------+---------+ | Handler_commit | 1 | | Handler_delete | 0 | | Handler_discover | 0 | | Handler_external_lock | 4 | | Handler_mrr_init | 0 | | Handler_prepare | 0 | | Handler_read_first | 1 | | Handler_read_key | 1 | | Handler_read_last | 0 | | Handler_read_next | 9430930 | | Handler_read_prev | 0 | | Handler_read_rnd | 0 | | Handler_read_rnd_next | 0 | | Handler_rollback | 0 | | Handler_savepoint | 0 | | Handler_savepoint_rollback | 0 | | Handler_update | 0 | | Handler_write | 1 | +----------------------------+---------+ 18 rows in set profiling use index:\nmysql\u003e set profiling=1; mysql\u003e select .... use index(f_contact_time) mysql\u003e show profile block io,cpu for query 1; +----------------------+----------+----------+------------+--------------+---------------+ | Status | Duration | CPU_user | CPU_system | Block_ops_in | Block_ops_out | +----------------------+----------+----------+------------+--------------+---------------+ | starting | 0.00013 | 0 | 0 | 0 | 0 | | checking permissions | 3.4E-5 | 0 | 0 | 0 | 0 | | Opening tables | 4.5E-5 | 0 | 0 | 0 | 0 | | init | 4.6E-5 | 0 | 0 | 0 | 0 | | System lock | 3E-5 | 0 | 0 | 0 | 0 | | optimizing | 3.9E-5 | 0 | 0 | 0 | 0 | | statistics | 0.000109 | 0 | 0 | 0 | 0 | | preparing | 5.5E-5 | 0 | 0 | 0 | 0 | | Sorting result | 3.1E-5 | 0 | 0 | 0 | 0 | | executing | 3.2E-5 | 0 | 0 | 0 | 0 | | Sending data | 3.4E-5 | 0 | 0 | 0 | 0 | | Creating sort index | 1.703224 | 1.718739 | 0.012999 | 0 | 0 | | end | 8.4E-5 | 0 | 0 | 0 | 0 | | query end | 3.2E-5 | 0 | 0 | 0 | 0 | | closing tables | 3.9E-5 | 0 | 0 | 0 | 0 | | freeing items | 7.3E-5 | 0 | 0 | 0 | 0 | | logging slow query | 3.2E-5 | 0 | 0 | 0 | 0 | | Opening tables | 5E-5 | 0 | 0 | 0 | 0 | | System lock | 6.9E-5 | 0 | 0 | 0 | 8 | | cleaning up | 4.1E-5 | 0 | 0 | 0 | 0 | +----------------------+----------+----------+------------+--------------+---------------+ 20 rows in set set profiling=0; mysql\u003e show status like \"Handler%\"; +----------------------------+--------+ | Variable_name | Value | +----------------------------+--------+ | Handler_commit | 1 | | Handler_delete | 0 | | Handler_discover | 0 | | Handler_external_lock | 6 | | Handler_mrr_init | 0 | | Handler_prepare | 0 | | Handler_read_first | 0 | | Handler_read_key | 188156 | | Handler_read_last | 0 | | Handler_read_next | 188155 | | Handler_read_prev | 0 | | Handler_read_rnd | 188155 | | Handler_read_rnd_next | 0 | | Handler_rollback | 0 | | Handler_savepoint | 0 | | Handler_savepoint_rollback | 0 | | Handler_update | 0 | | Handler_write | 1 | +----------------------------+--------+ 18 rows in set 第一个profiling 看到第一个profiling里面 Sending data 时间最长，第二个 Creating sort index 最久\nSending data: The thread is reading and processing rows for a SELECT statement, and sending data to the client. Because operations occurring during this state tend to perform large amounts of disk access (reads), it is often the longest-running state over the lifetime of a given query. Creating sort index The thread is processing a SELECT that is resolved using an internal temporary table Sending data 很具有误导性，它不仅表示发送数据到客户端，还包括“收集”数据，即mysql根据索引条件检索完数据后，得到一堆rowid，再根据rowid回表拿数据，有可能还要对数据过滤、排序，所以抛开网络因素，sending data时间长表明有大量的读磁盘操作，是非常笼统的一个状态。 下面的status里面\nHandler_read_first: 索引里面第一条记录被读取的次数，为1，说明做了一次索引全扫描。与前面 explain 结果 type=index 是一致的。\nHandler_read_key：根据索引定位到一行记录的次数。这个值越高，说明使用到了高效的索引。\nHandler_read_next： Number of requests to read the next row in key order, incremented if you are querying an index column with a range constraint or if you are doing an index scan.\n即根据索引key的顺序，依次去获取行数据的次数。 这个值在这里非常的大，表明Server读取从头读取索引 (f_some_id,f_qiye_id,f_type) key的 9430930 行数据之后，找到了300个满足条件的记录，并且已是排好顺序。在这里值会随着limit的增大而增大。\n第二个profiling\nHandler_read_rnd： The number of requests to read a row based on a fixed position. This value is high if you are doing a lot of queries that require sorting of the result. You probably have a lot of queries that require MySQL to scan entire tables or you have joins that don’t use keys properly.\n随机读取行数据的次数，可以认为是有一堆没有顺序的主键，要依次去读取数据的次数（随机IO）。一般在有内存排序的时候，后者join查询的副表关联字段上没有好的索引，这个值都会比较高。\n经过计算，条件满足 f_contact_time \u003e '2017-10-17 14:23:49' and f_contact_time \u003c '2017-10-17 14:23:53' 的记录有188155 个，因此根据索引依次读取到的行数 Handler_read_key=188155。\n这里有两个疑问个人没有解开：\n既然有MRR，Handler_read_rnd为什么还这么高呢，不应该是是顺序IO了？ 这里不太肯定，两种可能：一是MRR不影响这个计数；第二种可能是，我们这个表上没有主键，唯一索引也不满足所有列都NOT NULL定义，也就是这个表的主键实际是innodb内部维持增长的rowid，使用MRR之后，rowid有序但并不连续，读取行的随机性没有得到大的改善。 Using index condition 在这里有点费解，因为似乎没有where条件可以下推，f_contact_time索引只有 f_contact_time 这一列。 上面的分析过程只能知道实际执行过程是怎样的，直接从explain也能看出结果，这里是顺便理解一下 Hander_read_xxx, MRR, ICP 的含义，大部分sql优化都不用不到profiling和status。\n4. optimizer_trace 再看 optimizer_trace 跟踪的结果：(因为trace的信息太长，放到github gist上了)\ndefault： https://gist.github.com/seanlook/fe7d9065b1c05e766d88b4a5c3babb65 use index：https://gist.github.com/seanlook/b687daf63c8babee96f567c123cb9ddd optimizer_trace包含三个步骤，下面是本次trace简化的结构：\njson_preparation json_optimization condition_processing equality_propagation constant_propagation trivial_condition_removal table_dependencies ref_optimizer_key_uses rows_estimation range_analysis table_scan potential_range_indices chosen_range_access_summary considered_execution_plans best_access_path attaching_conditions_to_tables attached_conditions_computation rechecking_index_usage clause_processing refine_plan pushed_index_condition access_type reconsidering_access_paths_for_index_ordering plan_changed access_type, index json_execution 可以看到上面default与use index两次的trace，前大半部分都是一样的，候选索引都是 access_type=range, index=f_contact_time，就在 reconsidering_access_paths_for_index_ordering 的地方，“一票否决”，从而选择了 access_type=index_scan, index=some_qiye_type。\n搜索 reconsidering_access_paths_for_index_ordering 可以在mysql或percona的官网上，找到四五个相关的 bug report ：\n#70245，#78997，percona#1362212，#74602 网上提及比较多的是 #70245，调整参数 eq_range_index_dive_limit 可解决这个问题。我们也遇到过这个案例，见 MySQL 5.6 查询优化器新特性的“BUG” 。但是本文的例子满足range的个数达到18w(explain估算是36w)，也试着加大这个参数从2到800000，都没作用。\n#74602 这个说的是low_limit导致的，刚好在 optimizer_trace 里面的 rechecking_index_usage:recheck_reason:low_limit 。 测试神奇的发发现，上面的查询limit有个分解值，会选择不同的索引： （https://gist.github.com/seanlook/64990b956bf986eaeece5b26055f2f18 limit 8168后默认选择filesort的trace）\nmysql\u003e explain select f_some_id from d_ec_some1.t_tbl_test_time_08 where f_qiye_id=5077665 and f_type=9 and f_contact_time \u003e '2017-10-17 14:23:49' and f_contact_time \u003c '2017-10-17 14:23:53' order by f_some_id limit 8167; +----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+-------------+ | id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra | +----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+-------------+ | 1 | SIMPLE | t_tbl_test_time_08 | index | f_contact_time | some_qiye_type | 12 | NULL | 414115 | Using where | +----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+-------------+ 1 row in set mysql\u003e explain select f_some_id from d_ec_some1.t_tbl_test_time_08 where f_qiye_id=5077665 and f_type=9 and f_contact_time \u003e '2017-10-17 14:23:49' and f_contact_time \u003c '2017-10-17 14:23:53' order by f_some_id limit 8168; +----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+---------------------------------------------------------------+ | id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra | +----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+---------------------------------------------------------------+ | 1 | SIMPLE | t_tbl_test_time_08 | range | f_contact_time | f_contact_time | 5 | NULL | 360478 | Using index condition; Using where; Using MRR; Using filesort | +----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+---------------------------------------------------------------+ 1 row in set 具体为啥这样，bug里面没说，只是提到5.7已修复，5.6应该不会修复。\n5. 解决办法 其实做sql优化，执行计划不稳定这种，是不容易搞定的，因为并不是这个sql所有都会慢，而是不同值的特征，走不同的索引，会偶发性的慢。优化索引的时候，反而容易把原本较快的查询的索引改掉，造成更大的灾难。\n本文的sql便是如此。从业务那边了解到，f_contact_time范围是固定4s，99%的情况，这个索引效率很高，但是正好有一大批数据(18万) f_contact_time=‘2017-10-17 14:23:51’，导致优化器做出了自己以为更优的决定。\n那么解决这个问题，就是要去掉干扰因素，或者提供更优的选项给它。\n去掉干扰因素 干扰它的索引是 some_qiye_type，是个唯一索引，因为恰好f_some_id开头，索引优化器想当然的用它来避免排序。 去掉这个干扰因素就是调换 f_qiye_id,f_some_id的顺序。调换顺序还有个好处，有f_qiye_id等值条件，可以用在索引检索上。 但是它的负面作用有两个： 原本这个表上有 f_some_id 的等值、join ref以及分页查询，调换索引这两个字段顺序后，全都变成慢查询 f_qiye_id作为第一列，满足条件的值可能会有上百万，对这个查询的改观不大 提供更优的索引 添加索引 (f_qiye_id,f_contact_time) 看起来不错。这样一来，该类查询都会走这个索引 另外这个表上只有一个唯一索引，而且该唯一索引有字段允许null，所以没有主键。 加一个自增主键 f_id bigint unsigned not null 修改f_some_id字段为 f_some_id bigint unsigned NOT NULL 修改f_qiye_id字段为 f_qiye_id int unsigned NOT NULL 修改字段f_type字段为 tinyint NOT NULL 总之一句话：所有（作为索引的）字段，都定义为NOT NULL，f_some_id全部定义为bigint。最终表结构：\nCREATE TABLE `t_tbl_test_time_16` ( `f_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT, `f_some_id` bigint(20) unsigned NOT NULL, `f_qiye_id` int(11) unsigned NOT NULL DEFAULT '0', `f_type` tinyint(3) NOT NULL DEFAULT '0' COMMENT '有效联系类型 1: QQ联系，2:拨打电话，3:发送邮件，4:发送短信，5:添加跟进记录，6:拜访客户，7:EC联系，8:更新客户阶段', `f_contact_time` timestamp NOT NULL DEFAULT '1970-01-01 16:00:01', PRIMARY KEY(f_id), UNIQUE KEY `some_qiye_type` (`f_some_id`,`f_qiye_id`,`f_type`) USING BTREE, KEY `idx_qiye_time` (`f_qiye_id`,`f_contact_time`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4; 或者唯一索引变成联合主键（关于自增主键与联合主键的选择，参考 http://xgknight.com/2016/05/13/mysql-innodb-primary_key/ ）\nCREATE TABLE `t_tbl_test_time_16` ( `f_some_id` bigint(20) unsigned NOT NULL, `f_qiye_id` int(11) unsigned NOT NULL DEFAULT '0', `f_type` tinyint(3) NOT NULL DEFAULT '0' COMMENT '有效联系类型 1: QQ联系，2:拨打电话，3:发送邮件，4:发送短信，5:添加跟进记录，6:拜访客户，7:EC联系，8:更新客户阶段', `f_contact_time` timestamp NOT NULL DEFAULT '1970-01-01 16:00:01', PRIMARY KEY(`f_qiye_id`,`f_some_id`,`f_type`), KEY `idx_qiye_time` (`f_qiye_id`,`f_contact_time`), KEY `idx_some`(`f_some_id`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4; 原文连接地址：http://xgknight.com/2017/10/26/mysql-bad-plan-order_by-limit/\n",
+  "wordCount" : "2043",
+  "inLanguage": "en",
+  "datePublished": "2017-10-26T15:32:49Z",
+  "dateModified": "2017-10-26T15:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2017/10/mysql-order-by-limit-%E8%B5%B0%E9%94%99%E7%B4%A2%E5%BC%95range-indexscan/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      MySQL order by limit 走错索引(range-&gt;indexscan)
+    </h1>
+    <div class="post-meta"><span title='2017-10-26 15:32:49 +0000 UTC'>October 26, 2017</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>生产库遇到过好几例本文要讨论的案例，而且比较棘手。简而言之，有类似这样的查询 <code>SELECT * FROM t1 where t1.f2&gt;1 and t2.f2&lt;100 order by t1.id</code>，id是主键，条件里面有个range查询，就会造成优化器是选择主键，还是选择filesort问题，有些特殊情况就会选错索引，比如为了回避内存排序，选择了主键扫描，导致原本走范围过滤再sort 500ms勉强可以结束的查询，5分钟不出结果。</p>
+<p>下面具体来这个案例。</p>
+<h1 id="1-背景">1. 背景<a hidden class="anchor" aria-hidden="true" href="#1-背景">#</a></h1>
+<p>阿里云RDS，5.6.16-log。
+表 d_ec_someextend.t_tbl_test_time_08:</p>
+<pre tabindex="0"><code>CREATE TABLE `t_tbl_test_time_08` (
+  `f_some_id` int(11) unsigned DEFAULT &#39;0&#39;,
+  `f_qiye_id` int(11) DEFAULT &#39;0&#39;,
+  `f_type` tinyint(3) DEFAULT &#39;0&#39; COMMENT &#39;有效联系类型 1: QQ联系，2:拨打电话，3:发送邮件，4:发送短信，5:添加跟进记录，6:拜访客户，7:EC联系，8:更新客户阶段&#39;,
+  `f_contact_time` timestamp NULL DEFAULT &#39;1970-01-01 16:00:01&#39;,
+  UNIQUE KEY `some_qiye_type` (`f_some_id`,`f_qiye_id`,`f_type`),
+  KEY `f_contact_time` (`f_contact_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+</code></pre><p>表索引信息：</p>
+<pre tabindex="0"><code>mysql&gt; show table status like &#34;t_tbl_test_time_08&#34;;
++-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+
+| Name                  | Engine | Version | Row_format | Rows     | Avg_row_length | Data_length | Max_data_length | Index_length | Data_free | Auto_increment | Create_time         | Update_time | Check_time | Collation          | Checksum | Create_options | Comment | Block_format |
++-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+
+| t_tbl_test_time_08 | InnoDB |      10 | Compact    | 19264318 |             45 |   882900992 |               0 |   2176843776 | 752877568 | NULL           | 2017-10-25 20:27:08 | NULL        | NULL       | utf8mb4_general_ci | NULL     |                |         | Original     |
++-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+
+1 row in set
+ 
+mysql&gt; show index from t_tbl_test_time_08;
++--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+
+| Table              | Non_unique | Key_name        | Seq_in_index | Column_name    | Collation | Cardinality | Sub_part | Packed | Null | Index_type | Comment | Index_comment |
++--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+
+| t_tbl_test_time_08 |          0 | some_qiye_type  |            1 | f_some_id      | A         |    19264318 | NULL     | NULL   | YES  | BTREE      |         |               |
+| t_tbl_test_time_08 |          0 | some_qiye_type  |            2 | f_qiye_id      | A         |    19264318 | NULL     | NULL   | YES  | BTREE      |         |               |
+| t_tbl_test_time_08 |          0 | some_qiye_type  |            3 | f_type         | A         |    19264318 | NULL     | NULL   | YES  | BTREE      |         |               |
+| t_tbl_test_time_08 |          1 | f_contact_time  |            1 | f_contact_time | A         |     9632159 | NULL     | NULL   | YES  | BTREE      |         |               |
++--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+
+4 rows in set
+</code></pre><p><strong>问题查询：</strong></p>
+<pre tabindex="0"><code>select f_some_id from d_ec_some1.t_tbl_test_time_08
+where f_qiye_id=5077665 and f_type=9
+and f_contact_time &gt; &#39;2017-10-17 14:23:49&#39; and f_contact_time &lt; &#39;2017-10-17 14:23:53&#39;
+order by f_some_id limit 300
+</code></pre><!-- raw HTML omitted -->
+<p>该表的其它查询：</p>
+<pre tabindex="0"><code>SELECT `c`.`f_some_id`, max(f_contact_time) AS `time` FROM `d_ec_some`.`t_some_relation` AS `r`
+LEFT JOIN `d_ec_someextend`.`t_tbl_test_time_10` AS `c` ON c.f_some_id=r.f_some_id AND c.f_type in(1,2,3,4,5,6,7)
+WHERE (r.f_qiye_id=&#39;4047065&#39; and r.f_user_id=&#39;4047064&#39; and c.f_some_id is not null)
+GROUP BY `f_some_id` ORDER BY `time` desc LIMIT 20
+-- group-by, order-by
+  
+select f_some_id, f_type, f_contact_time from d_ec_some1.t_tbl_test_time_08
+where f_qiye_id = 1181333
+and f_type &gt; 0 and f_type &lt; 11
+and f_some_id &gt; 263047293 and f_some_id &lt; 780306437
+order by f_some_id
+-- 分页
+</code></pre><h1 id="2-explain">2. explain<a hidden class="anchor" aria-hidden="true" href="#2-explain">#</a></h1>
+<p>问题查询执行计划：</p>
+<pre tabindex="0"><code>mysql&gt; explain extended select f_some_id from d_ec_some1.t_tbl_test_time_08
+where f_qiye_id=5077665 and f_type=9
+and f_contact_time &gt; &#39;2017-10-17 14:23:49&#39; and f_contact_time &lt; &#39;2017-10-17 14:23:53&#39;
+order by f_some_id limit 300;
++----+-------------+-----------------------+-------+----------------+---------------+---------+------+-------+----------+-------------+
+| id | select_type | table                 | type  | possible_keys  | key           | key_len | ref  | rows  | filtered | Extra       |
++----+-------------+-----------------------+-------+----------------+---------------+---------+------+-------+----------+-------------+
+|  1 | SIMPLE      | t_tbl_test_time_08    | index | f_contact_time | some_qiye_type | 12     | NULL | 16032 |  2248.49 | Using where |
++----+-------------+-----------------------+-------+----------------+---------------+---------+------+-------+----------+-------------+
+1 row in set
+ 
+-- 指定一个索引
+mysql&gt; explain extended select f_some_id from d_ec_some1.t_tbl_test_time_08  use index(f_contact_time)
+where f_qiye_id=5077665 and f_type=9
+and f_contact_time &gt; &#39;2017-10-17 14:23:49&#39; and f_contact_time &lt; &#39;2017-10-17 14:23:53&#39;
+order by f_some_id limit 300;
++----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+----------+---------------------------------------------------------------+
+| id | select_type | table                 | type  | possible_keys  | key            | key_len | ref  | rows   | filtered | Extra                                                         |
++----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+----------+---------------------------------------------------------------+
+|  1 | SIMPLE      | t_tbl_test_time_08    | range | f_contact_time | f_contact_time | 5       | NULL | 360478 |      100 | Using index condition; Using where; Using MRR; Using filesort |
++----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+----------+---------------------------------------------------------------+
+1 row in set
+</code></pre><p>解释：
+第一个explain结果里面，<code>type=index</code>，表示 full index scan。注意这里看到的 index 不代表“查询用到索引了”。全索引扫描比全表扫描并不好到拿去，甚至更慢（因为随机IO）。是否用到正确的索引要看key那一列:
+<code>some_qiye_type</code> 索引定义是 <code>(f_some_id,f_qiye_id,f_type)</code>，从key_len=12看得出这三列都用上了（12=4+5+3）。但实际这个执行计划需要200多秒。</p>
+<p>第二个explain，在sql里面指定了 <code>use index(f_contact_time)</code>，依据是where条件里面f_contact_time的范围固定4s，猜想数据量不会很大，过滤效果会比较好。
+解释器结果，<code>type=range</code>，表示是个范围查找(“范围”涵盖的种类不止&lt;/&gt;)，使用的索引是 <code>f_contact_time(f_contact_time)</code>。Extra列:</p>
+<ul>
+<li><code>Using index condition</code>: 用到了索引下推特性。Using where是回表拿数据。关于ICP见文后参考。</li>
+<li><code>Using MRR</code>: 用到了 Multi-Range Read 优化特性。mysql在通过二级索引范围查找的时候，得到的记录在物理上是无序的，为了减少去获取数据的随机IO，它会在内存缓冲区里面先根据rowid快速排序，然后顺序IO去拉取数据。（这个缓冲区大小参数由 read_rnd_buffer_size 控制）</li>
+<li><code>Using filesort</code>: 需要内存排序。对应 order by f_some_id</li>
+</ul>
+<p>rows扫描虽然36w行，比前面的 16032 要多，但这个执行计划实际运行只需要0.7s，要快将近300倍。</p>
+<p>但MySQL优化器默认选择了第一个更慢的执行计划，它的理由是走 some_qiye_type 索引不需要内存排序，候选的 f_contact_time 被淘汰。mysql是基于cost的，所以在想是不是有什么参数可以改变optimizer的行为，让它filesort。
+（这里提一下，这类查询该表上非常多，绝大部分都走的是 f_contact_time，偶尔会有几条走some_qiye_type。这种执行计划不稳定的查询，实际带来的风险是会很高的，可能会拖垮db）</p>
+<p>这里我们祭出优化sql的两大法宝：profiling和optimizer_trace，来尝试找出是什么因素。</p>
+<ul>
+<li><code>profiling</code>：可以定位出sql从接受到返回结果，时间都耗在哪里</li>
+<li><code>optimizer_trace</code>: 跟踪优化器的成本评估过程，可以情况的看到它如何从多个候选索引里，做出选择</li>
+</ul>
+<h1 id="3-profiling">3. profiling<a hidden class="anchor" aria-hidden="true" href="#3-profiling">#</a></h1>
+<p>先来看两种查询计划 profiling 的结果。</p>
+<p>profiling 默认</p>
+<pre tabindex="0"><code>mysql&gt; set profiling=1;
+mysql&gt; select f_some_id from d_ec_some1.t_tbl_test_time_08 where f_qiye_id=5077665 and f_type=9
+and f_contact_time &gt; &#39;2017-10-17 14:23:49&#39; and f_contact_time &lt; &#39;2017-10-17 14:23:53&#39; order by f_some_id limit 300;
+
+mysql&gt; show profile block io,cpu for query 1;
++----------------------+------------+------------+------------+--------------+---------------+
+| Status               | Duration   | CPU_user   | CPU_system | Block_ops_in | Block_ops_out |
++----------------------+------------+------------+------------+--------------+---------------+
+| starting             | 0.000121   | 0          | 0          |            0 |             0 |
+| checking permissions | 3.2E-5     | 0          | 0          |            0 |             0 |
+| Opening tables       | 3.7E-5     | 0          | 0          |            0 |             0 |
+| init                 | 4.2E-5     | 0          | 0          |            0 |             0 |
+| System lock          | 2.9E-5     | 0          | 0          |            0 |             0 |
+| optimizing           | 3.3E-5     | 0          | 0          |            0 |             0 |
+| statistics           | 0.005796   | 0          | 0.000999   |          448 |             0 |
+| preparing            | 4.3E-5     | 0          | 0          |            0 |             0 |
+| Sorting result       | 2.8E-5     | 0          | 0          |            0 |             0 |
+| executing            | 2.7E-5     | 0          | 0          |            0 |             0 |
+| Sending data         | 172.824522 | 189.040262 | 2.441629   |      1504928 |          6896 |
+| end                  | 8.3E-5     | 0          | 0          |            0 |             0 |
+| query end            | 3E-5       | 0          | 0          |            0 |             0 |
+| closing tables       | 3.3E-5     | 0          | 0          |            0 |             0 |
+| freeing items        | 7E-5       | 0          | 0          |            0 |             0 |
+| logging slow query   | 3.1E-5     | 0          | 0          |            0 |             0 |
+| Opening tables       | 3.4E-5     | 0          | 0          |            0 |             0 |
+| System lock          | 7E-5       | 0          | 0          |            0 |             8 |
+| cleaning up          | 9.5E-5     | 0          | 0          |            0 |             0 |
++----------------------+------------+------------+------------+--------------+---------------+
+19 rows in set
+ 
+mysql&gt; show status like &#34;Handler%&#34;;
++----------------------------+---------+
+| Variable_name              | Value   |
++----------------------------+---------+
+| Handler_commit             | 1       |
+| Handler_delete             | 0       |
+| Handler_discover           | 0       |
+| Handler_external_lock      | 4       |
+| Handler_mrr_init           | 0       |
+| Handler_prepare            | 0       |
+| Handler_read_first         | 1       |
+| Handler_read_key           | 1       |
+| Handler_read_last          | 0       |
+| Handler_read_next          | 9430930 |
+| Handler_read_prev          | 0       |
+| Handler_read_rnd           | 0       |
+| Handler_read_rnd_next      | 0       |
+| Handler_rollback           | 0       |
+| Handler_savepoint          | 0       |
+| Handler_savepoint_rollback | 0       |
+| Handler_update             | 0       |
+| Handler_write              | 1       |
++----------------------------+---------+
+18 rows in set
+</code></pre><p>profiling use index:</p>
+<pre tabindex="0"><code>mysql&gt; set profiling=1;
+mysql&gt; select .... use index(f_contact_time)
+mysql&gt; show profile block io,cpu for query 1;
++----------------------+----------+----------+------------+--------------+---------------+
+| Status               | Duration | CPU_user | CPU_system | Block_ops_in | Block_ops_out |
++----------------------+----------+----------+------------+--------------+---------------+
+| starting             | 0.00013  | 0        | 0          |            0 |             0 |
+| checking permissions | 3.4E-5   | 0        | 0          |            0 |             0 |
+| Opening tables       | 4.5E-5   | 0        | 0          |            0 |             0 |
+| init                 | 4.6E-5   | 0        | 0          |            0 |             0 |
+| System lock          | 3E-5     | 0        | 0          |            0 |             0 |
+| optimizing           | 3.9E-5   | 0        | 0          |            0 |             0 |
+| statistics           | 0.000109 | 0        | 0          |            0 |             0 |
+| preparing            | 5.5E-5   | 0        | 0          |            0 |             0 |
+| Sorting result       | 3.1E-5   | 0        | 0          |            0 |             0 |
+| executing            | 3.2E-5   | 0        | 0          |            0 |             0 |
+| Sending data         | 3.4E-5   | 0        | 0          |            0 |             0 |
+| Creating sort index  | 1.703224 | 1.718739 | 0.012999   |            0 |             0 |
+| end                  | 8.4E-5   | 0        | 0          |            0 |             0 |
+| query end            | 3.2E-5   | 0        | 0          |            0 |             0 |
+| closing tables       | 3.9E-5   | 0        | 0          |            0 |             0 |
+| freeing items        | 7.3E-5   | 0        | 0          |            0 |             0 |
+| logging slow query   | 3.2E-5   | 0        | 0          |            0 |             0 |
+| Opening tables       | 5E-5     | 0        | 0          |            0 |             0 |
+| System lock          | 6.9E-5   | 0        | 0          |            0 |             8 |
+| cleaning up          | 4.1E-5   | 0        | 0          |            0 |             0 |
++----------------------+----------+----------+------------+--------------+---------------+
+20 rows in set
+set profiling=0;
+ 
+mysql&gt; show status like &#34;Handler%&#34;;
++----------------------------+--------+
+| Variable_name              | Value  |
++----------------------------+--------+
+| Handler_commit             | 1      |
+| Handler_delete             | 0      |
+| Handler_discover           | 0      |
+| Handler_external_lock      | 6      |
+| Handler_mrr_init           | 0      |
+| Handler_prepare            | 0      |
+| Handler_read_first         | 0      |
+| Handler_read_key           | 188156 |
+| Handler_read_last          | 0      |
+| Handler_read_next          | 188155 |
+| Handler_read_prev          | 0      |
+| Handler_read_rnd           | 188155 |
+| Handler_read_rnd_next      | 0      |
+| Handler_rollback           | 0      |
+| Handler_savepoint          | 0      |
+| Handler_savepoint_rollback | 0      |
+| Handler_update             | 0      |
+| Handler_write              | 1      |
++----------------------------+--------+
+18 rows in set
+</code></pre><p><strong>第一个profiling</strong>
+看到第一个profiling里面 <code>Sending data</code> 时间最长，第二个 <code>Creating sort index</code> 最久</p>
+<pre tabindex="0"><code>Sending data:
+The thread is reading and processing rows for a SELECT statement, and sending data to the client. Because operations occurring during this state tend to perform large amounts of disk access (reads), it is often the longest-running state over the lifetime of a given query.
+  
+Creating sort index
+The thread is processing a SELECT that is resolved using an internal temporary table
+</code></pre><p>Sending data 很具有误导性，它不仅表示发送数据到客户端，还包括“收集”数据，即mysql根据索引条件检索完数据后，得到一堆rowid，再根据rowid回表拿数据，有可能还要对数据过滤、排序，所以抛开网络因素，sending data时间长表明有大量的读磁盘操作，是非常笼统的一个状态。
+下面的status里面</p>
+<ul>
+<li>
+<p><code>Handler_read_first</code>: 索引里面第一条记录被读取的次数，为1，说明做了一次索引全扫描。与前面 explain 结果 type=index 是一致的。</p>
+</li>
+<li>
+<p><code>Handler_read_key</code>：根据索引定位到一行记录的次数。这个值越高，说明使用到了高效的索引。</p>
+</li>
+<li>
+<p><code>Handler_read_next</code>：
+Number of requests to read the next row in key order, incremented if you are querying an index column
+with a range constraint or if you are doing an index scan.</p>
+<p>即根据索引key的顺序，依次去获取行数据的次数。
+这个值在这里非常的大，表明Server读取从头读取索引 <code>(f_some_id,f_qiye_id,f_type)</code> key的 9430930 行数据之后，找到了300个满足条件的记录，并且已是排好顺序。在这里值会随着limit的增大而增大。</p>
+</li>
+</ul>
+<p><strong>第二个profiling</strong></p>
+<ul>
+<li>
+<p><code>Handler_read_rnd</code>：
+The number of requests to read a row based on a fixed position. This value is high if you are doing a lot of queries
+that require sorting of the result. You probably have a lot of queries that require MySQL to scan entire tables or you have joins
+that don&rsquo;t use keys properly.</p>
+<p>随机读取行数据的次数，可以认为是有一堆没有顺序的主键，要依次去读取数据的次数（随机IO）。一般在有内存排序的时候，后者join查询的副表关联字段上没有好的索引，这个值都会比较高。</p>
+</li>
+</ul>
+<p>经过计算，条件满足 <code>f_contact_time &gt; '2017-10-17 14:23:49' and f_contact_time &lt; '2017-10-17 14:23:53'</code> 的记录有188155 个，因此根据索引依次读取到的行数 Handler_read_key=188155。</p>
+<p>这里有两个疑问个人没有解开：</p>
+<ol>
+<li>既然有MRR，Handler_read_rnd为什么还这么高呢，不应该是是顺序IO了？
+这里不太肯定，两种可能：一是MRR不影响这个计数；第二种可能是，我们这个表上没有主键，唯一索引也不满足所有列都NOT NULL定义，也就是这个表的主键实际是innodb内部维持增长的rowid，使用MRR之后，rowid有序但并不连续，读取行的随机性没有得到大的改善。</li>
+<li><code>Using index condition</code> 在这里有点费解，因为似乎没有where条件可以下推，f_contact_time索引只有 f_contact_time 这一列。</li>
+</ol>
+<p>上面的分析过程只能知道实际执行过程是怎样的，直接从explain也能看出结果，这里是顺便理解一下 Hander_read_xxx, MRR, ICP 的含义，大部分sql优化都不用不到profiling和status。</p>
+<h1 id="4-optimizer_trace">4. optimizer_trace<a hidden class="anchor" aria-hidden="true" href="#4-optimizer_trace">#</a></h1>
+<p>再看 optimizer_trace 跟踪的结果：(因为trace的信息太长，放到github gist上了)</p>
+<ul>
+<li>default： <a href="https://gist.github.com/seanlook/fe7d9065b1c05e766d88b4a5c3babb65">https://gist.github.com/seanlook/fe7d9065b1c05e766d88b4a5c3babb65</a></li>
+<li>use index：https://gist.github.com/seanlook/b687daf63c8babee96f567c123cb9ddd</li>
+</ul>
+<p>optimizer_trace包含三个步骤，下面是本次trace简化的结构：</p>
+<ol>
+<li>json_preparation</li>
+<li>json_optimization
+<ul>
+<li>condition_processing
+<ul>
+<li>equality_propagation</li>
+<li>constant_propagation</li>
+<li>trivial_condition_removal</li>
+</ul>
+</li>
+<li>table_dependencies</li>
+<li>ref_optimizer_key_uses</li>
+<li>rows_estimation
+<ul>
+<li>range_analysis</li>
+<li>table_scan</li>
+<li>potential_range_indices</li>
+<li>chosen_range_access_summary</li>
+</ul>
+</li>
+<li>considered_execution_plans
+<ul>
+<li>best_access_path</li>
+</ul>
+</li>
+<li>attaching_conditions_to_tables
+<ul>
+<li>attached_conditions_computation</li>
+<li>rechecking_index_usage</li>
+</ul>
+</li>
+<li>clause_processing</li>
+<li>refine_plan
+<ul>
+<li>pushed_index_condition</li>
+<li>access_type</li>
+</ul>
+</li>
+<li>reconsidering_access_paths_for_index_ordering
+<ul>
+<li>plan_changed</li>
+<li>access_type, index</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>json_execution</li>
+</ol>
+<p>可以看到上面default与use index两次的trace，前大半部分都是一样的，候选索引都是 <em>access_type=range, index=f_contact_time</em>，就在 <code>reconsidering_access_paths_for_index_ordering</code> 的地方，“一票否决”，从而选择了 <em>access_type=index_scan, index=some_qiye_type</em>。</p>
+<p>搜索 reconsidering_access_paths_for_index_ordering 可以在mysql或percona的官网上，找到四五个相关的 bug report ：</p>
+<p><a href="https://bugs.mysql.com/bug.php?id=70245">#70245</a>，<a href="https://bugs.mysql.com/bug.php?id=78997">#78997</a>，<a href="https://bugs.launchpad.net/percona-server/+bug/1362212">percona#1362212</a>，<a href="https://bugs.mysql.com/bug.php?id=74602">#74602 </a></p>
+<p>网上提及比较多的是 #70245，调整参数 <code>eq_range_index_dive_limit</code> 可解决这个问题。我们也遇到过这个案例，见 <a href="http://imysql.com/2014/08/05/a-fake-bug-with-eq-range-index-dive-limit.shtml">MySQL 5.6 查询优化器新特性的“BUG”</a> 。但是本文的例子满足range的个数达到18w(explain估算是36w)，也试着加大这个参数从2到800000，都没作用。</p>
+<p><code>#74602</code> 这个说的是low_limit导致的，刚好在 optimizer_trace 里面的 <code>rechecking_index_usage:recheck_reason:low_limit</code> 。
+测试神奇的发发现，上面的查询limit有个分解值，会选择不同的索引：
+（https://gist.github.com/seanlook/64990b956bf986eaeece5b26055f2f18  limit 8168后默认选择filesort的trace）</p>
+<pre tabindex="0"><code>mysql&gt; explain select f_some_id from d_ec_some1.t_tbl_test_time_08
+where f_qiye_id=5077665 and f_type=9
+and f_contact_time &gt; &#39;2017-10-17 14:23:49&#39; and f_contact_time &lt; &#39;2017-10-17 14:23:53&#39;
+order by f_some_id limit 8167;
++----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+-------------+
+| id | select_type | table                 | type  | possible_keys  | key            | key_len | ref  | rows   | Extra       |
++----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+-------------+
+|  1 | SIMPLE      | t_tbl_test_time_08    | index | f_contact_time | some_qiye_type | 12      | NULL | 414115 | Using where |
++----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+-------------+
+1 row in set
+ 
+mysql&gt; explain select f_some_id from d_ec_some1.t_tbl_test_time_08
+where f_qiye_id=5077665 and f_type=9
+and f_contact_time &gt; &#39;2017-10-17 14:23:49&#39; and f_contact_time &lt; &#39;2017-10-17 14:23:53&#39;
+order by f_some_id limit 8168;
++----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+---------------------------------------------------------------+
+| id | select_type | table                 | type  | possible_keys  | key            | key_len | ref  | rows   | Extra                                                         |
++----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+---------------------------------------------------------------+
+|  1 | SIMPLE      | t_tbl_test_time_08    | range | f_contact_time | f_contact_time | 5       | NULL | 360478 | Using index condition; Using where; Using MRR; Using filesort |
++----+-------------+-----------------------+-------+----------------+----------------+---------+------+--------+---------------------------------------------------------------+
+1 row in set
+</code></pre><p>具体为啥这样，bug里面没说，只是提到5.7已修复，5.6应该不会修复。</p>
+<h1 id="5-解决办法">5. 解决办法<a hidden class="anchor" aria-hidden="true" href="#5-解决办法">#</a></h1>
+<p>其实做sql优化，执行计划不稳定这种，是不容易搞定的，因为并不是这个sql所有都会慢，而是不同值的特征，走不同的索引，会偶发性的慢。优化索引的时候，反而容易把原本较快的查询的索引改掉，造成更大的灾难。</p>
+<p>本文的sql便是如此。从业务那边了解到，f_contact_time范围是固定4s，99%的情况，这个索引效率很高，但是正好有一大批数据(18万) f_contact_time=&lsquo;2017-10-17 14:23:51&rsquo;，导致优化器做出了自己以为更优的决定。</p>
+<p>那么解决这个问题，就是要去掉干扰因素，或者提供更优的选项给它。</p>
+<ol>
+<li>去掉干扰因素
+干扰它的索引是 some_qiye_type，是个唯一索引，因为恰好f_some_id开头，索引优化器想当然的用它来避免排序。
+去掉这个干扰因素就是调换 f_qiye_id,f_some_id的顺序。调换顺序还有个好处，有f_qiye_id等值条件，可以用在索引检索上。
+但是它的负面作用有两个：</li>
+</ol>
+<ul>
+<li>原本这个表上有 f_some_id 的等值、join ref以及分页查询，调换索引这两个字段顺序后，全都变成慢查询</li>
+<li>f_qiye_id作为第一列，满足条件的值可能会有上百万，对这个查询的改观不大</li>
+</ul>
+<ol start="2">
+<li>提供更优的索引
+添加索引 (f_qiye_id,f_contact_time) 看起来不错。这样一来，该类查询都会走这个索引</li>
+</ol>
+<p>另外这个表上只有一个唯一索引，而且该唯一索引有字段允许null，所以没有主键。
+加一个自增主键 f_id bigint unsigned not null
+修改f_some_id字段为 f_some_id bigint unsigned NOT NULL
+修改f_qiye_id字段为 f_qiye_id int unsigned NOT NULL
+修改字段f_type字段为 tinyint NOT NULL
+总之一句话：所有（作为索引的）字段，都定义为NOT NULL，f_some_id全部定义为bigint。最终表结构：</p>
+<pre tabindex="0"><code>CREATE TABLE `t_tbl_test_time_16` (
+  `f_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `f_some_id` bigint(20) unsigned NOT NULL,
+  `f_qiye_id` int(11) unsigned NOT NULL DEFAULT &#39;0&#39;,
+  `f_type` tinyint(3) NOT NULL DEFAULT &#39;0&#39; COMMENT &#39;有效联系类型 1: QQ联系，2:拨打电话，3:发送邮件，4:发送短信，5:添加跟进记录，6:拜访客户，7:EC联系，8:更新客户阶段&#39;,
+  `f_contact_time` timestamp NOT NULL DEFAULT &#39;1970-01-01 16:00:01&#39;,
+  PRIMARY KEY(f_id),
+  UNIQUE KEY `some_qiye_type` (`f_some_id`,`f_qiye_id`,`f_type`) USING BTREE,
+  KEY `idx_qiye_time` (`f_qiye_id`,`f_contact_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+</code></pre><p>或者唯一索引变成联合主键（关于自增主键与联合主键的选择，参考 <a href="http://xgknight.com/2016/05/13/mysql-innodb-primary_key/">http://xgknight.com/2016/05/13/mysql-innodb-primary_key/</a> ）</p>
+<pre tabindex="0"><code>CREATE TABLE `t_tbl_test_time_16` (
+  `f_some_id` bigint(20) unsigned NOT NULL,
+  `f_qiye_id` int(11) unsigned NOT NULL DEFAULT &#39;0&#39;,
+  `f_type` tinyint(3) NOT NULL DEFAULT &#39;0&#39; COMMENT &#39;有效联系类型 1: QQ联系，2:拨打电话，3:发送邮件，4:发送短信，5:添加跟进记录，6:拜访客户，7:EC联系，8:更新客户阶段&#39;,
+  `f_contact_time` timestamp NOT NULL DEFAULT &#39;1970-01-01 16:00:01&#39;,
+  PRIMARY KEY(`f_qiye_id`,`f_some_id`,`f_type`),
+  KEY `idx_qiye_time` (`f_qiye_id`,`f_contact_time`),
+  KEY `idx_some`(`f_some_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+</code></pre><hr>
+<p>原文连接地址：http://xgknight.com/2017/10/26/mysql-bad-plan-order_by-limit/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/%E4%BC%98%E5%8C%96/">优化</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

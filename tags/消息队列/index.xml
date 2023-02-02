@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>消息队列 on Sean Note</title>
+    <link>http://xgknight.com/tags/%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97/</link>
+    <description>Recent content in 消息队列 on Sean Note</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 06 Jan 2018 15:32:49 +0000</lastBuildDate><atom:link href="http://xgknight.com/tags/%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>RabbitMQ 入门</title>
+      <link>http://xgknight.com/posts/2018/01/rabbitmq-%E5%85%A5%E9%97%A8/</link>
+      <pubDate>Sat, 06 Jan 2018 15:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2018/01/rabbitmq-%E5%85%A5%E9%97%A8/</guid>
+      <description>rabbitmq可以用一本书取讲，这里只是介绍一些使用过程中，常用到的基本的知识点。 官方文档覆盖的内容，非常全面：http://www.rabbitmq.com/documentation.html 。
+1. 介绍 RabbitMQ，即消息队列系统，它是一款开源消息队列中间件，采用Erlang语言开发，RabbitMQ是AMQP(Advanced Message Queueing Protocol)的标准实现。
+AMQP是一个公开发布的异步消息的规范，是提供统一消息服务的应用层标准高级消息队列协议，为面向消息的中间件设计.消息中间件主要用于组件之间的解耦，消息的发送者无需知道消息使用者的存在，反之亦然。
+https://www.rabbitmq.com/tutorials/amqp-concepts.html
+相对于JMS(Java Message Service)规范来说，JMS使用的是特定语言的APIs，而消息格式可自由定义，而AMQP对消息的格式和传输是有要求的，但实现不会受操作系统、开发语言以及平台等的限制。
+JMS和AMQP还有一个较大的区别：JMS有队列(Queues)和主题(Topics)两种消息传递模型，发送到 JMS队列 的消息最多只能被一个Client消费，发送到 JMS主题 的消息可能会被多个Clients消费；AMQP只有队列(Queues)，队列的消息只能被单个接受者消费，发送者并不直接把消息发送到队列中，而是发送到Exchange中，该Exchage会与一个或多个队列绑定，能够实现与JMS队列和主题同样的功能。
+另外还有一种 MQTT协议，意为消息队列遥测传输，是IBM开发的一个即时通讯协议。由于其维护一个长连接以轻量级低消耗著称，所以常用于移动端消息推送服务开发。MQTT是基于TCP的应用层协议封装，实现了异步Pub/Sub，在物联网（IoT）应用广泛。
+RabbitMQ可通过库、插件的形式，支持JMS和MQTT协议。参考：http://geek.csdn.net/news/detail/71894
+1.1 主要概念 Broker
+接收和分发消息的应用，RabbitMQ Server就是Message Broker
+Exchange
+message到达broker的第一站，根据分发规则，匹配查询表中的routing key，分发消息到queue中去。常用的类型有：direct, topic, fanout。
+如果没有队列绑定到exchange上，那么该exchange上的消息都会被丢弃，因为它不存储消息又不知道该怎么处理消息。
+Queue
+消息队列载体，每个消息都会被投入到一个或多个队列
+Binding
+在exchange和queue之间建立关系就叫Binding，消费者声明队列的时候一般会指定routing_key，也可以叫binding_key。Binding信息被保存到exchange中的查询表中，用于message的分发依据。
+Routing Key
+这里区分一下binding和routing: binding是一个将exchange和queue关联起来的动作，routing_key可以理解成队列的一个属性，表示这个队列接受符合该routing_key的消息，routing_key需要在发送消息的时候指定。
+Vhost
+于多租户和安全因素设计的，把AMQP的基本组件划分到一个虚拟的分组中，类似于网络中的namespace概念。当多个不同的用户使用同一个RabbitMQ server提供的服务时，可以划分出多个vhost，每个用户在自己的vhost创建exchange／queue等
+Producer
+消息生产者，就是投递消息的程序。只负责把消息发送exchange，附带一些消息属性。
+Consumer
+消息消费者，就是接受消息的程序。
+Channel
+如果每一次访问RabbitMQ都建立一个Connection，在消息量大的时候建立TCP Connection的开销将是巨大的，效率也较低。
+Channel是在connection内部建立的逻辑连接，如果应用程序支持多线程，通常每个thread创建单独的channel进行通讯，AMQP method包含了channel id帮助客户端和message broker识别channel，所以channel之间是完全隔离的。Channel作为轻量级的Connection极大减少了操作系统建立TCP connection的开销。
+1.2 对比 rabbitmq activemq rocketmq kafka zeromq redis
+celery 待续
+2. 安装配置 CentOS 6.</description>
+    </item>
+    
+  </channel>
+</rss>

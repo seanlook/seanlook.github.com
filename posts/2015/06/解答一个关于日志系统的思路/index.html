@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>解答一个关于日志系统的思路 | Sean Note</title>
+<meta name="keywords" content="linux, logsystem">
+<meta name="description" content="在一个群里看到一个面试题，试着去解答一下，毕竟正好花时间了解过日志这方面的内容。
+希望能达到的使用场景：
+在写业务逻辑时也能进行结构化的log, 并且log被转移到一个数据库， 一个UI前端以这个log数据库为支持， 可以可视化各种指标， 并且保留未来可以对指标进行alarm的可能性
+希望从两个方面考虑这个问题：
+技术通路实现。 在每一步会用些什么技术? 一些核心组件比如log采集和log数据库有哪些已有方案， 是否有优劣？ 从运维角度看， 这套系统可能在哪些方面有需要考量的地方。 比如log采集是否会影响业务进程？ log数据库的运维可能遇到哪些问题？ 可以看出问题提出者比较在意解决这些问题过程中的思维方式和学习能力，弱化实践经验的要求。
+首先根据要求确认一下要达到效果：
+log日志采集 log存储 log展示 alarm报警(附加) 1 确定日志流向/架构 因为一开始脑海里也不知道原型是怎样的，就是以前用过linux自带的rsyslog功能感觉很类似：在日志服务器上通过配置rsyslog存入mysql的插件，而其它的各个服务器上默认rsyslog都是开启的，修改conf的系统日志、mail、cron等不输出到本地，而是指向mysql数据库。前端通过loganalyzer从数据库获取数据，图形化显示（简陋到不想说了。。。），但是显示的柱形图/饼图没有什么意义，默认对系统messages处理比较方便，要记录nginx或业务逻辑的log还需做其它额外操作。
+但rsyslog并不是一无是处，它的整个架构特别是消息队列的设计，跟后面要讲的许多分布式日志系统是很像的。所以脑海里日记采集的原型出来了：
+业务逻辑的日志输出到文件file，服务上的日志采集客户端agent实时监控这个logfile，作为输入；日志中心服务器server接受来自agent的消息，存入后端数据库。另有一个UI从这个数据库取得数据显示，并提供搜索、统计图表。 然而有以下几个问题需要考虑，这也就是为什么出现各种开源解决方案： 日志产生数量过大，不能及时发送到server怎么办 可以使用队列或redis来缓冲 日志中心服务器server故障怎么办，肯定不能丢失日志，即可靠性 有的解决办法是对 log server 做集群，通过zookeeper来同步配置；有的是在agent上本地暂时存放，等恢复后重新传输，redis就可以承担这个角色 考虑到这个日志平台的可扩展性，新的日志来源input不一定是file，比如rsyslog 至少需要支持常用的input 是否支持过滤功能 filter可以在日志发送之前就把不匹配的日志内容排除掉 log结构化 收集的日志初始是一长字符串，为了后面使用方便，需要将日志结构化存储（后面会有说明） 存储采用关系型数据库对海量日志存储，性能肯定很大问题 log日志存储没有一致性的要求，甚至可以说一条日志根本就没意义，而是需要通过大量的日志，通过分析、比较趋势具备用处。于是日志的存储各显大招，主流有两种：hadoop分布式文件系统HDFS，elasticsearch（后面简称es）全文搜索引擎，它们都具备很强的可伸缩性和多节点高可用性 由于存储方式的不同，数据分析与展示也就有各自的阵营 HDFS一般采用MapReduce处理数据，es既可以通过其丰富的插件显示或搜索数据，也可以通过推荐使用的kibana来展示数据 总结下来大致流程图如下：
+2 log结构化 当然可能你一直存在这样一个疑问：log的结构化问题处理
+代码里logger的内容大概是timestamp,log_level,module,message&hellip; ，一下是nginx的access示例：
+172.16.30.88 - [08/Jun/2015:00:08:38 &#43;0800] &#34;POST /notice/statement_findStatementVByPage.htm?1433637553824 HTTP/1.1&#34; 200 114 &#34;http://service.tp-link.net/&#34; &#34;Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)&#34; 处理这条非结构话的字符串或消息，无非就是在它发送到日志中心之前格式化，像最简单的rsyslog处理方法是通过数据库表字段Mapping来存放，而es则是通过编写Grok规则来结构化，如将IP、日期、请求方式、响应状态码、响应时间等组合成json字符串。（然而Grok写起来是非常痛苦的，以至于官方github上专门维护了一份通用规则表）">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2015/06/%E8%A7%A3%E7%AD%94%E4%B8%80%E4%B8%AA%E5%85%B3%E4%BA%8E%E6%97%A5%E5%BF%97%E7%B3%BB%E7%BB%9F%E7%9A%84%E6%80%9D%E8%B7%AF/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="解答一个关于日志系统的思路" />
+<meta property="og:description" content="在一个群里看到一个面试题，试着去解答一下，毕竟正好花时间了解过日志这方面的内容。
+希望能达到的使用场景：
+在写业务逻辑时也能进行结构化的log, 并且log被转移到一个数据库， 一个UI前端以这个log数据库为支持， 可以可视化各种指标， 并且保留未来可以对指标进行alarm的可能性
+希望从两个方面考虑这个问题：
+技术通路实现。 在每一步会用些什么技术? 一些核心组件比如log采集和log数据库有哪些已有方案， 是否有优劣？ 从运维角度看， 这套系统可能在哪些方面有需要考量的地方。 比如log采集是否会影响业务进程？ log数据库的运维可能遇到哪些问题？ 可以看出问题提出者比较在意解决这些问题过程中的思维方式和学习能力，弱化实践经验的要求。
+首先根据要求确认一下要达到效果：
+log日志采集 log存储 log展示 alarm报警(附加) 1 确定日志流向/架构 因为一开始脑海里也不知道原型是怎样的，就是以前用过linux自带的rsyslog功能感觉很类似：在日志服务器上通过配置rsyslog存入mysql的插件，而其它的各个服务器上默认rsyslog都是开启的，修改conf的系统日志、mail、cron等不输出到本地，而是指向mysql数据库。前端通过loganalyzer从数据库获取数据，图形化显示（简陋到不想说了。。。），但是显示的柱形图/饼图没有什么意义，默认对系统messages处理比较方便，要记录nginx或业务逻辑的log还需做其它额外操作。
+但rsyslog并不是一无是处，它的整个架构特别是消息队列的设计，跟后面要讲的许多分布式日志系统是很像的。所以脑海里日记采集的原型出来了：
+业务逻辑的日志输出到文件file，服务上的日志采集客户端agent实时监控这个logfile，作为输入；日志中心服务器server接受来自agent的消息，存入后端数据库。另有一个UI从这个数据库取得数据显示，并提供搜索、统计图表。 然而有以下几个问题需要考虑，这也就是为什么出现各种开源解决方案： 日志产生数量过大，不能及时发送到server怎么办 可以使用队列或redis来缓冲 日志中心服务器server故障怎么办，肯定不能丢失日志，即可靠性 有的解决办法是对 log server 做集群，通过zookeeper来同步配置；有的是在agent上本地暂时存放，等恢复后重新传输，redis就可以承担这个角色 考虑到这个日志平台的可扩展性，新的日志来源input不一定是file，比如rsyslog 至少需要支持常用的input 是否支持过滤功能 filter可以在日志发送之前就把不匹配的日志内容排除掉 log结构化 收集的日志初始是一长字符串，为了后面使用方便，需要将日志结构化存储（后面会有说明） 存储采用关系型数据库对海量日志存储，性能肯定很大问题 log日志存储没有一致性的要求，甚至可以说一条日志根本就没意义，而是需要通过大量的日志，通过分析、比较趋势具备用处。于是日志的存储各显大招，主流有两种：hadoop分布式文件系统HDFS，elasticsearch（后面简称es）全文搜索引擎，它们都具备很强的可伸缩性和多节点高可用性 由于存储方式的不同，数据分析与展示也就有各自的阵营 HDFS一般采用MapReduce处理数据，es既可以通过其丰富的插件显示或搜索数据，也可以通过推荐使用的kibana来展示数据 总结下来大致流程图如下：
+2 log结构化 当然可能你一直存在这样一个疑问：log的结构化问题处理
+代码里logger的内容大概是timestamp,log_level,module,message&hellip; ，一下是nginx的access示例：
+172.16.30.88 - [08/Jun/2015:00:08:38 &#43;0800] &#34;POST /notice/statement_findStatementVByPage.htm?1433637553824 HTTP/1.1&#34; 200 114 &#34;http://service.tp-link.net/&#34; &#34;Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)&#34; 处理这条非结构话的字符串或消息，无非就是在它发送到日志中心之前格式化，像最简单的rsyslog处理方法是通过数据库表字段Mapping来存放，而es则是通过编写Grok规则来结构化，如将IP、日期、请求方式、响应状态码、响应时间等组合成json字符串。（然而Grok写起来是非常痛苦的，以至于官方github上专门维护了一份通用规则表）" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2015/06/%E8%A7%A3%E7%AD%94%E4%B8%80%E4%B8%AA%E5%85%B3%E4%BA%8E%E6%97%A5%E5%BF%97%E7%B3%BB%E7%BB%9F%E7%9A%84%E6%80%9D%E8%B7%AF/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2015-06-09T16:32:49+00:00" />
+<meta property="article:modified_time" content="2015-06-09T16:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="解答一个关于日志系统的思路"/>
+<meta name="twitter:description" content="在一个群里看到一个面试题，试着去解答一下，毕竟正好花时间了解过日志这方面的内容。
+希望能达到的使用场景：
+在写业务逻辑时也能进行结构化的log, 并且log被转移到一个数据库， 一个UI前端以这个log数据库为支持， 可以可视化各种指标， 并且保留未来可以对指标进行alarm的可能性
+希望从两个方面考虑这个问题：
+技术通路实现。 在每一步会用些什么技术? 一些核心组件比如log采集和log数据库有哪些已有方案， 是否有优劣？ 从运维角度看， 这套系统可能在哪些方面有需要考量的地方。 比如log采集是否会影响业务进程？ log数据库的运维可能遇到哪些问题？ 可以看出问题提出者比较在意解决这些问题过程中的思维方式和学习能力，弱化实践经验的要求。
+首先根据要求确认一下要达到效果：
+log日志采集 log存储 log展示 alarm报警(附加) 1 确定日志流向/架构 因为一开始脑海里也不知道原型是怎样的，就是以前用过linux自带的rsyslog功能感觉很类似：在日志服务器上通过配置rsyslog存入mysql的插件，而其它的各个服务器上默认rsyslog都是开启的，修改conf的系统日志、mail、cron等不输出到本地，而是指向mysql数据库。前端通过loganalyzer从数据库获取数据，图形化显示（简陋到不想说了。。。），但是显示的柱形图/饼图没有什么意义，默认对系统messages处理比较方便，要记录nginx或业务逻辑的log还需做其它额外操作。
+但rsyslog并不是一无是处，它的整个架构特别是消息队列的设计，跟后面要讲的许多分布式日志系统是很像的。所以脑海里日记采集的原型出来了：
+业务逻辑的日志输出到文件file，服务上的日志采集客户端agent实时监控这个logfile，作为输入；日志中心服务器server接受来自agent的消息，存入后端数据库。另有一个UI从这个数据库取得数据显示，并提供搜索、统计图表。 然而有以下几个问题需要考虑，这也就是为什么出现各种开源解决方案： 日志产生数量过大，不能及时发送到server怎么办 可以使用队列或redis来缓冲 日志中心服务器server故障怎么办，肯定不能丢失日志，即可靠性 有的解决办法是对 log server 做集群，通过zookeeper来同步配置；有的是在agent上本地暂时存放，等恢复后重新传输，redis就可以承担这个角色 考虑到这个日志平台的可扩展性，新的日志来源input不一定是file，比如rsyslog 至少需要支持常用的input 是否支持过滤功能 filter可以在日志发送之前就把不匹配的日志内容排除掉 log结构化 收集的日志初始是一长字符串，为了后面使用方便，需要将日志结构化存储（后面会有说明） 存储采用关系型数据库对海量日志存储，性能肯定很大问题 log日志存储没有一致性的要求，甚至可以说一条日志根本就没意义，而是需要通过大量的日志，通过分析、比较趋势具备用处。于是日志的存储各显大招，主流有两种：hadoop分布式文件系统HDFS，elasticsearch（后面简称es）全文搜索引擎，它们都具备很强的可伸缩性和多节点高可用性 由于存储方式的不同，数据分析与展示也就有各自的阵营 HDFS一般采用MapReduce处理数据，es既可以通过其丰富的插件显示或搜索数据，也可以通过推荐使用的kibana来展示数据 总结下来大致流程图如下：
+2 log结构化 当然可能你一直存在这样一个疑问：log的结构化问题处理
+代码里logger的内容大概是timestamp,log_level,module,message&hellip; ，一下是nginx的access示例：
+172.16.30.88 - [08/Jun/2015:00:08:38 &#43;0800] &#34;POST /notice/statement_findStatementVByPage.htm?1433637553824 HTTP/1.1&#34; 200 114 &#34;http://service.tp-link.net/&#34; &#34;Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)&#34; 处理这条非结构话的字符串或消息，无非就是在它发送到日志中心之前格式化，像最简单的rsyslog处理方法是通过数据库表字段Mapping来存放，而es则是通过编写Grok规则来结构化，如将IP、日期、请求方式、响应状态码、响应时间等组合成json字符串。（然而Grok写起来是非常痛苦的，以至于官方github上专门维护了一份通用规则表）"/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "解答一个关于日志系统的思路",
+      "item": "http://xgknight.com/posts/2015/06/%E8%A7%A3%E7%AD%94%E4%B8%80%E4%B8%AA%E5%85%B3%E4%BA%8E%E6%97%A5%E5%BF%97%E7%B3%BB%E7%BB%9F%E7%9A%84%E6%80%9D%E8%B7%AF/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "解答一个关于日志系统的思路",
+  "name": "解答一个关于日志系统的思路",
+  "description": "在一个群里看到一个面试题，试着去解答一下，毕竟正好花时间了解过日志这方面的内容。\n希望能达到的使用场景：\n在写业务逻辑时也能进行结构化的log, 并且log被转移到一个数据库， 一个UI前端以这个log数据库为支持， 可以可视化各种指标， 并且保留未来可以对指标进行alarm的可能性\n希望从两个方面考虑这个问题：\n技术通路实现。 在每一步会用些什么技术? 一些核心组件比如log采集和log数据库有哪些已有方案， 是否有优劣？ 从运维角度看， 这套系统可能在哪些方面有需要考量的地方。 比如log采集是否会影响业务进程？ log数据库的运维可能遇到哪些问题？ 可以看出问题提出者比较在意解决这些问题过程中的思维方式和学习能力，弱化实践经验的要求。\n首先根据要求确认一下要达到效果：\nlog日志采集 log存储 log展示 alarm报警(附加) 1 确定日志流向/架构 因为一开始脑海里也不知道原型是怎样的，就是以前用过linux自带的rsyslog功能感觉很类似：在日志服务器上通过配置rsyslog存入mysql的插件，而其它的各个服务器上默认rsyslog都是开启的，修改conf的系统日志、mail、cron等不输出到本地，而是指向mysql数据库。前端通过loganalyzer从数据库获取数据，图形化显示（简陋到不想说了。。。），但是显示的柱形图/饼图没有什么意义，默认对系统messages处理比较方便，要记录nginx或业务逻辑的log还需做其它额外操作。\n但rsyslog并不是一无是处，它的整个架构特别是消息队列的设计，跟后面要讲的许多分布式日志系统是很像的。所以脑海里日记采集的原型出来了：\n业务逻辑的日志输出到文件file，服务上的日志采集客户端agent实时监控这个logfile，作为输入；日志中心服务器server接受来自agent的消息，存入后端数据库。另有一个UI从这个数据库取得数据显示，并提供搜索、统计图表。 然而有以下几个问题需要考虑，这也就是为什么出现各种开源解决方案： 日志产生数量过大，不能及时发送到server怎么办 可以使用队列或redis来缓冲 日志中心服务器server故障怎么办，肯定不能丢失日志，即可靠性 有的解决办法是对 log server 做集群，通过zookeeper来同步配置；有的是在agent上本地暂时存放，等恢复后重新传输，redis就可以承担这个角色 考虑到这个日志平台的可扩展性，新的日志来源input不一定是file，比如rsyslog 至少需要支持常用的input 是否支持过滤功能 filter可以在日志发送之前就把不匹配的日志内容排除掉 log结构化 收集的日志初始是一长字符串，为了后面使用方便，需要将日志结构化存储（后面会有说明） 存储采用关系型数据库对海量日志存储，性能肯定很大问题 log日志存储没有一致性的要求，甚至可以说一条日志根本就没意义，而是需要通过大量的日志，通过分析、比较趋势具备用处。于是日志的存储各显大招，主流有两种：hadoop分布式文件系统HDFS，elasticsearch（后面简称es）全文搜索引擎，它们都具备很强的可伸缩性和多节点高可用性 由于存储方式的不同，数据分析与展示也就有各自的阵营 HDFS一般采用MapReduce处理数据，es既可以通过其丰富的插件显示或搜索数据，也可以通过推荐使用的kibana来展示数据 总结下来大致流程图如下：\n2 log结构化 当然可能你一直存在这样一个疑问：log的结构化问题处理\n代码里logger的内容大概是timestamp,log_level,module,message\u0026hellip; ，一下是nginx的access示例：\n172.16.30.88 - [08/Jun/2015:00:08:38 +0800] \u0026#34;POST /notice/statement_findStatementVByPage.htm?1433637553824 HTTP/1.1\u0026#34; 200 114 \u0026#34;http://service.tp-link.net/\u0026#34; \u0026#34;Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)\u0026#34; 处理这条非结构话的字符串或消息，无非就是在它发送到日志中心之前格式化，像最简单的rsyslog处理方法是通过数据库表字段Mapping来存放，而es则是通过编写Grok规则来结构化，如将IP、日期、请求方式、响应状态码、响应时间等组合成json字符串。（然而Grok写起来是非常痛苦的，以至于官方github上专门维护了一份通用规则表）",
+  "keywords": [
+    "linux", "logsystem"
+  ],
+  "articleBody": "在一个群里看到一个面试题，试着去解答一下，毕竟正好花时间了解过日志这方面的内容。\n希望能达到的使用场景：\n在写业务逻辑时也能进行结构化的log, 并且log被转移到一个数据库， 一个UI前端以这个log数据库为支持， 可以可视化各种指标， 并且保留未来可以对指标进行alarm的可能性\n希望从两个方面考虑这个问题：\n技术通路实现。 在每一步会用些什么技术? 一些核心组件比如log采集和log数据库有哪些已有方案， 是否有优劣？ 从运维角度看， 这套系统可能在哪些方面有需要考量的地方。 比如log采集是否会影响业务进程？ log数据库的运维可能遇到哪些问题？ 可以看出问题提出者比较在意解决这些问题过程中的思维方式和学习能力，弱化实践经验的要求。\n首先根据要求确认一下要达到效果：\nlog日志采集 log存储 log展示 alarm报警(附加) 1 确定日志流向/架构 因为一开始脑海里也不知道原型是怎样的，就是以前用过linux自带的rsyslog功能感觉很类似：在日志服务器上通过配置rsyslog存入mysql的插件，而其它的各个服务器上默认rsyslog都是开启的，修改conf的系统日志、mail、cron等不输出到本地，而是指向mysql数据库。前端通过loganalyzer从数据库获取数据，图形化显示（简陋到不想说了。。。），但是显示的柱形图/饼图没有什么意义，默认对系统messages处理比较方便，要记录nginx或业务逻辑的log还需做其它额外操作。\n但rsyslog并不是一无是处，它的整个架构特别是消息队列的设计，跟后面要讲的许多分布式日志系统是很像的。所以脑海里日记采集的原型出来了：\n业务逻辑的日志输出到文件file，服务上的日志采集客户端agent实时监控这个logfile，作为输入；日志中心服务器server接受来自agent的消息，存入后端数据库。另有一个UI从这个数据库取得数据显示，并提供搜索、统计图表。 然而有以下几个问题需要考虑，这也就是为什么出现各种开源解决方案： 日志产生数量过大，不能及时发送到server怎么办 可以使用队列或redis来缓冲 日志中心服务器server故障怎么办，肯定不能丢失日志，即可靠性 有的解决办法是对 log server 做集群，通过zookeeper来同步配置；有的是在agent上本地暂时存放，等恢复后重新传输，redis就可以承担这个角色 考虑到这个日志平台的可扩展性，新的日志来源input不一定是file，比如rsyslog 至少需要支持常用的input 是否支持过滤功能 filter可以在日志发送之前就把不匹配的日志内容排除掉 log结构化 收集的日志初始是一长字符串，为了后面使用方便，需要将日志结构化存储（后面会有说明） 存储采用关系型数据库对海量日志存储，性能肯定很大问题 log日志存储没有一致性的要求，甚至可以说一条日志根本就没意义，而是需要通过大量的日志，通过分析、比较趋势具备用处。于是日志的存储各显大招，主流有两种：hadoop分布式文件系统HDFS，elasticsearch（后面简称es）全文搜索引擎，它们都具备很强的可伸缩性和多节点高可用性 由于存储方式的不同，数据分析与展示也就有各自的阵营 HDFS一般采用MapReduce处理数据，es既可以通过其丰富的插件显示或搜索数据，也可以通过推荐使用的kibana来展示数据 总结下来大致流程图如下：\n2 log结构化 当然可能你一直存在这样一个疑问：log的结构化问题处理\n代码里logger的内容大概是timestamp,log_level,module,message… ，一下是nginx的access示例：\n172.16.30.88 - [08/Jun/2015:00:08:38 +0800] \"POST /notice/statement_findStatementVByPage.htm?1433637553824 HTTP/1.1\" 200 114 \"http://service.tp-link.net/\" \"Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)\" 处理这条非结构话的字符串或消息，无非就是在它发送到日志中心之前格式化，像最简单的rsyslog处理方法是通过数据库表字段Mapping来存放，而es则是通过编写Grok规则来结构化，如将IP、日期、请求方式、响应状态码、响应时间等组合成json字符串。（然而Grok写起来是非常痛苦的，以至于官方github上专门维护了一份通用规则表）\n可以说上面提到的各项内容从采集、存储、分析、展示，几乎在所有大型分布式日志系统中都可以找到各自的实现。而具体开源项目的选型，主要根据侧重功能、数据量级、管理复杂度、社区或文档的完善程度等来决定。\n3 对运维带来的影响 是否选用这一套日志管理系统，从运维角度看，需要考虑以下因素\n日志采集是否影响原有进程 应该这样说，业务代码的log是记录到文件的，日志采集进程也是是直接从文件读取，所以外部是不会影响（不包括占用系统资源）。但，记录日志势必会损耗一定的性能，建议做法是通过配置文件设定是否打开日志，优化做法是日志缓存、异步记录、仅记录有价值的日志。\nlog数据库的运维可能会遇到的问题 比较容易出现问题的就是log数据存储出现单点故障、性能不达标，这两方面顾虑都可以通过多节点集群来解决，而且要能够实现添加或去除节点对外透明（即可扩展性）。HDFS和es都可以满足这个要求。 具体到es，还可能遇到索引分区的问题，定义以timestamp或module或日志类型等索引，这个需要具体深入了解业务需求了。\n运维成本\n维护复杂程度，包括学习成本，文档是否完善，能否自定义插件，社区是否成熟涉及到出异常能否快速解决 部署是否方便，通过salt或docker能否方便的完成部署 资源，即引入这一套系统，所需要投入的基础设施 与docker结合的使用 日志默认是写到docker自己的文件系统上，记录或收集方式需要考虑 在host映射volume，日志写到host，日志收集方法不变 docker自身提供日志写入host的系统日志messages功能，日志改收集message 或者, 写插件，agent直接从docker stdout输入 将日志收集agent端封装在docker images里，统一从registry拉取运行，达到自动化部署 可靠性与伸缩性 上面也已经提到，agent日志传输失败需要能够暂时存在本地，等待重传；存储查询遇到性能问题有叫成熟的优化方案，如添加节点或优化es索引\n对日志系统进行监控 日志收集（进程）出现异常，能通过系统本身或其它监控平台报警。还要考虑恢复所用的时间。\n日志系统里定义阈值，能否及时告警 系统自带当然更好，如果没有实现指标告警的难易程度。（不幸的是，logstash有告警插件。。）\n实时性分析要求 即提交一个查询log请求，能够在秒级响应请求结果，图示化显示趋势。\n日志保留周期 对日志存储端来说这是个小问题，但是在agent服务器上日志文件是持续增大的，是否需要定期echo一下。\n认证访问 我们不会把日志数据公布给任何人，架设在内网还要，如果在公网，一是最好能ssl加密，而是有登录验证。这个在logstash没有看到相关的内容，可能需要自己实现\n后话 因为曾经在一次技术沙龙上听到有人分享过logstash，所以一提日志管理时就想到了它，从而比较方便了知道了一个日志采集、存储、分析、展示系统的一个大致技术和架构。然后问google “logstash alternative\"发现类似的开源/商业的技术可谓是百花齐放，flume，kafka，chukwa，fluent等（上面几个都有了解比较过，架构与上面的图片相似，有的是采用消息订阅的方式，有的结合hadoop使用分析TB级数据的）。\n一开始也是为了避免过早的陷入细节，就把上面几个框架记录了下各自的偏重的适用场景、优缺点、管理复杂度，然后自己搭了一套LEK（Logstash、Elasticsearch、Kibana）环境体验了一把，比起枯燥的看架构原理，更有成就感。从功能上来LEK说刚好可以达到所提要求，而且在github上的logstash的star有4000多个，大有一统江湖之势，新浪有结合docker在使用logstash，在一个交流群里问到也有人在用。（因为各版本兼容性问题，官网原文文档是最完善的。但logstash也有诸如内存占用偏高等问题，都有积极维护的插件来解决）\n最后结合自己以前的经验，思考了一下日后运维工作中可能会涉及到的问题，包括监控和自动化、高可用等方面。\n补充 后来知道还有使用OpenTSDB这种时间序列数据库去存放日志的方案，有机会研究一下。\n本文链接地址：http://xgknight.com/2015/06/09/gongshi-logsystem-elk-preview/\n",
+  "wordCount" : "113",
+  "inLanguage": "en",
+  "datePublished": "2015-06-09T16:32:49Z",
+  "dateModified": "2015-06-09T16:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2015/06/%E8%A7%A3%E7%AD%94%E4%B8%80%E4%B8%AA%E5%85%B3%E4%BA%8E%E6%97%A5%E5%BF%97%E7%B3%BB%E7%BB%9F%E7%9A%84%E6%80%9D%E8%B7%AF/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      解答一个关于日志系统的思路
+    </h1>
+    <div class="post-meta"><span title='2015-06-09 16:32:49 +0000 UTC'>June 9, 2015</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>在一个群里看到一个面试题，试着去解答一下，毕竟正好花时间了解过日志这方面的内容。</p>
+<blockquote>
+<p>希望能达到的使用场景：</p>
+<p>在写业务逻辑时也能进行结构化的log, 并且log被转移到一个数据库， 一个UI前端以这个log数据库为支持， 可以可视化各种指标， 并且保留未来可以对指标进行alarm的可能性</p>
+<p>希望从两个方面考虑这个问题：</p>
+<ol>
+<li>技术通路实现。 在每一步会用些什么技术?  一些核心组件比如log采集和log数据库有哪些已有方案， 是否有优劣？</li>
+<li>从运维角度看， 这套系统可能在哪些方面有需要考量的地方。 比如log采集是否会影响业务进程？ log数据库的运维可能遇到哪些问题？</li>
+</ol>
+</blockquote>
+<p>可以看出问题提出者比较在意解决这些问题过程中的思维方式和学习能力，弱化实践经验的要求。</p>
+<p>首先根据要求确认一下要达到效果：</p>
+<ol>
+<li>log日志采集</li>
+<li>log存储</li>
+<li>log展示</li>
+<li>alarm报警(附加)</li>
+</ol>
+<h2 id="1-确定日志流向架构">1 确定日志流向/架构<a hidden class="anchor" aria-hidden="true" href="#1-确定日志流向架构">#</a></h2>
+<p>因为一开始脑海里也不知道原型是怎样的，就是以前用过linux自带的rsyslog功能感觉很类似：在日志服务器上通过配置rsyslog存入mysql的插件，而其它的各个服务器上默认rsyslog都是开启的，修改conf的系统日志、mail、cron等不输出到本地，而是指向mysql数据库。前端通过loganalyzer从数据库获取数据，图形化显示（简陋到不想说了。。。），但是显示的柱形图/饼图没有什么意义，默认对系统messages处理比较方便，要记录nginx或业务逻辑的log还需做其它额外操作。</p>
+<p>但rsyslog并不是一无是处，它的整个架构特别是消息队列的设计，跟后面要讲的许多分布式日志系统是很像的。所以脑海里日记采集的原型出来了：</p>
+<ul>
+<li>业务逻辑的日志输出到文件file，服务上的日志采集客户端agent实时监控这个logfile，作为输入；日志中心服务器server接受来自agent的消息，存入后端数据库。另有一个UI从这个数据库取得数据显示，并提供搜索、统计图表。</li>
+<li>然而有以下几个问题需要考虑，这也就是为什么出现各种开源解决方案：</li>
+</ul>
+<ol>
+<li>日志产生数量过大，不能及时发送到server怎么办
+可以使用队列或redis来缓冲</li>
+<li>日志中心服务器server故障怎么办，肯定不能丢失日志，即可靠性
+有的解决办法是对 log server 做集群，通过zookeeper来同步配置；有的是在agent上本地暂时存放，等恢复后重新传输，redis就可以承担这个角色</li>
+<li>考虑到这个日志平台的可扩展性，新的日志来源input不一定是file，比如rsyslog
+至少需要支持常用的input</li>
+<li>是否支持过滤功能
+filter可以在日志发送之前就把不匹配的日志内容排除掉</li>
+<li>log结构化
+收集的日志初始是一长字符串，为了后面使用方便，需要将日志结构化存储（后面会有说明）</li>
+<li>存储采用关系型数据库对海量日志存储，性能肯定很大问题
+log日志存储没有一致性的要求，甚至可以说一条日志根本就没意义，而是需要通过大量的日志，通过分析、比较趋势具备用处。于是日志的存储各显大招，主流有两种：hadoop分布式文件系统HDFS，elasticsearch（后面简称es）全文搜索引擎，它们都具备很强的可伸缩性和多节点高可用性</li>
+<li>由于存储方式的不同，数据分析与展示也就有各自的阵营
+HDFS一般采用MapReduce处理数据，es既可以通过其丰富的插件显示或搜索数据，也可以通过推荐使用的kibana来展示数据</li>
+</ol>
+<p>总结下来大致流程图如下：</p>
+<!-- raw HTML omitted -->
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/gongshi-log-elk-preview.png" alt=""  />
+</p>
+<h2 id="2-log结构化">2 log结构化<a hidden class="anchor" aria-hidden="true" href="#2-log结构化">#</a></h2>
+<p>当然可能你一直存在这样一个疑问：log的结构化问题处理</p>
+<p>代码里logger的内容大概是timestamp,log_level,module,message&hellip; ，一下是nginx的access示例：</p>
+<pre tabindex="0"><code>172.16.30.88 - [08/Jun/2015:00:08:38 +0800] &#34;POST /notice/statement_findStatementVByPage.htm?1433637553824 HTTP/1.1&#34; 
+200 114 &#34;http://service.tp-link.net/&#34; &#34;Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)&#34;
+</code></pre><p>处理这条非结构话的字符串或消息，无非就是在它发送到日志中心之前格式化，像最简单的rsyslog处理方法是通过数据库表字段Mapping来存放，而es则是通过编写Grok规则来结构化，如将IP、日期、请求方式、响应状态码、响应时间等组合成json字符串。（然而Grok写起来是非常痛苦的，以至于官方github上专门维护了一份通用规则表）</p>
+<p>可以说上面提到的各项内容从采集、存储、分析、展示，几乎在所有大型分布式日志系统中都可以找到各自的实现。而具体开源项目的选型，主要根据侧重功能、数据量级、管理复杂度、社区或文档的完善程度等来决定。</p>
+<h2 id="3-对运维带来的影响">3 对运维带来的影响<a hidden class="anchor" aria-hidden="true" href="#3-对运维带来的影响">#</a></h2>
+<p>是否选用这一套日志管理系统，从运维角度看，需要考虑以下因素</p>
+<ol>
+<li>
+<p>日志采集是否影响原有进程
+应该这样说，业务代码的log是记录到文件的，日志采集进程也是是直接从文件读取，所以外部是不会影响（不包括占用系统资源）。但，记录日志势必会损耗一定的性能，建议做法是通过配置文件设定是否打开日志，优化做法是日志缓存、异步记录、仅记录有价值的日志。</p>
+</li>
+<li>
+<p>log数据库的运维可能会遇到的问题
+比较容易出现问题的就是log数据存储出现单点故障、性能不达标，这两方面顾虑都可以通过多节点集群来解决，而且要能够实现添加或去除节点对外透明（即可扩展性）。HDFS和es都可以满足这个要求。
+具体到es，还可能遇到索引分区的问题，定义以timestamp或module或日志类型等索引，这个需要具体深入了解业务需求了。</p>
+</li>
+<li>
+<p>运维成本</p>
+</li>
+</ol>
+<ul>
+<li>维护复杂程度，包括学习成本，文档是否完善，能否自定义插件，社区是否成熟涉及到出异常能否快速解决</li>
+<li>部署是否方便，通过salt或docker能否方便的完成部署</li>
+<li>资源，即引入这一套系统，所需要投入的基础设施</li>
+</ul>
+<ol start="4">
+<li>与docker结合的使用</li>
+</ol>
+<ul>
+<li>日志默认是写到docker自己的文件系统上，记录或收集方式需要考虑</li>
+<li>在host映射volume，日志写到host，日志收集方法不变</li>
+<li>docker自身提供日志写入host的系统日志messages功能，日志改收集message</li>
+<li>或者, 写插件，agent直接从docker stdout输入</li>
+<li>将日志收集agent端封装在docker images里，统一从registry拉取运行，达到自动化部署</li>
+</ul>
+<ol start="5">
+<li>
+<p>可靠性与伸缩性
+上面也已经提到，agent日志传输失败需要能够暂时存在本地，等待重传；存储查询遇到性能问题有叫成熟的优化方案，如添加节点或优化es索引</p>
+</li>
+<li>
+<p>对日志系统进行监控
+日志收集（进程）出现异常，能通过系统本身或其它监控平台报警。还要考虑恢复所用的时间。</p>
+</li>
+<li>
+<p>日志系统里定义阈值，能否及时告警
+系统自带当然更好，如果没有实现指标告警的难易程度。（不幸的是，logstash有告警插件。。）</p>
+</li>
+<li>
+<p>实时性分析要求
+即提交一个查询log请求，能够在秒级响应请求结果，图示化显示趋势。</p>
+</li>
+<li>
+<p>日志保留周期
+对日志存储端来说这是个小问题，但是在agent服务器上日志文件是持续增大的，是否需要定期echo一下。</p>
+</li>
+<li>
+<p>认证访问
+我们不会把日志数据公布给任何人，架设在内网还要，如果在公网，一是最好能ssl加密，而是有登录验证。这个在logstash没有看到相关的内容，可能需要自己实现</p>
+</li>
+</ol>
+<h2 id="后话">后话<a hidden class="anchor" aria-hidden="true" href="#后话">#</a></h2>
+<p>因为曾经在一次技术沙龙上听到有人分享过logstash，所以一提日志管理时就想到了它，从而比较方便了知道了一个日志采集、存储、分析、展示系统的一个大致技术和架构。然后问google &ldquo;logstash alternative&quot;发现类似的开源/商业的技术可谓是百花齐放，flume，kafka，chukwa，fluent等（上面几个都有了解比较过，架构与上面的图片相似，有的是采用消息订阅的方式，有的结合hadoop使用分析TB级数据的）。</p>
+<p>一开始也是为了避免过早的陷入细节，就把上面几个框架记录了下各自的偏重的适用场景、优缺点、管理复杂度，然后自己搭了一套LEK（Logstash、Elasticsearch、Kibana）环境体验了一把，比起枯燥的看架构原理，更有成就感。从功能上来LEK说刚好可以达到所提要求，而且在github上的logstash的star有4000多个，大有一统江湖之势，新浪有结合docker在使用logstash，在一个交流群里问到也有人在用。（因为各版本兼容性问题，官网原文文档是最完善的。但logstash也有诸如内存占用偏高等问题，都有积极维护的插件来解决）</p>
+<p>最后结合自己以前的经验，思考了一下日后运维工作中可能会涉及到的问题，包括监控和自动化、高可用等方面。</p>
+<p><strong>补充</strong>
+后来知道还有使用OpenTSDB这种时间序列数据库去存放日志的方案，有机会研究一下。</p>
+<hr>
+<p>本文链接地址：http://xgknight.com/2015/06/09/gongshi-logsystem-elk-preview/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/linux/">linux</a></li>
+      <li><a href="http://xgknight.com/tags/logsystem/">logsystem</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

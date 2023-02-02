@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>ProxySQL之性能测试对比 | Sean Note</title>
+<meta name="keywords" content="mysql, 中间件, proxysql">
+<meta name="description" content="本文会通过sysbench对ProxySQL进行基准测试，并与直连的性能进行对比。与此同时也对 Maxscale 和 Qihu360 Atlas 放在一起参考。 提示：压测前确保把query cache完全关掉。
+1. proxysql vs 直连 1.1 select nontrx ./bin/sysbench --test=/root/sysbench2/sysbench/tests/db/oltp.lua --mysql-host=10.0.100.36 --mysql-port=6033 --mysql-user=myuser --mysql-password=mypass \ --mysql-db=db15 --oltp-tables-count=20 --oltp-table-size=5000000 --report-interval=20 --oltp-dist-type=uniform --rand-init=on --max-requests=0 --oltp-test-mode=nontrx --oltp-nontrx-mode=select \ --oltp-read-only=on --oltp-skip-trx=on --max-time=120 --num-threads=2 run num-threads依次加大 2 5 10 20 50 100 200 400 {% iframe http://www.tubiaoxiu.com/p.html?s=106165b0eeca215a&amp;web_mode 900 700 %}
+sysbench线程并发数达到10以下，性能损失在30%以上；达到20，性能损失减少到10%左右。看到proxysql承载的并发数越高，性能损失越少；最好的时候在50线程数，相比直连损失5%。
+1.2 oltp dml 混合读写测试。proxysql结果图应该与上面相差无几，因为是主要好在计算 query digest 和规则匹配，与select无异，可参考下节的图示。
+sysbench 压测命令：
+./bin/sysbench --test=/root/sysbench2/sysbench/tests/db/oltp.lua --mysql-host=10.0.100.34 --mysql-port=3306 --mysql-user=myuser --mysql-password=mypass \ --mysql-db=db15 --oltp-tables-count=20 --oltp-table-size=5000000 --report-interval=20 --oltp-dist-type=uniform --rand-init=on --max-requests=0 --oltp-read-only=off --max-time=120 \ --num-threads=2 run num-threads依次加大 2 5 10 16 20 50 100 200 400 分别对PrxoySQL, Maxscale, Atlas, 直连，四种情况做基准测试 2.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E6%80%A7%E8%83%BD%E6%B5%8B%E8%AF%95%E5%AF%B9%E6%AF%94/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="ProxySQL之性能测试对比" />
+<meta property="og:description" content="本文会通过sysbench对ProxySQL进行基准测试，并与直连的性能进行对比。与此同时也对 Maxscale 和 Qihu360 Atlas 放在一起参考。 提示：压测前确保把query cache完全关掉。
+1. proxysql vs 直连 1.1 select nontrx ./bin/sysbench --test=/root/sysbench2/sysbench/tests/db/oltp.lua --mysql-host=10.0.100.36 --mysql-port=6033 --mysql-user=myuser --mysql-password=mypass \ --mysql-db=db15 --oltp-tables-count=20 --oltp-table-size=5000000 --report-interval=20 --oltp-dist-type=uniform --rand-init=on --max-requests=0 --oltp-test-mode=nontrx --oltp-nontrx-mode=select \ --oltp-read-only=on --oltp-skip-trx=on --max-time=120 --num-threads=2 run num-threads依次加大 2 5 10 20 50 100 200 400 {% iframe http://www.tubiaoxiu.com/p.html?s=106165b0eeca215a&amp;web_mode 900 700 %}
+sysbench线程并发数达到10以下，性能损失在30%以上；达到20，性能损失减少到10%左右。看到proxysql承载的并发数越高，性能损失越少；最好的时候在50线程数，相比直连损失5%。
+1.2 oltp dml 混合读写测试。proxysql结果图应该与上面相差无几，因为是主要好在计算 query digest 和规则匹配，与select无异，可参考下节的图示。
+sysbench 压测命令：
+./bin/sysbench --test=/root/sysbench2/sysbench/tests/db/oltp.lua --mysql-host=10.0.100.34 --mysql-port=3306 --mysql-user=myuser --mysql-password=mypass \ --mysql-db=db15 --oltp-tables-count=20 --oltp-table-size=5000000 --report-interval=20 --oltp-dist-type=uniform --rand-init=on --max-requests=0 --oltp-read-only=off --max-time=120 \ --num-threads=2 run num-threads依次加大 2 5 10 16 20 50 100 200 400 分别对PrxoySQL, Maxscale, Atlas, 直连，四种情况做基准测试 2." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E6%80%A7%E8%83%BD%E6%B5%8B%E8%AF%95%E5%AF%B9%E6%AF%94/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2017-04-20T21:32:49+00:00" />
+<meta property="article:modified_time" content="2017-04-20T21:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="ProxySQL之性能测试对比"/>
+<meta name="twitter:description" content="本文会通过sysbench对ProxySQL进行基准测试，并与直连的性能进行对比。与此同时也对 Maxscale 和 Qihu360 Atlas 放在一起参考。 提示：压测前确保把query cache完全关掉。
+1. proxysql vs 直连 1.1 select nontrx ./bin/sysbench --test=/root/sysbench2/sysbench/tests/db/oltp.lua --mysql-host=10.0.100.36 --mysql-port=6033 --mysql-user=myuser --mysql-password=mypass \ --mysql-db=db15 --oltp-tables-count=20 --oltp-table-size=5000000 --report-interval=20 --oltp-dist-type=uniform --rand-init=on --max-requests=0 --oltp-test-mode=nontrx --oltp-nontrx-mode=select \ --oltp-read-only=on --oltp-skip-trx=on --max-time=120 --num-threads=2 run num-threads依次加大 2 5 10 20 50 100 200 400 {% iframe http://www.tubiaoxiu.com/p.html?s=106165b0eeca215a&amp;web_mode 900 700 %}
+sysbench线程并发数达到10以下，性能损失在30%以上；达到20，性能损失减少到10%左右。看到proxysql承载的并发数越高，性能损失越少；最好的时候在50线程数，相比直连损失5%。
+1.2 oltp dml 混合读写测试。proxysql结果图应该与上面相差无几，因为是主要好在计算 query digest 和规则匹配，与select无异，可参考下节的图示。
+sysbench 压测命令：
+./bin/sysbench --test=/root/sysbench2/sysbench/tests/db/oltp.lua --mysql-host=10.0.100.34 --mysql-port=3306 --mysql-user=myuser --mysql-password=mypass \ --mysql-db=db15 --oltp-tables-count=20 --oltp-table-size=5000000 --report-interval=20 --oltp-dist-type=uniform --rand-init=on --max-requests=0 --oltp-read-only=off --max-time=120 \ --num-threads=2 run num-threads依次加大 2 5 10 16 20 50 100 200 400 分别对PrxoySQL, Maxscale, Atlas, 直连，四种情况做基准测试 2."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "ProxySQL之性能测试对比",
+      "item": "http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E6%80%A7%E8%83%BD%E6%B5%8B%E8%AF%95%E5%AF%B9%E6%AF%94/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "ProxySQL之性能测试对比",
+  "name": "ProxySQL之性能测试对比",
+  "description": "本文会通过sysbench对ProxySQL进行基准测试，并与直连的性能进行对比。与此同时也对 Maxscale 和 Qihu360 Atlas 放在一起参考。 提示：压测前确保把query cache完全关掉。\n1. proxysql vs 直连 1.1 select nontrx ./bin/sysbench --test=/root/sysbench2/sysbench/tests/db/oltp.lua --mysql-host=10.0.100.36 --mysql-port=6033 --mysql-user=myuser --mysql-password=mypass \\ --mysql-db=db15 --oltp-tables-count=20 --oltp-table-size=5000000 --report-interval=20 --oltp-dist-type=uniform --rand-init=on --max-requests=0 --oltp-test-mode=nontrx --oltp-nontrx-mode=select \\ --oltp-read-only=on --oltp-skip-trx=on --max-time=120 --num-threads=2 run num-threads依次加大 2 5 10 20 50 100 200 400 {% iframe http://www.tubiaoxiu.com/p.html?s=106165b0eeca215a\u0026amp;web_mode 900 700 %}\nsysbench线程并发数达到10以下，性能损失在30%以上；达到20，性能损失减少到10%左右。看到proxysql承载的并发数越高，性能损失越少；最好的时候在50线程数，相比直连损失5%。\n1.2 oltp dml 混合读写测试。proxysql结果图应该与上面相差无几，因为是主要好在计算 query digest 和规则匹配，与select无异，可参考下节的图示。\nsysbench 压测命令：\n./bin/sysbench --test=/root/sysbench2/sysbench/tests/db/oltp.lua --mysql-host=10.0.100.34 --mysql-port=3306 --mysql-user=myuser --mysql-password=mypass \\ --mysql-db=db15 --oltp-tables-count=20 --oltp-table-size=5000000 --report-interval=20 --oltp-dist-type=uniform --rand-init=on --max-requests=0 --oltp-read-only=off --max-time=120 \\ --num-threads=2 run num-threads依次加大 2 5 10 16 20 50 100 200 400 分别对PrxoySQL, Maxscale, Atlas, 直连，四种情况做基准测试 2.",
+  "keywords": [
+    "mysql", "中间件", "proxysql"
+  ],
+  "articleBody": "本文会通过sysbench对ProxySQL进行基准测试，并与直连的性能进行对比。与此同时也对 Maxscale 和 Qihu360 Atlas 放在一起参考。 提示：压测前确保把query cache完全关掉。\n1. proxysql vs 直连 1.1 select nontrx ./bin/sysbench --test=/root/sysbench2/sysbench/tests/db/oltp.lua --mysql-host=10.0.100.36 --mysql-port=6033 --mysql-user=myuser --mysql-password=mypass \\ --mysql-db=db15 --oltp-tables-count=20 --oltp-table-size=5000000 --report-interval=20 --oltp-dist-type=uniform --rand-init=on --max-requests=0 --oltp-test-mode=nontrx --oltp-nontrx-mode=select \\ --oltp-read-only=on --oltp-skip-trx=on --max-time=120 --num-threads=2 run num-threads依次加大 2 5 10 20 50 100 200 400 {% iframe http://www.tubiaoxiu.com/p.html?s=106165b0eeca215a\u0026web_mode 900 700 %}\nsysbench线程并发数达到10以下，性能损失在30%以上；达到20，性能损失减少到10%左右。看到proxysql承载的并发数越高，性能损失越少；最好的时候在50线程数，相比直连损失5%。\n1.2 oltp dml 混合读写测试。proxysql结果图应该与上面相差无几，因为是主要好在计算 query digest 和规则匹配，与select无异，可参考下节的图示。\nsysbench 压测命令：\n./bin/sysbench --test=/root/sysbench2/sysbench/tests/db/oltp.lua --mysql-host=10.0.100.34 --mysql-port=3306 --mysql-user=myuser --mysql-password=mypass \\ --mysql-db=db15 --oltp-tables-count=20 --oltp-table-size=5000000 --report-interval=20 --oltp-dist-type=uniform --rand-init=on --max-requests=0 --oltp-read-only=off --max-time=120 \\ --num-threads=2 run num-threads依次加大 2 5 10 16 20 50 100 200 400 分别对PrxoySQL, Maxscale, Atlas, 直连，四种情况做基准测试 2. proxysql vs maxscale vs atlas 作者自己也有指出，在客户端并发数不高的情况下，maxscale表现比proxysql要好。这里我也特意对maxscale和atlas一起做了个对比。配置基本是最小化的，没有很复杂的规则，只是中间转发。\nProxySQL (v1.3.5): mysql-threads=4 Atlas 360 (v2.2.1): event-threads=4 maxscale (v1.4.5): threads=4 ** 2.1 select nontrx ** oltp混合读写基准测试，没有复杂配置的情况下，ProxySQL与Maxscale神奇般的几乎重合，Qihu360的atlas要弱一些。\n** 2.2 oltp dml **\n原始数据： 3. rewrite vs non-rewrite 下面来测一下 query rewrite 对性能的影响，考虑到将来如果要分表，可以在ProxySQL这一层做，应用端无需改动表名。 为了达到效果，这里rewrite只是为表增加了个别名：\n-- proxysql admin cli update mysql_query_rules set match_pattern=\"(.*)(sbtest\\d+)(.*)\",replace_pattern=\"\\1\\2 as ttt \\3\" where rule_id \u003e=61 and rule_id \u003c=92; load mysql query rules to run; sysbench num-threads=20 的结果：\nreplace? qps response time avg(ms) proxysql replace 15734.49 17.79 proxysql no-replace 16764.66 16.70 直连 18778.43 14.91 在20个并发线程下，有 rewrite 是 no-rewrite 性能的 93.9% 。测试线程数继续加大到 50，差别更小。\n4. lots of rules 测试ProxySQL定义的 query rules 数量（并匹配但不apply），对性能的影响。\n测试的规则时批量插入大量能匹配sysbench查询的规则，但 mysql_query_rules.apply=0 :\ninsert into mysql_query_rules(active,schemaname,apply,flagIN) values (1,'db15',0,0),(1,'db15',0,0),(1,'db15',0,0),(1,'db15',0,0),(1,'db15',0,0), ... # 2 100 200 400 800 1200 2000 这里偶然发现一个问题，flagIN=0的规则必须要在 !=0 的规则前面，否则flagOUT找不到下一个新链入口.(经作者回复是参数 mysql-query_processor_iterations 控制的) 下面的结果是 sysbench num-threads=20 的几轮数据：（由于结果接近，没作图）\nmatched rules QPS RT avg CPU% 2 16741.54 16.69 151 100 16743.54 16.69 152 200 16749.94 16.71 159 400 16556.09 16.91 176 800 16522.02 16.94 203 1200 16477.70 16.99 220 2000 16333.59 17.14 263 看到匹配到的规则随着增多，QPS变化不大，只是略微下降；平均响应时间增加在3%以内；倒是ProxySQL对CPU的负载增加比较明显，匹配的规则从 2 个增加到 2000，cpu使用增加了 74% 。\n参考：\nhttps://www.percona.com/blog/2017/04/10/proxysql-rules-do-i-have-too-many/#comment-10967989 原文连接地址：http://xgknight.com/2017/04/20/mysql-proxysql-performance-test/\n",
+  "wordCount" : "260",
+  "inLanguage": "en",
+  "datePublished": "2017-04-20T21:32:49Z",
+  "dateModified": "2017-04-20T21:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E6%80%A7%E8%83%BD%E6%B5%8B%E8%AF%95%E5%AF%B9%E6%AF%94/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      ProxySQL之性能测试对比
+    </h1>
+    <div class="post-meta"><span title='2017-04-20 21:32:49 +0000 UTC'>April 20, 2017</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>本文会通过sysbench对ProxySQL进行基准测试，并与直连的性能进行对比。与此同时也对 Maxscale 和 Qihu360 Atlas 放在一起参考。
+提示：压测前确保把query cache完全关掉。</p>
+<h1 id="1-proxysql-vs-直连">1. proxysql vs 直连<a hidden class="anchor" aria-hidden="true" href="#1-proxysql-vs-直连">#</a></h1>
+<h2 id="11-select-nontrx">1.1 select nontrx<a hidden class="anchor" aria-hidden="true" href="#11-select-nontrx">#</a></h2>
+<pre tabindex="0"><code>./bin/sysbench --test=/root/sysbench2/sysbench/tests/db/oltp.lua --mysql-host=10.0.100.36 --mysql-port=6033 --mysql-user=myuser --mysql-password=mypass \
+--mysql-db=db15 --oltp-tables-count=20 --oltp-table-size=5000000 --report-interval=20 --oltp-dist-type=uniform --rand-init=on --max-requests=0 --oltp-test-mode=nontrx --oltp-nontrx-mode=select \
+--oltp-read-only=on --oltp-skip-trx=on --max-time=120 --num-threads=2 run
+
+num-threads依次加大 2 5 10 20 50 100 200 400
+</code></pre><p>{% iframe <a href="http://www.tubiaoxiu.com/p.html?s=106165b0eeca215a&amp;web_mode">http://www.tubiaoxiu.com/p.html?s=106165b0eeca215a&amp;web_mode</a> 900 700 %}</p>
+<!-- raw HTML omitted -->
+<!-- raw HTML omitted -->
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/proxysql-perf-rt.png" alt="Response Time Trends for ProxySQL"  />
+</p>
+<p>sysbench线程并发数达到10以下，性能损失在30%以上；达到20，性能损失减少到10%左右。看到proxysql承载的并发数越高，性能损失越少；最好的时候在50线程数，相比直连损失5%。</p>
+<h2 id="12-oltp-dml">1.2 oltp dml<a hidden class="anchor" aria-hidden="true" href="#12-oltp-dml">#</a></h2>
+<p>混合读写测试。proxysql结果图应该与上面相差无几，因为是主要好在计算 query digest 和规则匹配，与select无异，可参考下节的图示。</p>
+<p>sysbench 压测命令：</p>
+<pre tabindex="0"><code>./bin/sysbench --test=/root/sysbench2/sysbench/tests/db/oltp.lua --mysql-host=10.0.100.34 --mysql-port=3306 --mysql-user=myuser --mysql-password=mypass \
+--mysql-db=db15 --oltp-tables-count=20 --oltp-table-size=5000000 --report-interval=20 --oltp-dist-type=uniform --rand-init=on --max-requests=0 --oltp-read-only=off --max-time=120 \
+--num-threads=2 run
+
+num-threads依次加大 2 5 10 16 20 50 100 200 400
+分别对PrxoySQL, Maxscale, Atlas, 直连，四种情况做基准测试
+</code></pre><h1 id="2-proxysql-vs-maxscale-vs-atlas">2. proxysql vs maxscale vs atlas<a hidden class="anchor" aria-hidden="true" href="#2-proxysql-vs-maxscale-vs-atlas">#</a></h1>
+<p>作者自己也有指出，在客户端并发数不高的情况下，maxscale表现比proxysql要好。这里我也特意对maxscale和atlas一起做了个对比。配置基本是最小化的，没有很复杂的规则，只是中间转发。</p>
+<ul>
+<li>ProxySQL  (v1.3.5): mysql-threads=4</li>
+<li>Atlas 360 (v2.2.1): event-threads=4</li>
+<li>maxscale  (v1.4.5): threads=4</li>
+</ul>
+<p>** 2.1 select nontrx **
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/proxysql-perf-qps-maxscale-atlas.png" alt="QPS(select) Trends for ProxySQL/Maxscale/atlas"  />
+</p>
+<p>oltp混合读写基准测试，没有复杂配置的情况下，ProxySQL与Maxscale神奇般的几乎重合，Qihu360的atlas要弱一些。</p>
+<p>** 2.2 oltp dml **<br>
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/proxysql-perf-qps-oltp-maxscale-atlas.png" alt="QPS(oltp) Trends for ProxySQL/Maxscale/atlas"  />
+</p>
+<p>原始数据：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/proxysql-perf-qps-src-data.png" alt="ProxySQL Performance Test Source Data"  />
+</p>
+<h1 id="3-rewrite-vs-non-rewrite">3. rewrite vs non-rewrite<a hidden class="anchor" aria-hidden="true" href="#3-rewrite-vs-non-rewrite">#</a></h1>
+<p>下面来测一下 query rewrite 对性能的影响，考虑到将来如果要分表，可以在ProxySQL这一层做，应用端无需改动表名。
+为了达到效果，这里rewrite只是为表增加了个别名：</p>
+<pre tabindex="0"><code>-- proxysql admin cli
+update mysql_query_rules set match_pattern=&#34;(.*)(sbtest\d+)(.*)&#34;,replace_pattern=&#34;\1\2 as ttt \3&#34; where rule_id &gt;=61 and rule_id &lt;=92;
+load mysql query rules to run;
+</code></pre><p>sysbench num-threads=20 的结果：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">replace?</th>
+<th>qps</th>
+<th>response time avg(ms)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">proxysql replace</td>
+<td>15734.49</td>
+<td>17.79</td>
+</tr>
+<tr>
+<td style="text-align:left">proxysql no-replace</td>
+<td>16764.66</td>
+<td>16.70</td>
+</tr>
+<tr>
+<td style="text-align:left">直连</td>
+<td>18778.43</td>
+<td>14.91</td>
+</tr>
+</tbody>
+</table>
+<p>在20个并发线程下，有 rewrite 是 no-rewrite 性能的 93.9% 。测试线程数继续加大到 50，差别更小。</p>
+<h1 id="4-lots-of-rules">4. lots of rules<a hidden class="anchor" aria-hidden="true" href="#4-lots-of-rules">#</a></h1>
+<p>测试ProxySQL定义的 query rules 数量（并匹配但不apply），对性能的影响。</p>
+<p>测试的规则时批量插入大量能匹配sysbench查询的规则，但 mysql_query_rules.apply=0 :</p>
+<pre tabindex="0"><code>insert into mysql_query_rules(active,schemaname,apply,flagIN) values
+  (1,&#39;db15&#39;,0,0),(1,&#39;db15&#39;,0,0),(1,&#39;db15&#39;,0,0),(1,&#39;db15&#39;,0,0),(1,&#39;db15&#39;,0,0), ...
+
+# 2 100 200 400 800 1200 2000 
+</code></pre><p>这里偶然发现一个问题，flagIN=0的规则必须要在 !=0 的规则前面，否则flagOUT找不到下一个新链入口.(经作者回复是参数 <code>mysql-query_processor_iterations</code> 控制的)
+下面的结果是 sysbench num-threads=20 的几轮数据：（由于结果接近，没作图）</p>
+<table>
+<thead>
+<tr>
+<th>matched rules</th>
+<th>QPS</th>
+<th>RT avg</th>
+<th>CPU%</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2</td>
+<td>16741.54</td>
+<td>16.69</td>
+<td>151</td>
+<td></td>
+</tr>
+<tr>
+<td>100</td>
+<td>16743.54</td>
+<td>16.69</td>
+<td>152</td>
+<td></td>
+</tr>
+<tr>
+<td>200</td>
+<td>16749.94</td>
+<td>16.71</td>
+<td>159</td>
+<td></td>
+</tr>
+<tr>
+<td>400</td>
+<td>16556.09</td>
+<td>16.91</td>
+<td>176</td>
+<td></td>
+</tr>
+<tr>
+<td>800</td>
+<td>16522.02</td>
+<td>16.94</td>
+<td>203</td>
+<td></td>
+</tr>
+<tr>
+<td>1200</td>
+<td>16477.70</td>
+<td>16.99</td>
+<td>220</td>
+<td></td>
+</tr>
+<tr>
+<td>2000</td>
+<td>16333.59</td>
+<td>17.14</td>
+<td>263</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>看到匹配到的规则随着增多，QPS变化不大，只是略微下降；平均响应时间增加在3%以内；倒是ProxySQL对CPU的负载增加比较明显，匹配的规则从 2 个增加到 2000，cpu使用增加了 74% 。</p>
+<p>参考：</p>
+<ul>
+<li><a href="https://www.percona.com/blog/2017/04/10/proxysql-rules-do-i-have-too-many/#comment-10967989">https://www.percona.com/blog/2017/04/10/proxysql-rules-do-i-have-too-many/#comment-10967989</a></li>
+</ul>
+<hr>
+<p>原文连接地址：http://xgknight.com/2017/04/20/mysql-proxysql-performance-test/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/%E4%B8%AD%E9%97%B4%E4%BB%B6/">中间件</a></li>
+      <li><a href="http://xgknight.com/tags/proxysql/">proxysql</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

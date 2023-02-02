@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>mysql优化 on Sean Note</title>
+    <link>http://xgknight.com/tags/mysql%E4%BC%98%E5%8C%96/</link>
+    <description>Recent content in mysql优化 on Sean Note</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 11 Mar 2017 16:32:49 +0000</lastBuildDate><atom:link href="http://xgknight.com/tags/mysql%E4%BC%98%E5%8C%96/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>index merge 引起的死锁分析</title>
+      <link>http://xgknight.com/posts/2017/03/index-merge-%E5%BC%95%E8%B5%B7%E7%9A%84%E6%AD%BB%E9%94%81%E5%88%86%E6%9E%90/</link>
+      <pubDate>Sat, 11 Mar 2017 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/03/index-merge-%E5%BC%95%E8%B5%B7%E7%9A%84%E6%AD%BB%E9%94%81%E5%88%86%E6%9E%90/</guid>
+      <description>&lt;p&gt;在看线上一个 MySQL innodb status 时，发现有死锁信息，而且出现的频率还不低。于是分析了一下，把过程记录下来。&lt;/p&gt;
+&lt;h2 id=&#34;1-概要&#34;&gt;1. 概要&lt;/h2&gt;
+&lt;p&gt;表结构脱敏处理：&lt;/p&gt;
+&lt;pre tabindex=&#34;0&#34;&gt;&lt;code&gt;CREATE TABLE t_mytb1 (
+  f_id int(11) unsigned NOT NULL AUTO_INCREMENT,
+  f_fid int(11) unsigned NOT NULL DEFAULT &amp;#39;0&amp;#39;,
+  f_sid int(11) unsigned NOT NULL DEFAULT &amp;#39;0&amp;#39;,
+  f_mode varchar(32) NOT NULL DEFAULT &amp;#39;&amp;#39;,
+  f_read int(11) unsigned NOT NULL DEFAULT &amp;#39;0&amp;#39;,
+  f_xxx1 int(11) unsigned NOT NULL DEFAULT &amp;#39;0&amp;#39;,
+  f_xxx2 int(11) unsigned NOT NULL DEFAULT &amp;#39;0&amp;#39;,
+  f_wx_zone int(11) unsigned NOT NULL DEFAULT &amp;#39;0&amp;#39;,
+  PRIMARY KEY (f_id),
+  KEY idx_sid (f_sid),
+  KEY idx_fid (f_fid)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+&lt;/code&gt;&lt;/pre&gt;&lt;p&gt;死锁信息：&lt;/p&gt;
+&lt;pre tabindex=&#34;0&#34;&gt;&lt;code&gt;LATEST DETECTED DEADLOCK
+------------------------
+2017-02-28 13:58:29 7f25a3efd700
+*** (1) TRANSACTION:
+TRANSACTION 4907718431, ACTIVE 0.010 sec fetching rows
+mysql tables in use 3, locked 3
+LOCK WAIT 154 lock struct(s), heap size 30248, 10 row lock(s)
+LOCK BLOCKING MySQL thread id: 13589250 block 13589247
+MySQL thread id 13589247, OS thread handle 0x7f25a17e3700, query id 27061926722 11.xx.52.xx ecweb Searching rows for update
+UPDATE `d_db1`.`t_mytb1` SET `f_read` = f_read+1 WHERE (f_fid=91243) AND (f_sid=100) AND (f_mode=&amp;#39;浏览器&amp;#39;)
+*** (1) WAITING FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 13288 page no 375 n bits 352 index `PRIMARY` of table `d_db1`.`t_mytb1` trx id 4907718431 lock_mode X locks rec but not gap waiting
+Record lock, heap no 245 PHYSICAL RECORD: n_fields 10; compact format; info bits 0
+ 0: len 4; hex 0000a63b; asc    ;;;
+ 1: len 6; hex 0001246304a7; asc   $c  ;;
+ 2: len 7; hex 7f000ac0162428; asc      $(;;
+ 3: len 4; hex 00016470; asc   dp;;
+ 4: len 4; hex 00000064; asc    d;;
+ 5: len 9; hex e6b58fe8a788e599a8; asc          ;;
+ 6: len 4; hex 0000244f; asc   $O;;
+ 7: len 4; hex 0000007c; asc    |;;
+ 8: len 4; hex 00000000; asc     ;;
+ 9: len 4; hex 00000000; asc     ;;
+
+*** (2) TRANSACTION:
+TRANSACTION 4907718435, ACTIVE 0.007 sec fetching rows
+mysql tables in use 3, locked 3
+154 lock struct(s), heap size 30248, 3 row lock(s)
+MySQL thread id 13589250, OS thread handle 0x7f25a3efd700, query id 27061926757 11.xx.104.xxx ecweb Searching rows for update
+UPDATE `d_db1`.`t_mytb1` SET `f_read` = f_read+1 WHERE (f_fid=91248) AND (f_sid=100) AND (f_mode=&amp;#39;浏览器&amp;#39;)
+*** (2) HOLDS THE LOCK(S):
+RECORD LOCKS space id 13288 page no 375 n bits 352 index `PRIMARY` of table `d_db1`.`t_mytb1` trx id 4907718435 lock_mode X locks rec but not gap
+Record lock, heap no 245 PHYSICAL RECORD: n_fields 10; compact format; info bits 0
+ 0: len 4; hex 0000a63b; asc    ;;;  -- 42555
+ 1: len 6; hex 0001246304a7; asc   $c  ;;  -- 4905436327
+ 2: len 7; hex 7f000ac0162428; asc      $(;;
+ 3: len 4; hex 00016470; asc   dp;;  -- 91248
+ 4: len 4; hex 00000064; asc    d;;  -- 100
+ 5: len 9; hex e6b58fe8a788e599a8; asc          ;;
+ 6: len 4; hex 0000244f; asc   $O;;  -- 9295
+ 7: len 4; hex 0000007c; asc    |;;  -- 124
+ 8: len 4; hex 00000000; asc     ;;
+ 9: len 4; hex 00000000; asc     ;;
+
+*** (2) WAITING FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 13288 page no 202 n bits 1272 index `idx_sid` of table `d_db1`.`t_mytb1` trx id 4907718435 lock_mode X locks rec but not gap waiting
+Record lock, heap no 705 PHYSICAL RECORD: n_fields 2; compact format; info bits 0
+ 0: len 4; hex 00000064; asc    d;;  -- 100
+ 1: len 4; hex 0000a633; asc    3;;  -- 42547
+
+*** WE ROLL BACK TRANSACTION (2)
+&lt;/code&gt;&lt;/pre&gt;&lt;p&gt;乍一看很奇怪，tx1和tx2 两个 UPDATE 各自以 f_fid 为条件更新的记录互不影响才对，即使 91243，91248 两个值有可能出现在同一条数据上（因为f_fid上是二级索引），那顶多也就是个更新锁等待，谁后来谁等待，怎么会出现互相争用对方已持有的锁，被死锁检测机制捕获？&lt;/p&gt;
+&lt;p&gt;当然,把 update 语句拿到数据库中 EXPLAIN 一下就可以看出端倪。这里不妨先分析一下输出的锁情况：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;先看 Tx2 (对应trx id 4907718435)&lt;/strong&gt; :&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;code&gt;RECORD LOCKS space id 13288 page no 375 n bits 352&lt;/code&gt; 告诉我们是表空间id 13288 (可从 &lt;code&gt;information_schema.INNODB_SYS_DATAFILES&lt;/code&gt; 查到对应ibd文件) 即 t_mytb1 表，第 375 号页面的 245 位置的记录被锁，并且是 idx PRIMARY 上的记录锁（注：本实例隔离级别为RC）。 Tx2正持有这把记录锁。
+因为是聚集索引，显示了完整记录&lt;/li&gt;
+&lt;/ol&gt;
+&lt;pre tabindex=&#34;0&#34;&gt;&lt;code&gt;0: 主键f_id=42555
+1: DB_TRX_ID = 4905436327
+2: DB_ROLL_PTR指向undo记录的地址
+3: f_fid=91248
+4: f_sid=100
+   ...
+&lt;/code&gt;&lt;/pre&gt;&lt;ol start=&#34;2&#34;&gt;
+&lt;li&gt;然而Tx2还在等待一个记录锁（lock_mode X locks rec but not gap waiting），但这把锁来自二级索引 &lt;code&gt;idx_sid&lt;/code&gt; 索引上的记录锁。在 RC 级别下没有GAP lock，行锁除了加在符合条件的二级索引 f_sid=100 上外，还会对主键加record lock。
+二级索引值：&lt;/li&gt;
+&lt;/ol&gt;</description>
+    </item>
+    
+  </channel>
+</rss>

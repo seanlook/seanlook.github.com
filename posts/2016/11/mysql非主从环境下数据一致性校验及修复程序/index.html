@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>MySQL非主从环境下数据一致性校验及修复程序 | Sean Note</title>
+<meta name="keywords" content="mysql, python, pt-table-checksum">
+<meta name="description" content="1. 简介 项目地址：https://github.com/seanlook/px-table-checksum
+主从环境下数据一致性校验经常会用 pt-table-checksum 工具，它的原理及实施过程之前写过一篇文章：生产环境使用 pt-table-checksum 检查MySQL数据一致性。但是DBA工作中还会有些针对两个表检查是否一致，而这两个表之间并没有主从关系，pt工具是基于binlog把在主库进行的检查动作，在从库重放一遍，此时就不适用了。
+总会有这样特殊的需求，比如从阿里云RDS实例迁移到自建mysql实例，它的数据传输服务实现方式是基于表的批量数据提取，加上binlog订阅，但强制row模式会导致pt-table-checksum没有权限把会话临时改成statement。另一种需求是，整库进行字符集转换：库表定义都是utf8，但应用连接使用了默认的 latin1，要将连接字符集和表字符集统一起来，只能以latin1导出数据，再以utf8导入，这种情况数据一致性校验，且不说binlog解析程序不支持statement（如canal），新旧库本身内容不同，pt-table-checksum 算出的校验值也会不一样，失效。
+所以才萌生了参考 pt-table-checksum 自己写了一个：px-table-checksum 。
+2. 实现方法 整体思路是借鉴pt-table-checksum，从源库批量（即chunk）取出一块数据如1000行，计算CRC32值，同样的语句在目标库运行一遍，结果都存入另一个库，最后检查对应编号的chunk crc值是否一致。知道不一致还不行，得能否快速方便的修复差异，所以继续根据那些不一致的chunk，去目标库和源库找到不一致的行，是缺失，还是多余，还是被修改了，然后生成修复sql，根据指示是否自动修复。
+那么问题就在于：
+如何确定批次，也就是下一个chunk该怎么取？ 我还没想做到pt-table-checksum那样，可以根据负载动态调整chunk大小，甚至活跃线程数超过阀值就暂停检查，上来工作量就太大了。目前每次计算的chunk的行数是固定的，可以配置1000或2000等。 所以就要用到分页查询，根据（自增或联合）主键、唯一索引，每次limit 1000后升序取最后一条，作为下一批的起始。所以要分析表上的键情况，组合查询条件。目前仅能检查有主键或唯一所以的表。
+如何保证源库和目标库，运行的sql一样？ 之前一版是目标库和源库，以多线程各自计算chunk，入库，后来才意识到严重的bug：比如同样是取1000行，如果目标库少数据，那么下一个chunk起始就不一样，比较的结果简直一塌糊涂。 所以必须保证相同编号的chunk，起点必须相同，所以想到用队列，存放在源库跑过的所有校验sql，模拟pt工具在目标库重放。考虑到要多线程同时比较多个表，队列可能吃内存过大，于是使用了redis队列。
+直接在数据库中计算crc32，还是取出数据在内存里计算？ 翻了pt-table-checksum的源码，它是在数据库里计算的。但是第一节里说过，如果目标库和源库要使用不同的字符集才能读出正确的数据，只能查询出来之后再比较。所以 px-table-checksum 两种都支持，只需指定一个配置项。
+同时检查多个表，源库sql挤在队列，目标库拿出来执行时过了1s，此时源库那条数据又被修改了一次同步到了目标库，会导致计算结果不一致，实则一致，怎么处理 无法处理，是px-table-checksum相比pt-table-checksum最大的缺陷。 但为了尽可能减少此类问题（比如主从延迟也可能会），特意设计了多个redis队列，目标库多个检查线程，即比如同时指定检查8个表，源库检查会有8个线程对应，但可以根据表的写入情况，配置4个redis队列（目前是随机入列），10个目标库检查线程，来减少不准确因素。 但站在我的角度往往来说，不一致的数据会被记录下来，如果不多，人工核对一下；如果较多，就再跑一遍检查，如果两次都有同一条数据不一致，那就有情况了。
+3. 限制 如果检查期间源表数据，变化频繁，有可能检查的结果不准确 也就是上面第4点的问题。很明显，这个程序每个检查的事务是分开的，不像pt工具能严格保证每条检查sql的事务顺序。但有不一致的数据再排查一下就ok了。实际在我线上使用过程中，99.9%是准确的。 表上必须有主键或唯一索引 程序会检查，如果没有会退出。
+varbinay,blob等二进制字段不支持修复 其实也不是完全不支持，要看怎么用的。开发如果有把字符先转成字节，再存入mysql，这种就不支持修复。是有办法可以处理，那就是从源库查时用 hex()函数，修复sql里面unhex()写回去。
+4. 使用说明 该python程序基于2.7开发，2.6、3.x上没有测试。使用前需要安装 MySQLdb和hotqueue：
+$ sudo pip install MySQL-python hotqueue 要比较的表和选项，使用全配置化，即不通过命令行的方式指定（原谅命令行参数使用方式会额外增加代码量）。
+4.1 px-table-checksum.py 主程序，运行python px-table-checksum.py 执行一致性检查，但一定了解下面的配置文件选项。
+4.2 settings_checksum.py 配置选项
+CHUNK_SIZE: 每次提取的chunk行数
+REDIS_INFO: 指定使用redis队列地址
+REDIS_QUEUE_CNT: redis队列数量，消费者（目标库）有一一对应的线程守着队列
+REDIS_POOL_CNT: 生产者（源库）redis客户端连接池。这个设计是为了缓解GIL带来的问题，把入列端与出列端分开，因为如果表多可能短时间有大量sql入队列，避免hotqueue争用">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2016/11/mysql%E9%9D%9E%E4%B8%BB%E4%BB%8E%E7%8E%AF%E5%A2%83%E4%B8%8B%E6%95%B0%E6%8D%AE%E4%B8%80%E8%87%B4%E6%80%A7%E6%A0%A1%E9%AA%8C%E5%8F%8A%E4%BF%AE%E5%A4%8D%E7%A8%8B%E5%BA%8F/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="MySQL非主从环境下数据一致性校验及修复程序" />
+<meta property="og:description" content="1. 简介 项目地址：https://github.com/seanlook/px-table-checksum
+主从环境下数据一致性校验经常会用 pt-table-checksum 工具，它的原理及实施过程之前写过一篇文章：生产环境使用 pt-table-checksum 检查MySQL数据一致性。但是DBA工作中还会有些针对两个表检查是否一致，而这两个表之间并没有主从关系，pt工具是基于binlog把在主库进行的检查动作，在从库重放一遍，此时就不适用了。
+总会有这样特殊的需求，比如从阿里云RDS实例迁移到自建mysql实例，它的数据传输服务实现方式是基于表的批量数据提取，加上binlog订阅，但强制row模式会导致pt-table-checksum没有权限把会话临时改成statement。另一种需求是，整库进行字符集转换：库表定义都是utf8，但应用连接使用了默认的 latin1，要将连接字符集和表字符集统一起来，只能以latin1导出数据，再以utf8导入，这种情况数据一致性校验，且不说binlog解析程序不支持statement（如canal），新旧库本身内容不同，pt-table-checksum 算出的校验值也会不一样，失效。
+所以才萌生了参考 pt-table-checksum 自己写了一个：px-table-checksum 。
+2. 实现方法 整体思路是借鉴pt-table-checksum，从源库批量（即chunk）取出一块数据如1000行，计算CRC32值，同样的语句在目标库运行一遍，结果都存入另一个库，最后检查对应编号的chunk crc值是否一致。知道不一致还不行，得能否快速方便的修复差异，所以继续根据那些不一致的chunk，去目标库和源库找到不一致的行，是缺失，还是多余，还是被修改了，然后生成修复sql，根据指示是否自动修复。
+那么问题就在于：
+如何确定批次，也就是下一个chunk该怎么取？ 我还没想做到pt-table-checksum那样，可以根据负载动态调整chunk大小，甚至活跃线程数超过阀值就暂停检查，上来工作量就太大了。目前每次计算的chunk的行数是固定的，可以配置1000或2000等。 所以就要用到分页查询，根据（自增或联合）主键、唯一索引，每次limit 1000后升序取最后一条，作为下一批的起始。所以要分析表上的键情况，组合查询条件。目前仅能检查有主键或唯一所以的表。
+如何保证源库和目标库，运行的sql一样？ 之前一版是目标库和源库，以多线程各自计算chunk，入库，后来才意识到严重的bug：比如同样是取1000行，如果目标库少数据，那么下一个chunk起始就不一样，比较的结果简直一塌糊涂。 所以必须保证相同编号的chunk，起点必须相同，所以想到用队列，存放在源库跑过的所有校验sql，模拟pt工具在目标库重放。考虑到要多线程同时比较多个表，队列可能吃内存过大，于是使用了redis队列。
+直接在数据库中计算crc32，还是取出数据在内存里计算？ 翻了pt-table-checksum的源码，它是在数据库里计算的。但是第一节里说过，如果目标库和源库要使用不同的字符集才能读出正确的数据，只能查询出来之后再比较。所以 px-table-checksum 两种都支持，只需指定一个配置项。
+同时检查多个表，源库sql挤在队列，目标库拿出来执行时过了1s，此时源库那条数据又被修改了一次同步到了目标库，会导致计算结果不一致，实则一致，怎么处理 无法处理，是px-table-checksum相比pt-table-checksum最大的缺陷。 但为了尽可能减少此类问题（比如主从延迟也可能会），特意设计了多个redis队列，目标库多个检查线程，即比如同时指定检查8个表，源库检查会有8个线程对应，但可以根据表的写入情况，配置4个redis队列（目前是随机入列），10个目标库检查线程，来减少不准确因素。 但站在我的角度往往来说，不一致的数据会被记录下来，如果不多，人工核对一下；如果较多，就再跑一遍检查，如果两次都有同一条数据不一致，那就有情况了。
+3. 限制 如果检查期间源表数据，变化频繁，有可能检查的结果不准确 也就是上面第4点的问题。很明显，这个程序每个检查的事务是分开的，不像pt工具能严格保证每条检查sql的事务顺序。但有不一致的数据再排查一下就ok了。实际在我线上使用过程中，99.9%是准确的。 表上必须有主键或唯一索引 程序会检查，如果没有会退出。
+varbinay,blob等二进制字段不支持修复 其实也不是完全不支持，要看怎么用的。开发如果有把字符先转成字节，再存入mysql，这种就不支持修复。是有办法可以处理，那就是从源库查时用 hex()函数，修复sql里面unhex()写回去。
+4. 使用说明 该python程序基于2.7开发，2.6、3.x上没有测试。使用前需要安装 MySQLdb和hotqueue：
+$ sudo pip install MySQL-python hotqueue 要比较的表和选项，使用全配置化，即不通过命令行的方式指定（原谅命令行参数使用方式会额外增加代码量）。
+4.1 px-table-checksum.py 主程序，运行python px-table-checksum.py 执行一致性检查，但一定了解下面的配置文件选项。
+4.2 settings_checksum.py 配置选项
+CHUNK_SIZE: 每次提取的chunk行数
+REDIS_INFO: 指定使用redis队列地址
+REDIS_QUEUE_CNT: redis队列数量，消费者（目标库）有一一对应的线程守着队列
+REDIS_POOL_CNT: 生产者（源库）redis客户端连接池。这个设计是为了缓解GIL带来的问题，把入列端与出列端分开，因为如果表多可能短时间有大量sql入队列，避免hotqueue争用" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2016/11/mysql%E9%9D%9E%E4%B8%BB%E4%BB%8E%E7%8E%AF%E5%A2%83%E4%B8%8B%E6%95%B0%E6%8D%AE%E4%B8%80%E8%87%B4%E6%80%A7%E6%A0%A1%E9%AA%8C%E5%8F%8A%E4%BF%AE%E5%A4%8D%E7%A8%8B%E5%BA%8F/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2016-11-20T16:32:49+00:00" />
+<meta property="article:modified_time" content="2016-11-20T16:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="MySQL非主从环境下数据一致性校验及修复程序"/>
+<meta name="twitter:description" content="1. 简介 项目地址：https://github.com/seanlook/px-table-checksum
+主从环境下数据一致性校验经常会用 pt-table-checksum 工具，它的原理及实施过程之前写过一篇文章：生产环境使用 pt-table-checksum 检查MySQL数据一致性。但是DBA工作中还会有些针对两个表检查是否一致，而这两个表之间并没有主从关系，pt工具是基于binlog把在主库进行的检查动作，在从库重放一遍，此时就不适用了。
+总会有这样特殊的需求，比如从阿里云RDS实例迁移到自建mysql实例，它的数据传输服务实现方式是基于表的批量数据提取，加上binlog订阅，但强制row模式会导致pt-table-checksum没有权限把会话临时改成statement。另一种需求是，整库进行字符集转换：库表定义都是utf8，但应用连接使用了默认的 latin1，要将连接字符集和表字符集统一起来，只能以latin1导出数据，再以utf8导入，这种情况数据一致性校验，且不说binlog解析程序不支持statement（如canal），新旧库本身内容不同，pt-table-checksum 算出的校验值也会不一样，失效。
+所以才萌生了参考 pt-table-checksum 自己写了一个：px-table-checksum 。
+2. 实现方法 整体思路是借鉴pt-table-checksum，从源库批量（即chunk）取出一块数据如1000行，计算CRC32值，同样的语句在目标库运行一遍，结果都存入另一个库，最后检查对应编号的chunk crc值是否一致。知道不一致还不行，得能否快速方便的修复差异，所以继续根据那些不一致的chunk，去目标库和源库找到不一致的行，是缺失，还是多余，还是被修改了，然后生成修复sql，根据指示是否自动修复。
+那么问题就在于：
+如何确定批次，也就是下一个chunk该怎么取？ 我还没想做到pt-table-checksum那样，可以根据负载动态调整chunk大小，甚至活跃线程数超过阀值就暂停检查，上来工作量就太大了。目前每次计算的chunk的行数是固定的，可以配置1000或2000等。 所以就要用到分页查询，根据（自增或联合）主键、唯一索引，每次limit 1000后升序取最后一条，作为下一批的起始。所以要分析表上的键情况，组合查询条件。目前仅能检查有主键或唯一所以的表。
+如何保证源库和目标库，运行的sql一样？ 之前一版是目标库和源库，以多线程各自计算chunk，入库，后来才意识到严重的bug：比如同样是取1000行，如果目标库少数据，那么下一个chunk起始就不一样，比较的结果简直一塌糊涂。 所以必须保证相同编号的chunk，起点必须相同，所以想到用队列，存放在源库跑过的所有校验sql，模拟pt工具在目标库重放。考虑到要多线程同时比较多个表，队列可能吃内存过大，于是使用了redis队列。
+直接在数据库中计算crc32，还是取出数据在内存里计算？ 翻了pt-table-checksum的源码，它是在数据库里计算的。但是第一节里说过，如果目标库和源库要使用不同的字符集才能读出正确的数据，只能查询出来之后再比较。所以 px-table-checksum 两种都支持，只需指定一个配置项。
+同时检查多个表，源库sql挤在队列，目标库拿出来执行时过了1s，此时源库那条数据又被修改了一次同步到了目标库，会导致计算结果不一致，实则一致，怎么处理 无法处理，是px-table-checksum相比pt-table-checksum最大的缺陷。 但为了尽可能减少此类问题（比如主从延迟也可能会），特意设计了多个redis队列，目标库多个检查线程，即比如同时指定检查8个表，源库检查会有8个线程对应，但可以根据表的写入情况，配置4个redis队列（目前是随机入列），10个目标库检查线程，来减少不准确因素。 但站在我的角度往往来说，不一致的数据会被记录下来，如果不多，人工核对一下；如果较多，就再跑一遍检查，如果两次都有同一条数据不一致，那就有情况了。
+3. 限制 如果检查期间源表数据，变化频繁，有可能检查的结果不准确 也就是上面第4点的问题。很明显，这个程序每个检查的事务是分开的，不像pt工具能严格保证每条检查sql的事务顺序。但有不一致的数据再排查一下就ok了。实际在我线上使用过程中，99.9%是准确的。 表上必须有主键或唯一索引 程序会检查，如果没有会退出。
+varbinay,blob等二进制字段不支持修复 其实也不是完全不支持，要看怎么用的。开发如果有把字符先转成字节，再存入mysql，这种就不支持修复。是有办法可以处理，那就是从源库查时用 hex()函数，修复sql里面unhex()写回去。
+4. 使用说明 该python程序基于2.7开发，2.6、3.x上没有测试。使用前需要安装 MySQLdb和hotqueue：
+$ sudo pip install MySQL-python hotqueue 要比较的表和选项，使用全配置化，即不通过命令行的方式指定（原谅命令行参数使用方式会额外增加代码量）。
+4.1 px-table-checksum.py 主程序，运行python px-table-checksum.py 执行一致性检查，但一定了解下面的配置文件选项。
+4.2 settings_checksum.py 配置选项
+CHUNK_SIZE: 每次提取的chunk行数
+REDIS_INFO: 指定使用redis队列地址
+REDIS_QUEUE_CNT: redis队列数量，消费者（目标库）有一一对应的线程守着队列
+REDIS_POOL_CNT: 生产者（源库）redis客户端连接池。这个设计是为了缓解GIL带来的问题，把入列端与出列端分开，因为如果表多可能短时间有大量sql入队列，避免hotqueue争用"/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "MySQL非主从环境下数据一致性校验及修复程序",
+      "item": "http://xgknight.com/posts/2016/11/mysql%E9%9D%9E%E4%B8%BB%E4%BB%8E%E7%8E%AF%E5%A2%83%E4%B8%8B%E6%95%B0%E6%8D%AE%E4%B8%80%E8%87%B4%E6%80%A7%E6%A0%A1%E9%AA%8C%E5%8F%8A%E4%BF%AE%E5%A4%8D%E7%A8%8B%E5%BA%8F/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "MySQL非主从环境下数据一致性校验及修复程序",
+  "name": "MySQL非主从环境下数据一致性校验及修复程序",
+  "description": "1. 简介 项目地址：https://github.com/seanlook/px-table-checksum\n主从环境下数据一致性校验经常会用 pt-table-checksum 工具，它的原理及实施过程之前写过一篇文章：生产环境使用 pt-table-checksum 检查MySQL数据一致性。但是DBA工作中还会有些针对两个表检查是否一致，而这两个表之间并没有主从关系，pt工具是基于binlog把在主库进行的检查动作，在从库重放一遍，此时就不适用了。\n总会有这样特殊的需求，比如从阿里云RDS实例迁移到自建mysql实例，它的数据传输服务实现方式是基于表的批量数据提取，加上binlog订阅，但强制row模式会导致pt-table-checksum没有权限把会话临时改成statement。另一种需求是，整库进行字符集转换：库表定义都是utf8，但应用连接使用了默认的 latin1，要将连接字符集和表字符集统一起来，只能以latin1导出数据，再以utf8导入，这种情况数据一致性校验，且不说binlog解析程序不支持statement（如canal），新旧库本身内容不同，pt-table-checksum 算出的校验值也会不一样，失效。\n所以才萌生了参考 pt-table-checksum 自己写了一个：px-table-checksum 。\n2. 实现方法 整体思路是借鉴pt-table-checksum，从源库批量（即chunk）取出一块数据如1000行，计算CRC32值，同样的语句在目标库运行一遍，结果都存入另一个库，最后检查对应编号的chunk crc值是否一致。知道不一致还不行，得能否快速方便的修复差异，所以继续根据那些不一致的chunk，去目标库和源库找到不一致的行，是缺失，还是多余，还是被修改了，然后生成修复sql，根据指示是否自动修复。\n那么问题就在于：\n如何确定批次，也就是下一个chunk该怎么取？ 我还没想做到pt-table-checksum那样，可以根据负载动态调整chunk大小，甚至活跃线程数超过阀值就暂停检查，上来工作量就太大了。目前每次计算的chunk的行数是固定的，可以配置1000或2000等。 所以就要用到分页查询，根据（自增或联合）主键、唯一索引，每次limit 1000后升序取最后一条，作为下一批的起始。所以要分析表上的键情况，组合查询条件。目前仅能检查有主键或唯一所以的表。\n如何保证源库和目标库，运行的sql一样？ 之前一版是目标库和源库，以多线程各自计算chunk，入库，后来才意识到严重的bug：比如同样是取1000行，如果目标库少数据，那么下一个chunk起始就不一样，比较的结果简直一塌糊涂。 所以必须保证相同编号的chunk，起点必须相同，所以想到用队列，存放在源库跑过的所有校验sql，模拟pt工具在目标库重放。考虑到要多线程同时比较多个表，队列可能吃内存过大，于是使用了redis队列。\n直接在数据库中计算crc32，还是取出数据在内存里计算？ 翻了pt-table-checksum的源码，它是在数据库里计算的。但是第一节里说过，如果目标库和源库要使用不同的字符集才能读出正确的数据，只能查询出来之后再比较。所以 px-table-checksum 两种都支持，只需指定一个配置项。\n同时检查多个表，源库sql挤在队列，目标库拿出来执行时过了1s，此时源库那条数据又被修改了一次同步到了目标库，会导致计算结果不一致，实则一致，怎么处理 无法处理，是px-table-checksum相比pt-table-checksum最大的缺陷。 但为了尽可能减少此类问题（比如主从延迟也可能会），特意设计了多个redis队列，目标库多个检查线程，即比如同时指定检查8个表，源库检查会有8个线程对应，但可以根据表的写入情况，配置4个redis队列（目前是随机入列），10个目标库检查线程，来减少不准确因素。 但站在我的角度往往来说，不一致的数据会被记录下来，如果不多，人工核对一下；如果较多，就再跑一遍检查，如果两次都有同一条数据不一致，那就有情况了。\n3. 限制 如果检查期间源表数据，变化频繁，有可能检查的结果不准确 也就是上面第4点的问题。很明显，这个程序每个检查的事务是分开的，不像pt工具能严格保证每条检查sql的事务顺序。但有不一致的数据再排查一下就ok了。实际在我线上使用过程中，99.9%是准确的。 表上必须有主键或唯一索引 程序会检查，如果没有会退出。\nvarbinay,blob等二进制字段不支持修复 其实也不是完全不支持，要看怎么用的。开发如果有把字符先转成字节，再存入mysql，这种就不支持修复。是有办法可以处理，那就是从源库查时用 hex()函数，修复sql里面unhex()写回去。\n4. 使用说明 该python程序基于2.7开发，2.6、3.x上没有测试。使用前需要安装 MySQLdb和hotqueue：\n$ sudo pip install MySQL-python hotqueue 要比较的表和选项，使用全配置化，即不通过命令行的方式指定（原谅命令行参数使用方式会额外增加代码量）。\n4.1 px-table-checksum.py 主程序，运行python px-table-checksum.py 执行一致性检查，但一定了解下面的配置文件选项。\n4.2 settings_checksum.py 配置选项\nCHUNK_SIZE: 每次提取的chunk行数\nREDIS_INFO: 指定使用redis队列地址\nREDIS_QUEUE_CNT: redis队列数量，消费者（目标库）有一一对应的线程守着队列\nREDIS_POOL_CNT: 生产者（源库）redis客户端连接池。这个设计是为了缓解GIL带来的问题，把入列端与出列端分开，因为如果表多可能短时间有大量sql入队列，避免hotqueue争用",
+  "keywords": [
+    "mysql", "python", "pt-table-checksum"
+  ],
+  "articleBody": "1. 简介 项目地址：https://github.com/seanlook/px-table-checksum\n主从环境下数据一致性校验经常会用 pt-table-checksum 工具，它的原理及实施过程之前写过一篇文章：生产环境使用 pt-table-checksum 检查MySQL数据一致性。但是DBA工作中还会有些针对两个表检查是否一致，而这两个表之间并没有主从关系，pt工具是基于binlog把在主库进行的检查动作，在从库重放一遍，此时就不适用了。\n总会有这样特殊的需求，比如从阿里云RDS实例迁移到自建mysql实例，它的数据传输服务实现方式是基于表的批量数据提取，加上binlog订阅，但强制row模式会导致pt-table-checksum没有权限把会话临时改成statement。另一种需求是，整库进行字符集转换：库表定义都是utf8，但应用连接使用了默认的 latin1，要将连接字符集和表字符集统一起来，只能以latin1导出数据，再以utf8导入，这种情况数据一致性校验，且不说binlog解析程序不支持statement（如canal），新旧库本身内容不同，pt-table-checksum 算出的校验值也会不一样，失效。\n所以才萌生了参考 pt-table-checksum 自己写了一个：px-table-checksum 。\n2. 实现方法 整体思路是借鉴pt-table-checksum，从源库批量（即chunk）取出一块数据如1000行，计算CRC32值，同样的语句在目标库运行一遍，结果都存入另一个库，最后检查对应编号的chunk crc值是否一致。知道不一致还不行，得能否快速方便的修复差异，所以继续根据那些不一致的chunk，去目标库和源库找到不一致的行，是缺失，还是多余，还是被修改了，然后生成修复sql，根据指示是否自动修复。\n那么问题就在于：\n如何确定批次，也就是下一个chunk该怎么取？ 我还没想做到pt-table-checksum那样，可以根据负载动态调整chunk大小，甚至活跃线程数超过阀值就暂停检查，上来工作量就太大了。目前每次计算的chunk的行数是固定的，可以配置1000或2000等。 所以就要用到分页查询，根据（自增或联合）主键、唯一索引，每次limit 1000后升序取最后一条，作为下一批的起始。所以要分析表上的键情况，组合查询条件。目前仅能检查有主键或唯一所以的表。\n如何保证源库和目标库，运行的sql一样？ 之前一版是目标库和源库，以多线程各自计算chunk，入库，后来才意识到严重的bug：比如同样是取1000行，如果目标库少数据，那么下一个chunk起始就不一样，比较的结果简直一塌糊涂。 所以必须保证相同编号的chunk，起点必须相同，所以想到用队列，存放在源库跑过的所有校验sql，模拟pt工具在目标库重放。考虑到要多线程同时比较多个表，队列可能吃内存过大，于是使用了redis队列。\n直接在数据库中计算crc32，还是取出数据在内存里计算？ 翻了pt-table-checksum的源码，它是在数据库里计算的。但是第一节里说过，如果目标库和源库要使用不同的字符集才能读出正确的数据，只能查询出来之后再比较。所以 px-table-checksum 两种都支持，只需指定一个配置项。\n同时检查多个表，源库sql挤在队列，目标库拿出来执行时过了1s，此时源库那条数据又被修改了一次同步到了目标库，会导致计算结果不一致，实则一致，怎么处理 无法处理，是px-table-checksum相比pt-table-checksum最大的缺陷。 但为了尽可能减少此类问题（比如主从延迟也可能会），特意设计了多个redis队列，目标库多个检查线程，即比如同时指定检查8个表，源库检查会有8个线程对应，但可以根据表的写入情况，配置4个redis队列（目前是随机入列），10个目标库检查线程，来减少不准确因素。 但站在我的角度往往来说，不一致的数据会被记录下来，如果不多，人工核对一下；如果较多，就再跑一遍检查，如果两次都有同一条数据不一致，那就有情况了。\n3. 限制 如果检查期间源表数据，变化频繁，有可能检查的结果不准确 也就是上面第4点的问题。很明显，这个程序每个检查的事务是分开的，不像pt工具能严格保证每条检查sql的事务顺序。但有不一致的数据再排查一下就ok了。实际在我线上使用过程中，99.9%是准确的。 表上必须有主键或唯一索引 程序会检查，如果没有会退出。\nvarbinay,blob等二进制字段不支持修复 其实也不是完全不支持，要看怎么用的。开发如果有把字符先转成字节，再存入mysql，这种就不支持修复。是有办法可以处理，那就是从源库查时用 hex()函数，修复sql里面unhex()写回去。\n4. 使用说明 该python程序基于2.7开发，2.6、3.x上没有测试。使用前需要安装 MySQLdb和hotqueue：\n$ sudo pip install MySQL-python hotqueue 要比较的表和选项，使用全配置化，即不通过命令行的方式指定（原谅命令行参数使用方式会额外增加代码量）。\n4.1 px-table-checksum.py 主程序，运行python px-table-checksum.py 执行一致性检查，但一定了解下面的配置文件选项。\n4.2 settings_checksum.py 配置选项\nCHUNK_SIZE: 每次提取的chunk行数\nREDIS_INFO: 指定使用redis队列地址\nREDIS_QUEUE_CNT: redis队列数量，消费者（目标库）有一一对应的线程守着队列\nREDIS_POOL_CNT: 生产者（源库）redis客户端连接池。这个设计是为了缓解GIL带来的问题，把入列端与出列端分开，因为如果表多可能短时间有大量sql入队列，避免hotqueue争用\nCALC_CRC32_DB: True 表示在db里面计算checksum值，False表示取出chunk数据在python里面计算。默认给的值是根据连接字符集定的。\nDO_COMPARE: 运行模式\n0: 只提取数据计算，不比较是否一致。可以在之后在模式2下只比较\n1: 计算，并比较。常用，每次计算之前会删除上一次这个待检查表的结果，比较的结果只告诉哪些chunk号不一致。\n2: 不计算，只从t_checkum结果比较。常用，计算是消耗数据库资源的，可以只对已有的checksum计算结果比较不一致的地方。类似pt工具的--replicate-check-only选项。\nGEN_DATAFIX: 与DO_COMPARE结合使用，为 True 表示对不一致的chunk找到具体不一致行，并生成修复sql；为 False 则什么都不做。\nRUN_DATAFIX: 与GEN_DATAFIX结合使用，为 True 表示对生成的修复sql，在目标库执行。需要谨慎，如果哪一次设置了修复，记得完成后改回False，不然下次检查另一个表就出意外了，所以特意对这个选项再加了一个确认提示。\nDB_CHECKSUM: 一个字典，指定checksum的结果存到哪里 配置文件有示例，必须指定 db_name，表会自动创建。\n4.3 settings_cs_tables.py 上面的配置文件可以认为是用于控制程序的，这个配置文件是指定要校验的源库和目标库信息，以及要检验哪些表。\nTABLES_CHECK: 字典，指定要检查哪些表的一致性，db名为key，多个table名组成列表为value。暂不支持对整个db做检查，同时比较的表数量不建议超过8个 DB_SOURCE: 字典，指定源库的连接信息 DB_SOURCE: 字典，指定目标库的连接信息 5. 示例： Starting checksum thread for table: db1.t_test_201308 (192.168.1.122:3306) Before checksum: create table if not exists t_checksum Before checksum: delele old data from t_checksum if exists for table: db1.t_test_201308 Caculate crc32 in program instead of db.(this program need more memory and more db net traffic, but convert charset) Caculating checksums: 192.168.1.122:3306 db1.t_test_201308 TARGET: ('192.168.1.121:3306', 't_test_201308', 1, 'db1', '0', u'1495969', 451060506) TARGET: ('192.168.1.121:3306', 't_test_201308', 2, 'db1', u'1495969', u'1502593', -678155635) ... Starting checksum thread for table: db1.t_test_201408 (192.168.1.122:3306) Before checksum: delele old data from t_checksum if exists for table: db1.t_test_201408 Caculate crc32 in program instead of db.(this program need more memory and more db net traffic, but convert charset) Caculating checksums: 192.168.1.122:3306 db1.t_test_201408 TARGET: ('192.168.1.121:3306', 't_test_201408'TARGET: ('192.168.1.121:3306', 't_test_201408', 9, 8, 'db1', u'3836877', u'3845812', , 'db1', u'3845812'373759054) ... 源实例 192.168.1.122:3306 db1.t_test_201308 计算checksum结束！ db conection closed. Checksum thread ended for table: db1.t_test_201308 (192.168.1.122:3306) ... 源实例 192.168.1.122:3306 db1.t_test_201408 计算checksum结束！ 消费sql 0 退出！！ 消费sql -1 退出！！ ################################################################################ Start compare chunk's crc32 for table: [ db1.t_test_201308 ] 表 db1.t_test_201308 数据一致 ################################################################################ ################################################################################ Start compare chunk's crc32 for table: [ db1.t_test_201408 ] 表 db1.t_test_201408 数据不一致chunk数：10 -------------------------------------------------------------------------------- 该chunk [1] 存在行内容不一致, CRC32: src(828649697) rgt(-1396224393) 去源库和目标库获取chunk[1]不一致行： TO insert or update: [u'3761994'] TO delete: [] 该chunk [5] 存在行内容不一致, CRC32: src(1513453680) rgt(-1614463460) 去源库和目标库获取chunk[5]不一致行： TO insert or update: [u'3806841'] TO delete: [] 原文链接地址：http://xgknight.com/2016/11/20/py-mysql-table-checksum-non-replicas/\n",
+  "wordCount" : "314",
+  "inLanguage": "en",
+  "datePublished": "2016-11-20T16:32:49Z",
+  "dateModified": "2016-11-20T16:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2016/11/mysql%E9%9D%9E%E4%B8%BB%E4%BB%8E%E7%8E%AF%E5%A2%83%E4%B8%8B%E6%95%B0%E6%8D%AE%E4%B8%80%E8%87%B4%E6%80%A7%E6%A0%A1%E9%AA%8C%E5%8F%8A%E4%BF%AE%E5%A4%8D%E7%A8%8B%E5%BA%8F/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      MySQL非主从环境下数据一致性校验及修复程序
+    </h1>
+    <div class="post-meta"><span title='2016-11-20 16:32:49 +0000 UTC'>November 20, 2016</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><h2 id="1-简介">1. 简介<a hidden class="anchor" aria-hidden="true" href="#1-简介">#</a></h2>
+<p>项目地址：https://github.com/seanlook/px-table-checksum</p>
+<p>主从环境下数据一致性校验经常会用 pt-table-checksum 工具，它的原理及实施过程之前写过一篇文章：<a href="http://xgknight.com/2015/12/29/mysql_replica_pt-table-checksum/">生产环境使用 pt-table-checksum 检查MySQL数据一致性</a>。但是DBA工作中还会有些针对两个表检查是否一致，而这两个表之间并没有主从关系，pt工具是基于binlog把在主库进行的检查动作，在从库重放一遍，此时就不适用了。</p>
+<p>总会有这样特殊的需求，比如从阿里云RDS实例迁移到自建mysql实例，它的数据传输服务实现方式是基于表的批量数据提取，加上binlog订阅，但强制row模式会导致pt-table-checksum没有权限把会话临时改成statement。另一种需求是，整库进行字符集转换：库表定义都是utf8，但应用连接使用了默认的 latin1，要将连接字符集和表字符集统一起来，只能以latin1导出数据，再以utf8导入，这种情况数据一致性校验，且不说binlog解析程序不支持statement（如canal），新旧库本身内容不同，pt-table-checksum 算出的校验值也会不一样，失效。</p>
+<p>所以才萌生了参考 pt-table-checksum 自己写了一个：px-table-checksum 。</p>
+<h2 id="2-实现方法">2. 实现方法<a hidden class="anchor" aria-hidden="true" href="#2-实现方法">#</a></h2>
+<p>整体思路是借鉴pt-table-checksum，从源库批量（即chunk）取出一块数据如1000行，计算CRC32值，同样的语句在目标库运行一遍，结果都存入另一个库，最后检查对应编号的chunk crc值是否一致。知道不一致还不行，得能否快速方便的修复差异，所以继续根据那些不一致的chunk，去目标库和源库找到不一致的行，是缺失，还是多余，还是被修改了，然后生成修复sql，根据指示是否自动修复。</p>
+<p>那么问题就在于：</p>
+<ol>
+<li>
+<p>如何确定批次，也就是下一个chunk该怎么取？
+我还没想做到pt-table-checksum那样，可以根据负载动态调整chunk大小，甚至活跃线程数超过阀值就暂停检查，上来工作量就太大了。目前每次计算的chunk的行数是固定的，可以配置1000或2000等。
+所以就要用到分页查询，根据（自增或联合）主键、唯一索引，每次limit 1000后升序取最后一条，作为下一批的起始。所以要分析表上的键情况，组合查询条件。目前仅能检查有主键或唯一所以的表。</p>
+</li>
+<li>
+<p>如何保证源库和目标库，运行的sql一样？
+之前一版是目标库和源库，以多线程各自计算chunk，入库，后来才意识到严重的bug：比如同样是取1000行，如果目标库少数据，那么下一个chunk起始就不一样，比较的结果简直一塌糊涂。
+所以必须保证相同编号的chunk，起点必须相同，所以想到用队列，存放在源库跑过的所有校验sql，模拟pt工具在目标库重放。考虑到要多线程同时比较多个表，队列可能吃内存过大，于是使用了redis队列。</p>
+</li>
+<li>
+<p>直接在数据库中计算crc32，还是取出数据在内存里计算？
+翻了pt-table-checksum的源码，它是在数据库里计算的。但是第一节里说过，如果目标库和源库要使用不同的字符集才能读出正确的数据，只能查询出来之后再比较。所以 px-table-checksum 两种都支持，只需指定一个配置项。</p>
+</li>
+<li>
+<p>同时检查多个表，源库sql挤在队列，目标库拿出来执行时过了1s，此时源库那条数据又被修改了一次同步到了目标库，会导致计算结果不一致，实则一致，怎么处理
+无法处理，是px-table-checksum相比pt-table-checksum最大的缺陷。
+但为了尽可能减少此类问题（比如主从延迟也可能会），特意设计了多个redis队列，目标库多个检查线程，即比如同时指定检查8个表，源库检查会有8个线程对应，但可以根据表的写入情况，配置4个redis队列（目前是随机入列），10个目标库检查线程，来减少不准确因素。
+但站在我的角度往往来说，不一致的数据会被记录下来，如果不多，人工核对一下；如果较多，就再跑一遍检查，如果两次都有同一条数据不一致，那就有情况了。</p>
+</li>
+</ol>
+<h2 id="3-限制">3. 限制<a hidden class="anchor" aria-hidden="true" href="#3-限制">#</a></h2>
+<ol>
+<li>如果检查期间源表数据，变化频繁，有可能检查的结果不准确
+也就是上面第4点的问题。很明显，这个程序每个检查的事务是分开的，不像pt工具能严格保证每条检查sql的事务顺序。但有不一致的数据再排查一下就ok了。实际在我线上使用过程中，99.9%是准确的。</li>
+</ol>
+<!-- raw HTML omitted -->
+<ol start="2">
+<li>
+<p>表上必须有主键或唯一索引
+程序会检查，如果没有会退出。</p>
+</li>
+<li>
+<p>varbinay,blob等二进制字段不支持修复
+其实也不是完全不支持，要看怎么用的。开发如果有把字符先转成字节，再存入mysql，这种就不支持修复。是有办法可以处理，那就是从源库查时用 <code>hex()</code>函数，修复sql里面<code>unhex()</code>写回去。</p>
+</li>
+</ol>
+<h2 id="4-使用说明">4. 使用说明<a hidden class="anchor" aria-hidden="true" href="#4-使用说明">#</a></h2>
+<p>该python程序基于2.7开发，2.6、3.x上没有测试。使用前需要安装 <code>MySQLdb</code>和<code>hotqueue</code>：</p>
+<pre tabindex="0"><code>$ sudo pip install MySQL-python hotqueue
+</code></pre><p>要比较的表和选项，使用全配置化，即不通过命令行的方式指定（原谅命令行参数使用方式会额外增加代码量）。</p>
+<h3 id="41-px-table-checksumpy">4.1 <code>px-table-checksum.py</code><a hidden class="anchor" aria-hidden="true" href="#41-px-table-checksumpy">#</a></h3>
+<p>主程序，运行<code>python px-table-checksum.py</code> 执行一致性检查，但一定了解下面的配置文件选项。</p>
+<h3 id="42-settings_checksumpy">4.2 <code>settings_checksum.py</code><a hidden class="anchor" aria-hidden="true" href="#42-settings_checksumpy">#</a></h3>
+<p>配置选项</p>
+<ul>
+<li>
+<p><code>CHUNK_SIZE</code>: 每次提取的chunk行数</p>
+</li>
+<li>
+<p><code>REDIS_INFO</code>: 指定使用redis队列地址</p>
+</li>
+<li>
+<p><code>REDIS_QUEUE_CNT</code>: redis队列数量，消费者（目标库）有一一对应的线程守着队列</p>
+</li>
+<li>
+<p><code>REDIS_POOL_CNT</code>: 生产者（源库）redis客户端连接池。这个设计是为了缓解GIL带来的问题，把入列端与出列端分开，因为如果表多可能短时间有大量sql入队列，避免hotqueue争用</p>
+</li>
+<li>
+<p><code>CALC_CRC32_DB</code>: True 表示在db里面计算checksum值，False表示取出chunk数据在python里面计算。默认给的值是根据连接字符集定的。</p>
+</li>
+<li>
+<p><code>DO_COMPARE</code>: 运行模式</p>
+</li>
+<li>
+<p>0: 只提取数据计算，不比较是否一致。可以在之后在模式2下只比较</p>
+</li>
+<li>
+<p>1: 计算，并比较。常用，每次计算之前会删除上一次这个待检查表的结果，比较的结果只告诉哪些chunk号不一致。</p>
+</li>
+<li>
+<p>2: 不计算，只从t_checkum结果比较。常用，计算是消耗数据库资源的，可以只对已有的checksum计算结果比较不一致的地方。类似pt工具的<code>--replicate-check-only</code>选项。</p>
+</li>
+<li>
+<p><code>GEN_DATAFIX</code>:
+与<code>DO_COMPARE</code>结合使用，为 True 表示对不一致的chunk找到具体不一致行，并生成修复sql；为 False 则什么都不做。</p>
+</li>
+<li>
+<p><code>RUN_DATAFIX</code>:
+与<code>GEN_DATAFIX</code>结合使用，为 True 表示对生成的修复sql，在目标库执行。需要谨慎，如果哪一次设置了修复，记得完成后改回False，不然下次检查另一个表就出意外了，所以特意对这个选项再加了一个确认提示。</p>
+</li>
+<li>
+<p><code>DB_CHECKSUM</code>: 一个字典，指定checksum的结果存到哪里
+配置文件有示例，必须指定 <code>db_name</code>，表会自动创建。</p>
+</li>
+</ul>
+<h3 id="43-settings_cs_tablespy">4.3 <code>settings_cs_tables.py</code><a hidden class="anchor" aria-hidden="true" href="#43-settings_cs_tablespy">#</a></h3>
+<p>上面的配置文件可以认为是用于控制程序的，这个配置文件是指定要校验的源库和目标库信息，以及要检验哪些表。</p>
+<ul>
+<li><code>TABLES_CHECK</code>: 字典，指定要检查哪些表的一致性，db名为key，多个table名组成列表为value。暂不支持对整个db做检查，同时比较的表数量不建议超过8个</li>
+<li><code>DB_SOURCE</code>: 字典，指定源库的连接信息</li>
+<li><code>DB_SOURCE</code>: 字典，指定目标库的连接信息</li>
+</ul>
+<h2 id="5-示例">5. 示例：<a hidden class="anchor" aria-hidden="true" href="#5-示例">#</a></h2>
+<pre tabindex="0"><code>Starting checksum thread for table: db1.t_test_201308 (192.168.1.122:3306)
+Before checksum: create table if not exists t_checksum
+Before checksum: delele old data from t_checksum if exists for table:  db1.t_test_201308
+Caculate crc32 in program instead of db.(this program need more memory and more db net traffic, but convert charset)
+Caculating checksums:  192.168.1.122:3306 db1.t_test_201308
+TARGET: (&#39;192.168.1.121:3306&#39;, &#39;t_test_201308&#39;, 1, &#39;db1&#39;, &#39;0&#39;, u&#39;1495969&#39;, 451060506)
+TARGET: (&#39;192.168.1.121:3306&#39;, &#39;t_test_201308&#39;, 2, &#39;db1&#39;, u&#39;1495969&#39;, u&#39;1502593&#39;, -678155635)
+...
+Starting checksum thread for table: db1.t_test_201408 (192.168.1.122:3306)
+Before checksum: delele old data from t_checksum if exists for table:  db1.t_test_201408
+Caculate crc32 in program instead of db.(this program need more memory and more db net traffic, but convert charset)
+Caculating checksums:  192.168.1.122:3306 db1.t_test_201408
+TARGET: (&#39;192.168.1.121:3306&#39;, &#39;t_test_201408&#39;TARGET: (&#39;192.168.1.121:3306&#39;, &#39;t_test_201408&#39;, 9, 8, &#39;db1&#39;, u&#39;3836877&#39;, u&#39;3845812&#39;, , &#39;db1&#39;, u&#39;3845812&#39;373759054)
+...
+源实例 192.168.1.122:3306 db1.t_test_201308  计算checksum结束！
+db conection closed.
+Checksum thread ended for table: db1.t_test_201308 (192.168.1.122:3306)
+...
+源实例 192.168.1.122:3306 db1.t_test_201408  计算checksum结束！
+消费sql 0 退出！！
+消费sql -1 退出！！
+
+################################################################################
+Start compare chunk&#39;s crc32 for table: [ db1.t_test_201308 ]
+表 db1.t_test_201308 数据一致
+
+################################################################################
+################################################################################
+Start compare chunk&#39;s crc32 for table: [ db1.t_test_201408 ]
+表 db1.t_test_201408 数据不一致chunk数：10
+--------------------------------------------------------------------------------
+
+该chunk [1] 存在行内容不一致, CRC32: src(828649697) rgt(-1396224393)
+去源库和目标库获取chunk[1]不一致行：
+  TO insert or update:  [u&#39;3761994&#39;]
+  TO delete:  []
+
+该chunk [5] 存在行内容不一致, CRC32: src(1513453680) rgt(-1614463460)
+去源库和目标库获取chunk[5]不一致行：
+  TO insert or update:  [u&#39;3806841&#39;]
+  TO delete:  []
+</code></pre><hr>
+<p>原文链接地址：http://xgknight.com/2016/11/20/py-mysql-table-checksum-non-replicas/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/python/">python</a></li>
+      <li><a href="http://xgknight.com/tags/pt-table-checksum/">pt-table-checksum</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>ProxySQL之读写分离与分库路由演示 | Sean Note</title>
+<meta name="keywords" content="mysql, 中间件, proxysql">
+<meta name="description" content="本文演示使用ProxySQL来完成读写分离和后端分库的一个实际配置过程，安装及配置项介绍见前文 ProxySQL之安装及配置详解。
+环境
+instance0: 10.0.100.100 (db0,db2,db4,db6) instance1: 10.0.100.101 (db1,db3,db5,db7) instance2: 10.0.100.102 (db2,db6,db10,db14) instance3: 10.0.100.103 (db3,db7,db11,db15) instance0 slave: 192.168.10.4:3316 instance1 slave: 192.168.10.4:3326 instance2 slave: 192.168.10.4:3336 instance3 slave: 192.168.10.4:3346 proxysql node0: 10.0.100.36 现在想达到这样一个目的：客户端应用连接上 proxysql 的ip:port，连接时指定分库db名，执行sql时自动路由到对应的实例、对应的库。考虑下面的部署结构： 任何一个proxysql节点都是对等的，路由请求到后端instance的各个database上。
+1. 配置后端DB -- proxysql admin cli insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (100, &#39;10.0.100.100&#39;, 3307, 1, &#39;db0,ReadWrite&#39;), (1000, &#39;10.0.100.100&#39;, 3307, 1, &#39;db0,ReadWrite&#39;),(1000, &#39;192.168.10.4&#39;, 3316, 9, &#39;db0,ReadOnly&#39;); insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (101, &#39;10.0.100.101&#39;, 3307, 1, &#39;db1,ReadWrite&#39;), (1001, &#39;10.0.100.101&#39;, 3307, 1, &#39;db1,ReadWrite&#39;),(1001, &#39;192.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%E4%B8%8E%E5%88%86%E5%BA%93%E8%B7%AF%E7%94%B1%E6%BC%94%E7%A4%BA/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="ProxySQL之读写分离与分库路由演示" />
+<meta property="og:description" content="本文演示使用ProxySQL来完成读写分离和后端分库的一个实际配置过程，安装及配置项介绍见前文 ProxySQL之安装及配置详解。
+环境
+instance0: 10.0.100.100 (db0,db2,db4,db6) instance1: 10.0.100.101 (db1,db3,db5,db7) instance2: 10.0.100.102 (db2,db6,db10,db14) instance3: 10.0.100.103 (db3,db7,db11,db15) instance0 slave: 192.168.10.4:3316 instance1 slave: 192.168.10.4:3326 instance2 slave: 192.168.10.4:3336 instance3 slave: 192.168.10.4:3346 proxysql node0: 10.0.100.36 现在想达到这样一个目的：客户端应用连接上 proxysql 的ip:port，连接时指定分库db名，执行sql时自动路由到对应的实例、对应的库。考虑下面的部署结构： 任何一个proxysql节点都是对等的，路由请求到后端instance的各个database上。
+1. 配置后端DB -- proxysql admin cli insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (100, &#39;10.0.100.100&#39;, 3307, 1, &#39;db0,ReadWrite&#39;), (1000, &#39;10.0.100.100&#39;, 3307, 1, &#39;db0,ReadWrite&#39;),(1000, &#39;192.168.10.4&#39;, 3316, 9, &#39;db0,ReadOnly&#39;); insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (101, &#39;10.0.100.101&#39;, 3307, 1, &#39;db1,ReadWrite&#39;), (1001, &#39;10.0.100.101&#39;, 3307, 1, &#39;db1,ReadWrite&#39;),(1001, &#39;192." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%E4%B8%8E%E5%88%86%E5%BA%93%E8%B7%AF%E7%94%B1%E6%BC%94%E7%A4%BA/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2017-04-17T15:32:49+00:00" />
+<meta property="article:modified_time" content="2017-04-17T15:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="ProxySQL之读写分离与分库路由演示"/>
+<meta name="twitter:description" content="本文演示使用ProxySQL来完成读写分离和后端分库的一个实际配置过程，安装及配置项介绍见前文 ProxySQL之安装及配置详解。
+环境
+instance0: 10.0.100.100 (db0,db2,db4,db6) instance1: 10.0.100.101 (db1,db3,db5,db7) instance2: 10.0.100.102 (db2,db6,db10,db14) instance3: 10.0.100.103 (db3,db7,db11,db15) instance0 slave: 192.168.10.4:3316 instance1 slave: 192.168.10.4:3326 instance2 slave: 192.168.10.4:3336 instance3 slave: 192.168.10.4:3346 proxysql node0: 10.0.100.36 现在想达到这样一个目的：客户端应用连接上 proxysql 的ip:port，连接时指定分库db名，执行sql时自动路由到对应的实例、对应的库。考虑下面的部署结构： 任何一个proxysql节点都是对等的，路由请求到后端instance的各个database上。
+1. 配置后端DB -- proxysql admin cli insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (100, &#39;10.0.100.100&#39;, 3307, 1, &#39;db0,ReadWrite&#39;), (1000, &#39;10.0.100.100&#39;, 3307, 1, &#39;db0,ReadWrite&#39;),(1000, &#39;192.168.10.4&#39;, 3316, 9, &#39;db0,ReadOnly&#39;); insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (101, &#39;10.0.100.101&#39;, 3307, 1, &#39;db1,ReadWrite&#39;), (1001, &#39;10.0.100.101&#39;, 3307, 1, &#39;db1,ReadWrite&#39;),(1001, &#39;192."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "ProxySQL之读写分离与分库路由演示",
+      "item": "http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%E4%B8%8E%E5%88%86%E5%BA%93%E8%B7%AF%E7%94%B1%E6%BC%94%E7%A4%BA/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "ProxySQL之读写分离与分库路由演示",
+  "name": "ProxySQL之读写分离与分库路由演示",
+  "description": "本文演示使用ProxySQL来完成读写分离和后端分库的一个实际配置过程，安装及配置项介绍见前文 ProxySQL之安装及配置详解。\n环境\ninstance0: 10.0.100.100 (db0,db2,db4,db6) instance1: 10.0.100.101 (db1,db3,db5,db7) instance2: 10.0.100.102 (db2,db6,db10,db14) instance3: 10.0.100.103 (db3,db7,db11,db15) instance0 slave: 192.168.10.4:3316 instance1 slave: 192.168.10.4:3326 instance2 slave: 192.168.10.4:3336 instance3 slave: 192.168.10.4:3346 proxysql node0: 10.0.100.36 现在想达到这样一个目的：客户端应用连接上 proxysql 的ip:port，连接时指定分库db名，执行sql时自动路由到对应的实例、对应的库。考虑下面的部署结构： 任何一个proxysql节点都是对等的，路由请求到后端instance的各个database上。\n1. 配置后端DB -- proxysql admin cli insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (100, \u0026#39;10.0.100.100\u0026#39;, 3307, 1, \u0026#39;db0,ReadWrite\u0026#39;), (1000, \u0026#39;10.0.100.100\u0026#39;, 3307, 1, \u0026#39;db0,ReadWrite\u0026#39;),(1000, \u0026#39;192.168.10.4\u0026#39;, 3316, 9, \u0026#39;db0,ReadOnly\u0026#39;); insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (101, \u0026#39;10.0.100.101\u0026#39;, 3307, 1, \u0026#39;db1,ReadWrite\u0026#39;), (1001, \u0026#39;10.0.100.101\u0026#39;, 3307, 1, \u0026#39;db1,ReadWrite\u0026#39;),(1001, \u0026#39;192.",
+  "keywords": [
+    "mysql", "中间件", "proxysql"
+  ],
+  "articleBody": "本文演示使用ProxySQL来完成读写分离和后端分库的一个实际配置过程，安装及配置项介绍见前文 ProxySQL之安装及配置详解。\n环境\ninstance0: 10.0.100.100 (db0,db2,db4,db6) instance1: 10.0.100.101 (db1,db3,db5,db7) instance2: 10.0.100.102 (db2,db6,db10,db14) instance3: 10.0.100.103 (db3,db7,db11,db15) instance0 slave: 192.168.10.4:3316 instance1 slave: 192.168.10.4:3326 instance2 slave: 192.168.10.4:3336 instance3 slave: 192.168.10.4:3346 proxysql node0: 10.0.100.36 现在想达到这样一个目的：客户端应用连接上 proxysql 的ip:port，连接时指定分库db名，执行sql时自动路由到对应的实例、对应的库。考虑下面的部署结构： 任何一个proxysql节点都是对等的，路由请求到后端instance的各个database上。\n1. 配置后端DB -- proxysql admin cli insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (100, '10.0.100.100', 3307, 1, 'db0,ReadWrite'), (1000, '10.0.100.100', 3307, 1, 'db0,ReadWrite'),(1000, '192.168.10.4', 3316, 9, 'db0,ReadOnly'); insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (101, '10.0.100.101', 3307, 1, 'db1,ReadWrite'), (1001, '10.0.100.101', 3307, 1, 'db1,ReadWrite'),(1001, '192.168.10.4', 3326, 9, 'db1,ReadOnly'); insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (102, '10.0.100.102', 3307, 1, 'db2,ReadWrite'), (1002, '10.0.100.102', 3307, 1, 'db2,ReadWrite'),(1002, '192.168.10.4', 3336, 9, 'db2,ReadOnly'); insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (103, '10.0.100.103', 3307, 1, 'db3,ReadWrite'), (1003, '10.0.100.103', 3307, 1, 'db3,ReadWrite'),(1003, '192.168.10.4', 3346, 9, 'db3,ReadOnly'); 比如 100 是主库，则 1000 是从库，同时主库也可以处理 1/10 的读请求。\n2. 配置用户 -- proxysql admin cli insert into mysql_users(username, password,active,transaction_persistent) values('user0', 'password0', 1, 1),('read1', 'password1', 1, 1); 这里将 transaction_persistent 设置为1，如果不知道它的含义，请参考前文。\n要确保用户有能够登陆到后端的所有db的权限。\n3. 修改全局变量 -- proxysql admin cli set mysql-default_charset='utf8mb4'; set mysql-query_retries_on_failure=0; set mysql-max_stmts_per_connection=1000; set mysql-eventslog_filename='queries.log'; set monitor_slave_lag_when_null=7200; set mysql-ping_timeout_server=1500; set mysql-monitor_connect_timeout=1000; set mysql-default_max_latency_ms=2000; set mysql-monitor_username='monitor'; set mysql-monitor_password='monitor'; set mysql-server_version='5.6.16'; 需要提前给 monitor 账号开通权限，一般共用监控数据库的权限就足够了。\n让上面所有的修改生效:\n-- proxysql admin cli -- 应用 load mysql users to runtime; load mysql servers to runtime; load mysql variables to runtime; -- 保存到磁盘 save mysql users to disk; save mysql servers to disk; save mysql variables to disk; save mysql users to mem; -- 可以屏蔽看到的明文密码 4. 添加路由规则 一般配置ProxySQL规则步骤是 issues #653 :\n配置proxysql，将所有sql都发到主库 分析表 stats_mysql_query_digest 里面哪几种查询占比高 筛选哪些些占比高的SELECT，可以路由到从库 修改 mysql_query_rules 里面的规则，使其生效。不要一味的把所有查询都路由到主库 -- [1] read\u0026write split insert into mysql_query_rules(rule_id, active,match_digest,apply,flagOUT) values(49, 1,'^select\\s.*\\sfor update',0,21); insert into mysql_query_rules(rule_id, active,match_digest,apply,flagOUT) values(50, 1,'^\\(?select',0,20); insert into mysql_query_rules(rule_id, active,match_digest,negate_match_pattern,apply,flagOUT) values(60, 1,'^select',1,0,21); -- 下面最好从rule_id 70开始，中间留空 -- [2] flag 20 read insert into mysql_query_rules(active,schemaname,destination_hostgroup,apply,flagIN,flagOUT) values (1,'db0',1000,1,20,20), (1,'db1',1001,1,20,20), (1,'db2',1002,1,20,20), (1,'db3',1003,1,20,20), (1,'db4',1000,1,20,20), (1,'db5',1001,1,20,20), (1,'db6',1002,1,20,20), (1,'db7',1003,1,20,20), (1,'db8',1000,1,20,20), (1,'db9',1001,1,20,20), (1,'db10',1002,1,20,20), (1,'db11',1003,1,20,20), (1,'db12',1000,1,20,20), (1,'db13',1001,1,20,20), (1,'db14',1002,1,20,20), (1,'db15',1003,1,20,20); -- [3] flag 21 write insert into mysql_query_rules(active,schemaname,destination_hostgroup,apply,flagIN,flagOUT) values (1,'db0',100,1,21,21), (1,'db1',101,1,21,21), (1,'db2',102,1,21,21), (1,'db3',103,1,21,21), (1,'db4',100,1,21,21), (1,'db5',101,1,21,21), (1,'db6',102,1,21,21), (1,'db7',103,1,21,21), (1,'db8',100,1,21,21), (1,'db9',101,1,21,21), (1,'db10',102,1,21,21), (1,'db11',103,1,21,21), (1,'db12',100,1,21,21), (1,'db13',101,1,21,21), (1,'db14',102,1,21,21), (1,'db15',103,1,21,21); -- [4] no schema given when connect insert into mysql_query_rules(rule_id,active,schemaname,apply,flagOUT) values(20,1,'information_schema',0,302); -- [5] route according to dbX. insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) values(1000,1,'([\\s\\`])db(0|4|8|12)([\\.\\`])',100,1,302,302); insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) values(1001,1,'([\\s\\`])db(1|5|9|13)([\\.\\`])',101,1,302,302); insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) values(1002,1,'([\\s\\`])db(2|6|10|14)([\\.\\`])',102,1,302,302); insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) values(1003,1,'([\\s\\`])db(3|7|11|15)([\\.\\`])',103,1,302,302); -- [6] wrong usage insert into mysql_query_rules(rule_id,active,match_digest,apply,flagIN,flagOUT,error_msg,comment) values(1404,1,'^SELECT DATABASE\\(\\)$',1,302,302,'You should specify schema name first', 'use db0 Take long when no schema given for connection'); -- [7] default route insert into mysql_query_rules(rule_id,active,apply, flagIN,flagOUT,error_msg,comment) values(9999,1,1, 302,302,'No query rules matched (by ProxySQL)', \"Don't define the default hostgroup 0 for ME\"); -- [8] LOAD MYSQL QUERY RULES TO RUN; SAVE MYSQL QUERY RULES TO DISK; 逐个解释：\n以 select 开头并且不是 for update 类型的SQL，进入到新的规则链flagOUT=20;\n其它诸如 insert, delete, update, replace, set, show 等语句，都进入到规则链flagOUT=21。 注：’^(?select’ 规则匹配以select或 (select 开头的查询，但目前proxysql(1.3.6, 1.4.1)版本对以 ( 开头的查询不记录 stats_mysql_query_digest 表。#issue 1100\n有个小技巧，mysql_query_rules 表的rule_id有自增，但最好从中间某个数开始，因为一旦后续可能需要紧急在前面插入规则，从1开始就没空位了。\n这里大家可能有个顾虑，从库上可以执行 set NAMES xxx, set session sql_mode=xxx, SET autocommit=?, commit, rollback, START TRANSACTION, use dbx 这样的语句，不能全路由到主库吧？对此，另起了一篇文章 http://xgknight.com/2017/04/17/mysql-proxysql-multiplexing 。\nflagIN=20 是 只读链 的入口\n根据连接时指定的dbname，路由到对应的分库上。db0, db4, db8, db12 路由到 hostgroup_id=1000 ，db1, db5, db9, db16 路由到 hostgroup_id=1002 ，依次类推。 flagIN=flagOUT 则结束匹配。\nflagOUT=21 是 读写链的入口\n与上面的 [2] 类似，但是根据dbname路由到主库。\n当建立连接的时候没有指定dbname时，分两种情况\n使用连接的时候 use db0，因为mysql协议在每次 use dbname 时都会发送一个 SELECT DATABASE() 命令，第一次由于没有连接上后端任何DB，命令会执行超时失败，再次 use db0 是才成功。具体参考我所提的 issue #988 。 因此这里我为它添加了一个规则 [6]，遇到这种情况马上处理，而不用等待失败。 使用连接时从未有默认schema，添加规则 [5]，使用 schemaname.tablename 的形式匹配 schemaname，然后路由到对应的 hostgroup 。 因为没有定义 hostgroup 0，在意外情况什么规则都没匹配上时也依旧会等待失败，所以默认规则（默认路由）返回一个错误。 5. 效果演示 db0 与 db15 分别在两个实例上： (ecdba@10.0.100.36:6033) [(none)]\u003e select * from db0.tbl_0; +-----+----------------+--------+ | fid | username | corpid | +-----+----------------+--------+ | 1 | db0 aa | 0 | | 2 | db0 aa | 16 | | 3 | db0 autocommit | 32 | +-----+----------------+--------+ 3 rows in set (0.00 sec) (ecdba@10.0.100.36:6033) [(none)]\u003e select * from db15.tbl_0; +-----+-----------------------------+--------+ | fid | username | corpid | +-----+-----------------------------+--------+ | 1 | db15 c2dfdf地方大幅度d | 15 | | 2 | db15 c2dfdf地方大幅度d | 47 | | 3 | db15 c2dfdf地方大幅度d | 111 | +-----+-----------------------------+--------+ 3 rows in set (0.00 sec) 无法路由时，报错： (ecdba@10.0.100.36:6033) [(none)]\u003e show databases; ERROR 1148 (42000): No query rules matched (by ProxySQL) 看到 rule 的命中数符合预期： -- proxysql admin cli (admin@127.0.0.1:6032) [(none)]\u003e select active,hits, mysql_query_rules.rule_id, schemaname, match_digest, match_pattern, replace_pattern,destination_hostgroup hostgroup,s.comment,flagIn,flagOUT FROM mysql_query_rules NATURAL JOIN stats.stats_mysql_query_rules JOIN mysql_servers s on destination_hostgroup=hostgroup_id ORDER BY mysql_query_rules.rule_id; +--------+------+---------+--------------------+--------------+-------------------------------+-----------------+-----------+--------+---------+ | active | hits | rule_id | schemaname | match_digest | match_pattern | replace_pattern | hostgroup | flagIN | flagOUT | +--------+------+---------+--------------------+--------------+-------------------------------+-----------------+-----------+--------+---------+ | 1 | 3 | 20 | information_schema | NULL | NULL | NULL | NULL | 0 | 302 | | 1 | 0 | 50 | NULL | ^\\(*select | NULL | NULL | NULL | 0 | 20 | | 1 | 0 | 60 | NULL | ^select | NULL | NULL | NULL | 0 | 21 | | 1 | 0 | 61 | db0 | NULL | NULL | NULL | 1000 | 20 | 20 | | 1 | 0 | 62 | db1 | NULL | NULL | NULL | 1001 | 20 | 20 | | 1 | 0 | 63 | db2 | NULL | NULL | NULL | 1002 | 20 | 20 | | 1 | 0 | 64 | db3 | NULL | NULL | NULL | 1003 | 20 | 20 | .... | 1 | 0 | 77 | db0 | NULL | NULL | NULL | 100 | 21 | 21 | | 1 | 0 | 78 | db1 | NULL | NULL | NULL | 101 | 21 | 21 | | 1 | 0 | 79 | db2 | NULL | NULL | NULL | 102 | 21 | 21 | | 1 | 0 | 80 | db3 | NULL | NULL | NULL | 103 | 21 | 21 | ... | 1 | 0 | 92 | db15 | NULL | NULL | NULL | 103 | 21 | 21 | | 1 | 1 | 1000 | NULL | NULL | ([\\s\\`])db(0|4|8|12)([\\.\\`]) | NULL | 100 | 302 | 302 | | 1 | 0 | 1001 | NULL | NULL | ([\\s\\`])db(1|5|9|13)([\\.\\`]) | NULL | 101 | 302 | 302 | | 1 | 0 | 1002 | NULL | NULL | ([\\s\\`])db(2|6|10|14)([\\.\\`]) | NULL | 102 | 302 | 302 | | 1 | 1 | 1003 | NULL | NULL | ([\\s\\`])db(3|7|11|15)([\\.\\`]) | NULL | 103 | 302 | 302 | | 1 | 0 | 1404 | NULL | NULL | ^SELECT DATABASE\\(\\)$ | NULL | NULL | 302 | 302 | | 1 | 1 | 9999 | NULL | NULL | NULL | NULL | NULL | 302 | 302 | +--------+------+---------+--------------------+--------------+-------------------------------+-----------------+-----------+--------+---------+ 41 rows in set (0.01 sec) mysql\u003e select rule_id,schemaname,match_digest,match_pattern,destination_hostgroup,negate_match_pattern,apply,flagIN,flagOUT,error_msg from mysql_query_rules; 切换数据库继续：\n(ecdba@10.0.100.36:6033) [(none)]\u003e use db1; Database changed (ecdba@10.0.100.36:6033) [db1]\u003e select * from tbl_0; +-----+----------+--------+ | fid | username | corpid | +-----+----------+--------+ | 1 | db1 bb | 1 | | 2 | db1 bb | 17 | | 3 | db1 bb | 33 | +-----+----------+--------+ 3 rows in set (0.01 sec) (ecdba@10.0.100.36:6033) [db1]\u003e select * from `db5`.tbl_0; +-----+--------------------+--------+ | fid | username | corpid | +-----+--------------------+--------+ | 1 | db5 ces测试 kfjd | 5 | +-----+--------------------+--------+ db6并不在当前实例里： (ecdba@10.0.100.36:6033) [db1]\u003e select * from db6.tbl_0; ERROR 1146 (42S02): Table 'db6.tbl_0' doesn't exist 现在show databases不会再报错： (ecdba@10.0.100.36:6033) [db1]\u003e show databases; +--------------------+ | Database | +--------------------+ | information_schema | | db1 | | db13 | | db5 | | db9 | | mysql | | performance_schema | +--------------------+ 看到 stats 模块的统计信息： -- proxysql admin cli (admin@127.0.0.1:6032) [(none)]\u003e select hostgroup,schemaname,username,digest,substr(digest_text,120,-120),count_star from stats_mysql_query_digest; +-----------+--------------------+----------+--------------------+--------------------------------------------+------------+ | hostgroup | schemaname | username | digest | substr(digest_text,120,-120) | count_star | +-----------+--------------------+----------+--------------------+--------------------------------------------+------------+ | 1002 | db2 | ecdba | 0x45033ED34D21EDF5 | select * from tbl_0 | 1 | | 102 | db2 | ecdba | 0x02033E45904D3DF0 | show databases | 1 | | 102 | db2 | ecdba | 0x99531AEFF718C501 | show tables | 1 | | 1001 | db1 | ecdba | 0x620B328FE9D6D71A | SELECT DATABASE() | 1 | | 1001 | db1 | ecdba | 0x903E7B5A87B51352 | select * from db6.tbl_0 | 1 | | 1001 | db1 | ecdba | 0x0CE250A1C0E2C539 | select * from `db5`.tbl_0 | 1 | | 1001 | db1 | ecdba | 0x45033ED34D21EDF5 | select * from tbl_0 | 1 | | 101 | db1 | ecdba | 0x02033E45904D3DF0 | show databases | 2 | | 102 | db2 | ecdba | 0x6F8289B2913564A0 | update tbl_0 set username=? where corpid=? | 1 | | 0 | information_schema | ecdba | 0x620B328FE9D6D71A | SELECT DATABASE() | 1 | | 101 | db1 | ecdba | 0x99531AEFF718C501 | show tables | 1 | | 0 | information_schema | ecdba | 0x02033E45904D3DF0 | show databases | 1 | | 1001 | db1 | ecdba | 0x7A3428659E1BFDC2 | select * from db5.tbl_0 | 1 | | 103 | information_schema | ecdba | 0xA951EB38FA9ED6A4 | select * from db15.tbl_0 | 1 | | 100 | information_schema | ecdba | 0xA132AEDEC5932600 | select * from db0.tbl_0 | 1 | | 0 | information_schema | ecdba | 0x594F2C744B698066 | select USER() | 1 | | 0 | information_schema | ecdba | 0x226CD90D52A2BA0B | select @@version_comment limit ? | 1 | +-----------+--------------------+----------+--------------------+--------------------------------------------+------------+ 17 rows in set (0.01 sec) 达到了读写分离和分实例分库的目的。\n6. 另一种规则写法 从上面可以看到，客户端应用在使用的时候，最好都要指定 database name ，上面是因为加了第 5 类规则才避免由于不指定db时所带来的问题，但始终要求对每个 分db 建立自己连接，或者查询之前 use dbname ，当然也可以在获取连接的时候，传递dbname过去，拿到带正确db的连接过来。\n那么其实还有一种办法，不需要指定连接db，而是采用注释 hint 的形式，传递给proxysql，然后来自动路由。将第 4 节的规则 [2],[3] 改成下面的形式：\n-- [1] read\u0026write split -- instance0，read \u0026 write INSERT INTO mysql_query_rules (rule_id,active,match_pattern,apply,flagIN,flagOUT) VALUES (40,1,\"\\/\\*\\s*shard_corp_mod=(0|4|8|12)\\s*\\*.\",0,0,20); INSERT INTO mysql_query_rules (rule_id,active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) VALUES (50,1,'^select',1000,1,20,20); INSERT INTO mysql_query_rules (active,match_digest,negate_match_pattern,destination_hostgroup,apply,flagIN,flagOUT) VALUES (1,\"^select\",1,100,1,20,20); INSERT INTO mysql_query_rules (rule_id,active,match_pattern,apply,flagIN,flagOUT) VALUES (60,1,\"\\/\\*\\s*shard_corp_mod=(1|5|9|13)\\s*\\*.\",0,0,21); INSERT INTO mysql_query_rules (active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) VALUES (1,'^select',1001,1,21,21); INSERT INTO mysql_query_rules (active,match_digest,negate_match_pattern,destination_hostgroup,apply,flagIN,flagOUT) VALUES (1,\"^select\",1,101,1,21,21); INSERT INTO mysql_query_rules (rule_id,active,match_pattern,apply,flagIN,flagOUT) VALUES (70,1,\"\\/\\*\\s*shard_corp_mod=(2|6|10|14)\\s*\\*.\",0,0,22); INSERT INTO mysql_query_rules (active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) VALUES (1,'^select',1002,1,22,22); INSERT INTO mysql_query_rules (active,match_digest,negate_match_pattern,destination_hostgroup,apply,flagIN,flagOUT) VALUES (1,\"^select\",1,102,1,22,22); INSERT INTO mysql_query_rules (rule_id,active,match_pattern,apply,flagIN,flagOUT) VALUES (80,1,\"\\/\\*\\s*shard_corp_mod=(3|7|11|15)\\s*\\*.\",0,0,23); INSERT INTO mysql_query_rules (active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) VALUES (1,'^select',1003,1,23,23); INSERT INTO mysql_query_rules (active,match_digest,negate_match_pattern,destination_hostgroup,apply,flagIN,flagOUT) VALUES (1,\"^select\",1,103,1,23,23); -- [2] no /* shard_corp_mod=? */ given insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN) values(1000,1,'([\\s\\`])db(0|4|8|12)([\\.\\`])',100,1,0); insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN) values(1001,1,'([\\s\\`])db(1|5|9|13)([\\.\\`])',101,1,0); insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN) values(1002,1,'([\\s\\`])db(2|6|10|14)([\\.\\`])',102,1,0); insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN) values(1003,1,'([\\s\\`])db(3|7|11|15)([\\.\\`])',103,1,0); -- [3] wrong usage insert into mysql_query_rules(rule_id,active,schemaname,match_digest,apply,flagIN,error_msg,comment) values(1404,1,'information_schema','^SELECT DATABASE\\(\\)$',1,0,'You should specify schema name first', 'use db0 Take long when no schema given for connection'); -- [7] default route insert into mysql_query_rules(rule_id,active,apply, flagIN,error_msg,comment) values(9999,1,1, 0,'No query rules matched (by ProxySQL)', \"Don't define the default hostgroup 0 for ME\"); -- [8] LOAD MYSQL QUERY RULES TO RUN; SAVE MYSQL QUERY RULES TO DISK; 注意这里[2][3]用的是 match_pattern，而上节用的是match_digest，因为proxysql在处理fingerprint的时候，会去掉注释。如果在命令行测试，要加 -c 避免 HINT 被过滤掉。\n使用时Hint放sql最后面，每个sql都要带mod或者指定实例：select * from db5.tbl_0 /* shard_corp_mod=5 */，真正实施起来，应用端的复杂度以及proxysql的性能，还是有待考虑的。\n关于这些路由规则的写法对ProxySQL性能的影响，欢迎继续阅读这边文章 ProxySQL之性能测试对比\n参考：\nhttps://severalnines.com/blog/how-proxysql-adds-failover-and-query-control-your-mysql-replication-setup https://www.percona.com/blog/2016/08/30/mysql-sharding-with-proxysql/ 原文连接地址：http://xgknight.com/2017/04/17/mysql-proxysql-route-rw_split/\n",
+  "wordCount" : "1679",
+  "inLanguage": "en",
+  "datePublished": "2017-04-17T15:32:49Z",
+  "dateModified": "2017-04-17T15:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%E4%B8%8E%E5%88%86%E5%BA%93%E8%B7%AF%E7%94%B1%E6%BC%94%E7%A4%BA/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      ProxySQL之读写分离与分库路由演示
+    </h1>
+    <div class="post-meta"><span title='2017-04-17 15:32:49 +0000 UTC'>April 17, 2017</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>本文演示使用ProxySQL来完成读写分离和后端分库的一个实际配置过程，安装及配置项介绍见前文 <a href="http://xgknight.com/2017/04/10/mysql-proxysql-install-config/">ProxySQL之安装及配置详解</a>。</p>
+<p>环境</p>
+<pre tabindex="0"><code>instance0: 10.0.100.100 (db0,db2,db4,db6)
+instance1: 10.0.100.101 (db1,db3,db5,db7)
+instance2: 10.0.100.102 (db2,db6,db10,db14)
+instance3: 10.0.100.103 (db3,db7,db11,db15)
+
+instance0 slave: 192.168.10.4:3316
+instance1 slave: 192.168.10.4:3326
+instance2 slave: 192.168.10.4:3336
+instance3 slave: 192.168.10.4:3346
+
+proxysql node0: 10.0.100.36
+</code></pre><p>现在想达到这样一个目的：客户端应用连接上 proxysql 的ip:port，连接时指定分库db名，执行sql时自动路由到对应的实例、对应的库。考虑下面的部署结构：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/proxysql-rw-lb-deploy.png" alt="ProxySQL Deploy"  />
+</p>
+<p>任何一个proxysql节点都是对等的，路由请求到后端instance的各个database上。</p>
+<h1 id="1-配置后端db">1. 配置后端DB<a hidden class="anchor" aria-hidden="true" href="#1-配置后端db">#</a></h1>
+<pre tabindex="0"><code>-- proxysql admin cli
+
+insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values
+  (100, &#39;10.0.100.100&#39;, 3307, 1, &#39;db0,ReadWrite&#39;),
+  (1000, &#39;10.0.100.100&#39;, 3307, 1, &#39;db0,ReadWrite&#39;),(1000, &#39;192.168.10.4&#39;, 3316, 9, &#39;db0,ReadOnly&#39;);
+
+insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values
+  (101, &#39;10.0.100.101&#39;, 3307, 1, &#39;db1,ReadWrite&#39;),
+  (1001, &#39;10.0.100.101&#39;, 3307, 1, &#39;db1,ReadWrite&#39;),(1001, &#39;192.168.10.4&#39;, 3326, 9, &#39;db1,ReadOnly&#39;);
+
+insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values
+  (102, &#39;10.0.100.102&#39;, 3307, 1, &#39;db2,ReadWrite&#39;),
+  (1002, &#39;10.0.100.102&#39;, 3307, 1, &#39;db2,ReadWrite&#39;),(1002, &#39;192.168.10.4&#39;, 3336, 9, &#39;db2,ReadOnly&#39;);
+
+insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values
+  (103, &#39;10.0.100.103&#39;, 3307, 1, &#39;db3,ReadWrite&#39;),
+  (1003, &#39;10.0.100.103&#39;, 3307, 1, &#39;db3,ReadWrite&#39;),(1003, &#39;192.168.10.4&#39;, 3346, 9, &#39;db3,ReadOnly&#39;);
+</code></pre><p>比如 100 是主库，则 1000 是从库，同时主库也可以处理 1/10 的读请求。</p>
+<h1 id="2-配置用户">2. 配置用户<a hidden class="anchor" aria-hidden="true" href="#2-配置用户">#</a></h1>
+<pre tabindex="0"><code>-- proxysql admin cli
+
+insert into mysql_users(username, password,active,transaction_persistent)
+  values(&#39;user0&#39;, &#39;password0&#39;, 1, 1),(&#39;read1&#39;, &#39;password1&#39;, 1, 1);
+</code></pre><p>这里将 transaction_persistent 设置为1，如果不知道它的含义，请参考前文。</p>
+<p>要确保用户有能够登陆到后端的所有db的权限。</p>
+<h1 id="3-修改全局变量">3. 修改全局变量<a hidden class="anchor" aria-hidden="true" href="#3-修改全局变量">#</a></h1>
+<pre tabindex="0"><code>-- proxysql admin cli
+
+set mysql-default_charset=&#39;utf8mb4&#39;;
+set mysql-query_retries_on_failure=0;
+set mysql-max_stmts_per_connection=1000;
+set mysql-eventslog_filename=&#39;queries.log&#39;;
+set monitor_slave_lag_when_null=7200;
+
+set mysql-ping_timeout_server=1500;
+set mysql-monitor_connect_timeout=1000;
+set mysql-default_max_latency_ms=2000;
+
+set mysql-monitor_username=&#39;monitor&#39;;
+set mysql-monitor_password=&#39;monitor&#39;;
+set mysql-server_version=&#39;5.6.16&#39;;
+</code></pre><p>需要提前给 monitor 账号开通权限，一般共用监控数据库的权限就足够了。</p>
+<p><strong>让上面所有的修改生效</strong>:</p>
+<pre tabindex="0"><code>-- proxysql admin cli
+-- 应用
+load mysql users to runtime;
+load mysql servers to runtime;
+load mysql variables to runtime;
+
+-- 保存到磁盘
+save mysql users to disk;
+save mysql servers to disk;
+save mysql variables to disk;
+
+save mysql users to mem;  -- 可以屏蔽看到的明文密码
+</code></pre><h1 id="4-添加路由规则">4. 添加路由规则<a hidden class="anchor" aria-hidden="true" href="#4-添加路由规则">#</a></h1>
+<p>一般配置ProxySQL规则步骤是 <a href="https://github.com/sysown/proxysql/issues/653#issuecomment-242122732">issues #653</a> :</p>
+<ol>
+<li>配置proxysql，将所有sql都发到主库</li>
+<li>分析表 <code>stats_mysql_query_digest</code> 里面哪几种查询占比高</li>
+<li>筛选哪些些占比高的SELECT，可以路由到从库</li>
+<li>修改 <code>mysql_query_rules</code> 里面的规则，使其生效。不要一味的把所有查询都路由到主库</li>
+</ol>
+<pre tabindex="0"><code>-- [1] read&amp;write split
+insert into mysql_query_rules(rule_id, active,match_digest,apply,flagOUT) values(49, 1,&#39;^select\s.*\sfor update&#39;,0,21);
+insert into mysql_query_rules(rule_id, active,match_digest,apply,flagOUT) values(50, 1,&#39;^\(?select&#39;,0,20);
+insert into mysql_query_rules(rule_id, active,match_digest,negate_match_pattern,apply,flagOUT) values(60, 1,&#39;^select&#39;,1,0,21);
+
+-- 下面最好从rule_id 70开始，中间留空
+
+-- [2] flag 20 read
+insert into mysql_query_rules(active,schemaname,destination_hostgroup,apply,flagIN,flagOUT) values
+  (1,&#39;db0&#39;,1000,1,20,20), (1,&#39;db1&#39;,1001,1,20,20), (1,&#39;db2&#39;,1002,1,20,20), (1,&#39;db3&#39;,1003,1,20,20), (1,&#39;db4&#39;,1000,1,20,20), (1,&#39;db5&#39;,1001,1,20,20), (1,&#39;db6&#39;,1002,1,20,20), (1,&#39;db7&#39;,1003,1,20,20),
+  (1,&#39;db8&#39;,1000,1,20,20), (1,&#39;db9&#39;,1001,1,20,20), (1,&#39;db10&#39;,1002,1,20,20), (1,&#39;db11&#39;,1003,1,20,20), (1,&#39;db12&#39;,1000,1,20,20), (1,&#39;db13&#39;,1001,1,20,20), (1,&#39;db14&#39;,1002,1,20,20), (1,&#39;db15&#39;,1003,1,20,20);
+
+-- [3] flag 21 write
+insert into mysql_query_rules(active,schemaname,destination_hostgroup,apply,flagIN,flagOUT) values
+  (1,&#39;db0&#39;,100,1,21,21), (1,&#39;db1&#39;,101,1,21,21), (1,&#39;db2&#39;,102,1,21,21), (1,&#39;db3&#39;,103,1,21,21), (1,&#39;db4&#39;,100,1,21,21), (1,&#39;db5&#39;,101,1,21,21), (1,&#39;db6&#39;,102,1,21,21), (1,&#39;db7&#39;,103,1,21,21), 
+  (1,&#39;db8&#39;,100,1,21,21), (1,&#39;db9&#39;,101,1,21,21), (1,&#39;db10&#39;,102,1,21,21), (1,&#39;db11&#39;,103,1,21,21), (1,&#39;db12&#39;,100,1,21,21), (1,&#39;db13&#39;,101,1,21,21), (1,&#39;db14&#39;,102,1,21,21), (1,&#39;db15&#39;,103,1,21,21);
+
+-- [4] no schema given when connect
+insert into mysql_query_rules(rule_id,active,schemaname,apply,flagOUT) values(20,1,&#39;information_schema&#39;,0,302);
+
+-- [5] route according to dbX.
+insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) values(1000,1,&#39;([\s\`])db(0|4|8|12)([\.\`])&#39;,100,1,302,302);
+insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) values(1001,1,&#39;([\s\`])db(1|5|9|13)([\.\`])&#39;,101,1,302,302);
+insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) values(1002,1,&#39;([\s\`])db(2|6|10|14)([\.\`])&#39;,102,1,302,302);
+insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) values(1003,1,&#39;([\s\`])db(3|7|11|15)([\.\`])&#39;,103,1,302,302);
+
+-- [6] wrong usage
+insert into mysql_query_rules(rule_id,active,match_digest,apply,flagIN,flagOUT,error_msg,comment) 
+  values(1404,1,&#39;^SELECT DATABASE\(\)$&#39;,1,302,302,&#39;You should specify schema name first&#39;, &#39;use db0 Take long when no schema given for connection&#39;);
+
+-- [7] default route
+insert into mysql_query_rules(rule_id,active,apply, flagIN,flagOUT,error_msg,comment) values(9999,1,1, 302,302,&#39;No query rules matched (by ProxySQL)&#39;, &#34;Don&#39;t define the default hostgroup 0 for ME&#34;);
+
+-- [8]
+LOAD MYSQL QUERY RULES TO RUN;
+SAVE MYSQL QUERY RULES TO DISK;
+</code></pre><p>逐个解释：</p>
+<ol>
+<li>
+<p>以 select 开头并且不是 for update 类型的SQL，进入到新的规则链flagOUT=20;<br>
+其它诸如 insert, delete, update, replace, set, show 等语句，都进入到规则链flagOUT=21。
+注：&rsquo;^(?select&rsquo; 规则匹配以<code>select</code>或 <code>(select</code> 开头的查询，但目前proxysql(1.3.6, 1.4.1)版本对以 <code>(</code> 开头的查询不记录 stats_mysql_query_digest 表。<a href="https://github.com/sysown/proxysql/issues/1100">#issue 1100</a></p>
+<p>有个小技巧，mysql_query_rules 表的rule_id有自增，但最好从中间某个数开始，因为一旦后续可能需要紧急在前面插入规则，从1开始就没空位了。</p>
+<p>这里大家可能有个顾虑，从库上可以执行 <code>set NAMES xxx</code>, <code>set session sql_mode=xxx</code>, <code>SET autocommit=?</code>, <code>commit</code>, <code>rollback</code>, <code>START TRANSACTION</code>, <code>use dbx</code> 这样的语句，不能全路由到主库吧？对此，另起了一篇文章 <a href="http://xgknight.com/2017/04/17/mysql-proxysql-multiplexing">http://xgknight.com/2017/04/17/mysql-proxysql-multiplexing</a> 。</p>
+</li>
+<li>
+<p>flagIN=20 是 <em>只读链</em> 的入口<br>
+根据连接时指定的dbname，路由到对应的分库上。db0, db4, db8, db12 路由到 hostgroup_id=1000 ，db1, db5, db9, db16 路由到 hostgroup_id=1002 ，依次类推。
+flagIN=flagOUT 则结束匹配。</p>
+</li>
+<li>
+<p>flagOUT=21 是 <em>读写链</em>的入口<br>
+与上面的 [2] 类似，但是根据dbname路由到主库。</p>
+</li>
+<li>
+<p>当建立连接的时候没有指定dbname时，分两种情况</p>
+</li>
+</ol>
+<ul>
+<li>使用连接的时候 <code>use db0</code>，因为mysql协议在每次 use dbname 时都会发送一个 <code>SELECT DATABASE()</code> 命令，第一次由于没有连接上后端任何DB，命令会执行超时失败，再次 use db0 是才成功。具体参考我所提的 <a href="https://github.com/sysown/proxysql/issues/988">issue #988</a> 。
+因此这里我为它添加了一个规则 <strong>[6]</strong>，遇到这种情况马上处理，而不用等待失败。</li>
+<li>使用连接时从未有默认schema，添加规则 <strong>[5]</strong>，使用 <code>schemaname.tablename</code> 的形式匹配 schemaname，然后路由到对应的 hostgroup 。</li>
+</ul>
+<ol start="7">
+<li>因为没有定义 hostgroup 0，在意外情况什么规则都没匹配上时也依旧会等待失败，所以默认规则（默认路由）返回一个错误。</li>
+</ol>
+<h1 id="5-效果演示">5. 效果演示<a hidden class="anchor" aria-hidden="true" href="#5-效果演示">#</a></h1>
+<pre tabindex="0"><code>db0 与 db15 分别在两个实例上：
+
+(ecdba@10.0.100.36:6033) [(none)]&gt; select * from db0.tbl_0;
++-----+----------------+--------+
+| fid | username       | corpid |
++-----+----------------+--------+
+|   1 | db0 aa         |      0 |
+|   2 | db0 aa         |     16 |
+|   3 | db0 autocommit |     32 |
++-----+----------------+--------+
+3 rows in set (0.00 sec)
+
+(ecdba@10.0.100.36:6033) [(none)]&gt; select * from db15.tbl_0;
++-----+-----------------------------+--------+
+| fid | username                    | corpid |
++-----+-----------------------------+--------+
+|   1 | db15 c2dfdf地方大幅度d      |     15 |
+|   2 | db15 c2dfdf地方大幅度d      |     47 |
+|   3 | db15 c2dfdf地方大幅度d      |    111 |
++-----+-----------------------------+--------+
+3 rows in set (0.00 sec)
+
+无法路由时，报错：
+(ecdba@10.0.100.36:6033) [(none)]&gt; show databases;
+ERROR 1148 (42000): No query rules matched (by ProxySQL)
+
+
+看到 rule 的命中数符合预期：
+-- proxysql admin cli
+(admin@127.0.0.1:6032) [(none)]&gt; select active,hits, mysql_query_rules.rule_id, schemaname, match_digest, match_pattern, replace_pattern,destination_hostgroup hostgroup,s.comment,flagIn,flagOUT   
+FROM mysql_query_rules NATURAL JOIN stats.stats_mysql_query_rules 
+JOIN mysql_servers s on destination_hostgroup=hostgroup_id ORDER BY mysql_query_rules.rule_id;
++--------+------+---------+--------------------+--------------+-------------------------------+-----------------+-----------+--------+---------+
+| active | hits | rule_id | schemaname         | match_digest | match_pattern                 | replace_pattern | hostgroup | flagIN | flagOUT |
++--------+------+---------+--------------------+--------------+-------------------------------+-----------------+-----------+--------+---------+
+| 1      | 3    | 20      | information_schema | NULL         | NULL                          | NULL            | NULL      | 0      | 302     |
+| 1      | 0    | 50      | NULL               | ^\(*select   | NULL                          | NULL            | NULL      | 0      | 20      |
+| 1      | 0    | 60      | NULL               | ^select      | NULL                          | NULL            | NULL      | 0      | 21      |
+| 1      | 0    | 61      | db0                | NULL         | NULL                          | NULL            | 1000      | 20     | 20      |
+| 1      | 0    | 62      | db1                | NULL         | NULL                          | NULL            | 1001      | 20     | 20      |
+| 1      | 0    | 63      | db2                | NULL         | NULL                          | NULL            | 1002      | 20     | 20      |
+| 1      | 0    | 64      | db3                | NULL         | NULL                          | NULL            | 1003      | 20     | 20      |
+....
+| 1      | 0    | 77      | db0                | NULL         | NULL                          | NULL            | 100       | 21     | 21      |
+| 1      | 0    | 78      | db1                | NULL         | NULL                          | NULL            | 101       | 21     | 21      |
+| 1      | 0    | 79      | db2                | NULL         | NULL                          | NULL            | 102       | 21     | 21      |
+| 1      | 0    | 80      | db3                | NULL         | NULL                          | NULL            | 103       | 21     | 21      |
+...
+| 1      | 0    | 92      | db15               | NULL         | NULL                          | NULL            | 103       | 21     | 21      |
+| 1      | 1    | 1000    | NULL               | NULL         | ([\s\`])db(0|4|8|12)([\.\`])  | NULL            | 100       | 302    | 302     |
+| 1      | 0    | 1001    | NULL               | NULL         | ([\s\`])db(1|5|9|13)([\.\`])  | NULL            | 101       | 302    | 302     |
+| 1      | 0    | 1002    | NULL               | NULL         | ([\s\`])db(2|6|10|14)([\.\`]) | NULL            | 102       | 302    | 302     |
+| 1      | 1    | 1003    | NULL               | NULL         | ([\s\`])db(3|7|11|15)([\.\`]) | NULL            | 103       | 302    | 302     |
+| 1      | 0    | 1404    | NULL               | NULL         | ^SELECT DATABASE\(\)$         | NULL            | NULL      | 302    | 302     |
+| 1      | 1    | 9999    | NULL               | NULL         | NULL                          | NULL            | NULL      | 302    | 302     |
++--------+------+---------+--------------------+--------------+-------------------------------+-----------------+-----------+--------+---------+
+41 rows in set (0.01 sec)
+
+mysql&gt; select rule_id,schemaname,match_digest,match_pattern,destination_hostgroup,negate_match_pattern,apply,flagIN,flagOUT,error_msg from mysql_query_rules;
+</code></pre><p>切换数据库继续：</p>
+<pre tabindex="0"><code>(ecdba@10.0.100.36:6033) [(none)]&gt; use db1;
+Database changed
+
+(ecdba@10.0.100.36:6033) [db1]&gt; select * from tbl_0;
++-----+----------+--------+
+| fid | username | corpid |
++-----+----------+--------+
+|   1 | db1 bb   |      1 |
+|   2 | db1 bb   |     17 |
+|   3 | db1 bb   |     33 |
++-----+----------+--------+
+3 rows in set (0.01 sec)
+
+(ecdba@10.0.100.36:6033) [db1]&gt; select * from `db5`.tbl_0;
++-----+--------------------+--------+
+| fid | username           | corpid |
++-----+--------------------+--------+
+|   1 | db5 ces测试 kfjd   |      5 |
++-----+--------------------+--------+
+
+db6并不在当前实例里：
+(ecdba@10.0.100.36:6033) [db1]&gt; select * from db6.tbl_0;
+ERROR 1146 (42S02): Table &#39;db6.tbl_0&#39; doesn&#39;t exist
+
+现在show databases不会再报错：
+(ecdba@10.0.100.36:6033) [db1]&gt; show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| db1                |
+| db13               |
+| db5                |
+| db9                |
+| mysql              |
+| performance_schema |
++--------------------+
+
+
+看到 stats 模块的统计信息：
+-- proxysql admin cli
+(admin@127.0.0.1:6032) [(none)]&gt; select hostgroup,schemaname,username,digest,substr(digest_text,120,-120),count_star from stats_mysql_query_digest;
++-----------+--------------------+----------+--------------------+--------------------------------------------+------------+
+| hostgroup | schemaname         | username | digest             | substr(digest_text,120,-120)               | count_star |
++-----------+--------------------+----------+--------------------+--------------------------------------------+------------+
+| 1002      | db2                | ecdba    | 0x45033ED34D21EDF5 | select * from tbl_0                        | 1          |
+| 102       | db2                | ecdba    | 0x02033E45904D3DF0 | show databases                             | 1          |
+| 102       | db2                | ecdba    | 0x99531AEFF718C501 | show tables                                | 1          |
+| 1001      | db1                | ecdba    | 0x620B328FE9D6D71A | SELECT DATABASE()                          | 1          |
+| 1001      | db1                | ecdba    | 0x903E7B5A87B51352 | select * from db6.tbl_0                    | 1          |
+| 1001      | db1                | ecdba    | 0x0CE250A1C0E2C539 | select * from `db5`.tbl_0                  | 1          |
+| 1001      | db1                | ecdba    | 0x45033ED34D21EDF5 | select * from tbl_0                        | 1          |
+| 101       | db1                | ecdba    | 0x02033E45904D3DF0 | show databases                             | 2          |
+| 102       | db2                | ecdba    | 0x6F8289B2913564A0 | update tbl_0 set username=? where corpid=? | 1          |
+| 0         | information_schema | ecdba    | 0x620B328FE9D6D71A | SELECT DATABASE()                          | 1          |
+| 101       | db1                | ecdba    | 0x99531AEFF718C501 | show tables                                | 1          |
+| 0         | information_schema | ecdba    | 0x02033E45904D3DF0 | show databases                             | 1          |
+| 1001      | db1                | ecdba    | 0x7A3428659E1BFDC2 | select * from db5.tbl_0                    | 1          |
+| 103       | information_schema | ecdba    | 0xA951EB38FA9ED6A4 | select * from db15.tbl_0                   | 1          |
+| 100       | information_schema | ecdba    | 0xA132AEDEC5932600 | select * from db0.tbl_0                    | 1          |
+| 0         | information_schema | ecdba    | 0x594F2C744B698066 | select USER()                              | 1          |
+| 0         | information_schema | ecdba    | 0x226CD90D52A2BA0B | select @@version_comment limit ?           | 1          |
++-----------+--------------------+----------+--------------------+--------------------------------------------+------------+
+17 rows in set (0.01 sec)
+</code></pre><p>达到了读写分离和分实例分库的目的。</p>
+<h1 id="6-另一种规则写法">6. 另一种规则写法<a hidden class="anchor" aria-hidden="true" href="#6-另一种规则写法">#</a></h1>
+<p>从上面可以看到，客户端应用在使用的时候，最好都要指定 database name ，上面是因为加了第 5 类规则才避免由于不指定db时所带来的问题，但始终要求对每个 分db 建立自己连接，或者查询之前 use dbname ，当然也可以在获取连接的时候，传递dbname过去，拿到带正确db的连接过来。</p>
+<p>那么其实还有一种办法，不需要指定连接db，而是采用注释 hint 的形式，传递给proxysql，然后来自动路由。将第 4 节的规则 [2],[3] 改成下面的形式：</p>
+<pre tabindex="0"><code>-- [1] read&amp;write split
+-- instance0，read &amp; write
+INSERT INTO mysql_query_rules (rule_id,active,match_pattern,apply,flagIN,flagOUT) VALUES (40,1,&#34;\/\*\s*shard_corp_mod=(0|4|8|12)\s*\*.&#34;,0,0,20);
+INSERT INTO mysql_query_rules (rule_id,active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) VALUES (50,1,&#39;^select&#39;,1000,1,20,20);
+INSERT INTO mysql_query_rules (active,match_digest,negate_match_pattern,destination_hostgroup,apply,flagIN,flagOUT) VALUES (1,&#34;^select&#34;,1,100,1,20,20);
+
+INSERT INTO mysql_query_rules (rule_id,active,match_pattern,apply,flagIN,flagOUT) VALUES (60,1,&#34;\/\*\s*shard_corp_mod=(1|5|9|13)\s*\*.&#34;,0,0,21);
+INSERT INTO mysql_query_rules (active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) VALUES (1,&#39;^select&#39;,1001,1,21,21);
+INSERT INTO mysql_query_rules (active,match_digest,negate_match_pattern,destination_hostgroup,apply,flagIN,flagOUT) VALUES (1,&#34;^select&#34;,1,101,1,21,21);
+
+INSERT INTO mysql_query_rules (rule_id,active,match_pattern,apply,flagIN,flagOUT) VALUES (70,1,&#34;\/\*\s*shard_corp_mod=(2|6|10|14)\s*\*.&#34;,0,0,22);
+INSERT INTO mysql_query_rules (active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) VALUES (1,&#39;^select&#39;,1002,1,22,22);
+INSERT INTO mysql_query_rules (active,match_digest,negate_match_pattern,destination_hostgroup,apply,flagIN,flagOUT) VALUES (1,&#34;^select&#34;,1,102,1,22,22);
+
+INSERT INTO mysql_query_rules (rule_id,active,match_pattern,apply,flagIN,flagOUT) VALUES (80,1,&#34;\/\*\s*shard_corp_mod=(3|7|11|15)\s*\*.&#34;,0,0,23);
+INSERT INTO mysql_query_rules (active,match_digest,destination_hostgroup,apply,flagIN,flagOUT) VALUES (1,&#39;^select&#39;,1003,1,23,23);
+INSERT INTO mysql_query_rules (active,match_digest,negate_match_pattern,destination_hostgroup,apply,flagIN,flagOUT) VALUES (1,&#34;^select&#34;,1,103,1,23,23);
+
+-- [2] no /* shard_corp_mod=? */ given
+insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN) values(1000,1,&#39;([\s\`])db(0|4|8|12)([\.\`])&#39;,100,1,0);
+insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN) values(1001,1,&#39;([\s\`])db(1|5|9|13)([\.\`])&#39;,101,1,0);
+insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN) values(1002,1,&#39;([\s\`])db(2|6|10|14)([\.\`])&#39;,102,1,0);
+insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply,flagIN) values(1003,1,&#39;([\s\`])db(3|7|11|15)([\.\`])&#39;,103,1,0);
+
+-- [3] wrong usage
+insert into mysql_query_rules(rule_id,active,schemaname,match_digest,apply,flagIN,error_msg,comment) 
+  values(1404,1,&#39;information_schema&#39;,&#39;^SELECT DATABASE\(\)$&#39;,1,0,&#39;You should specify schema name first&#39;, &#39;use db0 Take long when no schema given for connection&#39;);
+
+-- [7] default route
+insert into mysql_query_rules(rule_id,active,apply, flagIN,error_msg,comment) values(9999,1,1, 0,&#39;No query rules matched (by ProxySQL)&#39;, &#34;Don&#39;t define the default hostgroup 0 for ME&#34;);
+
+-- [8]
+LOAD MYSQL QUERY RULES TO RUN;
+SAVE MYSQL QUERY RULES TO DISK;
+</code></pre><p>注意这里[2][3]用的是 <code>match_pattern</code>，而上节用的是<code>match_digest</code>，因为proxysql在处理fingerprint的时候，会去掉注释。如果在命令行测试，要加 <code>-c</code> 避免 HINT 被过滤掉。</p>
+<p>使用时Hint放sql最后面，每个sql都要带mod或者指定实例：<code>select * from db5.tbl_0 /* shard_corp_mod=5 */</code>，真正实施起来，应用端的复杂度以及proxysql的性能，还是有待考虑的。</p>
+<p>关于这些路由规则的写法对ProxySQL性能的影响，欢迎继续阅读这边文章 <a href="http://xgknight.com/2017/04/20/mysql-proxysql-performance-test/">ProxySQL之性能测试对比</a></p>
+<p>参考：</p>
+<ul>
+<li><a href="https://severalnines.com/blog/how-proxysql-adds-failover-and-query-control-your-mysql-replication-setup">https://severalnines.com/blog/how-proxysql-adds-failover-and-query-control-your-mysql-replication-setup</a></li>
+<li><a href="https://www.percona.com/blog/2016/08/30/mysql-sharding-with-proxysql/">https://www.percona.com/blog/2016/08/30/mysql-sharding-with-proxysql/</a></li>
+</ul>
+<hr>
+<p>原文连接地址：http://xgknight.com/2017/04/17/mysql-proxysql-route-rw_split/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/%E4%B8%AD%E9%97%B4%E4%BB%B6/">中间件</a></li>
+      <li><a href="http://xgknight.com/tags/proxysql/">proxysql</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

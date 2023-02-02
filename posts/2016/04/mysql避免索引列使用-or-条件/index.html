@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>MySQL避免索引列使用 OR 条件 | Sean Note</title>
+<meta name="keywords" content="mysql, SQL优化">
+<meta name="description" content="这个亏已经吃过很多次了，在开发以前的sql代码里面，许多以 or 作为where条件的查询，甚至更新。这里举例来说明使用 or 的弊端，以及改进办法。
+select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 926067 and (f_mobile =&#39;1234567891&#39; or f_phone =&#39;1234567891&#39; ) limit 1 从查询语句很容易看出，f_mobile和f_phone两个字段都有可能存电话号码，一般思路都是用 or 去一条sql解决，但表数据量一大简直是灾难： t_tbanme1上有索引idx_id_mobile(f_xxx_id,f_mobile), idx_phone(f_phone),idx_id_email(f_id,f_email)，explain 的结果却使用了 idx_id_email 索引，有时候运气好可能走 idx_id_mobile f_xxx_id
+因为mysql的每条查询，每个表上只能选择一个索引。如果使用了 idx_id_mobile 索引，恰好有一条数据，因为有 limit 1 ，那么恭喜很快得到结果；但如果 f_mobile 没有数据，那 f_phone 字段只能在f_id条件下挨个查找，扫描12w行。 or 跟 and 不一样，甚至有开发认为添加 (f_xxx_id,f_mobile,f_phone)不就完美了吗，要吐血了~
+那么优化sql呢，很简单（注意f_mobile,f_phone上都要有相应的索引），方法一：
+(select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 900000 and f_mobile =&#39;1234567891&#39; limit 1 ) UNION ALL (select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 900000 and f_phone =&#39;1234567891&#39; limit 1 ) 两条独立的sql都能用上索引，分查询各自limit，如果都有结果集返回，随便取一条就行。">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2016/04/mysql%E9%81%BF%E5%85%8D%E7%B4%A2%E5%BC%95%E5%88%97%E4%BD%BF%E7%94%A8-or-%E6%9D%A1%E4%BB%B6/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="MySQL避免索引列使用 OR 条件" />
+<meta property="og:description" content="这个亏已经吃过很多次了，在开发以前的sql代码里面，许多以 or 作为where条件的查询，甚至更新。这里举例来说明使用 or 的弊端，以及改进办法。
+select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 926067 and (f_mobile =&#39;1234567891&#39; or f_phone =&#39;1234567891&#39; ) limit 1 从查询语句很容易看出，f_mobile和f_phone两个字段都有可能存电话号码，一般思路都是用 or 去一条sql解决，但表数据量一大简直是灾难： t_tbanme1上有索引idx_id_mobile(f_xxx_id,f_mobile), idx_phone(f_phone),idx_id_email(f_id,f_email)，explain 的结果却使用了 idx_id_email 索引，有时候运气好可能走 idx_id_mobile f_xxx_id
+因为mysql的每条查询，每个表上只能选择一个索引。如果使用了 idx_id_mobile 索引，恰好有一条数据，因为有 limit 1 ，那么恭喜很快得到结果；但如果 f_mobile 没有数据，那 f_phone 字段只能在f_id条件下挨个查找，扫描12w行。 or 跟 and 不一样，甚至有开发认为添加 (f_xxx_id,f_mobile,f_phone)不就完美了吗，要吐血了~
+那么优化sql呢，很简单（注意f_mobile,f_phone上都要有相应的索引），方法一：
+(select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 900000 and f_mobile =&#39;1234567891&#39; limit 1 ) UNION ALL (select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 900000 and f_phone =&#39;1234567891&#39; limit 1 ) 两条独立的sql都能用上索引，分查询各自limit，如果都有结果集返回，随便取一条就行。" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2016/04/mysql%E9%81%BF%E5%85%8D%E7%B4%A2%E5%BC%95%E5%88%97%E4%BD%BF%E7%94%A8-or-%E6%9D%A1%E4%BB%B6/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2016-04-05T16:32:49+00:00" />
+<meta property="article:modified_time" content="2016-04-05T16:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="MySQL避免索引列使用 OR 条件"/>
+<meta name="twitter:description" content="这个亏已经吃过很多次了，在开发以前的sql代码里面，许多以 or 作为where条件的查询，甚至更新。这里举例来说明使用 or 的弊端，以及改进办法。
+select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 926067 and (f_mobile =&#39;1234567891&#39; or f_phone =&#39;1234567891&#39; ) limit 1 从查询语句很容易看出，f_mobile和f_phone两个字段都有可能存电话号码，一般思路都是用 or 去一条sql解决，但表数据量一大简直是灾难： t_tbanme1上有索引idx_id_mobile(f_xxx_id,f_mobile), idx_phone(f_phone),idx_id_email(f_id,f_email)，explain 的结果却使用了 idx_id_email 索引，有时候运气好可能走 idx_id_mobile f_xxx_id
+因为mysql的每条查询，每个表上只能选择一个索引。如果使用了 idx_id_mobile 索引，恰好有一条数据，因为有 limit 1 ，那么恭喜很快得到结果；但如果 f_mobile 没有数据，那 f_phone 字段只能在f_id条件下挨个查找，扫描12w行。 or 跟 and 不一样，甚至有开发认为添加 (f_xxx_id,f_mobile,f_phone)不就完美了吗，要吐血了~
+那么优化sql呢，很简单（注意f_mobile,f_phone上都要有相应的索引），方法一：
+(select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 900000 and f_mobile =&#39;1234567891&#39; limit 1 ) UNION ALL (select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 900000 and f_phone =&#39;1234567891&#39; limit 1 ) 两条独立的sql都能用上索引，分查询各自limit，如果都有结果集返回，随便取一条就行。"/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "MySQL避免索引列使用 OR 条件",
+      "item": "http://xgknight.com/posts/2016/04/mysql%E9%81%BF%E5%85%8D%E7%B4%A2%E5%BC%95%E5%88%97%E4%BD%BF%E7%94%A8-or-%E6%9D%A1%E4%BB%B6/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "MySQL避免索引列使用 OR 条件",
+  "name": "MySQL避免索引列使用 OR 条件",
+  "description": "这个亏已经吃过很多次了，在开发以前的sql代码里面，许多以 or 作为where条件的查询，甚至更新。这里举例来说明使用 or 的弊端，以及改进办法。\nselect f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 926067 and (f_mobile =\u0026#39;1234567891\u0026#39; or f_phone =\u0026#39;1234567891\u0026#39; ) limit 1 从查询语句很容易看出，f_mobile和f_phone两个字段都有可能存电话号码，一般思路都是用 or 去一条sql解决，但表数据量一大简直是灾难： t_tbanme1上有索引idx_id_mobile(f_xxx_id,f_mobile), idx_phone(f_phone),idx_id_email(f_id,f_email)，explain 的结果却使用了 idx_id_email 索引，有时候运气好可能走 idx_id_mobile f_xxx_id\n因为mysql的每条查询，每个表上只能选择一个索引。如果使用了 idx_id_mobile 索引，恰好有一条数据，因为有 limit 1 ，那么恭喜很快得到结果；但如果 f_mobile 没有数据，那 f_phone 字段只能在f_id条件下挨个查找，扫描12w行。 or 跟 and 不一样，甚至有开发认为添加 (f_xxx_id,f_mobile,f_phone)不就完美了吗，要吐血了~\n那么优化sql呢，很简单（注意f_mobile,f_phone上都要有相应的索引），方法一：\n(select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 900000 and f_mobile =\u0026#39;1234567891\u0026#39; limit 1 ) UNION ALL (select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 900000 and f_phone =\u0026#39;1234567891\u0026#39; limit 1 ) 两条独立的sql都能用上索引，分查询各自limit，如果都有结果集返回，随便取一条就行。",
+  "keywords": [
+    "mysql", "SQL优化"
+  ],
+  "articleBody": "这个亏已经吃过很多次了，在开发以前的sql代码里面，许多以 or 作为where条件的查询，甚至更新。这里举例来说明使用 or 的弊端，以及改进办法。\nselect f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 926067 and (f_mobile ='1234567891' or f_phone ='1234567891' ) limit 1 从查询语句很容易看出，f_mobile和f_phone两个字段都有可能存电话号码，一般思路都是用 or 去一条sql解决，但表数据量一大简直是灾难： t_tbanme1上有索引idx_id_mobile(f_xxx_id,f_mobile), idx_phone(f_phone),idx_id_email(f_id,f_email)，explain 的结果却使用了 idx_id_email 索引，有时候运气好可能走 idx_id_mobile f_xxx_id\n因为mysql的每条查询，每个表上只能选择一个索引。如果使用了 idx_id_mobile 索引，恰好有一条数据，因为有 limit 1 ，那么恭喜很快得到结果；但如果 f_mobile 没有数据，那 f_phone 字段只能在f_id条件下挨个查找，扫描12w行。 or 跟 and 不一样，甚至有开发认为添加 (f_xxx_id,f_mobile,f_phone)不就完美了吗，要吐血了~\n那么优化sql呢，很简单（注意f_mobile,f_phone上都要有相应的索引），方法一：\n(select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 900000 and f_mobile ='1234567891' limit 1 ) UNION ALL (select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 900000 and f_phone ='1234567891' limit 1 ) 两条独立的sql都能用上索引，分查询各自limit，如果都有结果集返回，随便取一条就行。\n还有一种优化办法，如果这种查询特别频繁（又无缓存），改成单独的sql执行，比如大部分号码值都在f_mobile上，那就先执行分sql1，有结果则结束，判断没有结果再执行分sql2 ，能减少数据库查询速度，让代码去处理更多的事情，方法二伪代码：\nsql1 = select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 900000 and f_mobile ='1234567891' limit 1; sq1.execute(); if no result sql1: sql1 = select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 900000 and f_phone ='1234567891' limit 1; sql1.execute(); 复杂一点的场景是止返回一条记录那么简单，limit 2：\nselect a.f_crm_id from d_dbname1.t_tbname1 as a where (a.f_create_time \u003e from_unixtime('1464107527') or a.f_modify_time \u003e from_unixtime('1464107527') ) limit 0,200 这种情况方法一、二都需要改造，因为 f_create_time，f_modify_time 都可能均满足判断条件，这样就会返回重复的数据。\n方法一需要改造：\n(select a.f_crm_id from d_dbname1.t_tbname1 as a where a.f_create_time \u003e from_unixtime('1464397527') limit 0,200 ) UNION ALL (select a.f_crm_id from d_dbname1.t_tbname1 as a where a.f_modify_time \u003e from_unixtime('1464397527') and a.f_create_time \u003c= from_unixtime('1464397527') limit 0,200 ) 有人说 把 UNION ALL 改成 UNION 不就去重了吗？如果说查询比较频繁，或者limit比较大，数据库还是会有压力，所以需要做trade off。\n这种情况更多还是适合方法二，包括有可能需要 order by limit 情况。改造伪代码：\nsql1 = (select a.f_crm_id from d_dbname1.t_tbname1 as a where a.f_create_time \u003e from_unixtime('1464397527') limit 0,200 ); sql1.execute(); sql1_count = sql1.result.count if sql1_count \u003c 200 : sql2 = (select a.f_crm_id from d_dbname1.t_tbname1 as a where a.f_modify_time \u003e from_unixtime('1464397527') and a.f_create_time \u003c= from_unixtime('1464397527') limit 0, (200 - sql1_count) ); sql2.execute(); final_result = paste(sql1,sql2); or条件在数据库上很难优化，能在代码里优化逻辑，不至于拖垮数据库。只有在 or 条件下无需索引时（且需要比较的数据量小），才考虑。\n相同字段 or 可改成 in，如 f_id=1 or f_id=100 -\u003e f_id in (1,100)。 效率问题见文章 mysql中or和in的效率问题 。\n上述优化情景都是存储引擎在 InnoDB 情况下，在MyISAM有不同，见mysql or条件可以使用索引而避免全表 。\n原文链接地址：http://xgknight.com/2016/04/05/mysql-avoid-or-query/\n",
+  "wordCount" : "258",
+  "inLanguage": "en",
+  "datePublished": "2016-04-05T16:32:49Z",
+  "dateModified": "2016-04-05T16:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2016/04/mysql%E9%81%BF%E5%85%8D%E7%B4%A2%E5%BC%95%E5%88%97%E4%BD%BF%E7%94%A8-or-%E6%9D%A1%E4%BB%B6/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      MySQL避免索引列使用 OR 条件
+    </h1>
+    <div class="post-meta"><span title='2016-04-05 16:32:49 +0000 UTC'>April 5, 2016</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>这个亏已经吃过很多次了，在开发以前的sql代码里面，许多以 or 作为where条件的查询，甚至更新。这里举例来说明使用 or 的弊端，以及改进办法。</p>
+<pre tabindex="0"><code>select f_crm_id from d_dbname1.t_tbname1 where  f_xxx_id = 926067  
+and (f_mobile =&#39;1234567891&#39; or f_phone =&#39;1234567891&#39; ) limit 1
+</code></pre><p>从查询语句很容易看出，f_mobile和f_phone两个字段都有可能存电话号码，一般思路都是用 or 去一条sql解决，但表数据量一大简直是灾难：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-avoid-or-1.png" alt=""  />
+</p>
+<p>t_tbanme1上有索引<code>idx_id_mobile(f_xxx_id,f_mobile)</code>, <code>idx_phone(f_phone)</code>,<code>idx_id_email(f_id,f_email)</code>，explain 的结果却使用了 idx_id_email 索引，有时候运气好可能走 idx_id_mobile f_xxx_id</p>
+<p><strong>因为mysql的每条查询，每个表上只能选择一个索引</strong>。如果使用了 idx_id_mobile 索引，恰好有一条数据，因为有 limit 1 ，那么恭喜很快得到结果；但如果 f_mobile 没有数据，那 f_phone 字段只能在f_id条件下挨个查找，扫描12w行。 or 跟 and 不一样，甚至有开发认为添加 <code>(f_xxx_id,f_mobile,f_phone)</code>不就完美了吗，要吐血了~</p>
+<!-- raw HTML omitted -->
+<p>那么优化sql呢，很简单（<strong>注意f_mobile,f_phone上都要有相应的索引</strong>），<strong>方法一</strong>：</p>
+<pre tabindex="0"><code>(select f_crm_id from d_dbname1.t_tbname1 where  f_xxx_id = 900000  and f_mobile =&#39;1234567891&#39; limit 1 )
+UNION ALL 
+(select f_crm_id from d_dbname1.t_tbname1 where  f_xxx_id = 900000  and f_phone =&#39;1234567891&#39; limit 1 )
+</code></pre><p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-avoid-or-2.png" alt=""  />
+</p>
+<p>两条独立的sql都能用上索引，分查询各自limit，如果都有结果集返回，随便取一条就行。</p>
+<p>还有一种优化办法，如果这种查询特别频繁（又无缓存），改成单独的sql执行，比如大部分号码值都在f_mobile上，那就先执行分sql1，有结果则结束，判断没有结果再执行分sql2 ，能减少数据库查询速度，让代码去处理更多的事情，<strong>方法二</strong>伪代码：</p>
+<pre tabindex="0"><code>sql1 = select f_crm_id from d_dbname1.t_tbname1 where  f_xxx_id = 900000  and f_mobile =&#39;1234567891&#39; limit 1;
+sq1.execute();
+if no result sql1:
+  sql1 = select f_crm_id from d_dbname1.t_tbname1 where  f_xxx_id = 900000  and f_phone =&#39;1234567891&#39; limit 1;
+    sql1.execute();
+</code></pre><hr>
+<p>复杂一点的场景是止返回一条记录那么简单，limit 2：</p>
+<pre tabindex="0"><code>select a.f_crm_id from d_dbname1.t_tbname1 as a 
+where (a.f_create_time &gt; from_unixtime(&#39;1464107527&#39;) or a.f_modify_time &gt; from_unixtime(&#39;1464107527&#39;) )
+limit 0,200
+</code></pre><p>这种情况方法一、二都需要改造，因为 f_create_time，f_modify_time 都可能均满足判断条件，这样就会返回重复的数据。</p>
+<p>方法一需要改造：</p>
+<pre tabindex="0"><code>(select a.f_crm_id from d_dbname1.t_tbname1 as a 
+where a.f_create_time &gt; from_unixtime(&#39;1464397527&#39;)
+limit 0,200 )
+UNION ALL
+(select a.f_crm_id from d_dbname1.t_tbname1 as a 
+where a.f_modify_time &gt; from_unixtime(&#39;1464397527&#39;) and a.f_create_time &lt;= from_unixtime(&#39;1464397527&#39;)
+limit 0,200 )
+</code></pre><p>有人说 把 UNION ALL 改成 UNION 不就去重了吗？如果说查询比较频繁，或者limit比较大，数据库还是会有压力，所以需要做trade off。</p>
+<p>这种情况更多还是适合方法二，包括有可能需要 order by limit 情况。改造伪代码：</p>
+<pre tabindex="0"><code>sql1 = (select a.f_crm_id from d_dbname1.t_tbname1 as a where a.f_create_time &gt; from_unixtime(&#39;1464397527&#39;) limit 0,200 );
+sql1.execute();
+sql1_count = sql1.result.count
+if sql1_count &lt; 200 :
+  sql2 = (select a.f_crm_id from d_dbname1.t_tbname1 as a where a.f_modify_time &gt; from_unixtime(&#39;1464397527&#39;) and a.f_create_time &lt;= from_unixtime(&#39;1464397527&#39;) limit 0, (200 - sql1_count) );
+  sql2.execute();
+
+final_result = paste(sql1,sql2);
+</code></pre><p>or条件在数据库上很难优化，能在代码里优化逻辑，不至于拖垮数据库。只有在 or 条件下无需索引时（且需要比较的数据量小），才考虑。</p>
+<p>相同字段 or 可改成 in，如 <code>f_id=1 or f_id=100</code> -&gt; <code>f_id in (1,100)</code>。 效率问题见文章 <a href="http://blog.chinaunix.net/uid-20639775-id-3416737.html">mysql中or和in的效率问题</a> 。</p>
+<p>上述优化情景都是存储引擎在 InnoDB 情况下，在MyISAM有不同，见<a href="http://blog.csdn.net/hguisu/article/details/7106159">mysql or条件可以使用索引而避免全表</a> 。</p>
+<hr>
+<p>原文链接地址：http://xgknight.com/2016/04/05/mysql-avoid-or-query/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/sql%E4%BC%98%E5%8C%96/">SQL优化</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

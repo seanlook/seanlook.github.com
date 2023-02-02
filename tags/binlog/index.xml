@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>binlog on Sean Note</title>
+    <link>http://xgknight.com/tags/binlog/</link>
+    <description>Recent content in binlog on Sean Note</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Thu, 25 Jan 2018 15:32:49 +0000</lastBuildDate><atom:link href="http://xgknight.com/tags/binlog/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Binlog可视化搜索：实现类似阿里RDS数据追踪功能</title>
+      <link>http://xgknight.com/posts/2018/01/binlog%E5%8F%AF%E8%A7%86%E5%8C%96%E6%90%9C%E7%B4%A2%E5%AE%9E%E7%8E%B0%E7%B1%BB%E4%BC%BC%E9%98%BF%E9%87%8Crds%E6%95%B0%E6%8D%AE%E8%BF%BD%E8%B8%AA%E5%8A%9F%E8%83%BD/</link>
+      <pubDate>Thu, 25 Jan 2018 15:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2018/01/binlog%E5%8F%AF%E8%A7%86%E5%8C%96%E6%90%9C%E7%B4%A2%E5%AE%9E%E7%8E%B0%E7%B1%BB%E4%BC%BC%E9%98%BF%E9%87%8Crds%E6%95%B0%E6%8D%AE%E8%BF%BD%E8%B8%AA%E5%8A%9F%E8%83%BD/</guid>
+      <description>MySQL Binlog 里面记录了每行数据的变更，开发有时候需要根据这些变更的时间、中间值去查问题，是bug导致的，还是用户操作引发的。然而原始binlog内容不利于检索，有段时间使用阿里RDS企业版DMS数据追踪的功能，也能完成这个工作，甚至生成回滚sql，后由于收费以及容量不够的缘故，放弃不用。
+本文所介绍的就是基于外面开源的各类组件，整合起来，达到类似数据追踪的功能 —— binlog 可视化。 功能类似：10分钟搭建MySQL Binlog分析+可视化方案
+1. 主要技术 项目地址： https://github.com/seanlook/maxwell-graylog
+docker
+使用容器来实现资源的申请和释放，毕竟这类检索binlog内容的需求不多。 本文基于阿里云的容器服务。
+maxwell
+从mysql server获取binlog和字段信息，组装成json流。建议先阅读 http://xgknight.com/2018/01/13/maxwell-binlog/
+官网：http://maxwells-daemon.io/
+graylog
+代替ELK技术栈的日志收集、处理、展示平台。社区版够用，需要自行安装，也可以把 graylog 换成 ELK stack。
+官网：https://www.graylog.org/
+nxlog
+nxlog 是用 C 语言写的一个开源日志收集处理软件，它是一个模块化、多线程、高性能的日志管理解决方案，支持多平台。
+参考：http://blog.csdn.net/weixin_29477879/article/details/52183746
+rabbitmq
+一款开源消息队列中间件，采用Erlang语言开发，RabbitMQ是AMQP(Advanced Message Queueing Protocol)的标准实现。建议先阅读 http://xgknight.com/2018/01/06/rabbitmq-introduce/ 。
+你也可以把消息队列换成kafka。
+2. 使用说明 2.1 举例 查看 some3 库 2018-01-22 13:00:00 ~ 2018-01-22 13:00:00 之间，表 t_ecsome_detail 的binlog变化，graylog根据AMQP协议从rabbitmq取binlog json流
+提前创建一个 Swarm容器集群，名字叫 maxwell。
+在【编排模板】里选择 maxwell-graylog-rabbitmq，【创建应用】下一步修改编排模板： （只修改 environment 里面的变量值）
+mysql-binlogsvr: image: registry-vpc.cn-hangzhou.aliyuncs.com/workec/mysql_binlogsvr:1.1.3 volumes: - maxwellgraylog_db_data:/var/lib/mysql environment: DBINSTANCE_ID: rm-bp19t9it7c2998633 START_TIME: &amp;#39;2018-01-22 13:00:00&amp;#39; END_TIME: &amp;#39;2018-01-22 14:00:00&amp;#39; ACCESS_ID: LTAIXKHm0v6ob5P4 ACCESS_SECRET: F7g***************Nll19no MYSQL_ROOT_PASSWORD: strongpassword maxwell-svr: image: registry-vpc.</description>
+    </item>
+    
+    <item>
+      <title>基于MySQL binlog增量数据同步方案(maxwell&#43;rabbimt&#43;pydbsync)</title>
+      <link>http://xgknight.com/posts/2018/01/%E5%9F%BA%E4%BA%8Emysql-binlog%E5%A2%9E%E9%87%8F%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5%E6%96%B9%E6%A1%88maxwell-rabbimt-pydbsync/</link>
+      <pubDate>Sun, 14 Jan 2018 15:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2018/01/%E5%9F%BA%E4%BA%8Emysql-binlog%E5%A2%9E%E9%87%8F%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5%E6%96%B9%E6%A1%88maxwell-rabbimt-pydbsync/</guid>
+      <description>应用场景：同 http://xgknight.com/2017/09/05/mysql-binlog-subscribe-simple-for-dba/ ，但更灵活：
+实时同步部分表到另外一个数据库实例 比如在数据库迁库时，将当天表的数据同步到新库，模拟阿里云dms数据传输的功能，相当于在测试环境演练，减少失误。 另外还可以从新库反向同步增量数据到老库，解决测试环境多项目测试引起数据库冲突的问题。
+正式切库时的回滚措施 比如数据库迁移项目，切换期间数据写向新库，但如果切换失败需要回滚到老库，就需要把这段时间新增的数据同步回老库（启动消费程序），这就不需要程序段再考虑复杂的回滚设计。
+数据库闪回 关于数据库误操作的闪回方案，见 文章MySQL根据离线binlog快速闪回 。binlog2sql的 -B 选项可以将sql反向组装，生产回滚sql。如果需要完善的闪回功能，要进一步开发，提高易用性。
+binlog搜索功能 目前组内一版的binlog搜索功能，是离线任务处理的方式，好处是不会占用太大空间，缺点是处理时间较长。通过实时binlog解析过滤的方式，入ES可以快速搜索。需要进一步开发完善。 结合graylog可以实现阿里云RDS类似的数据追踪功能。见 http://xgknight.com/2018/01/25/maxwell-graylog/
+rabbitmq介绍：http://xgknight.com/2018/01/06/rabbitmq-introduce/
+maxwell介绍：http://xgknight.com/2018/01/13/maxwell-binlog/
+数据已经生成，要完成 MySQL binlog 增量数据同步，还差一个消费者程序，将rabbitmq里面的消息取出来，在目标库重放：
+** https://github.com/seanlook/pydbsync ** 目前这个增量程序重放动作是：
+binlog里面 insert 和 update 行，都变成 replace into binlog里面 delele ，变成 delete ignore xxx limit 1 alter/create，原封不动 所以如果表上没有主键或者唯一索引，是非常难搞定的，原本的update变成 replace into 多插入一条数据。当然如果把 update 事件改成 update tables set f1=v1,f2=v2 where f1=v1,f2=vv2 limit 1 也没毛病。
+使用python3，安装rabbitmq 的python客户端即可：pip install pika
+config.py
+增量程序的配置文件
+db_info: 指定要写入的目标db rabbitmq_conn_info: 增量数据的来源，rabbitmq连接信息 rabbitmq_queue_bind: 指定怎么划分队列</description>
+    </item>
+    
+    <item>
+      <title>自建Binlog订阅服务 —— Maxwell</title>
+      <link>http://xgknight.com/posts/2018/01/%E8%87%AA%E5%BB%BAbinlog%E8%AE%A2%E9%98%85%E6%9C%8D%E5%8A%A1-maxwell/</link>
+      <pubDate>Sat, 13 Jan 2018 15:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2018/01/%E8%87%AA%E5%BB%BAbinlog%E8%AE%A2%E9%98%85%E6%9C%8D%E5%8A%A1-maxwell/</guid>
+      <description>1. 介绍 Maxwell 是java语言编写的能够读取、解析MySQL binlog，将行更新以json格式发送到 Kafka、RabbitMQ、AWS Kinesis、Google Cloud Pub/Sub、文件，有了增量的数据流，可以想象的应用场景实在太多了，如ETL、维护缓存、收集表级别的dml指标、增量到搜索引擎、数据分区迁移、切库binlog回滚方案，等等。
+它还提供其它功能：
+支持SELECT * FROM table 的方式做全量数据初始化 支持主库发生failover后，自动恢复binlog位置（GTID） 灵活的对数据进行分区，解决数据倾斜的问题。kafka支持 database, table, column等级别的数据分区 它的实现方式是伪装成MySQL Server的从库，接收binlog events，然后根据schemas信息拼装，支持ddl,xid,rows等各种event. maxwell由 zendesk 开源：https://github.com/zendesk/maxwell ，而且维护者相当活跃。
+网上已有人对 Alibaba Cannal, Zendesk Maxwell, Yelp mysql_streamer进行对比，见文后参考 实时抓取MySQL的更新数据到Hadoop。
+类似功能的还有：http://debezium.io/docs/connectors/mysql/
+安装 使用 maxwell 非常简单，只需要jdk环境
+yum install -y java-1.8.0-openjdk-1.8.0.121-1.b13.el6.x86_64 curl -sLo - https://github.com/zendesk/maxwell/releases/download/v1.12.0/maxwell-1.12.0.tar.gz \ | tar zxvf - cd maxwell-1.12.0 # 默认寻找当前目录下的 config.properties 配置文件 要求 mysql server binlog格式是 ROW， row_image 是 FULL。感受一下输出结果
+mysql&amp;gt; update test.e set m = 5.</description>
+    </item>
+    
+  </channel>
+</rss>

@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>使用sysbench对mysql压力测试 | Sean Note</title>
+<meta name="keywords" content="mysql, sysbench">
+<meta name="description" content="sysbench是一个模块化的、跨平台、多线程基准测试工具，主要用于评估测试各种不同系统参数下的数据库负载情况。关于这个项目的详细介绍请看：https://github.com/akopytov/sysbench 。 它主要包括以下几种方式的测试：
+cpu性能 磁盘io性能 调度程序性能 内存分配及传输速度 POSIX线程性能 数据库性能(OLTP基准测试) sysbench的数据库OLTP测试支持MySQL、PostgreSQL、Oracle，目前主要用于Linux操作系统，开源社区已经将sysbench移植到了Windows，并支持SQL Server的基准测试。
+废话不多说，开始。
+1. sysbench安装 mysql版本: mysql-community-server-5.6.29 OS: CentOS 6.7 X86_64 sysbench 0.5相比0.4版本有一些变化，包括oltp测试结合了lua脚本，还多了一些隐藏选项，本文会涉及得到一部分。 目前许多仓库里已编译好的二进制sysbench还是0.4.x版本，不过现在主流也还是github上的0.5，可以从 这里下载0.5版本的rpm包直接安装，不过我选择自己编译，因为只有这个办法是通用的。
+// 先安装编译依赖环境 $ sudo yum install gcc gcc-c&#43;&#43; automake make libtool mysql-community-devel $ cd /tmp &amp;&amp; git clone https://github.com/akopytov/sysbench.git $ cd /tmp/sysbench &amp;&amp; ./autogen.sh $ ./configure --prefix=/usr/local/sysbench-0.5 $ ./make &amp;&amp; sudo make install // 0.5版本需要oltp.lua测试脚本 // 如果是rpm包方式安装的，在 /usr/share/doc/sysbench/tests/db/ 下可找到 $ cd /usr/local/sysbench &amp;&amp; sudo mkdir -p share/tests/db $ cp /tmp/sysbench/sysbench/tests/db/*.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2016/03/%E4%BD%BF%E7%94%A8sysbench%E5%AF%B9mysql%E5%8E%8B%E5%8A%9B%E6%B5%8B%E8%AF%95/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="使用sysbench对mysql压力测试" />
+<meta property="og:description" content="sysbench是一个模块化的、跨平台、多线程基准测试工具，主要用于评估测试各种不同系统参数下的数据库负载情况。关于这个项目的详细介绍请看：https://github.com/akopytov/sysbench 。 它主要包括以下几种方式的测试：
+cpu性能 磁盘io性能 调度程序性能 内存分配及传输速度 POSIX线程性能 数据库性能(OLTP基准测试) sysbench的数据库OLTP测试支持MySQL、PostgreSQL、Oracle，目前主要用于Linux操作系统，开源社区已经将sysbench移植到了Windows，并支持SQL Server的基准测试。
+废话不多说，开始。
+1. sysbench安装 mysql版本: mysql-community-server-5.6.29 OS: CentOS 6.7 X86_64 sysbench 0.5相比0.4版本有一些变化，包括oltp测试结合了lua脚本，还多了一些隐藏选项，本文会涉及得到一部分。 目前许多仓库里已编译好的二进制sysbench还是0.4.x版本，不过现在主流也还是github上的0.5，可以从 这里下载0.5版本的rpm包直接安装，不过我选择自己编译，因为只有这个办法是通用的。
+// 先安装编译依赖环境 $ sudo yum install gcc gcc-c&#43;&#43; automake make libtool mysql-community-devel $ cd /tmp &amp;&amp; git clone https://github.com/akopytov/sysbench.git $ cd /tmp/sysbench &amp;&amp; ./autogen.sh $ ./configure --prefix=/usr/local/sysbench-0.5 $ ./make &amp;&amp; sudo make install // 0.5版本需要oltp.lua测试脚本 // 如果是rpm包方式安装的，在 /usr/share/doc/sysbench/tests/db/ 下可找到 $ cd /usr/local/sysbench &amp;&amp; sudo mkdir -p share/tests/db $ cp /tmp/sysbench/sysbench/tests/db/*." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2016/03/%E4%BD%BF%E7%94%A8sysbench%E5%AF%B9mysql%E5%8E%8B%E5%8A%9B%E6%B5%8B%E8%AF%95/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2016-03-28T16:32:49+00:00" />
+<meta property="article:modified_time" content="2016-03-28T16:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="使用sysbench对mysql压力测试"/>
+<meta name="twitter:description" content="sysbench是一个模块化的、跨平台、多线程基准测试工具，主要用于评估测试各种不同系统参数下的数据库负载情况。关于这个项目的详细介绍请看：https://github.com/akopytov/sysbench 。 它主要包括以下几种方式的测试：
+cpu性能 磁盘io性能 调度程序性能 内存分配及传输速度 POSIX线程性能 数据库性能(OLTP基准测试) sysbench的数据库OLTP测试支持MySQL、PostgreSQL、Oracle，目前主要用于Linux操作系统，开源社区已经将sysbench移植到了Windows，并支持SQL Server的基准测试。
+废话不多说，开始。
+1. sysbench安装 mysql版本: mysql-community-server-5.6.29 OS: CentOS 6.7 X86_64 sysbench 0.5相比0.4版本有一些变化，包括oltp测试结合了lua脚本，还多了一些隐藏选项，本文会涉及得到一部分。 目前许多仓库里已编译好的二进制sysbench还是0.4.x版本，不过现在主流也还是github上的0.5，可以从 这里下载0.5版本的rpm包直接安装，不过我选择自己编译，因为只有这个办法是通用的。
+// 先安装编译依赖环境 $ sudo yum install gcc gcc-c&#43;&#43; automake make libtool mysql-community-devel $ cd /tmp &amp;&amp; git clone https://github.com/akopytov/sysbench.git $ cd /tmp/sysbench &amp;&amp; ./autogen.sh $ ./configure --prefix=/usr/local/sysbench-0.5 $ ./make &amp;&amp; sudo make install // 0.5版本需要oltp.lua测试脚本 // 如果是rpm包方式安装的，在 /usr/share/doc/sysbench/tests/db/ 下可找到 $ cd /usr/local/sysbench &amp;&amp; sudo mkdir -p share/tests/db $ cp /tmp/sysbench/sysbench/tests/db/*."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "使用sysbench对mysql压力测试",
+      "item": "http://xgknight.com/posts/2016/03/%E4%BD%BF%E7%94%A8sysbench%E5%AF%B9mysql%E5%8E%8B%E5%8A%9B%E6%B5%8B%E8%AF%95/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "使用sysbench对mysql压力测试",
+  "name": "使用sysbench对mysql压力测试",
+  "description": "sysbench是一个模块化的、跨平台、多线程基准测试工具，主要用于评估测试各种不同系统参数下的数据库负载情况。关于这个项目的详细介绍请看：https://github.com/akopytov/sysbench 。 它主要包括以下几种方式的测试：\ncpu性能 磁盘io性能 调度程序性能 内存分配及传输速度 POSIX线程性能 数据库性能(OLTP基准测试) sysbench的数据库OLTP测试支持MySQL、PostgreSQL、Oracle，目前主要用于Linux操作系统，开源社区已经将sysbench移植到了Windows，并支持SQL Server的基准测试。\n废话不多说，开始。\n1. sysbench安装 mysql版本: mysql-community-server-5.6.29 OS: CentOS 6.7 X86_64 sysbench 0.5相比0.4版本有一些变化，包括oltp测试结合了lua脚本，还多了一些隐藏选项，本文会涉及得到一部分。 目前许多仓库里已编译好的二进制sysbench还是0.4.x版本，不过现在主流也还是github上的0.5，可以从 这里下载0.5版本的rpm包直接安装，不过我选择自己编译，因为只有这个办法是通用的。\n// 先安装编译依赖环境 $ sudo yum install gcc gcc-c++ automake make libtool mysql-community-devel $ cd /tmp \u0026amp;\u0026amp; git clone https://github.com/akopytov/sysbench.git $ cd /tmp/sysbench \u0026amp;\u0026amp; ./autogen.sh $ ./configure --prefix=/usr/local/sysbench-0.5 $ ./make \u0026amp;\u0026amp; sudo make install // 0.5版本需要oltp.lua测试脚本 // 如果是rpm包方式安装的，在 /usr/share/doc/sysbench/tests/db/ 下可找到 $ cd /usr/local/sysbench \u0026amp;\u0026amp; sudo mkdir -p share/tests/db $ cp /tmp/sysbench/sysbench/tests/db/*.",
+  "keywords": [
+    "mysql", "sysbench"
+  ],
+  "articleBody": "sysbench是一个模块化的、跨平台、多线程基准测试工具，主要用于评估测试各种不同系统参数下的数据库负载情况。关于这个项目的详细介绍请看：https://github.com/akopytov/sysbench 。 它主要包括以下几种方式的测试：\ncpu性能 磁盘io性能 调度程序性能 内存分配及传输速度 POSIX线程性能 数据库性能(OLTP基准测试) sysbench的数据库OLTP测试支持MySQL、PostgreSQL、Oracle，目前主要用于Linux操作系统，开源社区已经将sysbench移植到了Windows，并支持SQL Server的基准测试。\n废话不多说，开始。\n1. sysbench安装 mysql版本: mysql-community-server-5.6.29 OS: CentOS 6.7 X86_64 sysbench 0.5相比0.4版本有一些变化，包括oltp测试结合了lua脚本，还多了一些隐藏选项，本文会涉及得到一部分。 目前许多仓库里已编译好的二进制sysbench还是0.4.x版本，不过现在主流也还是github上的0.5，可以从 这里下载0.5版本的rpm包直接安装，不过我选择自己编译，因为只有这个办法是通用的。\n// 先安装编译依赖环境 $ sudo yum install gcc gcc-c++ automake make libtool mysql-community-devel $ cd /tmp \u0026\u0026 git clone https://github.com/akopytov/sysbench.git $ cd /tmp/sysbench \u0026\u0026 ./autogen.sh $ ./configure --prefix=/usr/local/sysbench-0.5 $ ./make \u0026\u0026 sudo make install // 0.5版本需要oltp.lua测试脚本 // 如果是rpm包方式安装的，在 /usr/share/doc/sysbench/tests/db/ 下可找到 $ cd /usr/local/sysbench \u0026\u0026 sudo mkdir -p share/tests/db $ cp /tmp/sysbench/sysbench/tests/db/*.lua share/tests/db/ $ ./bin/sysbench --version sysbench 0.5 如果需要测试PostgreSQL、Oracle，则在configure时需要加上 –with-oracle 或者 –with-pgsql 参数\n2. 使用sysbench对mysql压测 2.1 只读示例 ./bin/sysbench --test=./share/tests/db/oltp.lua \\ --mysql-host=10.0.201.36 --mysql-port=8066 --mysql-user=ecuser --mysql-password=ecuser \\ --mysql-db=dbtest1a --oltp-tables-count=10 --oltp-table-size=500000 \\ --report-interval=10 --oltp-dist-type=uniform --rand-init=on --max-requests=0 \\ --oltp-test-mode=nontrx --oltp-nontrx-mode=select \\ --oltp-read-only=on --oltp-skip-trx=on \\ --max-time=120 --num-threads=12 \\ [prepare|run|cleanup] 注意最后一行，一项测试开始前需要用prepare来准备好表和数据，run执行真正的压测，cleanup用来清除数据和表。实际prepare的表结构：\nmysql\u003e desc dbtest1a.sbtest1; +-------+------------------+------+-----+---------+----------------+ | Field | Type | Null | Key | Default | Extra | +-------+------------------+------+-----+---------+----------------+ | id | int(10) unsigned | NO | PRI | NULL | auto_increment | | k | int(10) unsigned | NO | MUL | 0 | | | c | char(120) | NO | | | | | pad | char(60) | NO | | | | +-------+------------------+------+-----+---------+----------------+ 4 rows in set (0.00 sec) 上面的测试命令代表的是：对mysql进行oltp基准测试，表数量10，每表行数约50w（几乎delete多少就会insert的多少），并且是非事务的只读测试，持续60s，并发线程数12。\n需要说明的选项：\nmysql-db=dbtest1a：测试使用的目标数据库，这个库名要事先创建\n--oltp-tables-count=10：产生表的数量\n--oltp-table-size=500000：每个表产生的记录行数\n--oltp-dist-type=uniform：指定随机取样类型，可选值有 uniform(均匀分布), Gaussian(高斯分布), special(空间分布)。默认是special\n--oltp-read-only=off：表示不止产生只读SQL，也就是使用oltp.lua时会采用读写混合模式。默认 off，如果设置为on，则不会产生update,delete,insert的sql。\n--oltp-test-mode=nontrx ：执行模式，这里是非事务式的。可选值有simple,complex,nontrx。默认是complex\nsimple：简单查询，SELECT c FROM sbtest WHERE id=N complex (advanced transactional)：事务模式在开始和结束事务之前加上begin和commit， 一个事务里可以有多个语句，如点查询、范围查询、排序查询、更新、删除、插入等，并且为了不破坏测试表的数据，该模式下一条记录删除后会在同一个事务里添加一条相同的记录。 nontrx (non-transactional)：与simple相似，但是可以进行update/insert等操作，所以如果做连续的对比压测，你可能需要重新cleanup,prepare。 --oltp-skip-trx=[on|off]：省略begin/commit语句。默认是off\n--rand-init=on：是否随机初始化数据，如果不随机化那么初始好的数据每行内容除了主键不同外其他完全相同\n--num-threads=12： 并发线程数，可以理解为模拟的客户端并发连接数\n--report-interval=10：表示每10s输出一次测试进度报告\n--max-requests=0：压力测试产生请求的总数，如果以下面的max-time来记，这个值设为0\n--max-time=120：压力测试的持续时间，这里是2分钟。\n注意，针对不同的选项取值就会有不同的子选项。比如oltp-dist-type=special，就有比如oltp-dist-pct=1、oltp-dist-res=50两个子选项，代表有50%的查询落在1%的行（即热点数据）上，另外50%均匀的(sample uniformly)落在另外99%的记录行上。\n再比如oltp-test-mode=nontrx时, 就可以有oltp-nontrx-mode，可选值有select（默认）, update_key, update_nokey, insert, delete，代表非事务式模式下使用的测试sql类型。\n以上代表的是一个只读的例子，可以把num-threads依次递增（16,36,72,128,256,512），或者调整my.cnf参数，比较效果。另外需要注意的是，大部分mysql中间件对事务的处理，默认都是把sql发到主库执行，所以只读测试需要加上oltp-skip-trx=on来跳过测试中的显式事务。\nps1: 只读测试也可以使用share/tests/db/select.lua进行，但只是简单的point select。 ps2: 我在用sysbench压的时候，在mysql后端会话里有时看到大量的query cache lock，如果使用的是uniform取样，最好把查询缓存关掉。当然如果是做两组性能对比压测，因为都受这个因素影响，关心也不大。\n2.2 混合读写 读写测试还是用oltp.lua，只需把--oltp-read-only等于off。\n./bin/sysbench --test=./share/tests/db/oltp.lua --mysql-host=10.0.201.36 --mysql-port=8066 --mysql-user=ecuser --mysql-password=ecuser --mysql-db=dbtest1a --oltp-tables-count=10 --oltp-table-size=500000 --report-interval=10 --rand-init=on --max-requests=0 --oltp-test-mode=nontrx --oltp-nontrx-mode=select --oltp-read-only=off --max-time=120 --num-threads=128 prepare ./bin/sysbench --test=./share/tests/db/oltp.lua --mysql-host=10.0.201.36 --mysql-port=8066 --mysql-user=ecuser --mysql-password=ecuser --mysql-db=dbtest1a --oltp-tables-count=10 --oltp-table-size=500000 --report-interval=10 --rand-init=on --max-requests=0 --oltp-test-mode=nontrx --oltp-nontrx-mode=select --oltp-read-only=off --max-time=120 --num-threads=128 run ./bin/sysbench --test=./share/tests/db/oltp.lua --mysql-host=10.0.201.36 --mysql-port=8066 --mysql-user=ecuser --mysql-password=ecuser --mysql-db=dbtest1a --oltp-tables-count=10 --oltp-table-size=500000 --report-interval=10 --rand-init=on --max-requests=0 --oltp-test-mode=nontrx --oltp-nontrx-mode=select --oltp-read-only=off --max-time=120 --num-threads=128 cleanup 然而oltp-test-mode=nontrx一直没有跟着我预期的去走，在mysql general log里面看到的sql记录与complex模式相同。所以上面示例中的--oltp-test-mode=nontrx --oltp-nontrx-mode=select可以删掉。\n**update: ** sysbench作者 akopytov 对我这个疑问有了回复：https://github.com/akopytov/sysbench/issues/34 ，原来sysbench 0.5版本去掉了这个选项，因为作者正在准备1.0版本，所以也就没有更新0.5版本的doc。网上的博客漫天飞，就没有一个提出来的，也是没谁了。\n分析一下oltp.lua脚本内容，可以清楚单个事务各操作的默认比例：select:update_key:update_non_key:delete:insert = 14:1:1:1:1，可通过oltp-point-selects、oltp-simple-ranges、oltp-sum-ranges、oltp-order-ranges、oltp-distinct-ranges，oltp-index-updates、oltp-non-index-updates这些选项去调整读写权重。\n同只读测试一样，在atlas,mycat这类中间件测试中如果不加oltp-skip-trx=on，那么所有查询都会发往主库，但如果在有写入的情况下使用--oltp-skip-trx=on跳过BEGIN和COMMIT，会出现问题：\nALERT: failed to execute MySQL query: INSERT INTO sbtest4 (id, k, c, pad) VALUES (48228, 47329, '82773802508-44916890724-85859319254-67627358653-96425730419-64102446666-75789993135-91202056934-68463872307-28147315305', '13146850449-23153169696-47584324044-14749610547-34267941374'): ALERT: Error 1062 Duplicate entry ‘48228’ for key ‘PRIMARY’ FATAL: failed to execute function `event’: (null)\n原因也很容易理解，每个线程将选择一个随机的表，不加事务的情况下高并发更新（插入）出现重复key的概率很大，但我们压测不在乎这些数据，所以需要跳过这个错误--mysql-ignore-errors=1062，这个问题老外有出过打补丁的方案允许--mysql-ignore-duplicates=on，但作者新加入的忽略错误码这个功能已经取代了它。mysql-ignore-errors选项是0.5版本加入的，但目前没有文档标明，也是我在github上提的 issue 作者回复的。\n这里不得不佩服老外的办事效率和责任心，提个疑惑能立马得到回复，反观国内，比如在atlas,mycat项目里提到问题到现在都没人搭理。。。\n2.3 只更新 如果基准测试的时候，你只想比较两个项目的update（或insert）效率，那可以不使用oltp脚本，而直接改用update_index.lua：\n./bin/sysbench --test=./share/tests/db/update_index.lua \\ --mysql-host=10.0.201.36 --mysql-port=8066 --mysql-user=ecuser --mysql-password=ecuser \\ --mysql-db=dbtest1a --oltp-tables-count=10 --oltp-table-size=500000 \\ --report-interval=10 --rand-init=on --max-requests=0 \\ --oltp-read-only=off --max-time=120 --num-threads=128 \\ [ prepare | run | cleanup ] 此时像oltp-read-only=off许多参数都失效了。需要说明的是这里 (非)索引更新，不是where条件根据索引去查找更新，而是更新索引列上的值。\n3. 结果解读 sysbench 0.5: multi-threaded system evaluation benchmark Running the test with following options: Number of threads: 128 Report intermediate results every 20 second(s) Initializing random number generator from timer. Random number generator seed is 0 and will be ignored Initializing worker threads... Threads started! [ 20s] threads: 128, tps: 2354.54, reads: 33035.89, writes: 9423.39, response time: 66.80ms (95%), errors: 0.00, reconnects: 0.00 [ 40s] threads: 128, tps: 2377.75, reads: 33274.26, writes: 9507.55, response time: 66.88ms (95%), errors: 0.00, reconnects: 0.00 [ 60s] threads: 128, tps: 2401.35, reads: 33615.30, writes: 9607.40, response time: 66.40ms (95%), errors: 0.00, reconnects: 0.00 [ 80s] threads: 128, tps: 2381.20, reads: 33331.50, writes: 9522.55, response time: 67.30ms (95%), errors: 0.00, reconnects: 0.00 [ 100s] threads: 128, tps: 2388.85, reads: 33446.10, writes: 9556.35, response time: 67.00ms (95%), errors: 0.00, reconnects: 0.00 [ 120s] threads: 128, tps: 2386.40, reads: 33421.35, writes: 9545.35, response time: 66.94ms (95%), errors: 0.00, reconnects: 0.00 OLTP test statistics: queries performed: read: 4003048 //总select数量 write: 1143728 //总update、insert、delete语句数量 other: 571864 //commit、unlock tables以及其他mutex的数量 total: 5718640 transactions: 285932 (2382.10 per sec.) //通常需要关注的数字(TPS) read/write requests: 5146776 (42877.85 per sec.) other operations: 571864 (4764.21 per sec.) ignored errors: 0 (0.00 per sec.) //忽略的错误数 reconnects: 0 (0.00 per sec.) General statistics: total time: 120.0334s //即max-time指定的压测实际 total number of events: 285932 //总的事件数，一般与transactions相同 total time taken by event execution: 15362.6623s response time: min: 17.60ms avg: 53.73ms //95%的语句的平均响应时间 max: 252.90ms approx. 95 percentile: 66.88ms Threads fairness: events (avg/stddev): 2233.8438/9.04 execution time (avg/stddev): 120.0208/0.01 我们一般关注的用于绘图的指标主要有：\nresponse time avg: 平均响应时间。（后面的95%的大小可以通过--percentile=98的方式去更改） transactions: 精确的说是这一项后面的TPS 。但如果使用了-oltp-skip-trx=on，这项事务数恒为0，需要用total number of events 去除以总时间，得到tps（其实还可以分为读tps和写tps） read/write requests: 用它除以总时间，得到吞吐量QPS 当然还有一些系统层面的cpu,io,mem相关指标 sysbench还可以对文件系统IO测试，CPU性能测试，以及内存分配与传输速度测试，这里就不介绍了。\n总结起来sysbench的缺点就是，模拟的表结构太简单，不像tpcc-mysql那样完整的事务系统。但对于性能压测对比还是很有用的，因为sysbench使用的环境参数限制是一样的。\n4. 参考 Percona sysbench oltp.lua sysbench manual 0.4 sysbench介绍与使用 sysbench测试mysql性能 sysbench 0.5使用手册 本文链接地址：http://xgknight.com/2016/03/28/mysql-sysbench\n",
+  "wordCount" : "651",
+  "inLanguage": "en",
+  "datePublished": "2016-03-28T16:32:49Z",
+  "dateModified": "2016-03-28T16:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2016/03/%E4%BD%BF%E7%94%A8sysbench%E5%AF%B9mysql%E5%8E%8B%E5%8A%9B%E6%B5%8B%E8%AF%95/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      使用sysbench对mysql压力测试
+    </h1>
+    <div class="post-meta"><span title='2016-03-28 16:32:49 +0000 UTC'>March 28, 2016</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>sysbench是一个模块化的、跨平台、多线程基准测试工具，主要用于评估测试各种不同系统参数下的数据库负载情况。关于这个项目的详细介绍请看：https://github.com/akopytov/sysbench 。
+它主要包括以下几种方式的测试：</p>
+<ol>
+<li>cpu性能</li>
+<li>磁盘io性能</li>
+<li>调度程序性能</li>
+<li>内存分配及传输速度</li>
+<li>POSIX线程性能</li>
+<li>数据库性能(OLTP基准测试)</li>
+</ol>
+<p>sysbench的数据库OLTP测试支持MySQL、PostgreSQL、Oracle，目前主要用于Linux操作系统，开源社区已经将sysbench移植到了Windows，并支持SQL Server的基准测试。</p>
+<p>废话不多说，开始。</p>
+<h2 id="1-sysbench安装">1. sysbench安装<a hidden class="anchor" aria-hidden="true" href="#1-sysbench安装">#</a></h2>
+<ul>
+<li>mysql版本: mysql-community-server-5.6.29</li>
+<li>OS: CentOS 6.7 X86_64</li>
+<li>sysbench 0.5相比0.4版本有一些变化，包括oltp测试结合了lua脚本，还多了一些隐藏选项，本文会涉及得到一部分。</li>
+</ul>
+<p>目前许多仓库里已编译好的二进制sysbench还是0.4.x版本，不过现在主流也还是github上的0.5，可以从 <a href="http://www.lefred.be/node/154">这里</a>下载0.5版本的rpm包直接安装，不过我选择自己编译，因为只有这个办法是通用的。</p>
+<pre tabindex="0"><code>// 先安装编译依赖环境
+$ sudo yum install gcc gcc-c++ automake make  libtool mysql-community-devel
+
+$ cd /tmp &amp;&amp; git clone https://github.com/akopytov/sysbench.git
+
+$ cd /tmp/sysbench &amp;&amp; ./autogen.sh
+$ ./configure --prefix=/usr/local/sysbench-0.5
+$ ./make &amp;&amp; sudo make install
+
+// 0.5版本需要oltp.lua测试脚本
+// 如果是rpm包方式安装的，在 /usr/share/doc/sysbench/tests/db/ 下可找到
+$ cd /usr/local/sysbench &amp;&amp; sudo mkdir -p share/tests/db
+$ cp /tmp/sysbench/sysbench/tests/db/*.lua share/tests/db/
+$ ./bin/sysbench --version
+sysbench 0.5
+</code></pre><p>如果需要测试PostgreSQL、Oracle，则在configure时需要加上 &ndash;with-oracle 或者 –with-pgsql 参数</p>
+<h2 id="2-使用sysbench对mysql压测">2. 使用sysbench对mysql压测<a hidden class="anchor" aria-hidden="true" href="#2-使用sysbench对mysql压测">#</a></h2>
+<h3 id="21-只读示例">2.1 只读示例<a hidden class="anchor" aria-hidden="true" href="#21-只读示例">#</a></h3>
+<pre tabindex="0"><code>./bin/sysbench --test=./share/tests/db/oltp.lua \
+--mysql-host=10.0.201.36 --mysql-port=8066 --mysql-user=ecuser --mysql-password=ecuser \
+--mysql-db=dbtest1a --oltp-tables-count=10 --oltp-table-size=500000 \
+--report-interval=10 --oltp-dist-type=uniform --rand-init=on --max-requests=0 \
+--oltp-test-mode=nontrx --oltp-nontrx-mode=select \
+--oltp-read-only=on --oltp-skip-trx=on \
+--max-time=120 --num-threads=12 \
+[prepare|run|cleanup]
+</code></pre><!-- raw HTML omitted -->
+<p>注意最后一行，一项测试开始前需要用<code>prepare</code>来准备好表和数据，<code>run</code>执行真正的压测，<code>cleanup</code>用来清除数据和表。实际prepare的表结构：</p>
+<pre tabindex="0"><code>mysql&gt; desc dbtest1a.sbtest1;
++-------+------------------+------+-----+---------+----------------+
+| Field | Type             | Null | Key | Default | Extra          |
++-------+------------------+------+-----+---------+----------------+
+| id    | int(10) unsigned | NO   | PRI | NULL    | auto_increment |
+| k     | int(10) unsigned | NO   | MUL | 0       |                |
+| c     | char(120)        | NO   |     |         |                |
+| pad   | char(60)         | NO   |     |         |                |
++-------+------------------+------+-----+---------+----------------+
+4 rows in set (0.00 sec)
+</code></pre><p>上面的测试命令代表的是：对mysql进行oltp基准测试，表数量10，每表行数约50w（几乎delete多少就会insert的多少），并且是非事务的只读测试，持续60s，并发线程数12。</p>
+<p><strong>需要说明的选项：</strong></p>
+<ul>
+<li>
+<p><code>mysql-db=dbtest1a</code>：测试使用的目标数据库，这个库名要事先创建</p>
+</li>
+<li>
+<p><code>--oltp-tables-count=10</code>：产生表的数量</p>
+</li>
+<li>
+<p><code>--oltp-table-size=500000</code>：每个表产生的记录行数</p>
+</li>
+<li>
+<p><code>--oltp-dist-type=uniform</code>：指定随机取样类型，可选值有 uniform(均匀分布), Gaussian(高斯分布), special(空间分布)。默认是special</p>
+</li>
+<li>
+<p><code>--oltp-read-only=off</code>：表示不止产生只读SQL，也就是使用oltp.lua时会采用读写混合模式。默认 off，如果设置为on，则不会产生update,delete,insert的sql。</p>
+</li>
+<li>
+<p><code>--oltp-test-mode=nontrx </code>：执行模式，这里是非事务式的。可选值有simple,complex,nontrx。默认是complex</p>
+<ul>
+<li>simple：简单查询，SELECT c FROM sbtest WHERE id=N</li>
+<li>complex (advanced transactional)：事务模式在开始和结束事务之前加上begin和commit， 一个事务里可以有多个语句，如点查询、范围查询、排序查询、更新、删除、插入等，并且为了不破坏测试表的数据，该模式下一条记录删除后会在同一个事务里添加一条相同的记录。</li>
+<li>nontrx (non-transactional)：与simple相似，但是可以进行update/insert等操作，所以如果做连续的对比压测，你可能需要重新cleanup,prepare。</li>
+</ul>
+</li>
+<li>
+<p><code>--oltp-skip-trx=[on|off]</code>：省略begin/commit语句。默认是off</p>
+</li>
+<li>
+<p><code>--rand-init=on</code>：是否随机初始化数据，如果不随机化那么初始好的数据每行内容除了主键不同外其他完全相同</p>
+</li>
+<li>
+<p><code>--num-threads=12</code>： 并发线程数，可以理解为模拟的客户端并发连接数</p>
+</li>
+<li>
+<p><code>--report-interval=10</code>：表示每10s输出一次测试进度报告</p>
+</li>
+<li>
+<p><code>--max-requests=0</code>：压力测试产生请求的总数，如果以下面的<code>max-time</code>来记，这个值设为0</p>
+</li>
+<li>
+<p><code>--max-time=120</code>：压力测试的持续时间，这里是2分钟。</p>
+</li>
+</ul>
+<p>注意，针对不同的选项取值就会有不同的子选项。比如<code>oltp-dist-type=special</code>，就有比如<code>oltp-dist-pct=1</code>、<code>oltp-dist-res=50</code>两个子选项，代表有50%的查询落在1%的行（即热点数据）上，另外50%均匀的(sample uniformly)落在另外99%的记录行上。</p>
+<p>再比如<code>oltp-test-mode=nontrx</code>时, 就可以有<code>oltp-nontrx-mode</code>，可选值有select（默认）, update_key, update_nokey, insert, delete，代表非事务式模式下使用的测试sql类型。</p>
+<p>以上代表的是一个只读的例子，可以把<code>num-threads</code>依次递增（16,36,72,128,256,512），或者调整my.cnf参数，比较效果。另外需要注意的是，大部分mysql中间件对事务的处理，默认都是把sql发到主库执行，所以只读测试需要加上<code>oltp-skip-trx=on</code>来跳过测试中的显式事务。</p>
+<p>ps1: 只读测试也可以使用<code>share/tests/db/select.lua</code>进行，但只是简单的point select。
+ps2: 我在用sysbench压的时候，在mysql后端会话里有时看到大量的query cache lock，如果使用的是uniform取样，最好把查询缓存关掉。当然如果是做两组性能对比压测，因为都受这个因素影响，关心也不大。</p>
+<h3 id="22-混合读写">2.2 混合读写<a hidden class="anchor" aria-hidden="true" href="#22-混合读写">#</a></h3>
+<p>读写测试还是用oltp.lua，只需把<code>--oltp-read-only</code>等于<code>off</code>。</p>
+<pre tabindex="0"><code>./bin/sysbench --test=./share/tests/db/oltp.lua --mysql-host=10.0.201.36 --mysql-port=8066 --mysql-user=ecuser --mysql-password=ecuser --mysql-db=dbtest1a --oltp-tables-count=10 --oltp-table-size=500000 --report-interval=10 --rand-init=on --max-requests=0 --oltp-test-mode=nontrx --oltp-nontrx-mode=select --oltp-read-only=off --max-time=120 --num-threads=128 prepare
+
+./bin/sysbench --test=./share/tests/db/oltp.lua --mysql-host=10.0.201.36 --mysql-port=8066 --mysql-user=ecuser --mysql-password=ecuser --mysql-db=dbtest1a --oltp-tables-count=10 --oltp-table-size=500000 --report-interval=10 --rand-init=on --max-requests=0 --oltp-test-mode=nontrx --oltp-nontrx-mode=select --oltp-read-only=off --max-time=120 --num-threads=128 run
+
+./bin/sysbench --test=./share/tests/db/oltp.lua --mysql-host=10.0.201.36 --mysql-port=8066 --mysql-user=ecuser --mysql-password=ecuser --mysql-db=dbtest1a --oltp-tables-count=10 --oltp-table-size=500000 --report-interval=10 --rand-init=on --max-requests=0 --oltp-test-mode=nontrx --oltp-nontrx-mode=select --oltp-read-only=off --max-time=120 --num-threads=128 cleanup
+</code></pre><p>然而<code>oltp-test-mode=nontrx</code>一直没有跟着我预期的去走，在mysql general log里面看到的sql记录与<code>complex</code>模式相同。所以上面示例中的<code>--oltp-test-mode=nontrx --oltp-nontrx-mode=select</code>可以删掉。</p>
+<p>**update: **
+sysbench作者 akopytov 对我这个疑问有了回复：https://github.com/akopytov/sysbench/issues/34 ，原来sysbench 0.5版本去掉了这个选项，因为作者正在准备1.0版本，所以也就没有更新0.5版本的doc。网上的博客漫天飞，就没有一个提出来的，也是没谁了。</p>
+<p>分析一下oltp.lua脚本内容，可以清楚单个事务各操作的默认比例：select:update_key:update_non_key:delete:insert = 14:1:1:1:1，可通过<code>oltp-point-selects</code>、<code>oltp-simple-ranges</code>、<code>oltp-sum-ranges</code>、<code>oltp-order-ranges</code>、<code>oltp-distinct-ranges</code>，<code>oltp-index-updates</code>、<code>oltp-non-index-updates</code>这些选项去调整读写权重。</p>
+<p>同只读测试一样，在atlas,mycat这类中间件测试中如果不加<code>oltp-skip-trx=on</code>，那么所有查询都会发往主库，但如果在有写入的情况下使用<code>--oltp-skip-trx=on</code>跳过BEGIN和COMMIT，会出现问题：</p>
+<blockquote>
+<p>ALERT: failed to execute MySQL query: <code>INSERT INTO sbtest4 (id, k, c, pad) VALUES (48228, 47329, '82773802508-44916890724-85859319254-67627358653-96425730419-64102446666-75789993135-91202056934-68463872307-28147315305',  '13146850449-23153169696-47584324044-14749610547-34267941374')</code>:
+ALERT: Error 1062 Duplicate entry &lsquo;48228&rsquo; for key &lsquo;PRIMARY&rsquo;
+FATAL: failed to execute function `event&rsquo;: (null)</p>
+</blockquote>
+<p>原因也很容易理解，每个线程将选择一个随机的表，不加事务的情况下高并发更新（插入）出现重复key的概率很大，但我们压测不在乎这些数据，所以需要跳过这个错误<code>--mysql-ignore-errors=1062</code>，这个问题老外有出过打补丁的方案允许<code>--mysql-ignore-duplicates=on</code>，但作者新加入的忽略错误码这个功能已经取代了它。<code>mysql-ignore-errors</code>选项是0.5版本加入的，但目前没有文档标明，也是我在github上提的 <a href="https://github.com/akopytov/sysbench/issues/23">issue</a> 作者回复的。</p>
+<p>这里不得不佩服老外的办事效率和责任心，提个疑惑能立马得到回复，反观国内，比如在atlas,mycat项目里提到问题到现在都没人搭理。。。</p>
+<h3 id="23-只更新">2.3 只更新<a hidden class="anchor" aria-hidden="true" href="#23-只更新">#</a></h3>
+<p>如果基准测试的时候，你只想比较两个项目的update（或insert）效率，那可以不使用oltp脚本，而直接改用<code>update_index.lua</code>：</p>
+<pre tabindex="0"><code>./bin/sysbench --test=./share/tests/db/update_index.lua \
+--mysql-host=10.0.201.36 --mysql-port=8066 --mysql-user=ecuser --mysql-password=ecuser \
+--mysql-db=dbtest1a --oltp-tables-count=10 --oltp-table-size=500000 \
+--report-interval=10 --rand-init=on --max-requests=0 \
+--oltp-read-only=off --max-time=120 --num-threads=128 \
+[ prepare | run | cleanup ]
+</code></pre><p>此时像<code>oltp-read-only=off</code>许多参数都失效了。需要说明的是这里 (非)索引更新，不是where条件根据索引去查找更新，而是更新索引列上的值。</p>
+<h2 id="3-结果解读">3. 结果解读<a hidden class="anchor" aria-hidden="true" href="#3-结果解读">#</a></h2>
+<pre tabindex="0"><code>sysbench 0.5:  multi-threaded system evaluation benchmark
+
+Running the test with following options:
+Number of threads: 128
+Report intermediate results every 20 second(s)
+Initializing random number generator from timer.
+
+Random number generator seed is 0 and will be ignored
+
+
+Initializing worker threads...
+
+Threads started!
+
+[  20s] threads: 128, tps: 2354.54, reads: 33035.89, writes: 9423.39, response time: 66.80ms (95%), errors: 0.00, reconnects:  0.00
+[  40s] threads: 128, tps: 2377.75, reads: 33274.26, writes: 9507.55, response time: 66.88ms (95%), errors: 0.00, reconnects:  0.00
+[  60s] threads: 128, tps: 2401.35, reads: 33615.30, writes: 9607.40, response time: 66.40ms (95%), errors: 0.00, reconnects:  0.00
+[  80s] threads: 128, tps: 2381.20, reads: 33331.50, writes: 9522.55, response time: 67.30ms (95%), errors: 0.00, reconnects:  0.00
+[ 100s] threads: 128, tps: 2388.85, reads: 33446.10, writes: 9556.35, response time: 67.00ms (95%), errors: 0.00, reconnects:  0.00
+[ 120s] threads: 128, tps: 2386.40, reads: 33421.35, writes: 9545.35, response time: 66.94ms (95%), errors: 0.00, reconnects:  0.00
+OLTP test statistics:
+    queries performed:
+        read:                            4003048  //总select数量
+        write:                           1143728  //总update、insert、delete语句数量
+        other:                           571864   //commit、unlock tables以及其他mutex的数量
+        total:                           5718640
+    transactions:                        285932 (2382.10 per sec.) //通常需要关注的数字(TPS)
+    read/write requests:                 5146776 (42877.85 per sec.)
+    other operations:                    571864 (4764.21 per sec.)
+    ignored errors:                      0      (0.00 per sec.) //忽略的错误数
+    reconnects:                          0      (0.00 per sec.)
+
+General statistics:
+    total time:                          120.0334s //即max-time指定的压测实际
+    total number of events:              285932   //总的事件数，一般与transactions相同
+    total time taken by event execution: 15362.6623s
+    response time:
+         min:                                 17.60ms
+         avg:                                 53.73ms //95%的语句的平均响应时间
+         max:                                252.90ms
+         approx.  95 percentile:              66.88ms
+
+Threads fairness:
+    events (avg/stddev):           2233.8438/9.04
+    execution time (avg/stddev):   120.0208/0.01
+</code></pre><p>我们一般关注的用于绘图的指标主要有：</p>
+<ul>
+<li>response time avg: 平均响应时间。（后面的95%的大小可以通过<code>--percentile=98</code>的方式去更改）</li>
+<li>transactions: 精确的说是这一项后面的TPS 。但如果使用了<code>-oltp-skip-trx=on</code>，这项事务数恒为0，需要用<code>total number of events</code> 去除以总时间，得到tps（其实还可以分为读tps和写tps）</li>
+<li>read/write requests: 用它除以总时间，得到吞吐量QPS</li>
+<li>当然还有一些系统层面的cpu,io,mem相关指标</li>
+</ul>
+<p>sysbench还可以对文件系统IO测试，CPU性能测试，以及内存分配与传输速度测试，这里就不介绍了。</p>
+<p>总结起来sysbench的缺点就是，模拟的表结构太简单，不像tpcc-mysql那样完整的事务系统。但对于性能压测对比还是很有用的，因为sysbench使用的环境参数限制是一样的。</p>
+<h2 id="4-参考">4. 参考<a hidden class="anchor" aria-hidden="true" href="#4-参考">#</a></h2>
+<ul>
+<li><a href="https://www.percona.com/docs/wiki/benchmark:sysbench:olpt.lua">Percona sysbench oltp.lua</a></li>
+<li><a href="http://imysql.com/wp-content/uploads/2014/10/sysbench-manual.pdf">sysbench manual 0.4</a></li>
+<li><a href="http://blog.csdn.net/zbszhangbosen/article/details/8236331">sysbench介绍与使用</a></li>
+<li><a href="http://verynull.com/2016/01/29/sysbench%E6%B5%8B%E8%AF%95mysql%E6%80%A7%E8%83%BD/">sysbench测试mysql性能</a></li>
+<li><a href="http://mingxinglai.com/cn/2013/07/sysbench/">sysbench 0.5使用手册</a></li>
+</ul>
+<hr>
+<p>本文链接地址：http://xgknight.com/2016/03/28/mysql-sysbench</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/sysbench/">sysbench</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

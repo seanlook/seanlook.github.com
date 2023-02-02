@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>主键 on Sean Note</title>
+    <link>http://xgknight.com/tags/%E4%B8%BB%E9%94%AE/</link>
+    <description>Recent content in 主键 on Sean Note</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Fri, 13 May 2016 15:32:49 +0000</lastBuildDate><atom:link href="http://xgknight.com/tags/%E4%B8%BB%E9%94%AE/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>InnoDB表主键设计方案</title>
+      <link>http://xgknight.com/posts/2016/05/innodb%E8%A1%A8%E4%B8%BB%E9%94%AE%E8%AE%BE%E8%AE%A1%E6%96%B9%E6%A1%88/</link>
+      <pubDate>Fri, 13 May 2016 15:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/05/innodb%E8%A1%A8%E4%B8%BB%E9%94%AE%E8%AE%BE%E8%AE%A1%E6%96%B9%E6%A1%88/</guid>
+      <description>关于MySQL InnoDB表的主键设计，有必要从开发规范 http://xgknight.com/2016/05/11/mysql-dev-principle-ec/ 里拿出来，单独展开说一下。 InnoDB是一个聚集索引组织表，即行数据是按照聚集索引在物理磁盘上存储的，并且是块状结构，默认一个block是16kB。
+图片来《高性能MySQL》
+首先在设计表结构时，表一定要显式定义主键，自增主键，或者联合主键，或全局ID。 （所有与主键，包括其它索引，相关的字段，都要定义为NOT NULL，这是因为如果允许NULL，那么在索引的每条记录上，都要多用一个标记去记录这个列是否是NULL，占用多余的存储空间）
+1. 自增主键特性 对于高并发的插入速度较快，因为每次插入新记录，都是在之前记录的右边顺序插入，不需要频繁的分裂。 表上要建立多个二级索引时，索引记录都会带上主键，根据主键去定位行数据。自增主键一般是int或bigint型，多个二级索引上面占用的空间较小。
+2. 联合主键特性 每次新记录插入，都要寻找到合适的“缝隙”，插入，当插入位置空间不够时，需要做页分裂，这个需要维护成本。 二级索引带上的主键值，是联合主键的总长度，所以一个单列索引占用的空间里面，主键部分占了大部分，空间利用率不高，而且这种是 optimize table 解决不了的。 （提示：聚集索引叶子节点，就是行数据本身，所以，不需要另外的空间存储主键）
+但是联合主键有一个好处：逻辑上一批数据，在物理上很有可能相邻存储，有可能检索的数据，在一个block里面，减少了读取并缓存磁盘块的数量，一个是速度的提升，一个是减小内存的消耗。 比如 (f_c_id,f_m_id,f_type) 作为联合主键，f_c_id=22299有20w条记录，每条记录平均160bytes，一个页能存16kB，即100条记录（不考虑预留），那么f_c_id=22299需要2000个page，而且是相邻的page。
+举例，应用检索数据 f_c_id=22299, f_m_id IN(12345,23456) ，假设数据在块1和块10，缓存到内存。不多久检索f_c_id=22299, f_m_id=12399，刚好在块1。
+如果是自增id，那么就没有这个顺序， 而是根据插入数据时间来的，那么这两条记录可能在物理上很远的地方，要多读取磁盘。
+3. 全局ID 全局ID跟自增ID特性基本相同，但是它的值是从另外的服务获取的数字增长类型，不要UUID。
+只在有分库（一般有全局统计需求），或其它可能需要全局唯一性的情况下，才使用，否则没必要引入多余的服务依赖。
+另外，定义全局ID时，注意字段范围要满足要求，小心溢出；不要加上多余的 AUTO_INCREMENT 定义。
+使用全局id还有一个好处：在做数据迁移或拆库时，可以无缝切换，因为新旧数据id不用担心重复。
+4. 设计原则：自增主键 VS 联合主键 所有索引字段，特别主键，无论自增或联合主键，一定定义为 not null 表没有特殊情况下，都使用自增主键，尽量不用联合主键 特别是“可能作为联合主键”里面有的字段，会频繁update的情况，更不能做联合主键 在业务层具有唯一性的属性，如果不依赖于数据库的唯一索引来编码，也不用使用Unique Key。如果需要数据库维护唯一性，可使用Unique Key，比如将上面的联合主键定义为联合索引，再另外定义一个自增主键 如果表上有一个单列字段，已具有唯一性，可直接定义成主键，不必设置自增id 尽量用int或bigint型，如果不能，也要控制主键varchar列的长度在30以内。不要用带汉字或url类似的字段作为主键 根据上面的顺序走完，还是想用联合主键的，以下任意条件满足，可用： 表上的插入数据并发量不高 有明显的上文【联合主键】部分说到的，热点数据相邻存储的场景 出了联合主键外，其它索引的只有1-2个 与DBA协商后同意 参考： http://imysql.com/2015/10/29/mysql-faq-clustered-index.shtml
+原文连接地址：http://xgknight.com/2016/05/13/mysql-innodb-primary_key/</description>
+    </item>
+    
+  </channel>
+</rss>

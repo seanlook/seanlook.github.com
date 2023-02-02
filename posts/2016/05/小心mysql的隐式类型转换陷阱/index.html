@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>小心MySQL的隐式类型转换陷阱 | Sean Note</title>
+<meta name="keywords" content="mysql, schema设计">
+<meta name="description" content="1. 隐式类型转换实例 今天生产库上突然出现MySQL线程数告警，IOPS很高，实例会话里面出现许多类似下面的sql：(修改了相关字段和值)
+SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233) 用 explain 看了下扫描行数和索引选择情况：
+mysql&gt;explain SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233); &#43;------&#43;---------------&#43;---------&#43;--------&#43;--------------------------------&#43;---------------&#43;------------&#43;--------&#43;--------&#43;------------------------------------&#43; | id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra | &#43;------&#43;---------------&#43;---------&#43;--------&#43;--------------------------------&#43;---------------&#43;------------&#43;--------&#43;--------&#43;------------------------------------&#43; | 1 | SIMPLE | t_tb1 | ref | uid_type_frid,idx_corpid_qq1id | uid_type_frid | 8 | const | 1386 | Using index condition; Using where | &#43;------&#43;---------------&#43;---------&#43;--------&#43;--------------------------------&#43;---------------&#43;------------&#43;--------&#43;--------&#43;------------------------------------&#43; 共返回 1 行记录,花费 11.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2016/05/%E5%B0%8F%E5%BF%83mysql%E7%9A%84%E9%9A%90%E5%BC%8F%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E9%99%B7%E9%98%B1/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="小心MySQL的隐式类型转换陷阱" />
+<meta property="og:description" content="1. 隐式类型转换实例 今天生产库上突然出现MySQL线程数告警，IOPS很高，实例会话里面出现许多类似下面的sql：(修改了相关字段和值)
+SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233) 用 explain 看了下扫描行数和索引选择情况：
+mysql&gt;explain SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233); &#43;------&#43;---------------&#43;---------&#43;--------&#43;--------------------------------&#43;---------------&#43;------------&#43;--------&#43;--------&#43;------------------------------------&#43; | id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra | &#43;------&#43;---------------&#43;---------&#43;--------&#43;--------------------------------&#43;---------------&#43;------------&#43;--------&#43;--------&#43;------------------------------------&#43; | 1 | SIMPLE | t_tb1 | ref | uid_type_frid,idx_corpid_qq1id | uid_type_frid | 8 | const | 1386 | Using index condition; Using where | &#43;------&#43;---------------&#43;---------&#43;--------&#43;--------------------------------&#43;---------------&#43;------------&#43;--------&#43;--------&#43;------------------------------------&#43; 共返回 1 行记录,花费 11." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2016/05/%E5%B0%8F%E5%BF%83mysql%E7%9A%84%E9%9A%90%E5%BC%8F%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E9%99%B7%E9%98%B1/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2016-05-05T16:32:49+00:00" />
+<meta property="article:modified_time" content="2016-05-05T16:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="小心MySQL的隐式类型转换陷阱"/>
+<meta name="twitter:description" content="1. 隐式类型转换实例 今天生产库上突然出现MySQL线程数告警，IOPS很高，实例会话里面出现许多类似下面的sql：(修改了相关字段和值)
+SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233) 用 explain 看了下扫描行数和索引选择情况：
+mysql&gt;explain SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233); &#43;------&#43;---------------&#43;---------&#43;--------&#43;--------------------------------&#43;---------------&#43;------------&#43;--------&#43;--------&#43;------------------------------------&#43; | id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra | &#43;------&#43;---------------&#43;---------&#43;--------&#43;--------------------------------&#43;---------------&#43;------------&#43;--------&#43;--------&#43;------------------------------------&#43; | 1 | SIMPLE | t_tb1 | ref | uid_type_frid,idx_corpid_qq1id | uid_type_frid | 8 | const | 1386 | Using index condition; Using where | &#43;------&#43;---------------&#43;---------&#43;--------&#43;--------------------------------&#43;---------------&#43;------------&#43;--------&#43;--------&#43;------------------------------------&#43; 共返回 1 行记录,花费 11."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "小心MySQL的隐式类型转换陷阱",
+      "item": "http://xgknight.com/posts/2016/05/%E5%B0%8F%E5%BF%83mysql%E7%9A%84%E9%9A%90%E5%BC%8F%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E9%99%B7%E9%98%B1/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "小心MySQL的隐式类型转换陷阱",
+  "name": "小心MySQL的隐式类型转换陷阱",
+  "description": "1. 隐式类型转换实例 今天生产库上突然出现MySQL线程数告警，IOPS很高，实例会话里面出现许多类似下面的sql：(修改了相关字段和值)\nSELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233) 用 explain 看了下扫描行数和索引选择情况：\nmysql\u0026gt;explain SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233); +------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+ | id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra | +------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+ | 1 | SIMPLE | t_tb1 | ref | uid_type_frid,idx_corpid_qq1id | uid_type_frid | 8 | const | 1386 | Using index condition; Using where | +------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+ 共返回 1 行记录,花费 11.",
+  "keywords": [
+    "mysql", "schema设计"
+  ],
+  "articleBody": "1. 隐式类型转换实例 今天生产库上突然出现MySQL线程数告警，IOPS很高，实例会话里面出现许多类似下面的sql：(修改了相关字段和值)\nSELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233) 用 explain 看了下扫描行数和索引选择情况：\nmysql\u003eexplain SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233); +------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+ | id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra | +------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+ | 1 | SIMPLE | t_tb1 | ref | uid_type_frid,idx_corpid_qq1id | uid_type_frid | 8 | const | 1386 | Using index condition; Using where | +------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+ 共返回 1 行记录,花费 11.52 ms. t_tb1 表上有个索引uid_type_frid(f_col2_id,f_type)、idx_corp_id_qq1id(f_col1_id,f_qq1_id)，而且如果选择后者时，f_qq1_id的过滤效果应该很佳，但却选择了前者。当使用 hint use index(idx_corp_id_qq1id)时：\nmysql\u003eexplain extended SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 use index(idx_corpid_qq1id) WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233); +------+---------------+--------+--------+---------------------+------------------+------------+----------+-------------+------------------------------------+ | id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra | +------+---------------+--------+--------+---------------------+------------------+------------+----------+-------------+------------------------------------+ | 1 | SIMPLE | t_tb1 | ref | idx_corpid_qq1id | idx_corpid_qq1id | 8 | const | 2375752 | Using index condition; Using where | +---- -+---------------+--------+--------+---------------------+------------------+------------+----------+-------------+------------------------------------+ 共返回 1 行记录,花费 17.48 ms. mysql\u003eshow warnings; +-----------------+----------------+-----------------------------------------------------------------------------------------------------------------------+ | Level | Code | Message | +-----------------+----------------+-----------------------------------------------------------------------------------------------------------------------+ | Warning | 1739 | Cannot use range access on index 'idx_corpid_qq1id' due to type or collation conversion on field 'f_qq1_id' | | Note | 1003 | /* select#1 */ select `d_dbname`.`t_tb1`.`f_col3_id` AS `f_col3_id`,`d_dbname`.`t_tb1`.`f_qq1_id` AS `f_qq1_id` from `d_dbname`.`t_tb1` USE INDEX (`idx_corpid_qq1id`) where | | | | ((`d_dbname`.`t_tb1`.`f_col2_id` = 1244378) and (`d_dbname`.`t_tb1`.`f_col1_id` = 1226391) and (`d_dbname`.`t_tb1`.`f_qq1_id` in | | | | (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233))) | +-----------------+----------------+-----------------------------------------------------------------------------------------------------------------------+ 共返回 2 行记录,花费 10.81 ms. rows列达到200w行，但问题也发现了：select_type应该是 range 才对，key_len看出来只用到了idx_corpid_qq1id索引的第一列。上面explain使用了 extended，所以show warnings;可以很明确的看到 f_qq1_id 出现了隐式类型转换：f_qq1_id是varchar，而后面的比较值是整型。\n解决该问题就是避免出现隐式类型转换(implicit type conversion)带来的不可控：把f_qq1_id in的内容写成字符串：\nmysql\u003eexplain SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in ('12345','23456','34567','45678','56789','67890','78901','89012','90123','901231'); +-------+---------------+--------+---------+--------------------------------+------------------+-------------+---------+---------+------------------------------------+ | id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra | +-------+---------------+--------+---------+--------------------------------+------------------+-------------+---------+---------+------------------------------------+ | 1 | SIMPLE | t_tb1 | range | uid_type_frid,idx_corpid_qq1id | idx_corpid_qq1id | 70 | | 40 | Using index condition; Using where | +-------+---------------+--------+---------+--------------------------------+------------------+-------------+---------+---------+------------------------------------+ 共返回 1 行记录,花费 12.41 ms. 扫描行数从1386减少为40。\n类似的还出现过一例：\nSELECT count(0) FROM d_dbname.t_tb2 where f_col1_id= '1931231' AND f_phone in(098890); | Warning | 1292 | Truncated incorrect DOUBLE value: '1512-98464356' 优化后直接从扫描rows 100w行降为1。\n借这个机会，系统的来看一下mysql中的隐式类型转换。\n2. mysql隐式转换规则 2.1 规则 下面来分析一下隐式转换的规则：\na. 两个参数至少有一个是 NULL 时，比较的结果也是 NULL，例外是使用 \u003c=\u003e 对两个 NULL 做比较时会返回 1，这两种情况都不需要做类型转换 b. 两个参数都是字符串，会按照字符串来比较，不做类型转换 c. 两个参数都是整数，按照整数来比较，不做类型转换 d. 十六进制的值和非数字做比较时，会被当做二进制串 e. 有一个参数是 TIMESTAMP 或 DATETIME，并且另外一个参数是常量，常量会被转换为 timestamp f. 有一个参数是 decimal 类型，如果另外一个参数是 decimal 或者整数，会将整数转换为 decimal 后进行比较，如果另外一个参数是浮点数，则会把 decimal 转换为浮点数进行比较 g. 所有其他情况下，两个参数都会被转换为浮点数再进行比较\nmysql\u003e select 11 + '11', 11 + 'aa', 'a1' + 'bb', 11 + '0.01a'; +-----------+-----------+-------------+--------------+ | 11 + '11' | 11 + 'aa' | 'a1' + 'bb' | 11 + '0.01a' | +-----------+-----------+-------------+--------------+ | 22 | 11 | 0 | 11.01 | +-----------+-----------+-------------+--------------+ 1 row in set, 4 warnings (0.00 sec) mysql\u003e show warnings; +---------+------+-------------------------------------------+ | Level | Code | Message | +---------+------+-------------------------------------------+ | Warning | 1292 | Truncated incorrect DOUBLE value: 'aa' | | Warning | 1292 | Truncated incorrect DOUBLE value: 'a1' | | Warning | 1292 | Truncated incorrect DOUBLE value: 'bb' | | Warning | 1292 | Truncated incorrect DOUBLE value: '0.01a' | +---------+------+-------------------------------------------+ 4 rows in set (0.00 sec) mysql\u003e select '11a' = 11, '11.0' = 11, '11.0' = '11', NULL = 1; +------------+-------------+---------------+----------+ | '11a' = 11 | '11.0' = 11 | '11.0' = '11' | NULL = 1 | +------------+-------------+---------------+----------+ | 1 | 1 | 0 | NULL | +------------+-------------+---------------+----------+ 1 row in set, 1 warning (0.01 sec) 上面可以看出11 + 'aa'，由于操作符两边的类型不一样且符合第g条，aa要被转换成浮点型小数，然而转换失败（字母被截断），可以认为转成了 0，整数11被转成浮点型还是它自己，所以11 + 'aa' = 11。\n0.01a转成double型也是被截断成0.01，所以11 + '0.01a' = 11.01。\n等式比较也说明了这一点，'11a'和'11.0'转换后都等于 11，这也正是文章开头实例为什么没走索引的原因： varchar型的f_qq1_id，转换成浮点型比较时，等于 12345 的情况有无数种如12345a、12345.b等待，MySQL优化器无法确定索引是否更有效，所以选择了其它方案。\n但并不是只要出现隐式类型转换，就会引起上面类似的性能问题，最终是要看转换后能否有效选择索引。像f_id = '654321'、f_mtime between '2016-05-01 00:00:00' and '2016-05-04 23:59:59'就不会影响索引选择，因为前者f_id是整型，即使与后面的字符串型数字转换成double比较，依然能根据double确定f_id的值，索引依然有效。后者是因为符合第e条，只是右边的常量做了转换。\n开发人员可能都只要存在这么一个隐式类型转换的坑，但却又经常不注意，所以干脆无需记住那么多规则，该什么类型就与什么类型比较。\n2.2 隐式类型转换的安全问题 implicit type conversion 不仅可能引起性能问题，还有可能产生安全问题。\nmysql\u003e desc t_account; +-----------+-------------+------+-----+---------+----------------+ | Field | Type | Null | Key | Default | Extra | +-----------+-------------+------+-----+---------+----------------+ | fid | int(11) | NO | PRI | NULL | auto_increment | | fname | varchar(20) | YES | | NULL | | | fpassword | varchar(50) | YES | | NULL | | +-----------+-------------+------+-----+---------+----------------+ mysql\u003e select * from t_account; +-----+-----------+-------------+ | fid | fname | fpassword | +-----+-----------+-------------+ | 1 | xiaoming | p_xiaoming | | 2 | xiaoming1 | p_xiaoming1 | +-----+-----------+-------------+ 假如应用前端没有WAF防护，那么下面的sql很容易注入： mysql\u003e select * from t_account where fname='A' ; fname传入 A' OR 1='1 mysql\u003e select * from t_account where fname='A' OR 1='1'; 攻击者更聪明一点： fname传入 A'+'B ，fpassword传入 ccc'+0 ：\nmysql\u003e select * from t_account where fname='A'+'B' and fpassword='ccc'+0; +-----+-----------+-------------+ | fid | fname | fpassword | +-----+-----------+-------------+ | 1 | xiaoming | p_xiaoming | | 2 | xiaoming1 | p_xiaoming1 | +-----+-----------+-------------+ 2 rows in set, 7 warnings (0.00 sec) 参考 MySQL隐式转化整理 WHRER条件里的数据类型必须和字段数据类型一致 Implicit type conversion in MySQL 原文链接地址：http://xgknight.com/2016/05/05/mysql-type-conversion/\n",
+  "wordCount" : "741",
+  "inLanguage": "en",
+  "datePublished": "2016-05-05T16:32:49Z",
+  "dateModified": "2016-05-05T16:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2016/05/%E5%B0%8F%E5%BF%83mysql%E7%9A%84%E9%9A%90%E5%BC%8F%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E9%99%B7%E9%98%B1/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      小心MySQL的隐式类型转换陷阱
+    </h1>
+    <div class="post-meta"><span title='2016-05-05 16:32:49 +0000 UTC'>May 5, 2016</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><h2 id="1-隐式类型转换实例">1. 隐式类型转换实例<a hidden class="anchor" aria-hidden="true" href="#1-隐式类型转换实例">#</a></h2>
+<p>今天生产库上突然出现MySQL线程数告警，IOPS很高，实例会话里面出现许多类似下面的sql：(修改了相关字段和值)</p>
+<pre tabindex="0"><code>SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and 
+f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233)
+</code></pre><p>用 explain 看了下扫描行数和索引选择情况：</p>
+<pre tabindex="0"><code>mysql&gt;explain SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 
+and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233);
++------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+
+| id   | select_type   | table   | type   | possible_keys                  | key           | key_len    | ref    | rows   | Extra                              |
++------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+
+| 1    | SIMPLE        | t_tb1   | ref    | uid_type_frid,idx_corpid_qq1id | uid_type_frid | 8          | const  | 1386   | Using index condition; Using where |
++------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+
+共返回 1 行记录,花费 11.52 ms.
+</code></pre><p>t_tb1 表上有个索引<code>uid_type_frid(f_col2_id,f_type)</code>、<code>idx_corp_id_qq1id(f_col1_id,f_qq1_id)</code>，而且如果选择后者时，f_qq1_id的过滤效果应该很佳，但却选择了前者。当使用 hint <code>use index(idx_corp_id_qq1id)</code>时：</p>
+<!-- raw HTML omitted -->
+<pre tabindex="0"><code>mysql&gt;explain extended SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1  use index(idx_corpid_qq1id) WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233);
++------+---------------+--------+--------+---------------------+------------------+------------+----------+-------------+------------------------------------+
+| id   | select_type   | table  | type   | possible_keys       | key              | key_len    | ref      | rows        | Extra                              |
++------+---------------+--------+--------+---------------------+------------------+------------+----------+-------------+------------------------------------+
+| 1    | SIMPLE        | t_tb1  | ref    | idx_corpid_qq1id    | idx_corpid_qq1id | 8          | const    | 2375752     | Using index condition; Using where |
++---- -+---------------+--------+--------+---------------------+------------------+------------+----------+-------------+------------------------------------+
+共返回 1 行记录,花费 17.48 ms.
+
+mysql&gt;show warnings;
++-----------------+----------------+-----------------------------------------------------------------------------------------------------------------------+
+| Level           | Code           | Message                                                                                                               |
++-----------------+----------------+-----------------------------------------------------------------------------------------------------------------------+
+| Warning         |           1739 | Cannot use range access on index &#39;idx_corpid_qq1id&#39; due to type or collation conversion on field &#39;f_qq1_id&#39;           |
+| Note            |           1003 | /* select#1 */ select `d_dbname`.`t_tb1`.`f_col3_id` AS `f_col3_id`,`d_dbname`.`t_tb1`.`f_qq1_id` AS `f_qq1_id` from `d_dbname`.`t_tb1` USE INDEX (`idx_corpid_qq1id`) where |
+|                 |                |  ((`d_dbname`.`t_tb1`.`f_col2_id` = 1244378) and (`d_dbname`.`t_tb1`.`f_col1_id` = 1226391) and (`d_dbname`.`t_tb1`.`f_qq1_id` in |
+|                 |                | (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233)))                                        |
++-----------------+----------------+-----------------------------------------------------------------------------------------------------------------------+
+共返回 2 行记录,花费 10.81 ms.
+</code></pre><p>rows列达到200w行，但问题也发现了：select_type应该是 range 才对，key_len看出来只用到了<code>idx_corpid_qq1id</code>索引的第一列。上面explain使用了 <code>extended</code>，所以<code>show warnings;</code>可以很明确的看到 f_qq1_id 出现了隐式类型转换：f_qq1_id是varchar，而后面的比较值是整型。</p>
+<p>解决该问题就是避免出现隐式类型转换(implicit type conversion)带来的不可控：把f_qq1_id in的内容写成字符串：</p>
+<pre tabindex="0"><code>mysql&gt;explain SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and 
+f_qq1_id in (&#39;12345&#39;,&#39;23456&#39;,&#39;34567&#39;,&#39;45678&#39;,&#39;56789&#39;,&#39;67890&#39;,&#39;78901&#39;,&#39;89012&#39;,&#39;90123&#39;,&#39;901231&#39;);
++-------+---------------+--------+---------+--------------------------------+------------------+-------------+---------+---------+------------------------------------+
+| id    | select_type   | table  | type    | possible_keys                  | key              | key_len     | ref     | rows    | Extra                              |
++-------+---------------+--------+---------+--------------------------------+------------------+-------------+---------+---------+------------------------------------+
+| 1     | SIMPLE        | t_tb1  | range   | uid_type_frid,idx_corpid_qq1id | idx_corpid_qq1id | 70          |         | 40      | Using index condition; Using where |
++-------+---------------+--------+---------+--------------------------------+------------------+-------------+---------+---------+------------------------------------+
+共返回 1 行记录,花费 12.41 ms.
+</code></pre><p>扫描行数从1386减少为40。</p>
+<p>类似的还出现过一例：</p>
+<pre tabindex="0"><code>SELECT count(0)  FROM d_dbname.t_tb2 where f_col1_id= &#39;1931231&#39;  AND f_phone in(098890);
+
+| Warning | 1292 | Truncated incorrect DOUBLE value: &#39;1512-98464356&#39;
+</code></pre><p>优化后直接从扫描rows 100w行降为1。</p>
+<p>借这个机会，系统的来看一下mysql中的隐式类型转换。</p>
+<h2 id="2-mysql隐式转换规则">2. mysql隐式转换规则<a hidden class="anchor" aria-hidden="true" href="#2-mysql隐式转换规则">#</a></h2>
+<h3 id="21-规则">2.1 规则<a hidden class="anchor" aria-hidden="true" href="#21-规则">#</a></h3>
+<p>下面来分析一下<a href="http://dev.mysql.com/doc/refman/5.7/en/type-conversion.html">隐式转换的规则</a>：</p>
+<blockquote>
+<p>a. 两个参数至少有一个是 NULL 时，比较的结果也是 NULL，例外是使用 &lt;=&gt; 对两个 NULL 做比较时会返回 1，这两种情况都不需要做类型转换
+b. 两个参数都是字符串，会按照字符串来比较，不做类型转换
+c. 两个参数都是整数，按照整数来比较，不做类型转换
+d. 十六进制的值和非数字做比较时，会被当做二进制串
+e. 有一个参数是 TIMESTAMP 或 DATETIME，并且另外一个参数是常量，常量会被转换为 timestamp
+f. 有一个参数是 decimal 类型，如果另外一个参数是 decimal 或者整数，会将整数转换为 decimal 后进行比较，如果另外一个参数是浮点数，则会把 decimal 转换为浮点数进行比较
+g. 所有其他情况下，两个参数都会被转换为浮点数再进行比较</p>
+</blockquote>
+<pre tabindex="0"><code>mysql&gt; select 11 + &#39;11&#39;, 11 + &#39;aa&#39;, &#39;a1&#39; + &#39;bb&#39;, 11 + &#39;0.01a&#39;;  
++-----------+-----------+-------------+--------------+
+| 11 + &#39;11&#39; | 11 + &#39;aa&#39; | &#39;a1&#39; + &#39;bb&#39; | 11 + &#39;0.01a&#39; |
++-----------+-----------+-------------+--------------+
+|        22 |        11 |           0 |        11.01 |
++-----------+-----------+-------------+--------------+
+1 row in set, 4 warnings (0.00 sec)
+
+mysql&gt; show warnings;
++---------+------+-------------------------------------------+
+| Level   | Code | Message                                   |
++---------+------+-------------------------------------------+
+| Warning | 1292 | Truncated incorrect DOUBLE value: &#39;aa&#39;    |
+| Warning | 1292 | Truncated incorrect DOUBLE value: &#39;a1&#39;    |
+| Warning | 1292 | Truncated incorrect DOUBLE value: &#39;bb&#39;    |
+| Warning | 1292 | Truncated incorrect DOUBLE value: &#39;0.01a&#39; |
++---------+------+-------------------------------------------+
+4 rows in set (0.00 sec)
+
+
+mysql&gt; select &#39;11a&#39; = 11, &#39;11.0&#39; = 11, &#39;11.0&#39; = &#39;11&#39;, NULL = 1;
++------------+-------------+---------------+----------+
+| &#39;11a&#39; = 11 | &#39;11.0&#39; = 11 | &#39;11.0&#39; = &#39;11&#39; | NULL = 1 |
++------------+-------------+---------------+----------+
+|          1 |           1 |             0 |     NULL |
++------------+-------------+---------------+----------+
+1 row in set, 1 warning (0.01 sec)
+</code></pre><p>上面可以看出<code>11 + 'aa'</code>，由于操作符两边的类型不一样且符合第g条，<code>aa</code>要被转换成浮点型小数，然而转换失败（字母被截断），可以认为转成了 0，整数<code>11</code>被转成浮点型还是它自己，所以<code>11 + 'aa' = 11</code>。</p>
+<p><code>0.01a</code>转成double型也是被截断成<code>0.01</code>，所以<code>11 + '0.01a' = 11.01</code>。</p>
+<p>等式比较也说明了这一点，<code>'11a'</code>和<code>'11.0'</code>转换后都等于 <code>11</code>，这也正是文章开头实例为什么没走索引的原因： varchar型的f_qq1_id，转换成浮点型比较时，等于 12345 的情况有无数种如12345a、12345.b等待，MySQL优化器无法确定索引是否更有效，所以选择了其它方案。</p>
+<p>但并不是只要出现隐式类型转换，就会引起上面类似的性能问题，最终是要看转换后能否有效选择索引。像<code>f_id = '654321'</code>、<code>f_mtime between '2016-05-01 00:00:00' and '2016-05-04 23:59:59'</code>就不会影响索引选择，因为前者f_id是整型，即使与后面的字符串型数字转换成double比较，依然能根据double确定f_id的值，索引依然有效。后者是因为符合第e条，只是右边的常量做了转换。</p>
+<p>开发人员可能都只要存在这么一个隐式类型转换的坑，但却又经常不注意，所以干脆无需记住那么多规则，该什么类型就与什么类型比较。</p>
+<h3 id="22-隐式类型转换的安全问题">2.2 隐式类型转换的安全问题<a hidden class="anchor" aria-hidden="true" href="#22-隐式类型转换的安全问题">#</a></h3>
+<p>implicit type conversion 不仅可能引起性能问题，还有可能产生安全问题。</p>
+<pre tabindex="0"><code>mysql&gt; desc t_account;
++-----------+-------------+------+-----+---------+----------------+
+| Field     | Type        | Null | Key | Default | Extra          |
++-----------+-------------+------+-----+---------+----------------+
+| fid       | int(11)     | NO   | PRI | NULL    | auto_increment |
+| fname     | varchar(20) | YES  |     | NULL    |                |
+| fpassword | varchar(50) | YES  |     | NULL    |                |
++-----------+-------------+------+-----+---------+----------------+
+
+mysql&gt; select * from t_account;
++-----+-----------+-------------+
+| fid | fname     | fpassword   |
++-----+-----------+-------------+
+|   1 | xiaoming  | p_xiaoming  |
+|   2 | xiaoming1 | p_xiaoming1 |
++-----+-----------+-------------+
+
+假如应用前端没有WAF防护，那么下面的sql很容易注入：
+mysql&gt; select * from t_account where fname=&#39;A&#39; ;
+
+fname传入  A&#39; OR 1=&#39;1  
+
+mysql&gt; select * from t_account where fname=&#39;A&#39; OR 1=&#39;1&#39;;
+</code></pre><p>攻击者更聪明一点： fname传入 <code>A'+'B</code>  ，fpassword传入 <code>ccc'+0</code> ：</p>
+<pre tabindex="0"><code>mysql&gt; select * from t_account where fname=&#39;A&#39;+&#39;B&#39; and fpassword=&#39;ccc&#39;+0;
++-----+-----------+-------------+
+| fid | fname     | fpassword   |
++-----+-----------+-------------+
+|   1 | xiaoming  | p_xiaoming  |
+|   2 | xiaoming1 | p_xiaoming1 |
++-----+-----------+-------------+
+2 rows in set, 7 warnings (0.00 sec)
+</code></pre><h2 id="参考">参考<a hidden class="anchor" aria-hidden="true" href="#参考">#</a></h2>
+<ul>
+<li><a href="https://yq.aliyun.com/articles/39477">MySQL隐式转化整理</a></li>
+<li><a href="http://blog.itpub.net/22418990/viewspace-1302080/">WHRER条件里的数据类型必须和字段数据类型一致</a></li>
+<li><a href="https://vagosec.org/2013/04/mysql-implicit-type-conversion/">Implicit type conversion in MySQL</a></li>
+</ul>
+<hr>
+<p>原文链接地址：http://xgknight.com/2016/05/05/mysql-type-conversion/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/schema%E8%AE%BE%E8%AE%A1/">schema设计</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

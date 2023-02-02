@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>MySQL数据库表结构同步之mysqldiff | Sean Note</title>
+<meta name="keywords" content="mysql, 表结构">
+<meta name="description" content="mysqldiff mysql官方有个 mysql-utilities 工具集，其中 mysqldiff 可用于比较两个db之间的表结构。 mysqldiff的语法格式是：
+$ mysqldiff --server1=user:pass@host:port:socket --server2=user:pass@host:port:socket db1.object1:db2.object1 db3:db4 这个语法有两个用法：
+db1:db2：如果只指定数据库，那么就将两个数据库中互相缺少的对象显示出来，不比较对象里面的差异。这里的对象包括表、存储过程、函数、触发器等。 如果db1与db2名字相同，可以只指定 db1 db1.object1:db2.object1：如果指定了具体表对象，那么就会详细对比两个表的差异，包括表名、字段名、备注、索引、大小写等所有的表相关的对象。
+如果两边db和对象名都相同，可以只指定 db1.object1 接下来看一些主要的参数：
+--server1：配置server1的连接。 --server2：配置server2的连接。 --character-set：配置连接时用的字符集，如果不显示配置默认使用character_set_client。 --width：配置显示的宽度。 --skip-table-options：保持表的选项不变，即对比的差异里面不包括表名、AUTO_INCREMENT、ENGINE、CHARSET等差异。 -d DIFFTYPE,--difftype=DIFFTYPE：差异的信息显示的方式，有 [unified|context|differ|sql]，默认是unified。如果使用sql，那么就直接生成差异的SQL，这样非常方便。 --changes-for=：修改对象。例如 &ndash;changes-for=server2，那么对比以sever1为主，生成的差异的修改也是针对server2的对象的修改。 --show-reverse：在生成的差异修改里面，同时会包含server2和server1的修改。 --force：完成所有的比较，不会在遇到一个差异之后退出 -vv：便于调试，输出许多信息 -q：quiet模式，关闭多余的信息输出 问题修复与增强 但是试用下来，发现有以下几大问题
+对象在一方不存在时，比对结果是 object does not exist，而我们通常需要的是，生产 CREATE/DROP XXX 语句 要比对一个db下面所有的对象（table, view, event, proc, func, trigger），要手动挨个 db1.t1, db2.v2&hellip;，而 db1:db2只是检查对象是否存在，不会自动比较db1与db2下的所有对象 比较时，auto_increment应该忽略，但是 mysqldiff 只提供 --skip-table-options ，忽略全部表选项，包括 auto_increment, engine, charset等等。 严重bug T1: idx1(f1,f2), T2: idx1(f1)，这种索引会生成 ADD INDEX idx(f2) T1: idx2(f1,f2), idx3(f3,f4), T2: idx4(f5)，这种组合索引，有可能生成的会乱序 这两个bug与mysqldiff的设计有关系，个人觉得它把比较和生产差异sql完全分开，复杂化了。它得到差异结果之后，生成sql又从db捞各种元数据来组装，其实从差异diff里面就可以获得组装需要的数据，也不容易出现隐藏的bug。参考实现 https://github.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2017/08/mysql%E6%95%B0%E6%8D%AE%E5%BA%93%E8%A1%A8%E7%BB%93%E6%9E%84%E5%90%8C%E6%AD%A5%E4%B9%8Bmysqldiff/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="MySQL数据库表结构同步之mysqldiff" />
+<meta property="og:description" content="mysqldiff mysql官方有个 mysql-utilities 工具集，其中 mysqldiff 可用于比较两个db之间的表结构。 mysqldiff的语法格式是：
+$ mysqldiff --server1=user:pass@host:port:socket --server2=user:pass@host:port:socket db1.object1:db2.object1 db3:db4 这个语法有两个用法：
+db1:db2：如果只指定数据库，那么就将两个数据库中互相缺少的对象显示出来，不比较对象里面的差异。这里的对象包括表、存储过程、函数、触发器等。 如果db1与db2名字相同，可以只指定 db1 db1.object1:db2.object1：如果指定了具体表对象，那么就会详细对比两个表的差异，包括表名、字段名、备注、索引、大小写等所有的表相关的对象。
+如果两边db和对象名都相同，可以只指定 db1.object1 接下来看一些主要的参数：
+--server1：配置server1的连接。 --server2：配置server2的连接。 --character-set：配置连接时用的字符集，如果不显示配置默认使用character_set_client。 --width：配置显示的宽度。 --skip-table-options：保持表的选项不变，即对比的差异里面不包括表名、AUTO_INCREMENT、ENGINE、CHARSET等差异。 -d DIFFTYPE,--difftype=DIFFTYPE：差异的信息显示的方式，有 [unified|context|differ|sql]，默认是unified。如果使用sql，那么就直接生成差异的SQL，这样非常方便。 --changes-for=：修改对象。例如 &ndash;changes-for=server2，那么对比以sever1为主，生成的差异的修改也是针对server2的对象的修改。 --show-reverse：在生成的差异修改里面，同时会包含server2和server1的修改。 --force：完成所有的比较，不会在遇到一个差异之后退出 -vv：便于调试，输出许多信息 -q：quiet模式，关闭多余的信息输出 问题修复与增强 但是试用下来，发现有以下几大问题
+对象在一方不存在时，比对结果是 object does not exist，而我们通常需要的是，生产 CREATE/DROP XXX 语句 要比对一个db下面所有的对象（table, view, event, proc, func, trigger），要手动挨个 db1.t1, db2.v2&hellip;，而 db1:db2只是检查对象是否存在，不会自动比较db1与db2下的所有对象 比较时，auto_increment应该忽略，但是 mysqldiff 只提供 --skip-table-options ，忽略全部表选项，包括 auto_increment, engine, charset等等。 严重bug T1: idx1(f1,f2), T2: idx1(f1)，这种索引会生成 ADD INDEX idx(f2) T1: idx2(f1,f2), idx3(f3,f4), T2: idx4(f5)，这种组合索引，有可能生成的会乱序 这两个bug与mysqldiff的设计有关系，个人觉得它把比较和生产差异sql完全分开，复杂化了。它得到差异结果之后，生成sql又从db捞各种元数据来组装，其实从差异diff里面就可以获得组装需要的数据，也不容易出现隐藏的bug。参考实现 https://github." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2017/08/mysql%E6%95%B0%E6%8D%AE%E5%BA%93%E8%A1%A8%E7%BB%93%E6%9E%84%E5%90%8C%E6%AD%A5%E4%B9%8Bmysqldiff/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2017-08-05T15:32:49+00:00" />
+<meta property="article:modified_time" content="2017-08-05T15:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="MySQL数据库表结构同步之mysqldiff"/>
+<meta name="twitter:description" content="mysqldiff mysql官方有个 mysql-utilities 工具集，其中 mysqldiff 可用于比较两个db之间的表结构。 mysqldiff的语法格式是：
+$ mysqldiff --server1=user:pass@host:port:socket --server2=user:pass@host:port:socket db1.object1:db2.object1 db3:db4 这个语法有两个用法：
+db1:db2：如果只指定数据库，那么就将两个数据库中互相缺少的对象显示出来，不比较对象里面的差异。这里的对象包括表、存储过程、函数、触发器等。 如果db1与db2名字相同，可以只指定 db1 db1.object1:db2.object1：如果指定了具体表对象，那么就会详细对比两个表的差异，包括表名、字段名、备注、索引、大小写等所有的表相关的对象。
+如果两边db和对象名都相同，可以只指定 db1.object1 接下来看一些主要的参数：
+--server1：配置server1的连接。 --server2：配置server2的连接。 --character-set：配置连接时用的字符集，如果不显示配置默认使用character_set_client。 --width：配置显示的宽度。 --skip-table-options：保持表的选项不变，即对比的差异里面不包括表名、AUTO_INCREMENT、ENGINE、CHARSET等差异。 -d DIFFTYPE,--difftype=DIFFTYPE：差异的信息显示的方式，有 [unified|context|differ|sql]，默认是unified。如果使用sql，那么就直接生成差异的SQL，这样非常方便。 --changes-for=：修改对象。例如 &ndash;changes-for=server2，那么对比以sever1为主，生成的差异的修改也是针对server2的对象的修改。 --show-reverse：在生成的差异修改里面，同时会包含server2和server1的修改。 --force：完成所有的比较，不会在遇到一个差异之后退出 -vv：便于调试，输出许多信息 -q：quiet模式，关闭多余的信息输出 问题修复与增强 但是试用下来，发现有以下几大问题
+对象在一方不存在时，比对结果是 object does not exist，而我们通常需要的是，生产 CREATE/DROP XXX 语句 要比对一个db下面所有的对象（table, view, event, proc, func, trigger），要手动挨个 db1.t1, db2.v2&hellip;，而 db1:db2只是检查对象是否存在，不会自动比较db1与db2下的所有对象 比较时，auto_increment应该忽略，但是 mysqldiff 只提供 --skip-table-options ，忽略全部表选项，包括 auto_increment, engine, charset等等。 严重bug T1: idx1(f1,f2), T2: idx1(f1)，这种索引会生成 ADD INDEX idx(f2) T1: idx2(f1,f2), idx3(f3,f4), T2: idx4(f5)，这种组合索引，有可能生成的会乱序 这两个bug与mysqldiff的设计有关系，个人觉得它把比较和生产差异sql完全分开，复杂化了。它得到差异结果之后，生成sql又从db捞各种元数据来组装，其实从差异diff里面就可以获得组装需要的数据，也不容易出现隐藏的bug。参考实现 https://github."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "MySQL数据库表结构同步之mysqldiff",
+      "item": "http://xgknight.com/posts/2017/08/mysql%E6%95%B0%E6%8D%AE%E5%BA%93%E8%A1%A8%E7%BB%93%E6%9E%84%E5%90%8C%E6%AD%A5%E4%B9%8Bmysqldiff/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "MySQL数据库表结构同步之mysqldiff",
+  "name": "MySQL数据库表结构同步之mysqldiff",
+  "description": "mysqldiff mysql官方有个 mysql-utilities 工具集，其中 mysqldiff 可用于比较两个db之间的表结构。 mysqldiff的语法格式是：\n$ mysqldiff --server1=user:pass@host:port:socket --server2=user:pass@host:port:socket db1.object1:db2.object1 db3:db4 这个语法有两个用法：\ndb1:db2：如果只指定数据库，那么就将两个数据库中互相缺少的对象显示出来，不比较对象里面的差异。这里的对象包括表、存储过程、函数、触发器等。 如果db1与db2名字相同，可以只指定 db1 db1.object1:db2.object1：如果指定了具体表对象，那么就会详细对比两个表的差异，包括表名、字段名、备注、索引、大小写等所有的表相关的对象。\n如果两边db和对象名都相同，可以只指定 db1.object1 接下来看一些主要的参数：\n--server1：配置server1的连接。 --server2：配置server2的连接。 --character-set：配置连接时用的字符集，如果不显示配置默认使用character_set_client。 --width：配置显示的宽度。 --skip-table-options：保持表的选项不变，即对比的差异里面不包括表名、AUTO_INCREMENT、ENGINE、CHARSET等差异。 -d DIFFTYPE,--difftype=DIFFTYPE：差异的信息显示的方式，有 [unified|context|differ|sql]，默认是unified。如果使用sql，那么就直接生成差异的SQL，这样非常方便。 --changes-for=：修改对象。例如 \u0026ndash;changes-for=server2，那么对比以sever1为主，生成的差异的修改也是针对server2的对象的修改。 --show-reverse：在生成的差异修改里面，同时会包含server2和server1的修改。 --force：完成所有的比较，不会在遇到一个差异之后退出 -vv：便于调试，输出许多信息 -q：quiet模式，关闭多余的信息输出 问题修复与增强 但是试用下来，发现有以下几大问题\n对象在一方不存在时，比对结果是 object does not exist，而我们通常需要的是，生产 CREATE/DROP XXX 语句 要比对一个db下面所有的对象（table, view, event, proc, func, trigger），要手动挨个 db1.t1, db2.v2\u0026hellip;，而 db1:db2只是检查对象是否存在，不会自动比较db1与db2下的所有对象 比较时，auto_increment应该忽略，但是 mysqldiff 只提供 --skip-table-options ，忽略全部表选项，包括 auto_increment, engine, charset等等。 严重bug T1: idx1(f1,f2), T2: idx1(f1)，这种索引会生成 ADD INDEX idx(f2) T1: idx2(f1,f2), idx3(f3,f4), T2: idx4(f5)，这种组合索引，有可能生成的会乱序 这两个bug与mysqldiff的设计有关系，个人觉得它把比较和生产差异sql完全分开，复杂化了。它得到差异结果之后，生成sql又从db捞各种元数据来组装，其实从差异diff里面就可以获得组装需要的数据，也不容易出现隐藏的bug。参考实现 https://github.",
+  "keywords": [
+    "mysql", "表结构"
+  ],
+  "articleBody": "mysqldiff mysql官方有个 mysql-utilities 工具集，其中 mysqldiff 可用于比较两个db之间的表结构。 mysqldiff的语法格式是：\n$ mysqldiff --server1=user:pass@host:port:socket --server2=user:pass@host:port:socket db1.object1:db2.object1 db3:db4 这个语法有两个用法：\ndb1:db2：如果只指定数据库，那么就将两个数据库中互相缺少的对象显示出来，不比较对象里面的差异。这里的对象包括表、存储过程、函数、触发器等。 如果db1与db2名字相同，可以只指定 db1 db1.object1:db2.object1：如果指定了具体表对象，那么就会详细对比两个表的差异，包括表名、字段名、备注、索引、大小写等所有的表相关的对象。\n如果两边db和对象名都相同，可以只指定 db1.object1 接下来看一些主要的参数：\n--server1：配置server1的连接。 --server2：配置server2的连接。 --character-set：配置连接时用的字符集，如果不显示配置默认使用character_set_client。 --width：配置显示的宽度。 --skip-table-options：保持表的选项不变，即对比的差异里面不包括表名、AUTO_INCREMENT、ENGINE、CHARSET等差异。 -d DIFFTYPE,--difftype=DIFFTYPE：差异的信息显示的方式，有 [unified|context|differ|sql]，默认是unified。如果使用sql，那么就直接生成差异的SQL，这样非常方便。 --changes-for=：修改对象。例如 –changes-for=server2，那么对比以sever1为主，生成的差异的修改也是针对server2的对象的修改。 --show-reverse：在生成的差异修改里面，同时会包含server2和server1的修改。 --force：完成所有的比较，不会在遇到一个差异之后退出 -vv：便于调试，输出许多信息 -q：quiet模式，关闭多余的信息输出 问题修复与增强 但是试用下来，发现有以下几大问题\n对象在一方不存在时，比对结果是 object does not exist，而我们通常需要的是，生产 CREATE/DROP XXX 语句 要比对一个db下面所有的对象（table, view, event, proc, func, trigger），要手动挨个 db1.t1, db2.v2…，而 db1:db2只是检查对象是否存在，不会自动比较db1与db2下的所有对象 比较时，auto_increment应该忽略，但是 mysqldiff 只提供 --skip-table-options ，忽略全部表选项，包括 auto_increment, engine, charset等等。 严重bug T1: idx1(f1,f2), T2: idx1(f1)，这种索引会生成 ADD INDEX idx(f2) T1: idx2(f1,f2), idx3(f3,f4), T2: idx4(f5)，这种组合索引，有可能生成的会乱序 这两个bug与mysqldiff的设计有关系，个人觉得它把比较和生产差异sql完全分开，复杂化了。它得到差异结果之后，生成sql又从db捞各种元数据来组装，其实从差异diff里面就可以获得组装需要的数据，也不容易出现隐藏的bug。参考实现 https://github.com/hidu/mysql-schema-sync\n针对上面几大问题，花了两天的时间阅读并修改了 mysqldiff 以及相关依赖的代码，都一一解决。 修复后的地址：https://github.com/seanlook/mysql-utilities/commits/master (mysql-utilities不像percona-toolkit那样每个工具都是All In One，需要改动mysqldiff.py意外的依赖模块)\n默认情况与官方的 mysqldiff 完全兼容，新增3个选项\n--include-create：是否生成创建对象(表等)的语句，而不是仅告知对象不存在。只有在 --difftype=sql 时有效。默认False --include-drop：是否生成DROP对象的语句，针对对象在原db不存在，而仅目标db存在的情况。只有在指定了--include-create 时起作用。drop操作因为比较危险，默认False，所以多加了这个选项 --skip-opt-autoinc：比较时跳过AUTO_INCREMNT。默认False 比较对象是，指定 db1.* 或 db1.*:db2.* 时，会比较他们所有的对象差异，而不仅显示缺少的对象 使用注意 比较时，尽量选择mysql版本相近的实例，比如mysql与mariadb比较，相同的表结构 show create table xxx 时可能得到不同的结果： mariadb会把int字段 default ‘0’ 自动改成 default 0 CURRENT_TIMESTAMP会显示成 current_timestamp() 字段 default NULL 时，mysql connector/python 查 information_schema.COLUMNS.COLUMN_DEFAULT 字段为 ‘NULL’ （带引号的字符），而不是None（即查出来是NULL），导致与mysql版本用不一样 字段注释 COMMENT '是否批准加入群 默认1批准 0拒绝\\0e=''t_user_g\\0' ，是成立的，正常\\0后面的都是没用的，但有个 ' 号，会导致生产sql时有多余的 ' 好，直接执行会失败。 所以，字段注释要规范，不要带入这些乱起乱七八糟的字符，特别是用IDE建表时，完成后在命令行 show create table xxx 看一下。 演示对比 mysqldiff --server1=ecdba:xx@yyyy:3305 --server2=ecdba:xx@yyyy:3305 mydb1.t_user:mydb2.t_user --changes-for=server2 --difftype=sql # WARNING: Using a password on the command line interface can be insecure. # server1 on 10.xx.xx.127: ... connected. # server2 on 10.xx.xx.127: ... connected. # Comparing mydb1.t_user to mydb2.t_user [FAIL] # Transformation for --changes-for=server2: # ALTER TABLE `mydb2`.`t_user` DROP INDEX idx_corpid, ADD INDEX idx_corpid_deptid (f_corp_id,f_dept_id), ADD INDEX idx_dept (f_dept_id); # Compare failed. One or more differences found. 这个地方原版里面会将idx_corpid_deptid生成 ADD INDEX idx_corpid_deptid(f_corp_id), ADD INDEX idx_corpid_deptid(f_dept_id)。这里已修复 原版： mydb1.t_test1:mydb2.t_test1 --changes-for=server2 --difftype=sql # WARNING: Using a password on the command line interface can be insecure. # server1 on 10.xx.xx.127: ... connected. # server2 on 10.xx.xx.127: ... connected. ERROR: The object mydb2.t_test1 does not exist. 新选项 --include-create --include-drop mydb1.t_test1:mydb2.t_test1 --changes-for=server2 --difftype=sql --include-create --include-drop # WARNING: Using a password on the command line interface can be insecure. # server1 on 10.xx.xx.127: ... connected. # server2 on 10.xx.xx.127: ... connected. USE mydb2; CREATE TABLE `t_test1` ( `id` int(11) DEFAULT NULL ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'; ' # Compare failed. One or more differences found. 新选项，修改changes-for后，生成drop mydb1.t_test1:mydb2.t_test1 --changes-for=server1 --difftype=sql --include-create --include-drop # WARNING: Using a password on the command line interface can be insecure. # server1 on 10.xx.xx.127: ... connected. # server2 on 10.xx.xx.127: ... connected. DROP TABLE IF EXISTS mydb1.t_test1; # Compare failed. One or more differences found. mydb1.t_user_face:mydb2.t_user_face --changes-for=server2 --difftype=sql --include-create --include-drop # WARNING: Using a password on the command line interface can be insecure. # server1 on 10.xx.xx.127: ... connected. # server2 on 10.xx.xx.127: ... connected. # Comparing mydb1.t_user_face to mydb2.t_user_face [FAIL] # Transformation for --changes-for=server2: # ALTER TABLE `mydb2`.`t_user_face` DROP INDEX idx_tt2, DROP INDEX idx_corp_time, DROP COLUMN f_test, ADD INDEX idx_corp_time (f_corp_id,f_modify_time), CHANGE COLUMN f_corp_id f_corp_id int(11) unsigned NOT NULL COMMENT '企业id', CHANGE COLUMN f_user_id f_user_id int(11) unsigned NOT NULL COMMENT '用户id', AUTO_INCREMENT=123434, COLLATE=utf8mb4_general_ci; # Compare failed. One or more differences found. 这个地方原版处理 idx_corp_time 时，因为第一列索引字段相同，会生成 ADD INDEX idx_corp_time(f_modify_time)。这里已修复 新选项 --skip-option-autoinc mydb1.t_user_face:mydb2.t_user_face --changes-for=server1 --difftype=sql --include-create --include-drop --skip-option-autoinc # WARNING: Using a password on the command line interface can be insecure. # server1 on 10.xx.xx.127: ... connected. # server2 on 10.xx.xx.127: ... connected. # Comparing mydb1.t_user_face to mydb2.t_user_face [FAIL] # Transformation for --changes-for=server1: # ALTER TABLE `mydb1`.`t_user_face` DROP INDEX idx_corp_time, ADD UNIQUE INDEX idx_tt2 (f_user_id,f_modify_time), ADD INDEX idx_corp_time (f_corp_id), CHANGE COLUMN f_corp_id f_corp_id int(10) unsigned NOT NULL COMMENT '企业id', CHANGE COLUMN f_user_id f_user_id int(10) unsigned NOT NULL COMMENT '用户id', ADD COLUMN f_test varchar(20) NOT NULL DEFAULT '' AFTER f_url, COLLATE=utf8_general_ci; # Compare failed. One or more differences found. 直接指定db，原版预修改版处理相同 mydb1:mydb2 --changes-for=server2 --difftype=sql # WARNING: Using a password on the command line interface can be insecure. # server1 on 10.xx.xx.127: ... connected. # server2 on 10.xx.xx.127: ... connected. # WARNING: Objects in server1.mydb1 but not in server1.mydb2: # TABLE: t_test1 # WARNING: Objects in server1.mydb2 but not in server1.mydb1: # VIEW: view_test # TABLE: t_test2 # Compare failed. One or more differences found. 指定 db.* ，处理相同 mydb1.*:mydb2.* --changes-for=server2 --difftype=sql # WARNING: Using a password on the command line interface can be insecure. # server1 on 10.xx.xx.127: ... connected. # server2 on 10.xx.xx.127: ... connected. ERROR: The object mydb1.* does not exist. 指定 db.* 和 --include-create ，依次处理全部对象，包括过程，视图等 mydb1.*:mydb2.* --changes-for=server2 --difftype=sql --difftype=sql --include-create --include-drop --skip-option-autoinc # WARNING: Using a password on the command line interface can be insecure. # server1 on 10.xx.xx.127: ... connected. # server2 on 10.xx.xx.127: ... connected. # WARNING: Objects in server1.mydb1 but not in server1.mydb2: # TABLE: t_test1 # WARNING: Objects in server1.mydb2 but not in server1.mydb1: # VIEW: view_test # TABLE: t_test2 # Comparing mydb1.t_user_face to mydb2.t_user_face [FAIL] # Transformation for --changes-for=server2: # ALTER TABLE `mydb2`.`t_user_face` DROP INDEX idx_tt2, DROP INDEX idx_corp_time, DROP COLUMN f_test, ADD INDEX idx_corp_time (f_corp_id,f_modify_time), CHANGE COLUMN f_corp_id f_corp_id int(11) unsigned NOT NULL COMMENT '企业id', CHANGE COLUMN f_user_id f_user_id int(11) unsigned NOT NULL COMMENT '用户id', COLLATE=utf8mb4_general_ci; DROP VIEW IF EXISTS mydb2.view_test; USE mydb2; CREATE TABLE `t_test1` ( `id` int(11) DEFAULT NULL ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'; ' # Comparing mydb1.t_user to mydb2.t_user [FAIL] # Transformation for --changes-for=server2: # ALTER TABLE `mydb2`.`t_user` DROP INDEX idx_corpid, ADD INDEX idx_corpid_deptid (f_corp_id,f_dept_id), ADD INDEX idx_dept (f_dept_id); # Comparing mydb1.proc_test to mydb2.proc_test [FAIL] # Transformation for --changes-for=server2: # DROP PROCEDURE IF EXISTS `mydb2`.`proc_test`; DELIMITER // CREATE DEFINER=`ecdba`@`%` PROCEDURE `mydb2`.`proc_test` () CONTAINS SQL SQL SECURITY DEFINER BEGIN select 1; END// DELIMITER ; DROP TABLE IF EXISTS mydb2.t_test2; # Compare failed. One or more differences found. 原文连接地址：http://xgknight.com/2017/08/05/mysql_mysqldiff/\n",
+  "wordCount" : "845",
+  "inLanguage": "en",
+  "datePublished": "2017-08-05T15:32:49Z",
+  "dateModified": "2017-08-05T15:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2017/08/mysql%E6%95%B0%E6%8D%AE%E5%BA%93%E8%A1%A8%E7%BB%93%E6%9E%84%E5%90%8C%E6%AD%A5%E4%B9%8Bmysqldiff/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      MySQL数据库表结构同步之mysqldiff
+    </h1>
+    <div class="post-meta"><span title='2017-08-05 15:32:49 +0000 UTC'>August 5, 2017</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><h1 id="mysqldiff">mysqldiff<a hidden class="anchor" aria-hidden="true" href="#mysqldiff">#</a></h1>
+<p>mysql官方有个 <a href="https://dev.mysql.com/doc/mysql-utilities/1.6/en/mysql-utils-install-rpm.html">mysql-utilities 工具集</a>，其中 mysqldiff 可用于比较两个db之间的表结构。
+mysqldiff的语法格式是：</p>
+<pre tabindex="0"><code>$ mysqldiff --server1=user:pass@host:port:socket --server2=user:pass@host:port:socket db1.object1:db2.object1 db3:db4
+</code></pre><p>这个语法有两个用法：</p>
+<ul>
+<li><code>db1:db2</code>：如果只指定数据库，那么就将两个数据库中互相缺少的对象显示出来，不比较对象里面的差异。这里的对象包括表、存储过程、函数、触发器等。
+如果db1与db2名字相同，可以只指定 <code>db1</code></li>
+<li><code>db1.object1:db2.object1</code>：如果指定了具体表对象，那么就会详细对比两个表的差异，包括表名、字段名、备注、索引、大小写等所有的表相关的对象。<br>
+如果两边db和对象名都相同，可以只指定 <code>db1.object1</code></li>
+</ul>
+<p>接下来看一些主要的参数：</p>
+<ul>
+<li><code>--server1</code>：配置server1的连接。</li>
+<li><code>--server2</code>：配置server2的连接。</li>
+<li><code>--character-set</code>：配置连接时用的字符集，如果不显示配置默认使用character_set_client。</li>
+<li><code>--width</code>：配置显示的宽度。</li>
+<li><code>--skip-table-options</code>：保持表的选项不变，即对比的差异里面不包括表名、AUTO_INCREMENT、ENGINE、CHARSET等差异。</li>
+<li><code>-d DIFFTYPE,--difftype=DIFFTYPE</code>：差异的信息显示的方式，有 [unified|context|differ|sql]，默认是unified。如果使用<code>sql</code>，那么就直接生成差异的SQL，这样非常方便。</li>
+<li><code>--changes-for=</code>：修改对象。例如 &ndash;changes-for=server2，那么对比以sever1为主，生成的差异的修改也是针对server2的对象的修改。</li>
+<li><code>--show-reverse</code>：在生成的差异修改里面，同时会包含server2和server1的修改。</li>
+<li><code>--force</code>：完成所有的比较，不会在遇到一个差异之后退出</li>
+<li><code>-vv</code>：便于调试，输出许多信息</li>
+<li><code>-q</code>：quiet模式，关闭多余的信息输出</li>
+</ul>
+<h1 id="问题修复与增强">问题修复与增强<a hidden class="anchor" aria-hidden="true" href="#问题修复与增强">#</a></h1>
+<p>但是试用下来，发现有以下几大问题</p>
+<ol>
+<li>对象在一方不存在时，比对结果是 object does not exist，而我们通常需要的是，生产 <code>CREATE/DROP XXX</code> 语句</li>
+<li>要比对一个db下面所有的对象（table, view, event, proc, func, trigger），要手动挨个 db1.t1, db2.v2&hellip;，而 db1:db2只是检查对象是否存在，不会自动比较db1与db2下的所有对象</li>
+<li>比较时，<code>auto_increment</code>应该忽略，但是 mysqldiff 只提供 <code>--skip-table-options</code> ，忽略全部表选项，包括 auto_increment, engine, charset等等。</li>
+<li>严重bug
+<ul>
+<li>T1: idx1(f1,f2),  T2: idx1(f1)，这种索引会生成 ADD INDEX idx(f2)</li>
+<li>T1: idx2(f1,f2), idx3(f3,f4),  T2: idx4(f5)，这种组合索引，有可能生成的会乱序</li>
+</ul>
+</li>
+</ol>
+<p>这两个bug与mysqldiff的设计有关系，个人觉得它把比较和生产差异sql完全分开，复杂化了。它得到差异结果之后，生成sql又从db捞各种元数据来组装，其实从差异diff里面就可以获得组装需要的数据，也不容易出现隐藏的bug。参考实现 <a href="https://github.com/hidu/mysql-schema-sync">https://github.com/hidu/mysql-schema-sync</a></p>
+<p>针对上面几大问题，花了两天的时间阅读并修改了 mysqldiff 以及相关依赖的代码，都一一解决。
+修复后的地址：https://github.com/seanlook/mysql-utilities/commits/master
+(mysql-utilities不像percona-toolkit那样每个工具都是All In One，需要改动mysqldiff.py意外的依赖模块)</p>
+<p>默认情况与官方的 mysqldiff 完全兼容，新增3个选项</p>
+<ol>
+<li><code>--include-create</code>：是否生成创建对象(表等)的语句，而不是仅告知对象不存在。只有在 <code>--difftype=sql</code> 时有效。默认False</li>
+<li><code>--include-drop</code>：是否生成DROP对象的语句，针对对象在原db不存在，而仅目标db存在的情况。只有在指定了<code>--include-create</code> 时起作用。drop操作因为比较危险，默认False，所以多加了这个选项</li>
+<li><code>--skip-opt-autoinc</code>：比较时跳过AUTO_INCREMNT。默认False</li>
+<li>比较对象是，指定 <code>db1.*</code>  或 <code>db1.*:db2.*</code> 时，会比较他们所有的对象差异，而不仅显示缺少的对象</li>
+</ol>
+<h2 id="使用注意">使用注意<a hidden class="anchor" aria-hidden="true" href="#使用注意">#</a></h2>
+<ol>
+<li>比较时，尽量选择mysql版本相近的实例，比如mysql与mariadb比较，相同的表结构 show create table xxx 时可能得到不同的结果：
+<ul>
+<li>mariadb会把int字段 default &lsquo;0&rsquo; 自动改成 default 0</li>
+<li><code>CURRENT_TIMESTAMP</code>会显示成 <code>current_timestamp()</code></li>
+<li>字段 <code>default NULL</code> 时，mysql connector/python 查 <code>information_schema.COLUMNS.COLUMN_DEFAULT</code> 字段为 <code>‘NULL’</code> （带引号的字符），而不是None（即查出来是NULL），导致与mysql版本用不一样</li>
+</ul>
+</li>
+<li>字段注释 <code>COMMENT '是否批准加入群 默认1批准 0拒绝\0e=''t_user_g\0'</code> ，是成立的，正常\0后面的都是没用的，但有个 <code>'</code> 号，会导致生产sql时有多余的 <code>'</code> 好，直接执行会失败。
+所以，字段注释要规范，不要带入这些乱起乱七八糟的字符，特别是用IDE建表时，完成后在命令行 show create table xxx 看一下。</li>
+</ol>
+<!-- raw HTML omitted -->
+<h1 id="演示对比">演示对比<a hidden class="anchor" aria-hidden="true" href="#演示对比">#</a></h1>
+<pre tabindex="0"><code>mysqldiff --server1=ecdba:xx@yyyy:3305 --server2=ecdba:xx@yyyy:3305 mydb1.t_user:mydb2.t_user  --changes-for=server2  --difftype=sql
+# WARNING: Using a password on the command line interface can be insecure.
+# server1 on 10.xx.xx.127: ... connected.
+# server2 on 10.xx.xx.127: ... connected.
+# Comparing mydb1.t_user to mydb2.t_user                           [FAIL]
+# Transformation for --changes-for=server2:
+#
+ 
+ALTER TABLE `mydb2`.`t_user`
+  DROP INDEX idx_corpid,
+  ADD INDEX idx_corpid_deptid (f_corp_id,f_dept_id),
+  ADD INDEX idx_dept (f_dept_id);
+ 
+# Compare failed. One or more differences found.
+  
+这个地方原版里面会将idx_corpid_deptid生成 ADD INDEX idx_corpid_deptid(f_corp_id), ADD INDEX idx_corpid_deptid(f_dept_id)。这里已修复
+</code></pre><pre tabindex="0"><code>原版：
+mydb1.t_test1:mydb2.t_test1  --changes-for=server2  --difftype=sql
+# WARNING: Using a password on the command line interface can be insecure.
+# server1 on 10.xx.xx.127: ... connected.
+# server2 on 10.xx.xx.127: ... connected.
+ERROR: The object mydb2.t_test1 does not exist.
+ 
+ 
+新选项 --include-create --include-drop
+mydb1.t_test1:mydb2.t_test1  --changes-for=server2  --difftype=sql --include-create --include-drop
+# WARNING: Using a password on the command line interface can be insecure.
+# server1 on 10.xx.xx.127: ... connected.
+# server2 on 10.xx.xx.127: ... connected.
+ 
+USE mydb2;
+CREATE TABLE `t_test1` (
+  `id` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4&#39;;
+&#39;
+# Compare failed. One or more differences found.
+ 
+ 
+新选项，修改changes-for后，生成drop
+mydb1.t_test1:mydb2.t_test1  --changes-for=server1  --difftype=sql --include-create --include-drop
+# WARNING: Using a password on the command line interface can be insecure.
+# server1 on 10.xx.xx.127: ... connected.
+# server2 on 10.xx.xx.127: ... connected.
+DROP TABLE IF EXISTS mydb1.t_test1;
+ 
+# Compare failed. One or more differences found.
+</code></pre><pre tabindex="0"><code>mydb1.t_user_face:mydb2.t_user_face  --changes-for=server2  --difftype=sql --include-create --include-drop
+# WARNING: Using a password on the command line interface can be insecure.
+# server1 on 10.xx.xx.127: ... connected.
+# server2 on 10.xx.xx.127: ... connected.
+# Comparing mydb1.t_user_face to mydb2.t_user_face                 [FAIL]
+# Transformation for --changes-for=server2:
+#
+ 
+ALTER TABLE `mydb2`.`t_user_face`
+  DROP INDEX idx_tt2,
+  DROP INDEX idx_corp_time,
+  DROP COLUMN f_test,
+  ADD INDEX idx_corp_time (f_corp_id,f_modify_time),
+  CHANGE COLUMN f_corp_id f_corp_id int(11) unsigned NOT NULL COMMENT &#39;企业id&#39;,
+  CHANGE COLUMN f_user_id f_user_id int(11) unsigned NOT NULL COMMENT &#39;用户id&#39;,
+AUTO_INCREMENT=123434, COLLATE=utf8mb4_general_ci;
+ 
+# Compare failed. One or more differences found.
+这个地方原版处理 idx_corp_time 时，因为第一列索引字段相同，会生成 ADD INDEX idx_corp_time(f_modify_time)。这里已修复
+ 
+新选项 --skip-option-autoinc
+mydb1.t_user_face:mydb2.t_user_face  --changes-for=server1  --difftype=sql --include-create --include-drop --skip-option-autoinc
+# WARNING: Using a password on the command line interface can be insecure.
+# server1 on 10.xx.xx.127: ... connected.
+# server2 on 10.xx.xx.127: ... connected.
+# Comparing mydb1.t_user_face to mydb2.t_user_face                 [FAIL]
+# Transformation for --changes-for=server1:
+#
+ 
+ALTER TABLE `mydb1`.`t_user_face`
+  DROP INDEX idx_corp_time,
+  ADD UNIQUE INDEX idx_tt2 (f_user_id,f_modify_time),
+  ADD INDEX idx_corp_time (f_corp_id),
+  CHANGE COLUMN f_corp_id f_corp_id int(10) unsigned NOT NULL COMMENT &#39;企业id&#39;,
+  CHANGE COLUMN f_user_id f_user_id int(10) unsigned NOT NULL COMMENT &#39;用户id&#39;,
+  ADD COLUMN f_test varchar(20) NOT NULL DEFAULT &#39;&#39; AFTER f_url,
+COLLATE=utf8_general_ci;
+ 
+# Compare failed. One or more differences found.
+</code></pre><pre tabindex="0"><code>直接指定db，原版预修改版处理相同
+mydb1:mydb2  --changes-for=server2  --difftype=sql
+# WARNING: Using a password on the command line interface can be insecure.
+# server1 on 10.xx.xx.127: ... connected.
+# server2 on 10.xx.xx.127: ... connected.
+# WARNING: Objects in server1.mydb1 but not in server1.mydb2:
+#        TABLE: t_test1
+# WARNING: Objects in server1.mydb2 but not in server1.mydb1:
+#         VIEW: view_test
+#        TABLE: t_test2
+# Compare failed. One or more differences found.
+ 
+ 
+指定 db.* ，处理相同
+mydb1.*:mydb2.*  --changes-for=server2  --difftype=sql
+# WARNING: Using a password on the command line interface can be insecure.
+# server1 on 10.xx.xx.127: ... connected.
+# server2 on 10.xx.xx.127: ... connected.
+ERROR: The object mydb1.* does not exist.
+ 
+ 
+指定 db.* 和 --include-create ，依次处理全部对象，包括过程，视图等
+mydb1.*:mydb2.*  --changes-for=server2  --difftype=sql --difftype=sql --include-create --include-drop --skip-option-autoinc
+# WARNING: Using a password on the command line interface can be insecure.
+# server1 on 10.xx.xx.127: ... connected.
+# server2 on 10.xx.xx.127: ... connected.
+# WARNING: Objects in server1.mydb1 but not in server1.mydb2:
+#        TABLE: t_test1
+# WARNING: Objects in server1.mydb2 but not in server1.mydb1:
+#         VIEW: view_test
+#        TABLE: t_test2
+# Comparing mydb1.t_user_face to mydb2.t_user_face                 [FAIL]
+# Transformation for --changes-for=server2:
+#
+ 
+ALTER TABLE `mydb2`.`t_user_face`
+  DROP INDEX idx_tt2,
+  DROP INDEX idx_corp_time,
+  DROP COLUMN f_test,
+  ADD INDEX idx_corp_time (f_corp_id,f_modify_time),
+  CHANGE COLUMN f_corp_id f_corp_id int(11) unsigned NOT NULL COMMENT &#39;企业id&#39;,
+  CHANGE COLUMN f_user_id f_user_id int(11) unsigned NOT NULL COMMENT &#39;用户id&#39;,
+COLLATE=utf8mb4_general_ci;
+ 
+DROP VIEW IF EXISTS mydb2.view_test;
+ 
+ 
+USE mydb2;
+CREATE TABLE `t_test1` (
+  `id` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4&#39;;
+&#39;
+# Comparing mydb1.t_user to mydb2.t_user                           [FAIL]
+# Transformation for --changes-for=server2:
+#
+ 
+ALTER TABLE `mydb2`.`t_user`
+  DROP INDEX idx_corpid,
+  ADD INDEX idx_corpid_deptid (f_corp_id,f_dept_id),
+  ADD INDEX idx_dept (f_dept_id);
+ 
+# Comparing mydb1.proc_test to mydb2.proc_test                     [FAIL]
+# Transformation for --changes-for=server2:
+#
+ 
+DROP PROCEDURE IF EXISTS `mydb2`.`proc_test`;
+DELIMITER //
+CREATE DEFINER=`ecdba`@`%` PROCEDURE `mydb2`.`proc_test` () CONTAINS SQL SQL SECURITY DEFINER BEGIN
+    select 1;
+ 
+END//
+DELIMITER ;
+ 
+ 
+DROP TABLE IF EXISTS mydb2.t_test2;
+ 
+# Compare failed. One or more differences found.
+</code></pre><hr>
+<p>原文连接地址：http://xgknight.com/2017/08/05/mysql_mysqldiff/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/%E8%A1%A8%E7%BB%93%E6%9E%84/">表结构</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

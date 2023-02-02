@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>关于MySQL自增主键的几点问题（下） | Sean Note</title>
+<meta name="keywords" content="mysql, schema设计">
+<meta name="description" content="AUTO-INC waiting 锁等待 这是生产环境出现的现象，某日下午5点业务高峰期，我们的 慢查询快照抓取程序 报出大量线程阻塞，但是1分钟以后就好了。于是分析了当时的 processlist 和 innodb status 现场记录，发现有大量的 AUTO-INC waiting：
+![auto-inc-lock-wait][1]
+当时想这是得多大的并发量，才会导致 AUTO_INCREMENT 列的自增id分配出现性能问题，不太愿意相信这个事实（后面就再也没出现过）。了解一番之后（见 关于MySQLz自增主键问题（上篇）），发现这个表级别的 AUTO-INC lock 就不应该在业务中存在，因为 innodb_autoinc_lock_mode为1，普通业务都是 simple inserts，获取自增id是靠内存里维护的一个互斥量（mutex counter）。
+问题拿到知数堂优化班上课群里讨论过，也只是猜测是不是慢查询多了导致负载高，或者当时磁盘遇到什么物理故障阿里云那边自动恢复了。再后来怀疑是不是因为插入时带了 auto_increment 列的值（我们有个redis incr实现的自增id服务，虽然这一列有 AAUTO_INCREMENT 定义，但实际已经从发号器取id了），会导致锁的性质会变？
+为了弄清这个疑问，特意去看了下mysql源码，发现如果插入的自增值比表当前AUTOINC值要大，是直接update mutex counter：
+看源码的时候也打消了另一个疑虑：show engine innodb status 看到的 AUTO-INC 有没有可能不区分 表级自增锁和互斥量计数器 两种自增方案，只是告诉你自增id获取忙不过来？ 实际不是的，代码里面有明确的定义是 autoinc_lock还是autoinc_mutex：
+// dict0dict.cc : #ifndef UNIV_HOTBACKUP /********************************************************************//** Acquire the autoinc lock. */ UNIV_INTERN void dict_table_autoinc_lock( /*====================*/ dict_table_t*	table)	/*!&lt; in/out: table */ { mutex_enter(&amp;table-&gt;autoinc_mutex); } /********************************************************************//** Unconditionally set the autoinc counter.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2017/02/%E5%85%B3%E4%BA%8Emysql%E8%87%AA%E5%A2%9E%E4%B8%BB%E9%94%AE%E7%9A%84%E5%87%A0%E7%82%B9%E9%97%AE%E9%A2%98%E4%B8%8B/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="关于MySQL自增主键的几点问题（下）" />
+<meta property="og:description" content="AUTO-INC waiting 锁等待 这是生产环境出现的现象，某日下午5点业务高峰期，我们的 慢查询快照抓取程序 报出大量线程阻塞，但是1分钟以后就好了。于是分析了当时的 processlist 和 innodb status 现场记录，发现有大量的 AUTO-INC waiting：
+![auto-inc-lock-wait][1]
+当时想这是得多大的并发量，才会导致 AUTO_INCREMENT 列的自增id分配出现性能问题，不太愿意相信这个事实（后面就再也没出现过）。了解一番之后（见 关于MySQLz自增主键问题（上篇）），发现这个表级别的 AUTO-INC lock 就不应该在业务中存在，因为 innodb_autoinc_lock_mode为1，普通业务都是 simple inserts，获取自增id是靠内存里维护的一个互斥量（mutex counter）。
+问题拿到知数堂优化班上课群里讨论过，也只是猜测是不是慢查询多了导致负载高，或者当时磁盘遇到什么物理故障阿里云那边自动恢复了。再后来怀疑是不是因为插入时带了 auto_increment 列的值（我们有个redis incr实现的自增id服务，虽然这一列有 AAUTO_INCREMENT 定义，但实际已经从发号器取id了），会导致锁的性质会变？
+为了弄清这个疑问，特意去看了下mysql源码，发现如果插入的自增值比表当前AUTOINC值要大，是直接update mutex counter：
+看源码的时候也打消了另一个疑虑：show engine innodb status 看到的 AUTO-INC 有没有可能不区分 表级自增锁和互斥量计数器 两种自增方案，只是告诉你自增id获取忙不过来？ 实际不是的，代码里面有明确的定义是 autoinc_lock还是autoinc_mutex：
+// dict0dict.cc : #ifndef UNIV_HOTBACKUP /********************************************************************//** Acquire the autoinc lock. */ UNIV_INTERN void dict_table_autoinc_lock( /*====================*/ dict_table_t*	table)	/*!&lt; in/out: table */ { mutex_enter(&amp;table-&gt;autoinc_mutex); } /********************************************************************//** Unconditionally set the autoinc counter." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2017/02/%E5%85%B3%E4%BA%8Emysql%E8%87%AA%E5%A2%9E%E4%B8%BB%E9%94%AE%E7%9A%84%E5%87%A0%E7%82%B9%E9%97%AE%E9%A2%98%E4%B8%8B/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2017-02-17T16:32:49+00:00" />
+<meta property="article:modified_time" content="2017-02-17T16:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="关于MySQL自增主键的几点问题（下）"/>
+<meta name="twitter:description" content="AUTO-INC waiting 锁等待 这是生产环境出现的现象，某日下午5点业务高峰期，我们的 慢查询快照抓取程序 报出大量线程阻塞，但是1分钟以后就好了。于是分析了当时的 processlist 和 innodb status 现场记录，发现有大量的 AUTO-INC waiting：
+![auto-inc-lock-wait][1]
+当时想这是得多大的并发量，才会导致 AUTO_INCREMENT 列的自增id分配出现性能问题，不太愿意相信这个事实（后面就再也没出现过）。了解一番之后（见 关于MySQLz自增主键问题（上篇）），发现这个表级别的 AUTO-INC lock 就不应该在业务中存在，因为 innodb_autoinc_lock_mode为1，普通业务都是 simple inserts，获取自增id是靠内存里维护的一个互斥量（mutex counter）。
+问题拿到知数堂优化班上课群里讨论过，也只是猜测是不是慢查询多了导致负载高，或者当时磁盘遇到什么物理故障阿里云那边自动恢复了。再后来怀疑是不是因为插入时带了 auto_increment 列的值（我们有个redis incr实现的自增id服务，虽然这一列有 AAUTO_INCREMENT 定义，但实际已经从发号器取id了），会导致锁的性质会变？
+为了弄清这个疑问，特意去看了下mysql源码，发现如果插入的自增值比表当前AUTOINC值要大，是直接update mutex counter：
+看源码的时候也打消了另一个疑虑：show engine innodb status 看到的 AUTO-INC 有没有可能不区分 表级自增锁和互斥量计数器 两种自增方案，只是告诉你自增id获取忙不过来？ 实际不是的，代码里面有明确的定义是 autoinc_lock还是autoinc_mutex：
+// dict0dict.cc : #ifndef UNIV_HOTBACKUP /********************************************************************//** Acquire the autoinc lock. */ UNIV_INTERN void dict_table_autoinc_lock( /*====================*/ dict_table_t*	table)	/*!&lt; in/out: table */ { mutex_enter(&amp;table-&gt;autoinc_mutex); } /********************************************************************//** Unconditionally set the autoinc counter."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "关于MySQL自增主键的几点问题（下）",
+      "item": "http://xgknight.com/posts/2017/02/%E5%85%B3%E4%BA%8Emysql%E8%87%AA%E5%A2%9E%E4%B8%BB%E9%94%AE%E7%9A%84%E5%87%A0%E7%82%B9%E9%97%AE%E9%A2%98%E4%B8%8B/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "关于MySQL自增主键的几点问题（下）",
+  "name": "关于MySQL自增主键的几点问题（下）",
+  "description": "AUTO-INC waiting 锁等待 这是生产环境出现的现象，某日下午5点业务高峰期，我们的 慢查询快照抓取程序 报出大量线程阻塞，但是1分钟以后就好了。于是分析了当时的 processlist 和 innodb status 现场记录，发现有大量的 AUTO-INC waiting：\n![auto-inc-lock-wait][1]\n当时想这是得多大的并发量，才会导致 AUTO_INCREMENT 列的自增id分配出现性能问题，不太愿意相信这个事实（后面就再也没出现过）。了解一番之后（见 关于MySQLz自增主键问题（上篇）），发现这个表级别的 AUTO-INC lock 就不应该在业务中存在，因为 innodb_autoinc_lock_mode为1，普通业务都是 simple inserts，获取自增id是靠内存里维护的一个互斥量（mutex counter）。\n问题拿到知数堂优化班上课群里讨论过，也只是猜测是不是慢查询多了导致负载高，或者当时磁盘遇到什么物理故障阿里云那边自动恢复了。再后来怀疑是不是因为插入时带了 auto_increment 列的值（我们有个redis incr实现的自增id服务，虽然这一列有 AAUTO_INCREMENT 定义，但实际已经从发号器取id了），会导致锁的性质会变？\n为了弄清这个疑问，特意去看了下mysql源码，发现如果插入的自增值比表当前AUTOINC值要大，是直接update mutex counter：\n看源码的时候也打消了另一个疑虑：show engine innodb status 看到的 AUTO-INC 有没有可能不区分 表级自增锁和互斥量计数器 两种自增方案，只是告诉你自增id获取忙不过来？ 实际不是的，代码里面有明确的定义是 autoinc_lock还是autoinc_mutex：\n// dict0dict.cc : #ifndef UNIV_HOTBACKUP /********************************************************************//** Acquire the autoinc lock. */ UNIV_INTERN void dict_table_autoinc_lock( /*====================*/ dict_table_t*\ttable)\t/*!\u0026lt; in/out: table */ { mutex_enter(\u0026amp;table-\u0026gt;autoinc_mutex); } /********************************************************************//** Unconditionally set the autoinc counter.",
+  "keywords": [
+    "mysql", "schema设计"
+  ],
+  "articleBody": "AUTO-INC waiting 锁等待 这是生产环境出现的现象，某日下午5点业务高峰期，我们的 慢查询快照抓取程序 报出大量线程阻塞，但是1分钟以后就好了。于是分析了当时的 processlist 和 innodb status 现场记录，发现有大量的 AUTO-INC waiting：\n![auto-inc-lock-wait][1]\n当时想这是得多大的并发量，才会导致 AUTO_INCREMENT 列的自增id分配出现性能问题，不太愿意相信这个事实（后面就再也没出现过）。了解一番之后（见 关于MySQLz自增主键问题（上篇）），发现这个表级别的 AUTO-INC lock 就不应该在业务中存在，因为 innodb_autoinc_lock_mode为1，普通业务都是 simple inserts，获取自增id是靠内存里维护的一个互斥量（mutex counter）。\n问题拿到知数堂优化班上课群里讨论过，也只是猜测是不是慢查询多了导致负载高，或者当时磁盘遇到什么物理故障阿里云那边自动恢复了。再后来怀疑是不是因为插入时带了 auto_increment 列的值（我们有个redis incr实现的自增id服务，虽然这一列有 AAUTO_INCREMENT 定义，但实际已经从发号器取id了），会导致锁的性质会变？\n为了弄清这个疑问，特意去看了下mysql源码，发现如果插入的自增值比表当前AUTOINC值要大，是直接update mutex counter：\n看源码的时候也打消了另一个疑虑：show engine innodb status 看到的 AUTO-INC 有没有可能不区分 表级自增锁和互斥量计数器 两种自增方案，只是告诉你自增id获取忙不过来？ 实际不是的，代码里面有明确的定义是 autoinc_lock还是autoinc_mutex：\n// dict0dict.cc : #ifndef UNIV_HOTBACKUP /********************************************************************//** Acquire the autoinc lock. */ UNIV_INTERN void dict_table_autoinc_lock( /*====================*/ dict_table_t*\ttable)\t/*!\u003c in/out: table */ { mutex_enter(\u0026table-\u003eautoinc_mutex); } /********************************************************************//** Unconditionally set the autoinc counter. */ UNIV_INTERN void dict_table_autoinc_initialize( /*==========================*/ dict_table_t*\ttable,\t/*!\u003c in/out: table */ ib_uint64_t\tvalue)\t/*!\u003c in: next value to assign to a row */ { ut_ad(mutex_own(\u0026table-\u003eautoinc_mutex)); table-\u003eautoinc = value; } 最后在微信上找周彦伟大神问问，在快要放弃的时候，从 innodb_lock_waits 中锁等待之间关系，一层一层挖，终于找到了一条这样的sql:\n\"INSERT INTO mydb1.t_mytable_inc ( f_log_id, f_fff_id, ..., f_from, f_sendmsg ) SELECT 2021712366, 507019984, ..., 10, 0 from dual\" 瞬间就明(ma)白(niang)了。典型的 INSERT ... SELECT ...， 但是 select 子句带的全是常量，但是对 innodb 来说它还是认为“这是 bulk inserts，我无法预估插入行数”，所以使用表级锁的自增方式。当时同时有 22 个这样的插入，可能负载也确实比较高导致活跃事务里主键最小的那一条一直处于 query end 状态，后面简单insert也需要等这个 语句 结束，直到释放 AUTO-INC table lock，以致引起雪崩效应。\n之所以一直没发现这条语句，是因为 processlist 太长了，而且格式不友好。快照抓取程序这块还可以优化。\n最后解决其实非常容易：\n既然已经有自增id服务，直接把把主键上的 AUTO_INCREMENT 定义去掉 整改这种 insert … select … 的sql。维护时可以，但开发账号要杜绝 周大神说他们用的是 mode 2 模式。也不失为一种方法 load data 为什么没阻塞其它事务 这是一个同行网友请教我的： ![][2]\n上篇讲到，load data infile 由于innodb无法提前知道插入的行数，所以归为 bulk inserts —— 表自增方式升级为表级锁，这样一来其它会话里的 insert岂不应该是会被阻塞，为什么实验结果却没有阻塞。\n当然一开始我也觉得奇怪，但是仔细想一下就知道，这个表级锁是一个特殊的表锁，为了提高并发性，它是在 语句 结束就释放了（而不是事务结束），那么只要验证 LOAD DATA 是把文件里面的行记录，拼装成单个insert就行了，这样其它会话的插入就可以在交错获得表级自增锁，实现不阻塞插入： ![][3]\n上图 row 模式下 的binlog，看到 BEGIN ... COMMIT 之间包含了 多行 insert。（注：在 statement 模式下，binlog里面记录的是 LOAD DATA 语句，从库会把文件从主库传输过来，再执行） 温馨提示： 1. 如果load data 的文件自带主键值，那么另一个会话获取的自增值很容易产生重复。 2. stackexchange上有个关于 [load data infile 对复制安全性的讨论](http://dba.stackexchange.com/questions/40400/loading-data-in-mysql-using-load-data-infile-replication-safe) ，同意二楼的观点，官方文档里说的 unsafe，并不是说执行这样的语句会导致安全问题，而是 considered unsafe，在 row-based 可用的情况下，优化器会自动把binlog记录为 row ，依然是安全的。 [1]: http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-autoinc-1.png [2]: http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-autoinc-loaddata.png [3]: http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-autoinc-loaddata-binlog.png --- 本文链接地址：http://xgknight.com/2017/02/17/mysql-autoincrement_2/ --- ",
+  "wordCount" : "228",
+  "inLanguage": "en",
+  "datePublished": "2017-02-17T16:32:49Z",
+  "dateModified": "2017-02-17T16:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2017/02/%E5%85%B3%E4%BA%8Emysql%E8%87%AA%E5%A2%9E%E4%B8%BB%E9%94%AE%E7%9A%84%E5%87%A0%E7%82%B9%E9%97%AE%E9%A2%98%E4%B8%8B/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      关于MySQL自增主键的几点问题（下）
+    </h1>
+    <div class="post-meta"><span title='2017-02-17 16:32:49 +0000 UTC'>February 17, 2017</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><h3 id="auto-inc-waiting-锁等待">AUTO-INC waiting 锁等待<a hidden class="anchor" aria-hidden="true" href="#auto-inc-waiting-锁等待">#</a></h3>
+<p>这是生产环境出现的现象，某日下午5点业务高峰期，我们的 <a href="http://xgknight.com/2016/09/27/python-mysql-querykill/">慢查询快照抓取程序</a> 报出大量线程阻塞，但是1分钟以后就好了。于是分析了当时的 processlist 和 innodb status 现场记录，发现有大量的 <code>AUTO-INC waiting</code>：</p>
+<p>![auto-inc-lock-wait][1]</p>
+<p>当时想这是得多大的并发量，才会导致 AUTO_INCREMENT 列的自增id分配出现性能问题，不太愿意相信这个事实（后面就再也没出现过）。了解一番之后（见 <a href="http://xgknight.com/2017/02/16/mysql-autoincrement/">关于MySQLz自增主键问题（上篇）</a>），发现这个表级别的 AUTO-INC lock 就不应该在业务中存在，因为 <code>innodb_autoinc_lock_mode</code>为1，普通业务都是 simple inserts，获取自增id是靠内存里维护的一个互斥量（mutex counter）。</p>
+<p>问题拿到知数堂优化班上课群里讨论过，也只是猜测是不是慢查询多了导致负载高，或者当时磁盘遇到什么物理故障阿里云那边自动恢复了。再后来怀疑是不是因为插入时带了 auto_increment 列的值（我们有个redis incr实现的自增id服务，虽然这一列有 AAUTO_INCREMENT 定义，但实际已经从发号器取id了），会导致锁的性质会变？</p>
+<p>为了弄清这个疑问，特意去看了下mysql源码，发现如果插入的自增值比表当前AUTOINC值要大，是直接update mutex counter：</p>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-autoinc-mutex-update.png" alt=""  />
+</p>
+<p>看源码的时候也打消了另一个疑虑：<code>show engine innodb status</code> 看到的 <code>AUTO-INC</code> 有没有可能不区分 表级自增锁和互斥量计数器 两种自增方案，只是告诉你自增id获取忙不过来？ 实际不是的，代码里面有明确的定义是 <code>autoinc_lock</code>还是<code>autoinc_mutex</code>：</p>
+<pre tabindex="0"><code>// dict0dict.cc :
+#ifndef UNIV_HOTBACKUP
+/********************************************************************//**
+Acquire the autoinc lock. */
+UNIV_INTERN
+void
+dict_table_autoinc_lock(
+/*====================*/
+	dict_table_t*	table)	/*!&lt; in/out: table */
+{
+	mutex_enter(&amp;table-&gt;autoinc_mutex);
+}
+
+/********************************************************************//**
+Unconditionally set the autoinc counter. */
+UNIV_INTERN
+void
+dict_table_autoinc_initialize(
+/*==========================*/
+	dict_table_t*	table,	/*!&lt; in/out: table */
+	ib_uint64_t	value)	/*!&lt; in: next value to assign to a row */
+{
+	ut_ad(mutex_own(&amp;table-&gt;autoinc_mutex));
+
+	table-&gt;autoinc = value;
+}
+</code></pre><!-- raw HTML omitted -->
+<p>最后在微信上找周彦伟大神问问，在快要放弃的时候，从 innodb_lock_waits 中锁等待之间关系，一层一层挖，终于找到了一条这样的sql:</p>
+<pre tabindex="0"><code>&#34;INSERT INTO mydb1.t_mytable_inc ( f_log_id, f_fff_id, ..., f_from, f_sendmsg )
+    SELECT 2021712366, 507019984, ..., 10, 0 from dual&#34;
+</code></pre><p>瞬间就明(ma)白(niang)了。典型的 <code>INSERT ... SELECT ...</code>， 但是 select 子句带的全是常量，但是对 innodb 来说它还是认为“这是 bulk inserts，我无法预估插入行数”，所以使用表级锁的自增方式。当时同时有 22 个这样的插入，可能负载也确实比较高导致活跃事务里主键最小的那一条一直处于 <em>query end</em> 状态，后面简单insert也需要等这个 语句 结束，直到释放 AUTO-INC table lock，以致引起雪崩效应。</p>
+<p>之所以一直没发现这条语句，是因为 processlist 太长了，而且格式不友好。快照抓取程序这块还可以优化。</p>
+<p>最后解决其实非常容易：</p>
+<ol>
+<li>既然已经有自增id服务，直接把把主键上的 AUTO_INCREMENT 定义去掉</li>
+<li>整改这种 insert &hellip; select &hellip; 的sql。维护时可以，但开发账号要杜绝</li>
+<li>周大神说他们用的是 mode 2 模式。也不失为一种方法</li>
+</ol>
+<h3 id="load-data-为什么没阻塞其它事务">load data 为什么没阻塞其它事务<a hidden class="anchor" aria-hidden="true" href="#load-data-为什么没阻塞其它事务">#</a></h3>
+<p>这是一个同行网友请教我的：
+![][2]</p>
+<p>上篇讲到，load data infile 由于innodb无法提前知道插入的行数，所以归为 bulk inserts —— 表自增方式升级为表级锁，这样一来其它会话里的 insert岂不应该是会被阻塞，为什么实验结果却没有阻塞。</p>
+<p>当然一开始我也觉得奇怪，但是仔细想一下就知道，这个表级锁是一个特殊的表锁，为了提高并发性，它是在 <strong>语句</strong> 结束就释放了（而不是事务结束），那么只要验证 LOAD DATA 是把文件里面的行记录，拼装成单个insert就行了，这样其它会话的插入就可以在交错获得表级自增锁，实现不阻塞插入：
+![][3]</p>
+<pre tabindex="0"><code class="language-上图我是为了看效果，临时设置" data-lang="上图我是为了看效果，临时设置">
+上图 row 模式下 的binlog，看到 BEGIN ... COMMIT 之间包含了 多行 insert。（注：在 statement 模式下，binlog里面记录的是 LOAD DATA 语句，从库会把文件从主库传输过来，再执行）
+
+
+温馨提示：  
+1. 如果load data 的文件自带主键值，那么另一个会话获取的自增值很容易产生重复。
+2. stackexchange上有个关于 [load data infile 对复制安全性的讨论](http://dba.stackexchange.com/questions/40400/loading-data-in-mysql-using-load-data-infile-replication-safe) ，同意二楼的观点，官方文档里说的 unsafe，并不是说执行这样的语句会导致安全问题，而是 considered unsafe，在 row-based 可用的情况下，优化器会自动把binlog记录为 row ，依然是安全的。
+
+
+
+  [1]: http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-autoinc-1.png
+  [2]: http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-autoinc-loaddata.png
+  [3]: http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-autoinc-loaddata-binlog.png
+
+
+
+---
+
+本文链接地址：http://xgknight.com/2017/02/17/mysql-autoincrement_2/
+
+---
+</code></pre>
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/schema%E8%AE%BE%E8%AE%A1/">schema设计</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

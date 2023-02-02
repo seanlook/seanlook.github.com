@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>优化 on Sean Note</title>
+    <link>http://xgknight.com/tags/%E4%BC%98%E5%8C%96/</link>
+    <description>Recent content in 优化 on Sean Note</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Thu, 26 Oct 2017 15:32:49 +0000</lastBuildDate><atom:link href="http://xgknight.com/tags/%E4%BC%98%E5%8C%96/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>MySQL order by limit 走错索引(range-&gt;indexscan)</title>
+      <link>http://xgknight.com/posts/2017/10/mysql-order-by-limit-%E8%B5%B0%E9%94%99%E7%B4%A2%E5%BC%95range-indexscan/</link>
+      <pubDate>Thu, 26 Oct 2017 15:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/10/mysql-order-by-limit-%E8%B5%B0%E9%94%99%E7%B4%A2%E5%BC%95range-indexscan/</guid>
+      <description>生产库遇到过好几例本文要讨论的案例，而且比较棘手。简而言之，有类似这样的查询 SELECT * FROM t1 where t1.f2&amp;gt;1 and t2.f2&amp;lt;100 order by t1.id，id是主键，条件里面有个range查询，就会造成优化器是选择主键，还是选择filesort问题，有些特殊情况就会选错索引，比如为了回避内存排序，选择了主键扫描，导致原本走范围过滤再sort 500ms勉强可以结束的查询，5分钟不出结果。
+下面具体来这个案例。
+1. 背景 阿里云RDS，5.6.16-log。 表 d_ec_someextend.t_tbl_test_time_08:
+CREATE TABLE `t_tbl_test_time_08` ( `f_some_id` int(11) unsigned DEFAULT &amp;#39;0&amp;#39;, `f_qiye_id` int(11) DEFAULT &amp;#39;0&amp;#39;, `f_type` tinyint(3) DEFAULT &amp;#39;0&amp;#39; COMMENT &amp;#39;有效联系类型 1: QQ联系，2:拨打电话，3:发送邮件，4:发送短信，5:添加跟进记录，6:拜访客户，7:EC联系，8:更新客户阶段&amp;#39;, `f_contact_time` timestamp NULL DEFAULT &amp;#39;1970-01-01 16:00:01&amp;#39;, UNIQUE KEY `some_qiye_type` (`f_some_id`,`f_qiye_id`,`f_type`), KEY `f_contact_time` (`f_contact_time`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4; 表索引信息：
+mysql&amp;gt; show table status like &amp;#34;t_tbl_test_time_08&amp;#34;; +-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+ | Name | Engine | Version | Row_format | Rows | Avg_row_length | Data_length | Max_data_length | Index_length | Data_free | Auto_increment | Create_time | Update_time | Check_time | Collation | Checksum | Create_options | Comment | Block_format | +-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+ | t_tbl_test_time_08 | InnoDB | 10 | Compact | 19264318 | 45 | 882900992 | 0 | 2176843776 | 752877568 | NULL | 2017-10-25 20:27:08 | NULL | NULL | utf8mb4_general_ci | NULL | | | Original | +-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+ 1 row in set mysql&amp;gt; show index from t_tbl_test_time_08; +--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+ | Table | Non_unique | Key_name | Seq_in_index | Column_name | Collation | Cardinality | Sub_part | Packed | Null | Index_type | Comment | Index_comment | +--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+ | t_tbl_test_time_08 | 0 | some_qiye_type | 1 | f_some_id | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 0 | some_qiye_type | 2 | f_qiye_id | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 0 | some_qiye_type | 3 | f_type | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 1 | f_contact_time | 1 | f_contact_time | A | 9632159 | NULL | NULL | YES | BTREE | | | +--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+ 4 rows in set 问题查询：</description>
+    </item>
+    
+  </channel>
+</rss>

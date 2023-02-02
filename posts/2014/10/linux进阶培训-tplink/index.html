@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>Linux进阶培训-tplink | Sean Note</title>
+<meta name="keywords" content="linux, 磁盘, 内存, 网络, 进程管理">
+<meta name="description" content="本文没啥实际内容，是给新人做linux培训的第二课进阶篇，主要着眼于体系，把一些工具混个眼熟。
+目录 Linux磁盘管理(进阶) Linux内存管理 Linux进程管理(进阶) Linux网络管理(进阶) Linux系统状态监控与调优 常见服务 Linux安全策略 其他 Linux磁盘管理（进阶） ext4文件系统格式 Inode、block、superblock、MBR VFS LVM pv、lv、vg lvdisplay、lvextend、vgdisplay、pvcreate… RAID raid0、raid1、raid5、raid10 r/w速度、磁盘利用率、安全性的权衡 磁盘IO性能 dd、iostat、iotop I/O等待 Linux内存管里（基础） 物理内存与虚拟内存 Swap space，分页存取 buffer与cache区分 内存监控命令 free、vmstat /proc文件系统 Linux进程管理（进阶） 进程与线程 进程优先级 进程监控命令 pidstat、lsof strace（系统调用跟踪） 后台进程 Ctrl&#43;z、jobs、bg、fg、&amp;、nohup screen Linux的网络管理 一些概念
+防火墙
+路由/网关
+子网掩码
+网络接口（参数）
+MAC
+TCP/IP协议
+应用层协议
+Linux网络管理 iptables
+Linux网络管理 主机网络流量监控 iftop、iptraf、sar tcpdump抓包 wireshark数据包分析工具 ##Linux网络管理
+iproute2 ip、ss Linux系统状态监控与调优 一些工具 sar、sysstat perf、logwatch 一些配置文件 sysctl.conf limits.conf Linux安全策略 禁止root直接登录 锁定不使用的账号 关闭ipv6 启用防火墙 定期检查日志 … Linux常见服务 tcp_wrappers SSH postfix FTP NFS/Samba DNS Apache/nginx … Linux其他 Linux开机过程分析 pam模块解读lsmod 编译make、ldd、ldconfig、gcc、gdb ACL Linux集群 内核模块 linux编程 … 本文链接地址：http://xgknight.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2014/10/linux%E8%BF%9B%E9%98%B6%E5%9F%B9%E8%AE%AD-tplink/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="Linux进阶培训-tplink" />
+<meta property="og:description" content="本文没啥实际内容，是给新人做linux培训的第二课进阶篇，主要着眼于体系，把一些工具混个眼熟。
+目录 Linux磁盘管理(进阶) Linux内存管理 Linux进程管理(进阶) Linux网络管理(进阶) Linux系统状态监控与调优 常见服务 Linux安全策略 其他 Linux磁盘管理（进阶） ext4文件系统格式 Inode、block、superblock、MBR VFS LVM pv、lv、vg lvdisplay、lvextend、vgdisplay、pvcreate… RAID raid0、raid1、raid5、raid10 r/w速度、磁盘利用率、安全性的权衡 磁盘IO性能 dd、iostat、iotop I/O等待 Linux内存管里（基础） 物理内存与虚拟内存 Swap space，分页存取 buffer与cache区分 内存监控命令 free、vmstat /proc文件系统 Linux进程管理（进阶） 进程与线程 进程优先级 进程监控命令 pidstat、lsof strace（系统调用跟踪） 后台进程 Ctrl&#43;z、jobs、bg、fg、&amp;、nohup screen Linux的网络管理 一些概念
+防火墙
+路由/网关
+子网掩码
+网络接口（参数）
+MAC
+TCP/IP协议
+应用层协议
+Linux网络管理 iptables
+Linux网络管理 主机网络流量监控 iftop、iptraf、sar tcpdump抓包 wireshark数据包分析工具 ##Linux网络管理
+iproute2 ip、ss Linux系统状态监控与调优 一些工具 sar、sysstat perf、logwatch 一些配置文件 sysctl.conf limits.conf Linux安全策略 禁止root直接登录 锁定不使用的账号 关闭ipv6 启用防火墙 定期检查日志 … Linux常见服务 tcp_wrappers SSH postfix FTP NFS/Samba DNS Apache/nginx … Linux其他 Linux开机过程分析 pam模块解读lsmod 编译make、ldd、ldconfig、gcc、gdb ACL Linux集群 内核模块 linux编程 … 本文链接地址：http://xgknight." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2014/10/linux%E8%BF%9B%E9%98%B6%E5%9F%B9%E8%AE%AD-tplink/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2014-10-06T16:32:49+00:00" />
+<meta property="article:modified_time" content="2014-10-06T16:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Linux进阶培训-tplink"/>
+<meta name="twitter:description" content="本文没啥实际内容，是给新人做linux培训的第二课进阶篇，主要着眼于体系，把一些工具混个眼熟。
+目录 Linux磁盘管理(进阶) Linux内存管理 Linux进程管理(进阶) Linux网络管理(进阶) Linux系统状态监控与调优 常见服务 Linux安全策略 其他 Linux磁盘管理（进阶） ext4文件系统格式 Inode、block、superblock、MBR VFS LVM pv、lv、vg lvdisplay、lvextend、vgdisplay、pvcreate… RAID raid0、raid1、raid5、raid10 r/w速度、磁盘利用率、安全性的权衡 磁盘IO性能 dd、iostat、iotop I/O等待 Linux内存管里（基础） 物理内存与虚拟内存 Swap space，分页存取 buffer与cache区分 内存监控命令 free、vmstat /proc文件系统 Linux进程管理（进阶） 进程与线程 进程优先级 进程监控命令 pidstat、lsof strace（系统调用跟踪） 后台进程 Ctrl&#43;z、jobs、bg、fg、&amp;、nohup screen Linux的网络管理 一些概念
+防火墙
+路由/网关
+子网掩码
+网络接口（参数）
+MAC
+TCP/IP协议
+应用层协议
+Linux网络管理 iptables
+Linux网络管理 主机网络流量监控 iftop、iptraf、sar tcpdump抓包 wireshark数据包分析工具 ##Linux网络管理
+iproute2 ip、ss Linux系统状态监控与调优 一些工具 sar、sysstat perf、logwatch 一些配置文件 sysctl.conf limits.conf Linux安全策略 禁止root直接登录 锁定不使用的账号 关闭ipv6 启用防火墙 定期检查日志 … Linux常见服务 tcp_wrappers SSH postfix FTP NFS/Samba DNS Apache/nginx … Linux其他 Linux开机过程分析 pam模块解读lsmod 编译make、ldd、ldconfig、gcc、gdb ACL Linux集群 内核模块 linux编程 … 本文链接地址：http://xgknight."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "Linux进阶培训-tplink",
+      "item": "http://xgknight.com/posts/2014/10/linux%E8%BF%9B%E9%98%B6%E5%9F%B9%E8%AE%AD-tplink/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Linux进阶培训-tplink",
+  "name": "Linux进阶培训-tplink",
+  "description": "本文没啥实际内容，是给新人做linux培训的第二课进阶篇，主要着眼于体系，把一些工具混个眼熟。\n目录 Linux磁盘管理(进阶) Linux内存管理 Linux进程管理(进阶) Linux网络管理(进阶) Linux系统状态监控与调优 常见服务 Linux安全策略 其他 Linux磁盘管理（进阶） ext4文件系统格式 Inode、block、superblock、MBR VFS LVM pv、lv、vg lvdisplay、lvextend、vgdisplay、pvcreate… RAID raid0、raid1、raid5、raid10 r/w速度、磁盘利用率、安全性的权衡 磁盘IO性能 dd、iostat、iotop I/O等待 Linux内存管里（基础） 物理内存与虚拟内存 Swap space，分页存取 buffer与cache区分 内存监控命令 free、vmstat /proc文件系统 Linux进程管理（进阶） 进程与线程 进程优先级 进程监控命令 pidstat、lsof strace（系统调用跟踪） 后台进程 Ctrl+z、jobs、bg、fg、\u0026amp;、nohup screen Linux的网络管理 一些概念\n防火墙\n路由/网关\n子网掩码\n网络接口（参数）\nMAC\nTCP/IP协议\n应用层协议\nLinux网络管理 iptables\nLinux网络管理 主机网络流量监控 iftop、iptraf、sar tcpdump抓包 wireshark数据包分析工具 ##Linux网络管理\niproute2 ip、ss Linux系统状态监控与调优 一些工具 sar、sysstat perf、logwatch 一些配置文件 sysctl.conf limits.conf Linux安全策略 禁止root直接登录 锁定不使用的账号 关闭ipv6 启用防火墙 定期检查日志 … Linux常见服务 tcp_wrappers SSH postfix FTP NFS/Samba DNS Apache/nginx … Linux其他 Linux开机过程分析 pam模块解读lsmod 编译make、ldd、ldconfig、gcc、gdb ACL Linux集群 内核模块 linux编程 … 本文链接地址：http://xgknight.",
+  "keywords": [
+    "linux", "磁盘", "内存", "网络", "进程管理"
+  ],
+  "articleBody": "本文没啥实际内容，是给新人做linux培训的第二课进阶篇，主要着眼于体系，把一些工具混个眼熟。\n目录 Linux磁盘管理(进阶) Linux内存管理 Linux进程管理(进阶) Linux网络管理(进阶) Linux系统状态监控与调优 常见服务 Linux安全策略 其他 Linux磁盘管理（进阶） ext4文件系统格式 Inode、block、superblock、MBR VFS LVM pv、lv、vg lvdisplay、lvextend、vgdisplay、pvcreate… RAID raid0、raid1、raid5、raid10 r/w速度、磁盘利用率、安全性的权衡 磁盘IO性能 dd、iostat、iotop I/O等待 Linux内存管里（基础） 物理内存与虚拟内存 Swap space，分页存取 buffer与cache区分 内存监控命令 free、vmstat /proc文件系统 Linux进程管理（进阶） 进程与线程 进程优先级 进程监控命令 pidstat、lsof strace（系统调用跟踪） 后台进程 Ctrl+z、jobs、bg、fg、\u0026、nohup screen Linux的网络管理 一些概念\n防火墙\n路由/网关\n子网掩码\n网络接口（参数）\nMAC\nTCP/IP协议\n应用层协议\nLinux网络管理 iptables\nLinux网络管理 主机网络流量监控 iftop、iptraf、sar tcpdump抓包 wireshark数据包分析工具 ##Linux网络管理\niproute2 ip、ss Linux系统状态监控与调优 一些工具 sar、sysstat perf、logwatch 一些配置文件 sysctl.conf limits.conf Linux安全策略 禁止root直接登录 锁定不使用的账号 关闭ipv6 启用防火墙 定期检查日志 … Linux常见服务 tcp_wrappers SSH postfix FTP NFS/Samba DNS Apache/nginx … Linux其他 Linux开机过程分析 pam模块解读lsmod 编译make、ldd、ldconfig、gcc、gdb ACL Linux集群 内核模块 linux编程 … 本文链接地址：http://xgknight.com/2014/10/06/linux-level2/\n",
+  "wordCount" : "92",
+  "inLanguage": "en",
+  "datePublished": "2014-10-06T16:32:49Z",
+  "dateModified": "2014-10-06T16:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2014/10/linux%E8%BF%9B%E9%98%B6%E5%9F%B9%E8%AE%AD-tplink/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      Linux进阶培训-tplink
+    </h1>
+    <div class="post-meta"><span title='2014-10-06 16:32:49 +0000 UTC'>October 6, 2014</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>本文没啥实际内容，是给新人做linux培训的第二课进阶篇，主要着眼于体系，把一些工具混个眼熟。</p>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/linux-level2-01.PNG" alt=""  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/linux-level2-02.PNG" alt=""  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/linux-level2-03.PNG" alt=""  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/linux-level2-04.PNG" alt=""  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/linux-level2-05.PNG" alt=""  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/linux-level2-06.PNG" alt=""  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/linux-level2-07.PNG" alt=""  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/linux-level2-08.PNG" alt=""  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/linux-level2-09.PNG" alt=""  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/linux-level2-10.PNG" alt=""  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/linux-level2-11.PNG" alt=""  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/linux-level2-12.PNG" alt=""  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/linux-level2-13.PNG" alt=""  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/linux-level2-14.PNG" alt=""  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/linux-level2-15.PNG" alt=""  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/linux-level2-16.PNG" alt=""  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/linux-level2-17.PNG" alt=""  />
+</p>
+<h2 id="目录">目录<a hidden class="anchor" aria-hidden="true" href="#目录">#</a></h2>
+<ul>
+<li>Linux磁盘管理(进阶)</li>
+<li>Linux内存管理</li>
+<li>Linux进程管理(进阶)</li>
+<li>Linux网络管理(进阶)</li>
+<li>Linux系统状态监控与调优</li>
+<li>常见服务</li>
+<li>Linux安全策略</li>
+<li>其他</li>
+</ul>
+<h2 id="linux磁盘管理进阶">Linux磁盘管理（进阶）<a hidden class="anchor" aria-hidden="true" href="#linux磁盘管理进阶">#</a></h2>
+<ul>
+<li>ext4文件系统格式</li>
+<li>Inode、block、superblock、MBR</li>
+<li>VFS</li>
+<li>LVM</li>
+<li>pv、lv、vg</li>
+<li>lvdisplay、lvextend、vgdisplay、pvcreate…</li>
+<li>RAID</li>
+<li>raid0、raid1、raid5、raid10</li>
+<li>r/w速度、磁盘利用率、安全性的权衡</li>
+<li>磁盘IO性能
+<ul>
+<li>dd、iostat、iotop</li>
+<li>I/O等待</li>
+</ul>
+</li>
+</ul>
+<h2 id="linux内存管里基础">Linux内存管里（基础）<a hidden class="anchor" aria-hidden="true" href="#linux内存管里基础">#</a></h2>
+<ul>
+<li>物理内存与虚拟内存</li>
+<li>Swap space，分页存取</li>
+<li>buffer与cache区分</li>
+<li>内存监控命令</li>
+<li>free、vmstat</li>
+<li>/proc文件系统</li>
+</ul>
+<!-- raw HTML omitted -->
+<h2 id="linux进程管理进阶">Linux进程管理（进阶）<a hidden class="anchor" aria-hidden="true" href="#linux进程管理进阶">#</a></h2>
+<ul>
+<li>进程与线程</li>
+<li>进程优先级</li>
+<li>进程监控命令</li>
+<li>pidstat、lsof</li>
+<li>strace（系统调用跟踪）</li>
+<li>后台进程</li>
+<li>Ctrl+z、jobs、bg、fg、&amp;、nohup</li>
+<li>screen</li>
+</ul>
+<h2 id="linux的网络管理">Linux的网络管理<a hidden class="anchor" aria-hidden="true" href="#linux的网络管理">#</a></h2>
+<ul>
+<li>
+<p>一些概念</p>
+</li>
+<li>
+<p>防火墙</p>
+</li>
+<li>
+<p>路由/网关</p>
+</li>
+<li>
+<p>子网掩码</p>
+</li>
+<li>
+<p>网络接口（参数）</p>
+</li>
+<li>
+<p>MAC</p>
+</li>
+<li>
+<p>TCP/IP协议</p>
+</li>
+<li>
+<p>应用层协议</p>
+</li>
+</ul>
+<p>Linux网络管理
+iptables</p>
+<h2 id="linux网络管理">Linux网络管理<a hidden class="anchor" aria-hidden="true" href="#linux网络管理">#</a></h2>
+<ul>
+<li>主机网络流量监控</li>
+<li>iftop、iptraf、sar</li>
+<li>tcpdump抓包</li>
+<li>wireshark数据包分析工具</li>
+</ul>
+<p>##Linux网络管理</p>
+<ul>
+<li>iproute2</li>
+<li>ip、ss</li>
+</ul>
+<h2 id="linux系统状态监控与调优">Linux系统状态监控与调优<a hidden class="anchor" aria-hidden="true" href="#linux系统状态监控与调优">#</a></h2>
+<ul>
+<li>一些工具</li>
+<li>sar、sysstat</li>
+<li>perf、logwatch</li>
+<li>一些配置文件</li>
+<li>sysctl.conf</li>
+<li>limits.conf</li>
+</ul>
+<h2 id="linux安全策略">Linux安全策略<a hidden class="anchor" aria-hidden="true" href="#linux安全策略">#</a></h2>
+<ul>
+<li>禁止root直接登录</li>
+<li>锁定不使用的账号</li>
+<li>关闭ipv6</li>
+<li>启用防火墙</li>
+<li>定期检查日志</li>
+<li>…</li>
+</ul>
+<h2 id="linux常见服务">Linux常见服务<a hidden class="anchor" aria-hidden="true" href="#linux常见服务">#</a></h2>
+<ul>
+<li>tcp_wrappers</li>
+<li>SSH</li>
+<li>postfix</li>
+<li>FTP</li>
+<li>NFS/Samba</li>
+<li>DNS</li>
+<li>Apache/nginx</li>
+<li>…</li>
+</ul>
+<h2 id="linux其他">Linux其他<a hidden class="anchor" aria-hidden="true" href="#linux其他">#</a></h2>
+<ul>
+<li>Linux开机过程分析</li>
+<li>pam模块解读lsmod</li>
+<li>编译make、ldd、ldconfig、gcc、gdb</li>
+<li>ACL</li>
+<li>Linux集群</li>
+<li>内核模块</li>
+<li>linux编程</li>
+<li>…</li>
+</ul>
+<hr>
+<p>本文链接地址：http://xgknight.com/2014/10/06/linux-level2/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/linux/">linux</a></li>
+      <li><a href="http://xgknight.com/tags/%E7%A3%81%E7%9B%98/">磁盘</a></li>
+      <li><a href="http://xgknight.com/tags/%E5%86%85%E5%AD%98/">内存</a></li>
+      <li><a href="http://xgknight.com/tags/%E7%BD%91%E7%BB%9C/">网络</a></li>
+      <li><a href="http://xgknight.com/tags/%E8%BF%9B%E7%A8%8B%E7%AE%A1%E7%90%86/">进程管理</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

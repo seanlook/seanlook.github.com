@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>表结构 on Sean Note</title>
+    <link>http://xgknight.com/tags/%E8%A1%A8%E7%BB%93%E6%9E%84/</link>
+    <description>Recent content in 表结构 on Sean Note</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Thu, 02 Nov 2017 15:32:49 +0000</lastBuildDate><atom:link href="http://xgknight.com/tags/%E8%A1%A8%E7%BB%93%E6%9E%84/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>MySQL数据库表结构同步之SchemaSync</title>
+      <link>http://xgknight.com/posts/2017/11/mysql%E6%95%B0%E6%8D%AE%E5%BA%93%E8%A1%A8%E7%BB%93%E6%9E%84%E5%90%8C%E6%AD%A5%E4%B9%8Bschemasync/</link>
+      <pubDate>Thu, 02 Nov 2017 15:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/11/mysql%E6%95%B0%E6%8D%AE%E5%BA%93%E8%A1%A8%E7%BB%93%E6%9E%84%E5%90%8C%E6%AD%A5%E4%B9%8Bschemasync/</guid>
+      <description>SchemaSync是个能够在mysql数据库之间，比较并生成表结构差异的工具，项目地址 https://github.com/mmatuson/SchemaSync 。
+SchemaSync介绍与使用 因为工作中经常需要在各个环境之间同步表结构，特别是生产与测试环境之间，长时间的运行后，总会有不一致的。测试环境的表结构一般是测试验证功能之后没有问题，然后通过工单的形式由DBA在生产环境修改。但生产库的结构，如修改索引，紧急修改字段长度，久而久之就会与测试环境有差异，需要同步到测试环境。
+又或者有多套测试环境之间要保持结构同步，又比如同一类db（分库）的情况下，比较schema之间的对象差异。
+SchemaSync不仅限于表结构，它可以处理的对象还有：视图、事件、存储过程、函数、触发器、外键，与 mysql-utilities 相当。但 SchemaSync 更适合于实践：
+默认不会同步 AUTO_INCREMENT 和 COMMENT`，有选项可以控制 对不存在的对象会生成对应的CREATE，对多余的对象会生成DROP 对生成 alter&amp;hellip;column 的sql，是有列顺序的 安装简单，相比mysqldiff，要安装mysql-connector-python和一整套mysql-utilities工具 当然前两点在我自己的 mysqldiff 版本里，已经加入了支持，见 MySQL数据库表结构同步之mysqldiff
+SchemaSync安装：
+（使用virtualenv） $ pip install mysql-python pymysql schemaobject schemasync SchemaObject也是同一个作者的，专门用于操作数据库对象的库，于是schemasync只需要获取对象，比较差异，然后调用schemaobect生成sql。（SchemaObject依赖pymysql，SchemaSync依赖MySQLdb，其实可以用同一个）
+SchemaSync用法：
+$ schemasync --help Usage: schemasync [options] &amp;lt;source&amp;gt; &amp;lt;target&amp;gt; source/target format: mysql://user:pass@host:port/database A MySQL Schema Synchronization Utility Options: -h, --help show this help message and exit -V, --version show version and exit. -r, --revision increment the migration script version number if a file with the same name already exists.</description>
+    </item>
+    
+    <item>
+      <title>MySQL数据库表结构同步之mysqldiff</title>
+      <link>http://xgknight.com/posts/2017/08/mysql%E6%95%B0%E6%8D%AE%E5%BA%93%E8%A1%A8%E7%BB%93%E6%9E%84%E5%90%8C%E6%AD%A5%E4%B9%8Bmysqldiff/</link>
+      <pubDate>Sat, 05 Aug 2017 15:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/08/mysql%E6%95%B0%E6%8D%AE%E5%BA%93%E8%A1%A8%E7%BB%93%E6%9E%84%E5%90%8C%E6%AD%A5%E4%B9%8Bmysqldiff/</guid>
+      <description>mysqldiff mysql官方有个 mysql-utilities 工具集，其中 mysqldiff 可用于比较两个db之间的表结构。 mysqldiff的语法格式是：
+$ mysqldiff --server1=user:pass@host:port:socket --server2=user:pass@host:port:socket db1.object1:db2.object1 db3:db4 这个语法有两个用法：
+db1:db2：如果只指定数据库，那么就将两个数据库中互相缺少的对象显示出来，不比较对象里面的差异。这里的对象包括表、存储过程、函数、触发器等。 如果db1与db2名字相同，可以只指定 db1 db1.object1:db2.object1：如果指定了具体表对象，那么就会详细对比两个表的差异，包括表名、字段名、备注、索引、大小写等所有的表相关的对象。
+如果两边db和对象名都相同，可以只指定 db1.object1 接下来看一些主要的参数：
+--server1：配置server1的连接。 --server2：配置server2的连接。 --character-set：配置连接时用的字符集，如果不显示配置默认使用character_set_client。 --width：配置显示的宽度。 --skip-table-options：保持表的选项不变，即对比的差异里面不包括表名、AUTO_INCREMENT、ENGINE、CHARSET等差异。 -d DIFFTYPE,--difftype=DIFFTYPE：差异的信息显示的方式，有 [unified|context|differ|sql]，默认是unified。如果使用sql，那么就直接生成差异的SQL，这样非常方便。 --changes-for=：修改对象。例如 &amp;ndash;changes-for=server2，那么对比以sever1为主，生成的差异的修改也是针对server2的对象的修改。 --show-reverse：在生成的差异修改里面，同时会包含server2和server1的修改。 --force：完成所有的比较，不会在遇到一个差异之后退出 -vv：便于调试，输出许多信息 -q：quiet模式，关闭多余的信息输出 问题修复与增强 但是试用下来，发现有以下几大问题
+对象在一方不存在时，比对结果是 object does not exist，而我们通常需要的是，生产 CREATE/DROP XXX 语句 要比对一个db下面所有的对象（table, view, event, proc, func, trigger），要手动挨个 db1.t1, db2.v2&amp;hellip;，而 db1:db2只是检查对象是否存在，不会自动比较db1与db2下的所有对象 比较时，auto_increment应该忽略，但是 mysqldiff 只提供 --skip-table-options ，忽略全部表选项，包括 auto_increment, engine, charset等等。 严重bug T1: idx1(f1,f2), T2: idx1(f1)，这种索引会生成 ADD INDEX idx(f2) T1: idx2(f1,f2), idx3(f3,f4), T2: idx4(f5)，这种组合索引，有可能生成的会乱序 这两个bug与mysqldiff的设计有关系，个人觉得它把比较和生产差异sql完全分开，复杂化了。它得到差异结果之后，生成sql又从db捞各种元数据来组装，其实从差异diff里面就可以获得组装需要的数据，也不容易出现隐藏的bug。参考实现 https://github.</description>
+    </item>
+    
+  </channel>
+</rss>

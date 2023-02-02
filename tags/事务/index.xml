@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>事务 on Sean Note</title>
+    <link>http://xgknight.com/tags/%E4%BA%8B%E5%8A%A1/</link>
+    <description>Recent content in 事务 on Sean Note</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 03 Sep 2016 16:32:49 +0000</lastBuildDate><atom:link href="http://xgknight.com/tags/%E4%BA%8B%E5%8A%A1/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同</title>
+      <link>http://xgknight.com/posts/2016/09/read-commited-%E4%B8%8E-repeatable-read-%E4%BA%8B%E5%8A%A1%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E4%B9%8B%E9%97%B4%E7%9A%84%E5%BC%82%E5%90%8C/</link>
+      <pubDate>Sat, 03 Sep 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/09/read-commited-%E4%B8%8E-repeatable-read-%E4%BA%8B%E5%8A%A1%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E4%B9%8B%E9%97%B4%E7%9A%84%E5%BC%82%E5%90%8C/</guid>
+      <description>经常会被问到 InnoDB隔离级别中 READ-COMMITED和REPEATABLE-READ 的区别，今天就整理了一下，不再从“脏读”、“幻读”这样的名词解释一样去回答了。
+1. 行锁 InnoDB行锁实际锁的是索引记录，为了防止死锁的产生以及维护所需要的隔离级别，在执行sql语句的全过程中，innodb必须对所需要修改的行每条索引记录上锁。如此一来，如果你执行的 UPDATE 没有很好的索引，那么会导致锁定许多行：
+update employees set store_id = 0 where store_id = 1; ---TRANSACTION 1EAB04, ACTIVE 7 sec 633 lock struct(s), &amp;lt;strong&amp;gt;heap size 96696&amp;lt;/strong&amp;gt;, 218786 row lock(s), undo log entries 1 MySQL thread id 4, OS thread handle 0x7f8dfc35d700, query id 47 localhost root show engine innodb status 上面的 employees 表 store_id 列没有索引。注意 UPDATE 已经执行完成（没有提交），但依然有 218786 个行锁没有释放，还有一个undo记录。这意味着只有一行被更改，但却持有了额外的锁。堆大小（heap size）代表了分配给锁使用的内存数量。
+在 REPEATABLE-READ 级别，事务持有的 每个锁 在整个事务期间一直被持有。
+在 READ-COMMITED 级别，事务里面特定语句结束之后，不匹配该sql语句扫描条件的锁，会被释放。</description>
+    </item>
+    
+    <item>
+      <title>浅析MySQL事务隔离级别与锁 分享</title>
+      <link>http://xgknight.com/posts/2016/08/%E6%B5%85%E6%9E%90mysql%E4%BA%8B%E5%8A%A1%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E4%B8%8E%E9%94%81-%E5%88%86%E4%BA%AB/</link>
+      <pubDate>Tue, 30 Aug 2016 21:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/08/%E6%B5%85%E6%9E%90mysql%E4%BA%8B%E5%8A%A1%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E4%B8%8E%E9%94%81-%E5%88%86%E4%BA%AB/</guid>
+      <description>这段时间在公司内部准备了一个分享，主题是关于 MySQL事务与锁，准备过程内容很多，也深入弄清楚了一些以前比较迷糊的地方，加上后面的讨论也就一个半小时。
+主要涉及的是乐观锁与悲观锁，InnoDB多版本并发控制的实现，以及隔离级别与各种情况加锁分析，因为涉及的主要还是开发人员，所以不是很深奥。也算花了不少心血，分享一下。
+slideshare: http://www.slideshare.net/ssuser5a0bc0/my-sql-seanlook
+{% pdf http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-ppt-trx_isolation-lock-seanlook.pdf 900 512 %}
+原文连接地址：http://xgknight.com/2016/08/30/mysql-ppt-trx_isolation-lock/</description>
+    </item>
+    
+  </channel>
+</rss>

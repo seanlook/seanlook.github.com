@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>replication on Sean Note</title>
+    <link>http://xgknight.com/tags/replication/</link>
+    <description>Recent content in replication on Sean Note</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sun, 11 Mar 2018 16:32:49 +0000</lastBuildDate><atom:link href="http://xgknight.com/tags/replication/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>MySQL主从复制idempotent模式以及同步错误处理预案</title>
+      <link>http://xgknight.com/posts/2018/03/mysql%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6idempotent%E6%A8%A1%E5%BC%8F%E4%BB%A5%E5%8F%8A%E5%90%8C%E6%AD%A5%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86%E9%A2%84%E6%A1%88/</link>
+      <pubDate>Sun, 11 Mar 2018 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2018/03/mysql%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6idempotent%E6%A8%A1%E5%BC%8F%E4%BB%A5%E5%8F%8A%E5%90%8C%E6%AD%A5%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86%E9%A2%84%E6%A1%88/</guid>
+      <description>1. slave_exec_mode 参数作用 slave_exec_mode 可以在主从复制中遇到 duplicate-key 和 no-key-found 错误时，自动覆盖或者略过binlog里面这个row_event，避免报错停止复制。
+这个参数原本是解决像 NDB Cluster 多节点写入冲突的情况，也可以在普通主从、双主、环形复制等情况下解决冲突，保持幂等性。幂等性怎么定义，感兴趣的可以阅读The differences between IDEMPOTENT and AUTO-REPAIR mode）。
+set global slave_exec_mode=IDEMPOTENT （可以动态修改）使从库运行在 幂等模式，对1062，1032等不同的错误类型，有不同的处理：
+write_row event 遇到主键冲突或唯一索引冲突，这一行被覆写(delete + insert)。 delete时候不是full value match，仅需要主键或唯一索引找到记录则删除 delete_row event 遇到记录不存在，忽略这一行 update_row event 修改唯一索引导致的冲突，忽略这一行 注意：
+idempotent 模式都是对有疑问的行进行replace或ignore，不影响其它row。 idempotent 模式要求表上必须要有主键 binlog必须是 FULL RBR 模式 2. slave-skip-errors 这个参数不能在线修改，只能加到配置文件里面或者启动的时候带上--slave-skip-errors=1032,1062。除非你真的理解它skip掉了什么，否则不建议使用。
+讲一个我所遇到的坑。在我们的一个分库项目中，需要把一个database里面的数据拆成32份，于是做了个主从，把从库里面不需要的那份删除，但复制过来肯定会报 HA_ERR_KEY_NOT_FOUND 错误，于是这也是所期望的，就设置了--slave-skip-errors=1032。
+但接下来就出现 1062:HA_ERR_FOUND_DUPP_KEY 错误！从库只会删数据，不会写入和更新，怎么会出现重复数据？读者不妨试想一下为什么。
+这里做个说明：
+① insert into t values (1, &amp;#39;a&amp;#39;), (2, &amp;#39;b&amp;#39;), (3, &amp;#39;c&amp;#39;); ② begin; ③ delete from t where id=1; ④ delete from t where id in (1, 2, 3); ⑤ insert into t where (3, &amp;#39;c&amp;#39;), (4, &amp;#39;d&amp;#39;), (5, &amp;#39;e&amp;#39;); ⑥ update t set .</description>
+    </item>
+    
+  </channel>
+</rss>

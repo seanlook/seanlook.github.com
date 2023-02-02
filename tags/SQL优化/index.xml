@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>SQL优化 on Sean Note</title>
+    <link>http://xgknight.com/tags/sql%E4%BC%98%E5%8C%96/</link>
+    <description>Recent content in SQL优化 on Sean Note</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 11 Jun 2016 16:32:49 +0000</lastBuildDate><atom:link href="http://xgknight.com/tags/sql%E4%BC%98%E5%8C%96/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Advanced MySQL Query Tuning .pdf</title>
+      <link>http://xgknight.com/posts/2016/06/advanced-mysql-query-tuning-.pdf/</link>
+      <pubDate>Sat, 11 Jun 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/06/advanced-mysql-query-tuning-.pdf/</guid>
+      <description>端午在家无聊，又不想学习。于是在Youtube随便逛，看到一个很不错的分享，来自 Percona Database Performance。下面是演示稿：
+slideshare: http://www.slideshare.net/ssuser5a0bc0/webinar-2013-advancedquerytuning
+{% pdf https://www.slideshare.net/slideshow/embed_code/key/3HLJJcJmM9KLGT %}
+Youtube: https://www.youtube.com/watch?v=TPFibi2G_oo
+能 条件 的可以看看。
+Percona webinars上有许多类似的分享，传送门： https://www.percona.com/resources/webinars ，不少是他们CEO Peter Zaitsev 亲自上马的。
+原文连接地址：http://xgknight.com/2016/06/11/mysql-advanced-query-tuning-percona/</description>
+    </item>
+    
+    <item>
+      <title>MySQL避免索引列使用 OR 条件</title>
+      <link>http://xgknight.com/posts/2016/04/mysql%E9%81%BF%E5%85%8D%E7%B4%A2%E5%BC%95%E5%88%97%E4%BD%BF%E7%94%A8-or-%E6%9D%A1%E4%BB%B6/</link>
+      <pubDate>Tue, 05 Apr 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/04/mysql%E9%81%BF%E5%85%8D%E7%B4%A2%E5%BC%95%E5%88%97%E4%BD%BF%E7%94%A8-or-%E6%9D%A1%E4%BB%B6/</guid>
+      <description>这个亏已经吃过很多次了，在开发以前的sql代码里面，许多以 or 作为where条件的查询，甚至更新。这里举例来说明使用 or 的弊端，以及改进办法。
+select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 926067 and (f_mobile =&amp;#39;1234567891&amp;#39; or f_phone =&amp;#39;1234567891&amp;#39; ) limit 1 从查询语句很容易看出，f_mobile和f_phone两个字段都有可能存电话号码，一般思路都是用 or 去一条sql解决，但表数据量一大简直是灾难： t_tbanme1上有索引idx_id_mobile(f_xxx_id,f_mobile), idx_phone(f_phone),idx_id_email(f_id,f_email)，explain 的结果却使用了 idx_id_email 索引，有时候运气好可能走 idx_id_mobile f_xxx_id
+因为mysql的每条查询，每个表上只能选择一个索引。如果使用了 idx_id_mobile 索引，恰好有一条数据，因为有 limit 1 ，那么恭喜很快得到结果；但如果 f_mobile 没有数据，那 f_phone 字段只能在f_id条件下挨个查找，扫描12w行。 or 跟 and 不一样，甚至有开发认为添加 (f_xxx_id,f_mobile,f_phone)不就完美了吗，要吐血了~
+那么优化sql呢，很简单（注意f_mobile,f_phone上都要有相应的索引），方法一：
+(select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 900000 and f_mobile =&amp;#39;1234567891&amp;#39; limit 1 ) UNION ALL (select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 900000 and f_phone =&amp;#39;1234567891&amp;#39; limit 1 ) 两条独立的sql都能用上索引，分查询各自limit，如果都有结果集返回，随便取一条就行。</description>
+    </item>
+    
+  </channel>
+</rss>

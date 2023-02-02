@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>中间件 on Sean Note</title>
+    <link>http://xgknight.com/tags/%E4%B8%AD%E9%97%B4%E4%BB%B6/</link>
+    <description>Recent content in 中间件 on Sean Note</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Thu, 27 Apr 2017 15:32:49 +0000</lastBuildDate><atom:link href="http://xgknight.com/tags/%E4%B8%AD%E9%97%B4%E4%BB%B6/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>ProxySQL之改进patch：记录查询sql完整样例与合并digest多个?</title>
+      <link>http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E6%94%B9%E8%BF%9Bpatch%E8%AE%B0%E5%BD%95%E6%9F%A5%E8%AF%A2sql%E5%AE%8C%E6%95%B4%E6%A0%B7%E4%BE%8B%E4%B8%8E%E5%90%88%E5%B9%B6digest%E5%A4%9A%E4%B8%AA/</link>
+      <pubDate>Thu, 27 Apr 2017 15:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E6%94%B9%E8%BF%9Bpatch%E8%AE%B0%E5%BD%95%E6%9F%A5%E8%AF%A2sql%E5%AE%8C%E6%95%B4%E6%A0%B7%E4%BE%8B%E4%B8%8E%E5%90%88%E5%B9%B6digest%E5%A4%9A%E4%B8%AA/</guid>
+      <description>近期一直在思考sql上线审核该怎么做，刚好接触到 ProxySQL 这个中间件，内置了一个计算sql指纹的功能，但是没有记录原始的sql语句。当前正有个紧急的拆库项目也希望知道库上所有的查询。于是把ProxySQL的代码下了回来研究了几天，改了把，加入了两个功能：
+在 stats_mysql_query_digest 表上增加 query_text 字段，当第一次出现这个digest_text时，把原始sql记录下来。 修改计算指纹的模块，对 IN或者 VALUES 后面的多个 ? 合并。这个是目前 c_tokenizer.c 文件里没有做的，用到底1点上可以避免重复记录。 效果： 多个 ? 被折叠成 ?,，有些意外情况时 ??，因为后面一些多余空格的缘故，没有像 pt-fingerprint 那样完全模糊化，像这里digest就保留了大小写、去除重复空格、保留 ` 分隔符。但仅有的几种意外情况是可以接受的。
+后面的 query_text 列也有些未知情况，就是末尾会加上一些奇怪的字符，还在排除，但大体不影响需求。
+代码是基于最新 v1.3.6 稳定版修改的，查看变更 https://github.com/sysown/proxysql/compare/v1.3.6...seanlook:v1.3.7-querysample_digest
+多个 ? 合并只涉及到 c_tokenizer.c 文件，分别在flag=4（处理 &#39;abc&#39;,&#39;def&#39; 的情况）和flag=5（处理 1,2, 3 的情况）加入判断：
+// wrap two more ? to one ?, if (*(p_r_t-2) == &amp;#39;?&amp;#39; &amp;amp;&amp;amp; (*(p_r_t-1) ==&amp;#39; &amp;#39; || *(p_r_t-1) == &amp;#39;,&amp;#39; || *(p_r_t-1) == &amp;#39;?&amp;#39;)){ *(p_r-1) = &amp;#39;,&amp;#39;; } else *p_r++ = &amp;#39;?</description>
+    </item>
+    
+    <item>
+      <title>ProxySQL之性能测试对比</title>
+      <link>http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E6%80%A7%E8%83%BD%E6%B5%8B%E8%AF%95%E5%AF%B9%E6%AF%94/</link>
+      <pubDate>Thu, 20 Apr 2017 21:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E6%80%A7%E8%83%BD%E6%B5%8B%E8%AF%95%E5%AF%B9%E6%AF%94/</guid>
+      <description>本文会通过sysbench对ProxySQL进行基准测试，并与直连的性能进行对比。与此同时也对 Maxscale 和 Qihu360 Atlas 放在一起参考。 提示：压测前确保把query cache完全关掉。
+1. proxysql vs 直连 1.1 select nontrx ./bin/sysbench --test=/root/sysbench2/sysbench/tests/db/oltp.lua --mysql-host=10.0.100.36 --mysql-port=6033 --mysql-user=myuser --mysql-password=mypass \ --mysql-db=db15 --oltp-tables-count=20 --oltp-table-size=5000000 --report-interval=20 --oltp-dist-type=uniform --rand-init=on --max-requests=0 --oltp-test-mode=nontrx --oltp-nontrx-mode=select \ --oltp-read-only=on --oltp-skip-trx=on --max-time=120 --num-threads=2 run num-threads依次加大 2 5 10 20 50 100 200 400 {% iframe http://www.tubiaoxiu.com/p.html?s=106165b0eeca215a&amp;amp;web_mode 900 700 %}
+sysbench线程并发数达到10以下，性能损失在30%以上；达到20，性能损失减少到10%左右。看到proxysql承载的并发数越高，性能损失越少；最好的时候在50线程数，相比直连损失5%。
+1.2 oltp dml 混合读写测试。proxysql结果图应该与上面相差无几，因为是主要好在计算 query digest 和规则匹配，与select无异，可参考下节的图示。
+sysbench 压测命令：
+./bin/sysbench --test=/root/sysbench2/sysbench/tests/db/oltp.lua --mysql-host=10.0.100.34 --mysql-port=3306 --mysql-user=myuser --mysql-password=mypass \ --mysql-db=db15 --oltp-tables-count=20 --oltp-table-size=5000000 --report-interval=20 --oltp-dist-type=uniform --rand-init=on --max-requests=0 --oltp-read-only=off --max-time=120 \ --num-threads=2 run num-threads依次加大 2 5 10 16 20 50 100 200 400 分别对PrxoySQL, Maxscale, Atlas, 直连，四种情况做基准测试 2.</description>
+    </item>
+    
+    <item>
+      <title>ProxySQL之连接复用（multiplexing）以及相关问题说明</title>
+      <link>http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E8%BF%9E%E6%8E%A5%E5%A4%8D%E7%94%A8multiplexing%E4%BB%A5%E5%8F%8A%E7%9B%B8%E5%85%B3%E9%97%AE%E9%A2%98%E8%AF%B4%E6%98%8E/</link>
+      <pubDate>Mon, 17 Apr 2017 21:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E8%BF%9E%E6%8E%A5%E5%A4%8D%E7%94%A8multiplexing%E4%BB%A5%E5%8F%8A%E7%9B%B8%E5%85%B3%E9%97%AE%E9%A2%98%E8%AF%B4%E6%98%8E/</guid>
+      <description>ProxySQL在连接池(persistent connection poll)的基础上，还有一个连接复用的概念 multiplexing connection，官方的wiki里没有很明确的说明，但在作者的一些 blog post 和 issue 里能找到解答： https://github.com/sysown/proxysql/issues/939#issuecomment-287489317
+由于SQL可以路由，一个客户端连接上来，可能会到多个 hostgroup 发起连接。复用的意思是，一个后端DB的连接，可以“同时”被多个客户端使用。
+传统的连接池，会在客户端断开连接（会话）后，把连接放回到池里。在ProxySQL中，由于连接复用，连接会在sql语句执行结束后，便将连接放回到池里（客户端会话可能并没有断开），这样便可大大提高后端连接的使用效率，而避免前段请求过大导致后端连接数疯长。
+但这样做有时候并不安全，比如应用端连接时指定了 set NAMES xxx，然后执行查询，那么由于multiplexing可能导致两个语句发到不同的DB上执行，继而没有按照预期的字符集执行。proxysql考虑到了这种情况：
+连接会话里创建了临时表，CREATE TEMPORARY table xxxx... select @开头的变量，如select @@hostname 手动开启了事务，start transaction, commit, rollback等等 连接设置了自己的用户变量，比如set names xxx, set autocommit x, set sql_mode=xxx, set v_uservar=xx等等 第1,2,3点会根据路由规则，会自动禁用multiplex，发到对应hostgroup后，连接未断开之前不会复用到其它客户端。具体是发到主库还是从库，与匹配的规则有关。 issue #941 和 #917 都有提到临时表丢失的问题，可以用不同的rule来避免
+下面对上面几点一一说明。
+1. 临时表与用户变量（验证 1, 2） 以下注意连接的会话窗口及执行顺序，admin打头的是在proxysql管理接口上执行。
+-- [session 1] mysql client proxysql (ecdba@10.0.100.36:6033) [(none)]&amp;gt; select 1; +---+ | 1 | +---+ | 1 | +---+ -- [session 2] proxysql admin cli select * from stats_mysql_processlist; Empty set (0.</description>
+    </item>
+    
+    <item>
+      <title>ProxySQL之读写分离与分库路由演示</title>
+      <link>http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%E4%B8%8E%E5%88%86%E5%BA%93%E8%B7%AF%E7%94%B1%E6%BC%94%E7%A4%BA/</link>
+      <pubDate>Mon, 17 Apr 2017 15:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%E4%B8%8E%E5%88%86%E5%BA%93%E8%B7%AF%E7%94%B1%E6%BC%94%E7%A4%BA/</guid>
+      <description>本文演示使用ProxySQL来完成读写分离和后端分库的一个实际配置过程，安装及配置项介绍见前文 ProxySQL之安装及配置详解。
+环境
+instance0: 10.0.100.100 (db0,db2,db4,db6) instance1: 10.0.100.101 (db1,db3,db5,db7) instance2: 10.0.100.102 (db2,db6,db10,db14) instance3: 10.0.100.103 (db3,db7,db11,db15) instance0 slave: 192.168.10.4:3316 instance1 slave: 192.168.10.4:3326 instance2 slave: 192.168.10.4:3336 instance3 slave: 192.168.10.4:3346 proxysql node0: 10.0.100.36 现在想达到这样一个目的：客户端应用连接上 proxysql 的ip:port，连接时指定分库db名，执行sql时自动路由到对应的实例、对应的库。考虑下面的部署结构： 任何一个proxysql节点都是对等的，路由请求到后端instance的各个database上。
+1. 配置后端DB -- proxysql admin cli insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (100, &amp;#39;10.0.100.100&amp;#39;, 3307, 1, &amp;#39;db0,ReadWrite&amp;#39;), (1000, &amp;#39;10.0.100.100&amp;#39;, 3307, 1, &amp;#39;db0,ReadWrite&amp;#39;),(1000, &amp;#39;192.168.10.4&amp;#39;, 3316, 9, &amp;#39;db0,ReadOnly&amp;#39;); insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (101, &amp;#39;10.0.100.101&amp;#39;, 3307, 1, &amp;#39;db1,ReadWrite&amp;#39;), (1001, &amp;#39;10.0.100.101&amp;#39;, 3307, 1, &amp;#39;db1,ReadWrite&amp;#39;),(1001, &amp;#39;192.</description>
+    </item>
+    
+    <item>
+      <title>ProxySQL之安装及配置详解</title>
+      <link>http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E5%AE%89%E8%A3%85%E5%8F%8A%E9%85%8D%E7%BD%AE%E8%AF%A6%E8%A7%A3/</link>
+      <pubDate>Mon, 10 Apr 2017 21:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E5%AE%89%E8%A3%85%E5%8F%8A%E9%85%8D%E7%BD%AE%E8%AF%A6%E8%A7%A3/</guid>
+      <description>ProxySQL是一个高性能的MySQL中间件，拥有强大的规则引擎。具有以下特性：
+连接池，而且是 multiplexing 主机和用户的最大连接数限制 自动下线后端DB 延迟超过阀值 ping 延迟超过阀值 网络不通或宕机 强大的规则路由引擎 实现读写分离 查询重写 sql流量镜像 支持prepared statement 支持Query Cache 支持负载均衡，与gelera结合自动failover 集这么多优秀特性于一身，那么缺点呢就是项目不够成熟，好在作者一直在及时更新，并且受到 Percona 官方的支持。
+1. 安装 从 https://github.com/sysown/proxysql/releases 下载相应的版本。这里我选择 proxysql-1.3.5-1-centos67.x86_64.rpm，也是当前最新稳定版。
+yum localinstall proxysql-1.3.5-1-centos67.x86_64.rpm -y 可以马上启动了：
+/etc/init.d/proxysql start Starting ProxySQL: DONE! proxysql有个配置文件 /etc/proxysql.cnf，只在第一次启动的时候有用，后续所有的配置修改都是对SQLite数据库操作，并且不会更新到proxysql.cnf文件中。ProxySQL绝大部分配置都可以在线修改，配置存储在 /var/lib/proxysql/proxysql.db 中，后面会介绍它的在线配置的设计方式。
+proxysql 启动后会像 mysqld 一样，马上fork一个子进程，真正处理请求，而父进程负责监控子进程运行状况，如果crash了就拉起来。
+编译安装 安装高版本 gcc-4.8 # cd /etc/yum.repos.d # wget https://copr.fedoraproject.org/coprs/rhscl/devtoolset-3/repo/epel-6/rhscl-devtoolset-3-epel-6.repo \ -O /etc/yum.repos.d/rhscl-devtoolset-3-epel-6.repo # yum install -y scl-utils policycoreutils-python # yum --disablerepo=&amp;#39;*&amp;#39; --enablerepo=&amp;#39;rhscl-devtoolset-3&amp;#39; install devtoolset-3-gcc devtoolset-3-gcc-c++ devtoolset-3-binutils # yum --enablerepo=testing-devtools-2-centos-6 install devtoolset-3-gcc devtoolset-3-gcc-c++ devtoolset-3-binutils 上一步会把 GCC 安装到以下目录 /opt/rh/devtoolset-3/root/usr/bin 接下来需要修改系统的配置，使默认的 gcc 和 g++ 命令使用的是新安装的版本。启用SCL环境中新版本GCC： # scl enable devtoolset-3 bash 现在查看 g++ 的版本号： # gcc --version 编译安装proxysql # cd proxysql-master # make # make install 2.</description>
+    </item>
+    
+  </channel>
+</rss>

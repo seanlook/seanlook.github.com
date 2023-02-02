@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>遇到腾讯云CDB连接字符集设置一个坑 | Sean Note</title>
+<meta name="keywords" content="mysql, 腾讯云, 字符集">
+<meta name="description" content="最近一个与qq有关的服务迁到腾讯云上，相应的数据库也要从原阿里云RDS迁移到腾讯云CDB上，经过一番摸索，不带任何政治色彩的说，CDB跟RDS相比弱的不止一条街。比如看个错误日志还要提工单，数据库访问没有白名单，数据传输服务竞不支持源库的开启GTID，自带的后台管理是phpMyAdmin，要临时看查询日志也要提工单，当然这些都是可以容忍通过其它方法解决的，但是如果使用上带来了mysql数据库本身的影响，就用的不太爽了。
+最近2个月一直在弄与字符集相关的工作，却还是在cdb踩到一个大坑。情况是这样的，我们旧的RDS上的数据库表定义都是utf8，但由于历史原因，开发一直使用 latin1 去连接的。现在要把这样的一个db迁移到CDB，腾讯云的数据传输服务出了点问题，于是想了办法用阿里云的DTS反向迁。现象是：
+用Navicat客户端latin1连接，旧数据显示都ok 但程序端看到历史数据全是乱码，新数据正常 而且新数据通过navicat去看用 utf8 连接才正常 在mysql命令行下手动 set names latin1 读取旧数据ok，但新数据乱码 这明显是新写入的时候就是以 utf8 连接的，读取的时候新旧数据也以 utf8 连接。但应用端已明确设置使用 latin1 连接来读写。为了验证是否CDB的问题，在相同环境下自建了个mysql实例，一切都ok。
+腾讯云工程师先是怀疑迁移有问题，后来说可能是character_set_server设置的问题，我站在2个月来处理字符集的经验看了虽然不太可能，还是配合截了几个图，在工单、电话了里撕了几个来回：
+因为跟腾讯有合作关系，上头就直接联系到了腾讯云的人，这才找到问题根源：都是--skip-character-set-client-handshake惹的祸。
+--character-set-client-handshake Do not ignore character set information sent by the client. To ignore client information and use the default server character set, use --skip-character-set-client-handshake; this makes MySQL behave like MySQL 4.0 一看到这个选项就恍然大悟了，官方文档FAQ里有专门介绍：A.11.11（个人感觉最后一段贴的结果有问题），大意是说为了兼容 mysql 4.0 的习惯，mysqld启动时加上 --skip-character-set-client-handshake 来忽略客户端字符集的设置，强制使用服务端character-set-server的设置。
+但这个选项默认是没有开启的，当你在web控制台修改了实例字符集时，CDB自作自作主张修改了这个参数并重启 character_set_client_handshake = 0 。而这个参数在 show variables 看不到的，隐藏的比较深。正好我建实例的时候选择了utf8，然后修改为utf8mb4，但应用端要求latin1，便中枪了。
+主要是以前没听过这个参数，后来发现老叶也有篇文章讲到它 MySQL字符集的一个坑，其实是很小的东西，结果排查验证问题前后花了2天。。。">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2016/10/%E9%81%87%E5%88%B0%E8%85%BE%E8%AE%AF%E4%BA%91cdb%E8%BF%9E%E6%8E%A5%E5%AD%97%E7%AC%A6%E9%9B%86%E8%AE%BE%E7%BD%AE%E4%B8%80%E4%B8%AA%E5%9D%91/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="遇到腾讯云CDB连接字符集设置一个坑" />
+<meta property="og:description" content="最近一个与qq有关的服务迁到腾讯云上，相应的数据库也要从原阿里云RDS迁移到腾讯云CDB上，经过一番摸索，不带任何政治色彩的说，CDB跟RDS相比弱的不止一条街。比如看个错误日志还要提工单，数据库访问没有白名单，数据传输服务竞不支持源库的开启GTID，自带的后台管理是phpMyAdmin，要临时看查询日志也要提工单，当然这些都是可以容忍通过其它方法解决的，但是如果使用上带来了mysql数据库本身的影响，就用的不太爽了。
+最近2个月一直在弄与字符集相关的工作，却还是在cdb踩到一个大坑。情况是这样的，我们旧的RDS上的数据库表定义都是utf8，但由于历史原因，开发一直使用 latin1 去连接的。现在要把这样的一个db迁移到CDB，腾讯云的数据传输服务出了点问题，于是想了办法用阿里云的DTS反向迁。现象是：
+用Navicat客户端latin1连接，旧数据显示都ok 但程序端看到历史数据全是乱码，新数据正常 而且新数据通过navicat去看用 utf8 连接才正常 在mysql命令行下手动 set names latin1 读取旧数据ok，但新数据乱码 这明显是新写入的时候就是以 utf8 连接的，读取的时候新旧数据也以 utf8 连接。但应用端已明确设置使用 latin1 连接来读写。为了验证是否CDB的问题，在相同环境下自建了个mysql实例，一切都ok。
+腾讯云工程师先是怀疑迁移有问题，后来说可能是character_set_server设置的问题，我站在2个月来处理字符集的经验看了虽然不太可能，还是配合截了几个图，在工单、电话了里撕了几个来回：
+因为跟腾讯有合作关系，上头就直接联系到了腾讯云的人，这才找到问题根源：都是--skip-character-set-client-handshake惹的祸。
+--character-set-client-handshake Do not ignore character set information sent by the client. To ignore client information and use the default server character set, use --skip-character-set-client-handshake; this makes MySQL behave like MySQL 4.0 一看到这个选项就恍然大悟了，官方文档FAQ里有专门介绍：A.11.11（个人感觉最后一段贴的结果有问题），大意是说为了兼容 mysql 4.0 的习惯，mysqld启动时加上 --skip-character-set-client-handshake 来忽略客户端字符集的设置，强制使用服务端character-set-server的设置。
+但这个选项默认是没有开启的，当你在web控制台修改了实例字符集时，CDB自作自作主张修改了这个参数并重启 character_set_client_handshake = 0 。而这个参数在 show variables 看不到的，隐藏的比较深。正好我建实例的时候选择了utf8，然后修改为utf8mb4，但应用端要求latin1，便中枪了。
+主要是以前没听过这个参数，后来发现老叶也有篇文章讲到它 MySQL字符集的一个坑，其实是很小的东西，结果排查验证问题前后花了2天。。。" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2016/10/%E9%81%87%E5%88%B0%E8%85%BE%E8%AE%AF%E4%BA%91cdb%E8%BF%9E%E6%8E%A5%E5%AD%97%E7%AC%A6%E9%9B%86%E8%AE%BE%E7%BD%AE%E4%B8%80%E4%B8%AA%E5%9D%91/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2016-10-17T16:32:49+00:00" />
+<meta property="article:modified_time" content="2016-10-17T16:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="遇到腾讯云CDB连接字符集设置一个坑"/>
+<meta name="twitter:description" content="最近一个与qq有关的服务迁到腾讯云上，相应的数据库也要从原阿里云RDS迁移到腾讯云CDB上，经过一番摸索，不带任何政治色彩的说，CDB跟RDS相比弱的不止一条街。比如看个错误日志还要提工单，数据库访问没有白名单，数据传输服务竞不支持源库的开启GTID，自带的后台管理是phpMyAdmin，要临时看查询日志也要提工单，当然这些都是可以容忍通过其它方法解决的，但是如果使用上带来了mysql数据库本身的影响，就用的不太爽了。
+最近2个月一直在弄与字符集相关的工作，却还是在cdb踩到一个大坑。情况是这样的，我们旧的RDS上的数据库表定义都是utf8，但由于历史原因，开发一直使用 latin1 去连接的。现在要把这样的一个db迁移到CDB，腾讯云的数据传输服务出了点问题，于是想了办法用阿里云的DTS反向迁。现象是：
+用Navicat客户端latin1连接，旧数据显示都ok 但程序端看到历史数据全是乱码，新数据正常 而且新数据通过navicat去看用 utf8 连接才正常 在mysql命令行下手动 set names latin1 读取旧数据ok，但新数据乱码 这明显是新写入的时候就是以 utf8 连接的，读取的时候新旧数据也以 utf8 连接。但应用端已明确设置使用 latin1 连接来读写。为了验证是否CDB的问题，在相同环境下自建了个mysql实例，一切都ok。
+腾讯云工程师先是怀疑迁移有问题，后来说可能是character_set_server设置的问题，我站在2个月来处理字符集的经验看了虽然不太可能，还是配合截了几个图，在工单、电话了里撕了几个来回：
+因为跟腾讯有合作关系，上头就直接联系到了腾讯云的人，这才找到问题根源：都是--skip-character-set-client-handshake惹的祸。
+--character-set-client-handshake Do not ignore character set information sent by the client. To ignore client information and use the default server character set, use --skip-character-set-client-handshake; this makes MySQL behave like MySQL 4.0 一看到这个选项就恍然大悟了，官方文档FAQ里有专门介绍：A.11.11（个人感觉最后一段贴的结果有问题），大意是说为了兼容 mysql 4.0 的习惯，mysqld启动时加上 --skip-character-set-client-handshake 来忽略客户端字符集的设置，强制使用服务端character-set-server的设置。
+但这个选项默认是没有开启的，当你在web控制台修改了实例字符集时，CDB自作自作主张修改了这个参数并重启 character_set_client_handshake = 0 。而这个参数在 show variables 看不到的，隐藏的比较深。正好我建实例的时候选择了utf8，然后修改为utf8mb4，但应用端要求latin1，便中枪了。
+主要是以前没听过这个参数，后来发现老叶也有篇文章讲到它 MySQL字符集的一个坑，其实是很小的东西，结果排查验证问题前后花了2天。。。"/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "遇到腾讯云CDB连接字符集设置一个坑",
+      "item": "http://xgknight.com/posts/2016/10/%E9%81%87%E5%88%B0%E8%85%BE%E8%AE%AF%E4%BA%91cdb%E8%BF%9E%E6%8E%A5%E5%AD%97%E7%AC%A6%E9%9B%86%E8%AE%BE%E7%BD%AE%E4%B8%80%E4%B8%AA%E5%9D%91/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "遇到腾讯云CDB连接字符集设置一个坑",
+  "name": "遇到腾讯云CDB连接字符集设置一个坑",
+  "description": "最近一个与qq有关的服务迁到腾讯云上，相应的数据库也要从原阿里云RDS迁移到腾讯云CDB上，经过一番摸索，不带任何政治色彩的说，CDB跟RDS相比弱的不止一条街。比如看个错误日志还要提工单，数据库访问没有白名单，数据传输服务竞不支持源库的开启GTID，自带的后台管理是phpMyAdmin，要临时看查询日志也要提工单，当然这些都是可以容忍通过其它方法解决的，但是如果使用上带来了mysql数据库本身的影响，就用的不太爽了。\n最近2个月一直在弄与字符集相关的工作，却还是在cdb踩到一个大坑。情况是这样的，我们旧的RDS上的数据库表定义都是utf8，但由于历史原因，开发一直使用 latin1 去连接的。现在要把这样的一个db迁移到CDB，腾讯云的数据传输服务出了点问题，于是想了办法用阿里云的DTS反向迁。现象是：\n用Navicat客户端latin1连接，旧数据显示都ok 但程序端看到历史数据全是乱码，新数据正常 而且新数据通过navicat去看用 utf8 连接才正常 在mysql命令行下手动 set names latin1 读取旧数据ok，但新数据乱码 这明显是新写入的时候就是以 utf8 连接的，读取的时候新旧数据也以 utf8 连接。但应用端已明确设置使用 latin1 连接来读写。为了验证是否CDB的问题，在相同环境下自建了个mysql实例，一切都ok。\n腾讯云工程师先是怀疑迁移有问题，后来说可能是character_set_server设置的问题，我站在2个月来处理字符集的经验看了虽然不太可能，还是配合截了几个图，在工单、电话了里撕了几个来回：\n因为跟腾讯有合作关系，上头就直接联系到了腾讯云的人，这才找到问题根源：都是--skip-character-set-client-handshake惹的祸。\n--character-set-client-handshake Do not ignore character set information sent by the client. To ignore client information and use the default server character set, use --skip-character-set-client-handshake; this makes MySQL behave like MySQL 4.0 一看到这个选项就恍然大悟了，官方文档FAQ里有专门介绍：A.11.11（个人感觉最后一段贴的结果有问题），大意是说为了兼容 mysql 4.0 的习惯，mysqld启动时加上 --skip-character-set-client-handshake 来忽略客户端字符集的设置，强制使用服务端character-set-server的设置。\n但这个选项默认是没有开启的，当你在web控制台修改了实例字符集时，CDB自作自作主张修改了这个参数并重启 character_set_client_handshake = 0 。而这个参数在 show variables 看不到的，隐藏的比较深。正好我建实例的时候选择了utf8，然后修改为utf8mb4，但应用端要求latin1，便中枪了。\n主要是以前没听过这个参数，后来发现老叶也有篇文章讲到它 MySQL字符集的一个坑，其实是很小的东西，结果排查验证问题前后花了2天。。。",
+  "keywords": [
+    "mysql", "腾讯云", "字符集"
+  ],
+  "articleBody": "最近一个与qq有关的服务迁到腾讯云上，相应的数据库也要从原阿里云RDS迁移到腾讯云CDB上，经过一番摸索，不带任何政治色彩的说，CDB跟RDS相比弱的不止一条街。比如看个错误日志还要提工单，数据库访问没有白名单，数据传输服务竞不支持源库的开启GTID，自带的后台管理是phpMyAdmin，要临时看查询日志也要提工单，当然这些都是可以容忍通过其它方法解决的，但是如果使用上带来了mysql数据库本身的影响，就用的不太爽了。\n最近2个月一直在弄与字符集相关的工作，却还是在cdb踩到一个大坑。情况是这样的，我们旧的RDS上的数据库表定义都是utf8，但由于历史原因，开发一直使用 latin1 去连接的。现在要把这样的一个db迁移到CDB，腾讯云的数据传输服务出了点问题，于是想了办法用阿里云的DTS反向迁。现象是：\n用Navicat客户端latin1连接，旧数据显示都ok 但程序端看到历史数据全是乱码，新数据正常 而且新数据通过navicat去看用 utf8 连接才正常 在mysql命令行下手动 set names latin1 读取旧数据ok，但新数据乱码 这明显是新写入的时候就是以 utf8 连接的，读取的时候新旧数据也以 utf8 连接。但应用端已明确设置使用 latin1 连接来读写。为了验证是否CDB的问题，在相同环境下自建了个mysql实例，一切都ok。\n腾讯云工程师先是怀疑迁移有问题，后来说可能是character_set_server设置的问题，我站在2个月来处理字符集的经验看了虽然不太可能，还是配合截了几个图，在工单、电话了里撕了几个来回：\n因为跟腾讯有合作关系，上头就直接联系到了腾讯云的人，这才找到问题根源：都是--skip-character-set-client-handshake惹的祸。\n--character-set-client-handshake Do not ignore character set information sent by the client. To ignore client information and use the default server character set, use --skip-character-set-client-handshake; this makes MySQL behave like MySQL 4.0 一看到这个选项就恍然大悟了，官方文档FAQ里有专门介绍：A.11.11（个人感觉最后一段贴的结果有问题），大意是说为了兼容 mysql 4.0 的习惯，mysqld启动时加上 --skip-character-set-client-handshake 来忽略客户端字符集的设置，强制使用服务端character-set-server的设置。\n但这个选项默认是没有开启的，当你在web控制台修改了实例字符集时，CDB自作自作主张修改了这个参数并重启 character_set_client_handshake = 0 。而这个参数在 show variables 看不到的，隐藏的比较深。正好我建实例的时候选择了utf8，然后修改为utf8mb4，但应用端要求latin1，便中枪了。\n主要是以前没听过这个参数，后来发现老叶也有篇文章讲到它 MySQL字符集的一个坑，其实是很小的东西，结果排查验证问题前后花了2天。。。\n原文链接地址：http://xgknight.com/2016/10/17/mysql-charset-handshake-cdb/\n",
+  "wordCount" : "71",
+  "inLanguage": "en",
+  "datePublished": "2016-10-17T16:32:49Z",
+  "dateModified": "2016-10-17T16:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2016/10/%E9%81%87%E5%88%B0%E8%85%BE%E8%AE%AF%E4%BA%91cdb%E8%BF%9E%E6%8E%A5%E5%AD%97%E7%AC%A6%E9%9B%86%E8%AE%BE%E7%BD%AE%E4%B8%80%E4%B8%AA%E5%9D%91/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      遇到腾讯云CDB连接字符集设置一个坑
+    </h1>
+    <div class="post-meta"><span title='2016-10-17 16:32:49 +0000 UTC'>October 17, 2016</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>最近一个与qq有关的服务迁到腾讯云上，相应的数据库也要从原阿里云RDS迁移到腾讯云CDB上，经过一番摸索，不带任何政治色彩的说，CDB跟RDS相比弱的不止一条街。比如看个错误日志还要提工单，数据库访问没有白名单，数据传输服务竞不支持源库的开启GTID，自带的后台管理是phpMyAdmin，要临时看查询日志也要提工单，当然这些都是可以容忍通过其它方法解决的，但是如果使用上带来了mysql数据库本身的影响，就用的不太爽了。</p>
+<p>最近2个月一直在弄与字符集相关的工作，却还是在cdb踩到一个大坑。情况是这样的，我们旧的RDS上的数据库表定义都是utf8，但由于历史原因，开发一直使用 latin1 去连接的。现在要把这样的一个db迁移到CDB，腾讯云的数据传输服务出了点问题，于是想了办法用阿里云的DTS反向迁。现象是：</p>
+<ol>
+<li>用Navicat客户端latin1连接，旧数据显示都ok</li>
+<li>但程序端看到历史数据全是乱码，新数据正常</li>
+<li>而且<strong>新数据通过navicat去看用 utf8 连接才正常</strong></li>
+<li>在mysql命令行下手动 <code>set names latin1</code> 读取旧数据ok，但新数据乱码</li>
+</ol>
+<p>这明显是新写入的时候就是以 utf8 连接的，读取的时候新旧数据也以 utf8 连接。但应用端已明确设置使用 latin1 连接来读写。为了验证是否CDB的问题，在相同环境下自建了个mysql实例，一切都ok。</p>
+<p>腾讯云工程师先是怀疑迁移有问题，后来说可能是character_set_server设置的问题，我站在2个月来处理字符集的经验看了虽然不太可能，还是配合截了几个图，在工单、电话了里撕了几个来回：</p>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-qcloud-charset1.png" alt=""  />
+</p>
+<p>因为跟腾讯有合作关系，上头就直接联系到了腾讯云的人，这才找到问题根源：都是<code>--skip-character-set-client-handshake</code>惹的祸。</p>
+<pre tabindex="0"><code>--character-set-client-handshake
+
+Do not ignore character set information sent by the client. To ignore client information and use the default server character set, use --skip-character-set-client-handshake; this makes MySQL behave like MySQL 4.0
+</code></pre><!-- raw HTML omitted -->
+<p>一看到这个选项就恍然大悟了，官方文档FAQ里有专门介绍：<a href="https://dev.mysql.com/doc/refman/5.6/en/faqs-cjk.html">A.11.11</a>（个人感觉最后一段贴的结果有问题），大意是说为了兼容 mysql 4.0 的习惯，mysqld启动时加上 <code>--skip-character-set-client-handshake</code> 来忽略客户端字符集的设置，强制使用服务端<code>character-set-server</code>的设置。</p>
+<p>但这个选项默认是没有开启的，当你在web控制台修改了实例字符集时，CDB自作自作主张修改了这个参数并重启 character_set_client_handshake = 0 。而这个参数在 <code>show variables</code> 看不到的，隐藏的比较深。正好我建实例的时候选择了utf8，然后修改为utf8mb4，但应用端要求latin1，便中枪了。</p>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-qcloud-charset.png" alt=""  />
+</p>
+<p>主要是以前没听过这个参数，后来发现老叶也有篇文章讲到它 <a href="http://imysql.com/2013/10/29/misunderstand-about-charset-handshake.shtm">MySQL字符集的一个坑</a>，其实是很小的东西，结果排查验证问题前后花了2天。。。</p>
+<hr>
+<p>原文链接地址：http://xgknight.com/2016/10/17/mysql-charset-handshake-cdb/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/%E8%85%BE%E8%AE%AF%E4%BA%91/">腾讯云</a></li>
+      <li><a href="http://xgknight.com/tags/%E5%AD%97%E7%AC%A6%E9%9B%86/">字符集</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

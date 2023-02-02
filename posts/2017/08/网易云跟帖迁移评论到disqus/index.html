@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>网易云跟帖迁移评论到disqus | Sean Note</title>
+<meta name="keywords" content="mysql, blog">
+<meta name="description" content="早前折腾博客的时候，在众多评论系统中选择了多说，用了2年结果多说倒闭了，也算是影响了网络上众多的站点。
+于是在16年的时候把评论换成了网易云跟帖，以为有网易这个靠山，体验虽然差点但是不会轻易关闭。云跟帖还提供了从多说直接导入的工具，随意旧的评论直接弄过来了。
+可谁想不到一年，网易云跟帖也关闭了。
+现在不怎么去折腾博客这玩意了，往里面写写东西才是王道，所以就决定直接把评论系统换成国外的 disqus，总不至于国内种种原因关闭了，代价就是要懂得科学上网，考虑博客的受众都是IT同仁，也就只好这样了。
+然而被坑了，网上有许多文章和工具可以从多说迁移到disqus，但是几乎没看到从网易云跟帖迁移到disqus，三者导出的评论格式不一样。云跟帖导出的是 json，disqus导入是扩展的Wordpress格式。
+在拖了3个月后，找到了从网易云跟帖备份出来的旧评论文件，简单用python转换了一下，现在可以用了。
+WXR格式：https://help.disqus.com/customer/portal/articles/472150-custom-xml-import-format
+转换代码gist地址：https://gist.coding.net/u/seanlook/c395cda7c5f4421b85efcd898a8fdf21 (comments_convert.py)
+云跟帖导出文件命名为 gentie163.py，懒得用python处理，直接修改这个文件的内容为 python 字典定义：
+sed -i &#39;s/&#34;url&#34;:&#34;xgknight.com/&#34;url&#34;:&#34;http:\/\/xgknight.com/g&#39; gentie163.py sed -i &#39;s/false/False/g&#39; gentie163.py sed -i &#39;s/:null/:&#34;&#34;/g&#39; gentie163.py sed -i &#39;s/^/comments = /&#39; gentie163.py 字典直接转xml比较容易：http://python3-cookbook.readthedocs.io/zh_CN/latest/c06/p05_turning_dictionary_into_xml.html#
+转换后的文件为 data_output.xml:
+# python3 comments_convert.py 在这个页面导入：https://seanlook.disqus.com/admin/discussions/import/platform/generic/
+可在页面 https://import.disqus.com/ 看到import进度，包括失败信息。（不要重复导入）
+说明：
+disqus每篇文章有个thread_idendifier，这里处理直接根据文章的时间戳转换来用，不影响 dsq:remote是设置单点登录，没去深究，直接丢弃这个属性了 头像信息丢失(因为sso) 本文链接地址：http://xgknight.com/2017/08/29/blog_migrate_gentie163_disqus/">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2017/08/%E7%BD%91%E6%98%93%E4%BA%91%E8%B7%9F%E5%B8%96%E8%BF%81%E7%A7%BB%E8%AF%84%E8%AE%BA%E5%88%B0disqus/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="网易云跟帖迁移评论到disqus" />
+<meta property="og:description" content="早前折腾博客的时候，在众多评论系统中选择了多说，用了2年结果多说倒闭了，也算是影响了网络上众多的站点。
+于是在16年的时候把评论换成了网易云跟帖，以为有网易这个靠山，体验虽然差点但是不会轻易关闭。云跟帖还提供了从多说直接导入的工具，随意旧的评论直接弄过来了。
+可谁想不到一年，网易云跟帖也关闭了。
+现在不怎么去折腾博客这玩意了，往里面写写东西才是王道，所以就决定直接把评论系统换成国外的 disqus，总不至于国内种种原因关闭了，代价就是要懂得科学上网，考虑博客的受众都是IT同仁，也就只好这样了。
+然而被坑了，网上有许多文章和工具可以从多说迁移到disqus，但是几乎没看到从网易云跟帖迁移到disqus，三者导出的评论格式不一样。云跟帖导出的是 json，disqus导入是扩展的Wordpress格式。
+在拖了3个月后，找到了从网易云跟帖备份出来的旧评论文件，简单用python转换了一下，现在可以用了。
+WXR格式：https://help.disqus.com/customer/portal/articles/472150-custom-xml-import-format
+转换代码gist地址：https://gist.coding.net/u/seanlook/c395cda7c5f4421b85efcd898a8fdf21 (comments_convert.py)
+云跟帖导出文件命名为 gentie163.py，懒得用python处理，直接修改这个文件的内容为 python 字典定义：
+sed -i &#39;s/&#34;url&#34;:&#34;xgknight.com/&#34;url&#34;:&#34;http:\/\/xgknight.com/g&#39; gentie163.py sed -i &#39;s/false/False/g&#39; gentie163.py sed -i &#39;s/:null/:&#34;&#34;/g&#39; gentie163.py sed -i &#39;s/^/comments = /&#39; gentie163.py 字典直接转xml比较容易：http://python3-cookbook.readthedocs.io/zh_CN/latest/c06/p05_turning_dictionary_into_xml.html#
+转换后的文件为 data_output.xml:
+# python3 comments_convert.py 在这个页面导入：https://seanlook.disqus.com/admin/discussions/import/platform/generic/
+可在页面 https://import.disqus.com/ 看到import进度，包括失败信息。（不要重复导入）
+说明：
+disqus每篇文章有个thread_idendifier，这里处理直接根据文章的时间戳转换来用，不影响 dsq:remote是设置单点登录，没去深究，直接丢弃这个属性了 头像信息丢失(因为sso) 本文链接地址：http://xgknight.com/2017/08/29/blog_migrate_gentie163_disqus/" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2017/08/%E7%BD%91%E6%98%93%E4%BA%91%E8%B7%9F%E5%B8%96%E8%BF%81%E7%A7%BB%E8%AF%84%E8%AE%BA%E5%88%B0disqus/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2017-08-29T16:32:49+00:00" />
+<meta property="article:modified_time" content="2017-08-29T16:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="网易云跟帖迁移评论到disqus"/>
+<meta name="twitter:description" content="早前折腾博客的时候，在众多评论系统中选择了多说，用了2年结果多说倒闭了，也算是影响了网络上众多的站点。
+于是在16年的时候把评论换成了网易云跟帖，以为有网易这个靠山，体验虽然差点但是不会轻易关闭。云跟帖还提供了从多说直接导入的工具，随意旧的评论直接弄过来了。
+可谁想不到一年，网易云跟帖也关闭了。
+现在不怎么去折腾博客这玩意了，往里面写写东西才是王道，所以就决定直接把评论系统换成国外的 disqus，总不至于国内种种原因关闭了，代价就是要懂得科学上网，考虑博客的受众都是IT同仁，也就只好这样了。
+然而被坑了，网上有许多文章和工具可以从多说迁移到disqus，但是几乎没看到从网易云跟帖迁移到disqus，三者导出的评论格式不一样。云跟帖导出的是 json，disqus导入是扩展的Wordpress格式。
+在拖了3个月后，找到了从网易云跟帖备份出来的旧评论文件，简单用python转换了一下，现在可以用了。
+WXR格式：https://help.disqus.com/customer/portal/articles/472150-custom-xml-import-format
+转换代码gist地址：https://gist.coding.net/u/seanlook/c395cda7c5f4421b85efcd898a8fdf21 (comments_convert.py)
+云跟帖导出文件命名为 gentie163.py，懒得用python处理，直接修改这个文件的内容为 python 字典定义：
+sed -i &#39;s/&#34;url&#34;:&#34;xgknight.com/&#34;url&#34;:&#34;http:\/\/xgknight.com/g&#39; gentie163.py sed -i &#39;s/false/False/g&#39; gentie163.py sed -i &#39;s/:null/:&#34;&#34;/g&#39; gentie163.py sed -i &#39;s/^/comments = /&#39; gentie163.py 字典直接转xml比较容易：http://python3-cookbook.readthedocs.io/zh_CN/latest/c06/p05_turning_dictionary_into_xml.html#
+转换后的文件为 data_output.xml:
+# python3 comments_convert.py 在这个页面导入：https://seanlook.disqus.com/admin/discussions/import/platform/generic/
+可在页面 https://import.disqus.com/ 看到import进度，包括失败信息。（不要重复导入）
+说明：
+disqus每篇文章有个thread_idendifier，这里处理直接根据文章的时间戳转换来用，不影响 dsq:remote是设置单点登录，没去深究，直接丢弃这个属性了 头像信息丢失(因为sso) 本文链接地址：http://xgknight.com/2017/08/29/blog_migrate_gentie163_disqus/"/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "网易云跟帖迁移评论到disqus",
+      "item": "http://xgknight.com/posts/2017/08/%E7%BD%91%E6%98%93%E4%BA%91%E8%B7%9F%E5%B8%96%E8%BF%81%E7%A7%BB%E8%AF%84%E8%AE%BA%E5%88%B0disqus/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "网易云跟帖迁移评论到disqus",
+  "name": "网易云跟帖迁移评论到disqus",
+  "description": "早前折腾博客的时候，在众多评论系统中选择了多说，用了2年结果多说倒闭了，也算是影响了网络上众多的站点。\n于是在16年的时候把评论换成了网易云跟帖，以为有网易这个靠山，体验虽然差点但是不会轻易关闭。云跟帖还提供了从多说直接导入的工具，随意旧的评论直接弄过来了。\n可谁想不到一年，网易云跟帖也关闭了。\n现在不怎么去折腾博客这玩意了，往里面写写东西才是王道，所以就决定直接把评论系统换成国外的 disqus，总不至于国内种种原因关闭了，代价就是要懂得科学上网，考虑博客的受众都是IT同仁，也就只好这样了。\n然而被坑了，网上有许多文章和工具可以从多说迁移到disqus，但是几乎没看到从网易云跟帖迁移到disqus，三者导出的评论格式不一样。云跟帖导出的是 json，disqus导入是扩展的Wordpress格式。\n在拖了3个月后，找到了从网易云跟帖备份出来的旧评论文件，简单用python转换了一下，现在可以用了。\nWXR格式：https://help.disqus.com/customer/portal/articles/472150-custom-xml-import-format\n转换代码gist地址：https://gist.coding.net/u/seanlook/c395cda7c5f4421b85efcd898a8fdf21 (comments_convert.py)\n云跟帖导出文件命名为 gentie163.py，懒得用python处理，直接修改这个文件的内容为 python 字典定义：\nsed -i \u0026#39;s/\u0026#34;url\u0026#34;:\u0026#34;xgknight.com/\u0026#34;url\u0026#34;:\u0026#34;http:\\/\\/xgknight.com/g\u0026#39; gentie163.py sed -i \u0026#39;s/false/False/g\u0026#39; gentie163.py sed -i \u0026#39;s/:null/:\u0026#34;\u0026#34;/g\u0026#39; gentie163.py sed -i \u0026#39;s/^/comments = /\u0026#39; gentie163.py 字典直接转xml比较容易：http://python3-cookbook.readthedocs.io/zh_CN/latest/c06/p05_turning_dictionary_into_xml.html#\n转换后的文件为 data_output.xml:\n# python3 comments_convert.py 在这个页面导入：https://seanlook.disqus.com/admin/discussions/import/platform/generic/\n可在页面 https://import.disqus.com/ 看到import进度，包括失败信息。（不要重复导入）\n说明：\ndisqus每篇文章有个thread_idendifier，这里处理直接根据文章的时间戳转换来用，不影响 dsq:remote是设置单点登录，没去深究，直接丢弃这个属性了 头像信息丢失(因为sso) 本文链接地址：http://xgknight.com/2017/08/29/blog_migrate_gentie163_disqus/",
+  "keywords": [
+    "mysql", "blog"
+  ],
+  "articleBody": "早前折腾博客的时候，在众多评论系统中选择了多说，用了2年结果多说倒闭了，也算是影响了网络上众多的站点。\n于是在16年的时候把评论换成了网易云跟帖，以为有网易这个靠山，体验虽然差点但是不会轻易关闭。云跟帖还提供了从多说直接导入的工具，随意旧的评论直接弄过来了。\n可谁想不到一年，网易云跟帖也关闭了。\n现在不怎么去折腾博客这玩意了，往里面写写东西才是王道，所以就决定直接把评论系统换成国外的 disqus，总不至于国内种种原因关闭了，代价就是要懂得科学上网，考虑博客的受众都是IT同仁，也就只好这样了。\n然而被坑了，网上有许多文章和工具可以从多说迁移到disqus，但是几乎没看到从网易云跟帖迁移到disqus，三者导出的评论格式不一样。云跟帖导出的是 json，disqus导入是扩展的Wordpress格式。\n在拖了3个月后，找到了从网易云跟帖备份出来的旧评论文件，简单用python转换了一下，现在可以用了。\nWXR格式：https://help.disqus.com/customer/portal/articles/472150-custom-xml-import-format\n转换代码gist地址：https://gist.coding.net/u/seanlook/c395cda7c5f4421b85efcd898a8fdf21 (comments_convert.py)\n云跟帖导出文件命名为 gentie163.py，懒得用python处理，直接修改这个文件的内容为 python 字典定义：\nsed -i 's/\"url\":\"xgknight.com/\"url\":\"http:\\/\\/xgknight.com/g' gentie163.py sed -i 's/false/False/g' gentie163.py sed -i 's/:null/:\"\"/g' gentie163.py sed -i 's/^/comments = /' gentie163.py 字典直接转xml比较容易：http://python3-cookbook.readthedocs.io/zh_CN/latest/c06/p05_turning_dictionary_into_xml.html#\n转换后的文件为 data_output.xml:\n# python3 comments_convert.py 在这个页面导入：https://seanlook.disqus.com/admin/discussions/import/platform/generic/\n可在页面 https://import.disqus.com/ 看到import进度，包括失败信息。（不要重复导入）\n说明：\ndisqus每篇文章有个thread_idendifier，这里处理直接根据文章的时间戳转换来用，不影响 dsq:remote是设置单点登录，没去深究，直接丢弃这个属性了 头像信息丢失(因为sso) 本文链接地址：http://xgknight.com/2017/08/29/blog_migrate_gentie163_disqus/\n",
+  "wordCount" : "48",
+  "inLanguage": "en",
+  "datePublished": "2017-08-29T16:32:49Z",
+  "dateModified": "2017-08-29T16:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2017/08/%E7%BD%91%E6%98%93%E4%BA%91%E8%B7%9F%E5%B8%96%E8%BF%81%E7%A7%BB%E8%AF%84%E8%AE%BA%E5%88%B0disqus/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      网易云跟帖迁移评论到disqus
+    </h1>
+    <div class="post-meta"><span title='2017-08-29 16:32:49 +0000 UTC'>August 29, 2017</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>早前折腾博客的时候，在众多评论系统中选择了多说，用了2年结果多说倒闭了，也算是影响了网络上众多的站点。</p>
+<p>于是在16年的时候把评论换成了网易云跟帖，以为有网易这个靠山，体验虽然差点但是不会轻易关闭。云跟帖还提供了从多说直接导入的工具，随意旧的评论直接弄过来了。</p>
+<p>可谁想不到一年，网易云跟帖也关闭了。</p>
+<p>现在不怎么去折腾博客这玩意了，往里面写写东西才是王道，所以就决定直接把评论系统换成国外的 disqus，总不至于国内种种原因关闭了，代价就是要懂得科学上网，考虑博客的受众都是IT同仁，也就只好这样了。</p>
+<p>然而被坑了，网上有许多文章和工具可以<a href="https://github.com/JamesPan/duoshuo-migrator/blob/master/duoshuo-migrator.py">从多说迁移到disqus</a>，但是几乎没看到从网易云跟帖迁移到disqus，三者导出的评论格式不一样。云跟帖导出的是 json，disqus导入是扩展的Wordpress格式。</p>
+<p>在拖了3个月后，找到了从网易云跟帖备份出来的旧评论文件，简单用python转换了一下，现在可以用了。</p>
+<p>WXR格式：https://help.disqus.com/customer/portal/articles/472150-custom-xml-import-format</p>
+<p><strong>转换代码gist地址</strong>：https://gist.coding.net/u/seanlook/c395cda7c5f4421b85efcd898a8fdf21  (comments_convert.py)</p>
+<p>云跟帖导出文件命名为 gentie163.py，懒得用python处理，直接修改这个文件的内容为 python 字典定义：</p>
+<pre tabindex="0"><code>sed -i &#39;s/&#34;url&#34;:&#34;xgknight.com/&#34;url&#34;:&#34;http:\/\/xgknight.com/g&#39; gentie163.py
+sed -i &#39;s/false/False/g&#39; gentie163.py
+sed -i &#39;s/:null/:&#34;&#34;/g&#39; gentie163.py
+sed -i &#39;s/^/comments = /&#39; gentie163.py
+</code></pre><p>字典直接转xml比较容易：http://python3-cookbook.readthedocs.io/zh_CN/latest/c06/p05_turning_dictionary_into_xml.html#</p>
+<p>转换后的文件为 <code>data_output.xml</code>:</p>
+<pre tabindex="0"><code># python3 comments_convert.py
+</code></pre><p>在这个页面导入：https://seanlook.disqus.com/admin/discussions/import/platform/generic/</p>
+<p>可在页面 <a href="https://import.disqus.com/">https://import.disqus.com/</a> 看到import进度，包括失败信息。（不要重复导入）</p>
+<p>说明：</p>
+<ul>
+<li>disqus每篇文章有个thread_idendifier，这里处理直接根据文章的时间戳转换来用，不影响</li>
+<li>dsq:remote是设置单点登录，没去深究，直接丢弃这个属性了</li>
+<li>头像信息丢失(因为sso)</li>
+</ul>
+<hr>
+<p>本文链接地址：http://xgknight.com/2017/08/29/blog_migrate_gentie163_disqus/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/blog/">blog</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

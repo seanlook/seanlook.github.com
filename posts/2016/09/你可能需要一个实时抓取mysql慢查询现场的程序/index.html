@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>你可能需要一个实时抓取MySQL慢查询现场的程序 | Sean Note</title>
+<meta name="keywords" content="mysql, python">
+<meta name="description" content="Python完成的一个小程序，初衷用于杀掉 MySQL 上的异常线程，如慢查询、处于Sleep状态的，但上线运行以后，以另一种模式运行来实时发现现网的慢查询特别有用，挖掘了许多潜在问题。 项目地址：https://github.com/seanlook/myquerykill
+在使用阿里云RDS的过程中，数据库出现异常，需要快速恢复。网上有许多类似的kill脚本，都是通过 mysqladmin 实现的。然而 Ali-RDS 环境有以下限制：
+不提供 SUPER 权限的用户，也就是用户只能 kill 自己的线程 当连接数暴增时，外部用户无法登陆，包括控制台 为了解决上面两大问题，该 python 脚本通过在db实例上，使用多线程的方式，为每个用户保留一个连接，并实时读取指令配置文件 mysqk.ini，发现有 kill 需求时，利用对应用户已有连接找到 information_schema.processlist 中符合条件的线程，并 kill 。
+说明：该脚本在9月份做过一次重写，7月份的版本（分支 old_0.5.0）是每实例每用户，对应一个线程，db实例一多线程数也太多，看得始终不太优雅，于是改成了一个db实例一个线程，维护同时维护多个用户的会话。同时新版也加入了更多的功能，如按时间窗口检查，包含或排除特定连接，邮件通知，配置项覆盖。
+1. 特性 始终通过 mysql ping 维持一个长连接，并有断开自动重来机制，解决没有连接可用的尴尬 每个db实例有自己的线程，避免需要单独登陆个别用户去kill的繁复操作。 如果你具有 SUPER 权限，也可以简化配置做到兼容 能够分开应对需要杀死线程的场景： 长时间运行超过 N 秒的 Sleep 状态的事务 （一般不建议，但有时候kill它，可以快速释放连接给管理员使用） 排除一些线程不能kill，如 Binlog dump。可配置 包含特定关键字的线程要kill 出现符合条件的线程时，会对当时的processlist, engine status，lock_wait 做一个快照，并邮件发出。妈妈再也不愁没有事故现场了。 有试运行dry_run模式，即执行所有的检查过程但不真正kill 这便是开头所讲的，实时关注生产环境慢查询，而不是等出现问题被动去看slow log，严重的情况连接数可能已经爆了 支持只在时间窗口内运行，考虑到晚上一些长任务不检查 密码加密 2. 快速上手 需要pip安装MySQL-python和pycrypto两个库，只在python 2.7上有测试。
+在 settings.py 里面设置连接的用户名和密码信息。这里假设同一批db的要check的认证信息是一样的，指定的用户既用于登录认证，也用于告知脚本哪些用户需要被检查。 密码要通过 prpcryptec.py 加密，加密的密钥需写入脚本本身的 KEY_DB_AUTH变量。（担心泄露的话，把mysqk.py编译成 pyc 来跑）">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2016/09/%E4%BD%A0%E5%8F%AF%E8%83%BD%E9%9C%80%E8%A6%81%E4%B8%80%E4%B8%AA%E5%AE%9E%E6%97%B6%E6%8A%93%E5%8F%96mysql%E6%85%A2%E6%9F%A5%E8%AF%A2%E7%8E%B0%E5%9C%BA%E7%9A%84%E7%A8%8B%E5%BA%8F/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="你可能需要一个实时抓取MySQL慢查询现场的程序" />
+<meta property="og:description" content="Python完成的一个小程序，初衷用于杀掉 MySQL 上的异常线程，如慢查询、处于Sleep状态的，但上线运行以后，以另一种模式运行来实时发现现网的慢查询特别有用，挖掘了许多潜在问题。 项目地址：https://github.com/seanlook/myquerykill
+在使用阿里云RDS的过程中，数据库出现异常，需要快速恢复。网上有许多类似的kill脚本，都是通过 mysqladmin 实现的。然而 Ali-RDS 环境有以下限制：
+不提供 SUPER 权限的用户，也就是用户只能 kill 自己的线程 当连接数暴增时，外部用户无法登陆，包括控制台 为了解决上面两大问题，该 python 脚本通过在db实例上，使用多线程的方式，为每个用户保留一个连接，并实时读取指令配置文件 mysqk.ini，发现有 kill 需求时，利用对应用户已有连接找到 information_schema.processlist 中符合条件的线程，并 kill 。
+说明：该脚本在9月份做过一次重写，7月份的版本（分支 old_0.5.0）是每实例每用户，对应一个线程，db实例一多线程数也太多，看得始终不太优雅，于是改成了一个db实例一个线程，维护同时维护多个用户的会话。同时新版也加入了更多的功能，如按时间窗口检查，包含或排除特定连接，邮件通知，配置项覆盖。
+1. 特性 始终通过 mysql ping 维持一个长连接，并有断开自动重来机制，解决没有连接可用的尴尬 每个db实例有自己的线程，避免需要单独登陆个别用户去kill的繁复操作。 如果你具有 SUPER 权限，也可以简化配置做到兼容 能够分开应对需要杀死线程的场景： 长时间运行超过 N 秒的 Sleep 状态的事务 （一般不建议，但有时候kill它，可以快速释放连接给管理员使用） 排除一些线程不能kill，如 Binlog dump。可配置 包含特定关键字的线程要kill 出现符合条件的线程时，会对当时的processlist, engine status，lock_wait 做一个快照，并邮件发出。妈妈再也不愁没有事故现场了。 有试运行dry_run模式，即执行所有的检查过程但不真正kill 这便是开头所讲的，实时关注生产环境慢查询，而不是等出现问题被动去看slow log，严重的情况连接数可能已经爆了 支持只在时间窗口内运行，考虑到晚上一些长任务不检查 密码加密 2. 快速上手 需要pip安装MySQL-python和pycrypto两个库，只在python 2.7上有测试。
+在 settings.py 里面设置连接的用户名和密码信息。这里假设同一批db的要check的认证信息是一样的，指定的用户既用于登录认证，也用于告知脚本哪些用户需要被检查。 密码要通过 prpcryptec.py 加密，加密的密钥需写入脚本本身的 KEY_DB_AUTH变量。（担心泄露的话，把mysqk.py编译成 pyc 来跑）" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2016/09/%E4%BD%A0%E5%8F%AF%E8%83%BD%E9%9C%80%E8%A6%81%E4%B8%80%E4%B8%AA%E5%AE%9E%E6%97%B6%E6%8A%93%E5%8F%96mysql%E6%85%A2%E6%9F%A5%E8%AF%A2%E7%8E%B0%E5%9C%BA%E7%9A%84%E7%A8%8B%E5%BA%8F/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2016-09-27T16:32:49+00:00" />
+<meta property="article:modified_time" content="2016-09-27T16:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="你可能需要一个实时抓取MySQL慢查询现场的程序"/>
+<meta name="twitter:description" content="Python完成的一个小程序，初衷用于杀掉 MySQL 上的异常线程，如慢查询、处于Sleep状态的，但上线运行以后，以另一种模式运行来实时发现现网的慢查询特别有用，挖掘了许多潜在问题。 项目地址：https://github.com/seanlook/myquerykill
+在使用阿里云RDS的过程中，数据库出现异常，需要快速恢复。网上有许多类似的kill脚本，都是通过 mysqladmin 实现的。然而 Ali-RDS 环境有以下限制：
+不提供 SUPER 权限的用户，也就是用户只能 kill 自己的线程 当连接数暴增时，外部用户无法登陆，包括控制台 为了解决上面两大问题，该 python 脚本通过在db实例上，使用多线程的方式，为每个用户保留一个连接，并实时读取指令配置文件 mysqk.ini，发现有 kill 需求时，利用对应用户已有连接找到 information_schema.processlist 中符合条件的线程，并 kill 。
+说明：该脚本在9月份做过一次重写，7月份的版本（分支 old_0.5.0）是每实例每用户，对应一个线程，db实例一多线程数也太多，看得始终不太优雅，于是改成了一个db实例一个线程，维护同时维护多个用户的会话。同时新版也加入了更多的功能，如按时间窗口检查，包含或排除特定连接，邮件通知，配置项覆盖。
+1. 特性 始终通过 mysql ping 维持一个长连接，并有断开自动重来机制，解决没有连接可用的尴尬 每个db实例有自己的线程，避免需要单独登陆个别用户去kill的繁复操作。 如果你具有 SUPER 权限，也可以简化配置做到兼容 能够分开应对需要杀死线程的场景： 长时间运行超过 N 秒的 Sleep 状态的事务 （一般不建议，但有时候kill它，可以快速释放连接给管理员使用） 排除一些线程不能kill，如 Binlog dump。可配置 包含特定关键字的线程要kill 出现符合条件的线程时，会对当时的processlist, engine status，lock_wait 做一个快照，并邮件发出。妈妈再也不愁没有事故现场了。 有试运行dry_run模式，即执行所有的检查过程但不真正kill 这便是开头所讲的，实时关注生产环境慢查询，而不是等出现问题被动去看slow log，严重的情况连接数可能已经爆了 支持只在时间窗口内运行，考虑到晚上一些长任务不检查 密码加密 2. 快速上手 需要pip安装MySQL-python和pycrypto两个库，只在python 2.7上有测试。
+在 settings.py 里面设置连接的用户名和密码信息。这里假设同一批db的要check的认证信息是一样的，指定的用户既用于登录认证，也用于告知脚本哪些用户需要被检查。 密码要通过 prpcryptec.py 加密，加密的密钥需写入脚本本身的 KEY_DB_AUTH变量。（担心泄露的话，把mysqk.py编译成 pyc 来跑）"/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "你可能需要一个实时抓取MySQL慢查询现场的程序",
+      "item": "http://xgknight.com/posts/2016/09/%E4%BD%A0%E5%8F%AF%E8%83%BD%E9%9C%80%E8%A6%81%E4%B8%80%E4%B8%AA%E5%AE%9E%E6%97%B6%E6%8A%93%E5%8F%96mysql%E6%85%A2%E6%9F%A5%E8%AF%A2%E7%8E%B0%E5%9C%BA%E7%9A%84%E7%A8%8B%E5%BA%8F/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "你可能需要一个实时抓取MySQL慢查询现场的程序",
+  "name": "你可能需要一个实时抓取MySQL慢查询现场的程序",
+  "description": "Python完成的一个小程序，初衷用于杀掉 MySQL 上的异常线程，如慢查询、处于Sleep状态的，但上线运行以后，以另一种模式运行来实时发现现网的慢查询特别有用，挖掘了许多潜在问题。 项目地址：https://github.com/seanlook/myquerykill\n在使用阿里云RDS的过程中，数据库出现异常，需要快速恢复。网上有许多类似的kill脚本，都是通过 mysqladmin 实现的。然而 Ali-RDS 环境有以下限制：\n不提供 SUPER 权限的用户，也就是用户只能 kill 自己的线程 当连接数暴增时，外部用户无法登陆，包括控制台 为了解决上面两大问题，该 python 脚本通过在db实例上，使用多线程的方式，为每个用户保留一个连接，并实时读取指令配置文件 mysqk.ini，发现有 kill 需求时，利用对应用户已有连接找到 information_schema.processlist 中符合条件的线程，并 kill 。\n说明：该脚本在9月份做过一次重写，7月份的版本（分支 old_0.5.0）是每实例每用户，对应一个线程，db实例一多线程数也太多，看得始终不太优雅，于是改成了一个db实例一个线程，维护同时维护多个用户的会话。同时新版也加入了更多的功能，如按时间窗口检查，包含或排除特定连接，邮件通知，配置项覆盖。\n1. 特性 始终通过 mysql ping 维持一个长连接，并有断开自动重来机制，解决没有连接可用的尴尬 每个db实例有自己的线程，避免需要单独登陆个别用户去kill的繁复操作。 如果你具有 SUPER 权限，也可以简化配置做到兼容 能够分开应对需要杀死线程的场景： 长时间运行超过 N 秒的 Sleep 状态的事务 （一般不建议，但有时候kill它，可以快速释放连接给管理员使用） 排除一些线程不能kill，如 Binlog dump。可配置 包含特定关键字的线程要kill 出现符合条件的线程时，会对当时的processlist, engine status，lock_wait 做一个快照，并邮件发出。妈妈再也不愁没有事故现场了。 有试运行dry_run模式，即执行所有的检查过程但不真正kill 这便是开头所讲的，实时关注生产环境慢查询，而不是等出现问题被动去看slow log，严重的情况连接数可能已经爆了 支持只在时间窗口内运行，考虑到晚上一些长任务不检查 密码加密 2. 快速上手 需要pip安装MySQL-python和pycrypto两个库，只在python 2.7上有测试。\n在 settings.py 里面设置连接的用户名和密码信息。这里假设同一批db的要check的认证信息是一样的，指定的用户既用于登录认证，也用于告知脚本哪些用户需要被检查。 密码要通过 prpcryptec.py 加密，加密的密钥需写入脚本本身的 KEY_DB_AUTH变量。（担心泄露的话，把mysqk.py编译成 pyc 来跑）",
+  "keywords": [
+    "mysql", "python"
+  ],
+  "articleBody": "Python完成的一个小程序，初衷用于杀掉 MySQL 上的异常线程，如慢查询、处于Sleep状态的，但上线运行以后，以另一种模式运行来实时发现现网的慢查询特别有用，挖掘了许多潜在问题。 项目地址：https://github.com/seanlook/myquerykill\n在使用阿里云RDS的过程中，数据库出现异常，需要快速恢复。网上有许多类似的kill脚本，都是通过 mysqladmin 实现的。然而 Ali-RDS 环境有以下限制：\n不提供 SUPER 权限的用户，也就是用户只能 kill 自己的线程 当连接数暴增时，外部用户无法登陆，包括控制台 为了解决上面两大问题，该 python 脚本通过在db实例上，使用多线程的方式，为每个用户保留一个连接，并实时读取指令配置文件 mysqk.ini，发现有 kill 需求时，利用对应用户已有连接找到 information_schema.processlist 中符合条件的线程，并 kill 。\n说明：该脚本在9月份做过一次重写，7月份的版本（分支 old_0.5.0）是每实例每用户，对应一个线程，db实例一多线程数也太多，看得始终不太优雅，于是改成了一个db实例一个线程，维护同时维护多个用户的会话。同时新版也加入了更多的功能，如按时间窗口检查，包含或排除特定连接，邮件通知，配置项覆盖。\n1. 特性 始终通过 mysql ping 维持一个长连接，并有断开自动重来机制，解决没有连接可用的尴尬 每个db实例有自己的线程，避免需要单独登陆个别用户去kill的繁复操作。 如果你具有 SUPER 权限，也可以简化配置做到兼容 能够分开应对需要杀死线程的场景： 长时间运行超过 N 秒的 Sleep 状态的事务 （一般不建议，但有时候kill它，可以快速释放连接给管理员使用） 排除一些线程不能kill，如 Binlog dump。可配置 包含特定关键字的线程要kill 出现符合条件的线程时，会对当时的processlist, engine status，lock_wait 做一个快照，并邮件发出。妈妈再也不愁没有事故现场了。 有试运行dry_run模式，即执行所有的检查过程但不真正kill 这便是开头所讲的，实时关注生产环境慢查询，而不是等出现问题被动去看slow log，严重的情况连接数可能已经爆了 支持只在时间窗口内运行，考虑到晚上一些长任务不检查 密码加密 2. 快速上手 需要pip安装MySQL-python和pycrypto两个库，只在python 2.7上有测试。\n在 settings.py 里面设置连接的用户名和密码信息。这里假设同一批db的要check的认证信息是一样的，指定的用户既用于登录认证，也用于告知脚本哪些用户需要被检查。 密码要通过 prpcryptec.py 加密，加密的密钥需写入脚本本身的 KEY_DB_AUTH变量。（担心泄露的话，把mysqk.py编译成 pyc 来跑）\n在 mysqk.ini 主配置文件里面\ndb_info 节设置需要被检查的数据库地址，如 db01=10.0.200.100:3306 可分别 db01等指定需要kill thread的选项。[id_db01] 则默认复用 [db_commkill] 的选项 db_comconfig 节设置 db_puser 为能查看到所有processlist的权限用户，且在 settings.py 的DB_AUTH中已指定 只想执行检查，并不想真正kill异常线程，确认 dry_run不等于0 Here we go!\n3. 配置项说明 mysqk.ini：\n3.1 mail_config 邮件通知相关设置，smtp服务地址和认证信息。 mail_receiver= 设置空，表示不发邮件\n3.2 db_info 设置要检查kill哪些数据库实例. 格式：=:，dbid是唯一表示db实例的，后面设置各db需要被kill的选项，小节配置名就是 id_；端口必需指定。\n在这里出现的db实例都会被执行检查，可用 ; 注释，但需要重启脚本。\n3.3 db_comconfig 检查用公共配置，实时生效。\ndb_puser：指定一个用户名用于 show processlist，需要的权限：PROCESS、information_schema库查看。可以认为是一个代表用户，检查异常thread，把结果提供给有该thread杀掉权限用户。 run_max_count：执行检查的次数，是一个全局控制开关。每次修改这个值都会重新开始检查，即一个 clean start，让刚修改的配置生效。 为 0 表示脚本不进行任何检查，只简单维护与数据库的连接存活。存活检查频率在 settings.py 由 CHECK_CONFIG_INTERVAL × CHECK_PING_MULTI决定 为 999 表示会在后台一致检查连接线程（但不一定有符合kill条件的），检查的频率在 settings.py 里面 CHECK_CONFIG_INTERVAL 指定 为其它值时，表示检查次数满后停止检查 dry_run：是否开启试运行模式，为0表示真实kill，为1或其它值表示试运行。试运行模式可用于监控慢查询并告警。注意同一会话线程ID只告警一次 run_time_window：运行的检查的时间窗口，格式如 08:00-22:00，在这个时间以外不执行检查，留空表示不限制。主要考虑晚上一些统计任务可能出现“异常”线程。 3.4 db_commkill kill用公共配置，实时生效，会被 id_ 节的选项覆盖。\nk_user：很关键的一个选项，表示你要检查并kill哪些数据库用户，多个用逗号分隔（不要带引号）。\n为 all 时，表示要检查 settings.py 里 DB_AUTH 指定的所有用户\n为 none 时，表示不kill任何异常线程，效果与设置了 dry_run 模式相当\nk_longtime：执行超过设定值的sql则认为异常。一般大于 CHECK_CONFIG_INTERVAL\nk_sleep：Sleep超过设定秒的sql则认为异常，为 0 表示不杀掉sleep状态的线程\nk_exclude：排除掉那些特定关键字的线程，比如复制线程、管理员的连接等\nk_include：包含这些特定关键字的线程，需要被kill。注意，它作用在满足 k_user 和 k_exclude 的前提之下。\nk_exclude与k_include 的值是支持python re模块正则的格式，不要带引号\n3.5 id_dbid 这部分区域的配置项与 db_commconfig 相同，用于针对个别db的kill选项。\n4. 使用建议 两种组合模式：\n设置 dry_run=0，默认 k_user=none，当数据库出现异常时，主动修改对应db的k_user值，动态kill 设置 dry_run=1，默认 k_user=all，相当于运行在daemon模式，有慢查询则邮件通知，并且记录下当时的信息。建议此模式 当然你也可以dry_run=0，k_user=all，让程序一直在后台跑并kill，但生产环境极不推荐。\n有日志和快照文件可以查看。\n5. 配置文件示例 mysqlk.ini :\n[mail_config] mail_host=smtp.exmail.qq.com mail_user=xxx@ecqun.com mail_pass=xxxxxx mail_receiver= [db_info] crm0=192.168.1.125:3306 crm1=192.168.1.126:3306 crm2=192.168.1.127:3306 crm3=192.168.1.128:3306 base=10.0.200.142:3306 [db_commconfig] db_puser=ecuser ; how many kill times once this config file changed ; 0: DISABLE all kill ; 999: always kill threads that meet kill conditions ; default: 1 ; can not be inherit run_max_count=999 dry_run=1 run_time_window=08:00-22:00 [db_commkill] k_user=all k_longtime=10 k_lock=1 k_sleep=0 k_exclude=Binlog|ecdba|Daemon k_include=select sleep\\(17\\) [id_crm0] ; k_user: who's threads to be killed. use comma to separate ; none: do not kill anyone's threads ; all: kill all user's threads (with other where conditions) ; default: none k_user=all ; k_longtime: filter the threads who's running time is longer than this ; 0: ignore the time \u003e x condition ; default: 10 k_longtime=10 ; k_sleep: whether kill sleepd threads or not ; 0: do not kill command='Sleep' threads from processlist ; when it set to 1, usually it's subset of k_longtime condition ; default: 0 k_sleep=0 [id_crm1] k_user=ecuser k_longtime=10 k_sleep=0 [id_crm2] k_user=all k_longtime=10 k_sleep=0 [id_crm3] 6. 运行示例 原文链接地址：http://xgknight.com/2016/09/27/python-mysql-querykill/\n",
+  "wordCount" : "347",
+  "inLanguage": "en",
+  "datePublished": "2016-09-27T16:32:49Z",
+  "dateModified": "2016-09-27T16:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2016/09/%E4%BD%A0%E5%8F%AF%E8%83%BD%E9%9C%80%E8%A6%81%E4%B8%80%E4%B8%AA%E5%AE%9E%E6%97%B6%E6%8A%93%E5%8F%96mysql%E6%85%A2%E6%9F%A5%E8%AF%A2%E7%8E%B0%E5%9C%BA%E7%9A%84%E7%A8%8B%E5%BA%8F/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      你可能需要一个实时抓取MySQL慢查询现场的程序
+    </h1>
+    <div class="post-meta"><span title='2016-09-27 16:32:49 +0000 UTC'>September 27, 2016</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>Python完成的一个小程序，初衷用于杀掉 MySQL 上的异常线程，如慢查询、处于Sleep状态的，但上线运行以后，以另一种模式运行来实时发现现网的慢查询特别有用，挖掘了许多潜在问题。
+<strong>项目地址</strong>：https://github.com/seanlook/myquerykill</p>
+<p>在使用阿里云RDS的过程中，数据库出现异常，需要快速恢复。网上有许多类似的kill脚本，都是通过 mysqladmin 实现的。然而 Ali-RDS 环境有以下限制：</p>
+<ul>
+<li>不提供 SUPER 权限的用户，也就是用户只能 kill 自己的线程</li>
+<li>当连接数暴增时，外部用户无法登陆，包括控制台</li>
+</ul>
+<p>为了解决上面两大问题，该 python 脚本通过在db实例上，使用多线程的方式，为每个用户保留一个连接，并<strong>实时</strong>读取指令配置文件 <code>mysqk.ini</code>，发现有 kill 需求时，利用对应用户已有连接找到 <code>information_schema.processlist</code> 中符合条件的线程，并 kill 。</p>
+<p>说明：该脚本在9月份做过一次重写，7月份的版本（分支 old_0.5.0）是每实例每用户，对应一个线程，db实例一多线程数也太多，看得始终不太优雅，于是改成了一个db实例一个线程，维护同时维护多个用户的会话。同时新版也加入了更多的功能，如按时间窗口检查，包含或排除特定连接，邮件通知，配置项覆盖。</p>
+<h1 id="1-特性">1. 特性<a hidden class="anchor" aria-hidden="true" href="#1-特性">#</a></h1>
+<ol>
+<li>始终通过 mysql ping 维持一个长连接，并有断开自动重来机制，解决没有连接可用的尴尬</li>
+<li>每个db实例有自己的线程，避免需要单独登陆个别用户去kill的繁复操作。
+如果你具有 SUPER 权限，也可以简化配置做到兼容</li>
+<li>能够分开应对需要杀死线程的场景：</li>
+</ol>
+<ul>
+<li>长时间运行超过 N 秒的</li>
+<li>Sleep 状态的事务 （一般不建议，但有时候kill它，可以快速释放连接给管理员使用）</li>
+<li>排除一些线程不能kill，如 Binlog dump。可配置</li>
+<li>包含特定关键字的线程要kill</li>
+</ul>
+<ol start="4">
+<li>出现符合条件的线程时，会对当时的processlist, engine status，lock_wait 做一个快照，并邮件发出。妈妈再也不愁没有事故现场了。</li>
+<li>有试运行dry_run模式，即执行所有的检查过程但不真正kill
+这便是开头所讲的，实时关注生产环境慢查询，而不是等出现问题被动去看slow log，严重的情况连接数可能已经爆了</li>
+<li>支持只在时间窗口内运行，考虑到晚上一些长任务不检查</li>
+<li>密码加密</li>
+</ol>
+<!-- raw HTML omitted -->
+<h1 id="2-快速上手">2. 快速上手<a hidden class="anchor" aria-hidden="true" href="#2-快速上手">#</a></h1>
+<p>需要pip安装<code>MySQL-python</code>和<code>pycrypto</code>两个库，只在python 2.7上有测试。</p>
+<p>在 <em>settings.py</em> 里面设置连接的用户名和密码信息。这里假设同一批db的要check的认证信息是一样的，指定的用户既用于登录认证，也用于告知脚本哪些用户需要被检查。
+密码要通过 <code>prpcryptec.py</code> 加密，加密的密钥需写入脚本本身的 <code>KEY_DB_AUTH</code>变量。（担心泄露的话，把mysqk.py编译成 pyc 来跑）</p>
+<p>在 <em>mysqk.ini</em> 主配置文件里面</p>
+<ul>
+<li><code>db_info</code> 节设置需要被检查的数据库地址，如 <code>db01=10.0.200.100:3306</code></li>
+<li>可分别 <code>db01</code>等指定需要kill thread的选项。<code>[id_db01]</code> 则默认复用 <code>[db_commkill]</code> 的选项</li>
+<li><code>db_comconfig</code> 节设置 <code>db_puser</code> 为能查看到所有processlist的权限用户，且在 <em>settings.py</em> 的DB_AUTH中已指定</li>
+<li>只想执行检查，并不想真正kill异常线程，确认 dry_run不等于0</li>
+</ul>
+<p>Here we go!</p>
+<h1 id="3-配置项说明">3. 配置项说明<a hidden class="anchor" aria-hidden="true" href="#3-配置项说明">#</a></h1>
+<p><strong><code>mysqk.ini</code></strong>：</p>
+<h2 id="31-mail_config">3.1 mail_config<a hidden class="anchor" aria-hidden="true" href="#31-mail_config">#</a></h2>
+<p>邮件通知相关设置，smtp服务地址和认证信息。
+<code>mail_receiver=</code> 设置空，表示不发邮件</p>
+<h2 id="32-db_info">3.2 db_info<a hidden class="anchor" aria-hidden="true" href="#32-db_info">#</a></h2>
+<p>设置要检查kill哪些数据库实例.
+格式：<code>&lt;dbid&gt;=&lt;host&gt;:&lt;port&gt;</code>，dbid是唯一表示db实例的，后面设置各db需要被kill的选项，小节配置名就是 <code>id_&lt;dbid&gt;</code>；端口必需指定。</p>
+<p>在这里出现的db实例都会被执行检查，可用 ; 注释，但需要重启脚本。</p>
+<h2 id="33-db_comconfig">3.3 db_comconfig<a hidden class="anchor" aria-hidden="true" href="#33-db_comconfig">#</a></h2>
+<p>检查用公共配置，实时生效。</p>
+<ul>
+<li><code>db_puser</code>：指定一个用户名用于 show processlist，需要的权限：PROCESS、information_schema库查看。可以认为是一个代表用户，检查异常thread，把结果提供给有该thread杀掉权限用户。</li>
+<li><code>run_max_count</code>：执行检查的次数，是一个全局控制开关。每次修改这个值都会重新开始检查，即一个 clean start，让刚修改的配置生效。
+<ul>
+<li>为 0 表示脚本不进行任何检查，只简单维护与数据库的连接存活。存活检查频率在 <em>settings.py</em> 由 <code>CHECK_CONFIG_INTERVAL × CHECK_PING_MULTI</code>决定</li>
+<li>为 999 表示会在后台一致检查连接线程（但不一定有符合kill条件的），检查的频率在 <em>settings.py</em> 里面 <code>CHECK_CONFIG_INTERVAL</code> 指定</li>
+<li>为其它值时，表示检查次数满后停止检查</li>
+</ul>
+</li>
+<li><code>dry_run</code>：是否开启试运行模式，为0表示真实kill，为1或其它值表示试运行。试运行模式可用于监控慢查询并告警。注意同一会话线程ID只告警一次</li>
+<li><code>run_time_window</code>：运行的检查的时间窗口，格式如 <code>08:00-22:00</code>，在这个时间以外不执行检查，留空表示不限制。主要考虑晚上一些统计任务可能出现“异常”线程。</li>
+</ul>
+<h2 id="34-db_commkill">3.4 db_commkill<a hidden class="anchor" aria-hidden="true" href="#34-db_commkill">#</a></h2>
+<p>kill用公共配置，实时生效，会被 <code>id_&lt;dbid&gt;</code> 节的选项覆盖。</p>
+<ul>
+<li>
+<p><code>k_user</code>：很关键的一个选项，表示你要检查并kill哪些数据库用户，多个用逗号分隔（不要带引号）。<br>
+为 <code>all</code> 时，表示要检查 <em>settings.py</em> 里 DB_AUTH 指定的所有用户<br>
+为 <code>none</code> 时，表示不kill任何异常线程，效果与设置了 dry_run 模式相当</p>
+</li>
+<li>
+<p><code>k_longtime</code>：执行超过设定值的sql则认为异常。一般大于 CHECK_CONFIG_INTERVAL</p>
+</li>
+<li>
+<p><code>k_sleep</code>：Sleep超过设定秒的sql则认为异常，为 0 表示不杀掉sleep状态的线程</p>
+</li>
+<li>
+<p><code>k_exclude</code>：排除掉那些特定关键字的线程，比如复制线程、管理员的连接等</p>
+</li>
+<li>
+<p><code>k_include</code>：包含这些特定关键字的线程，需要被kill。注意，它作用在满足 k_user 和 k_exclude 的前提之下。<br>
+k_exclude与k_include 的值是支持python re模块正则的格式，不要带引号</p>
+</li>
+</ul>
+<h2 id="35-id_dbid">3.5 id_dbid<a hidden class="anchor" aria-hidden="true" href="#35-id_dbid">#</a></h2>
+<p>这部分区域的配置项与 db_commconfig 相同，用于针对个别db的kill选项。</p>
+<h1 id="4-使用建议">4. 使用建议<a hidden class="anchor" aria-hidden="true" href="#4-使用建议">#</a></h1>
+<p>两种组合模式：</p>
+<ol>
+<li>设置 <code>dry_run=0</code>，默认 <code>k_user=none</code>，当数据库出现异常时，主动修改对应db的k_user值，动态kill</li>
+<li>设置 <code>dry_run=1</code>，默认 <code>k_user=all</code>，相当于运行在daemon模式，有慢查询则邮件通知，并且记录下当时的信息。<strong>建议此模式</strong></li>
+</ol>
+<p>当然你也可以<code>dry_run=0</code>，<code>k_user=all</code>，让程序一直在后台跑并kill，但生产环境极不推荐。</p>
+<p>有日志和快照文件可以查看。</p>
+<h1 id="5-配置文件示例">5. 配置文件示例<a hidden class="anchor" aria-hidden="true" href="#5-配置文件示例">#</a></h1>
+<p>mysqlk.ini :</p>
+<pre tabindex="0"><code>[mail_config]
+mail_host=smtp.exmail.qq.com
+mail_user=xxx@ecqun.com
+mail_pass=xxxxxx
+
+mail_receiver=
+
+[db_info]
+crm0=192.168.1.125:3306
+crm1=192.168.1.126:3306
+crm2=192.168.1.127:3306
+crm3=192.168.1.128:3306
+base=10.0.200.142:3306
+
+[db_commconfig]
+db_puser=ecuser
+
+; how many kill times once this config file changed
+; 0: DISABLE all kill
+; 999: always kill threads that meet kill conditions
+; default: 1
+; can not be inherit
+run_max_count=999
+dry_run=1
+run_time_window=08:00-22:00
+
+
+[db_commkill]
+k_user=all
+k_longtime=10
+k_lock=1
+k_sleep=0
+
+k_exclude=Binlog|ecdba|Daemon
+k_include=select sleep\(17\)
+
+
+[id_crm0]
+; k_user: who&#39;s threads to be killed. use comma to separate
+;         none: do not kill anyone&#39;s threads
+;         all: kill all user&#39;s threads (with other where conditions)
+; default: none
+k_user=all
+
+; k_longtime: filter the threads who&#39;s running time is longer than this
+;             0: ignore the time &gt; x  condition
+; default: 10
+k_longtime=10
+
+; k_sleep: whether kill sleepd threads or not
+;          0: do not kill command=&#39;Sleep&#39; threads from processlist
+;          when it set to 1, usually it&#39;s subset of k_longtime condition
+; default: 0
+k_sleep=0
+
+[id_crm1]
+k_user=ecuser
+k_longtime=10
+k_sleep=0
+
+[id_crm2]
+k_user=all
+k_longtime=10
+k_sleep=0
+
+[id_crm3]
+</code></pre><h1 id="6-运行示例">6. 运行示例<a hidden class="anchor" aria-hidden="true" href="#6-运行示例">#</a></h1>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-myquery-shot.png" alt="run-demo"  />
+</p>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/python-mysql-slowquery-discover.png" alt="slowquery-discover"  />
+</p>
+<hr>
+<p>原文链接地址：http://xgknight.com/2016/09/27/python-mysql-querykill/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/python/">python</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

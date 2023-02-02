@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>InnoDB行格式对text/blob大变长字段的影响 | Sean Note</title>
+<meta name="keywords" content="mysql, schema设计">
+<meta name="description" content="最近在排查现网Text与Blob类型，发现有不少，在《高性能MySQL(第3版)》看到对这两种变长数据类型的处理会涉及到在磁盘上创建临时表，性能开销比较大。于是把影响blob型数据存储方式了解了一下：row_format。
+1. InnoDB的Antelop与Barracuda文件格式 Innodb存储引擎保存记录，是以行的形式存放的（与之对应的是像Google BigTable这种列数据库）。在InnoDB 1.0.x版本之前，InnoDB 存储引擎提供了 Compact 和 Redundant 两种格式来存放行记录数据，这也是目前使用最多的一种格式。Redundant 格式是为兼容之前版本而保留的。
+MySQL 5.1 中的 innodb_plugin 引入了新的文件格式：Barracuda（将以前的行格式 compact 和 redundant 合称为Antelope），该文件格式拥有新的两种行格式：compressed和dynamic。
+在 MySQL 5.6 版本中，默认还是 Compact 行格式，也是目前使用最多的一种 ROW FORMAT。用户可以通过命令 SHOW TABLE STATUS LIKE&#39;table_name&#39; 来查看当前表使用的行格式，其中 row_format 列表示当前所使用的行记录结构类型。
+mysql&gt; show variables like &#34;innodb_file_format&#34;; &#43;--------------------&#43;-----------&#43; | Variable_name | Value | &#43;--------------------&#43;-----------&#43; | innodb_file_format | Barracuda | &#43;--------------------&#43;-----------&#43; 1 row in set mysql&gt; show table status like &#34;tablename%&#34;\G *************************** 1. row *************************** Name: t_rf_compact Engine: InnoDB Version: 10 Row_format: Compact Rows: 4 Avg_row_length: 36864 Data_length: 147456 Max_data_length: 0 Index_length: 0 Data_free: 0 Auto_increment: 7 Create_time: 2016-05-14 20:52:58 Update_time: NULL Check_time: NULL Collation: utf8_general_ci Checksum: NULL Create_options: Comment: 1 row in set (0.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2016/05/innodb%E8%A1%8C%E6%A0%BC%E5%BC%8F%E5%AF%B9text/blob%E5%A4%A7%E5%8F%98%E9%95%BF%E5%AD%97%E6%AE%B5%E7%9A%84%E5%BD%B1%E5%93%8D/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="InnoDB行格式对text/blob大变长字段的影响" />
+<meta property="og:description" content="最近在排查现网Text与Blob类型，发现有不少，在《高性能MySQL(第3版)》看到对这两种变长数据类型的处理会涉及到在磁盘上创建临时表，性能开销比较大。于是把影响blob型数据存储方式了解了一下：row_format。
+1. InnoDB的Antelop与Barracuda文件格式 Innodb存储引擎保存记录，是以行的形式存放的（与之对应的是像Google BigTable这种列数据库）。在InnoDB 1.0.x版本之前，InnoDB 存储引擎提供了 Compact 和 Redundant 两种格式来存放行记录数据，这也是目前使用最多的一种格式。Redundant 格式是为兼容之前版本而保留的。
+MySQL 5.1 中的 innodb_plugin 引入了新的文件格式：Barracuda（将以前的行格式 compact 和 redundant 合称为Antelope），该文件格式拥有新的两种行格式：compressed和dynamic。
+在 MySQL 5.6 版本中，默认还是 Compact 行格式，也是目前使用最多的一种 ROW FORMAT。用户可以通过命令 SHOW TABLE STATUS LIKE&#39;table_name&#39; 来查看当前表使用的行格式，其中 row_format 列表示当前所使用的行记录结构类型。
+mysql&gt; show variables like &#34;innodb_file_format&#34;; &#43;--------------------&#43;-----------&#43; | Variable_name | Value | &#43;--------------------&#43;-----------&#43; | innodb_file_format | Barracuda | &#43;--------------------&#43;-----------&#43; 1 row in set mysql&gt; show table status like &#34;tablename%&#34;\G *************************** 1. row *************************** Name: t_rf_compact Engine: InnoDB Version: 10 Row_format: Compact Rows: 4 Avg_row_length: 36864 Data_length: 147456 Max_data_length: 0 Index_length: 0 Data_free: 0 Auto_increment: 7 Create_time: 2016-05-14 20:52:58 Update_time: NULL Check_time: NULL Collation: utf8_general_ci Checksum: NULL Create_options: Comment: 1 row in set (0." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2016/05/innodb%E8%A1%8C%E6%A0%BC%E5%BC%8F%E5%AF%B9text/blob%E5%A4%A7%E5%8F%98%E9%95%BF%E5%AD%97%E6%AE%B5%E7%9A%84%E5%BD%B1%E5%93%8D/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2016-05-18T16:32:49+00:00" />
+<meta property="article:modified_time" content="2016-05-18T16:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="InnoDB行格式对text/blob大变长字段的影响"/>
+<meta name="twitter:description" content="最近在排查现网Text与Blob类型，发现有不少，在《高性能MySQL(第3版)》看到对这两种变长数据类型的处理会涉及到在磁盘上创建临时表，性能开销比较大。于是把影响blob型数据存储方式了解了一下：row_format。
+1. InnoDB的Antelop与Barracuda文件格式 Innodb存储引擎保存记录，是以行的形式存放的（与之对应的是像Google BigTable这种列数据库）。在InnoDB 1.0.x版本之前，InnoDB 存储引擎提供了 Compact 和 Redundant 两种格式来存放行记录数据，这也是目前使用最多的一种格式。Redundant 格式是为兼容之前版本而保留的。
+MySQL 5.1 中的 innodb_plugin 引入了新的文件格式：Barracuda（将以前的行格式 compact 和 redundant 合称为Antelope），该文件格式拥有新的两种行格式：compressed和dynamic。
+在 MySQL 5.6 版本中，默认还是 Compact 行格式，也是目前使用最多的一种 ROW FORMAT。用户可以通过命令 SHOW TABLE STATUS LIKE&#39;table_name&#39; 来查看当前表使用的行格式，其中 row_format 列表示当前所使用的行记录结构类型。
+mysql&gt; show variables like &#34;innodb_file_format&#34;; &#43;--------------------&#43;-----------&#43; | Variable_name | Value | &#43;--------------------&#43;-----------&#43; | innodb_file_format | Barracuda | &#43;--------------------&#43;-----------&#43; 1 row in set mysql&gt; show table status like &#34;tablename%&#34;\G *************************** 1. row *************************** Name: t_rf_compact Engine: InnoDB Version: 10 Row_format: Compact Rows: 4 Avg_row_length: 36864 Data_length: 147456 Max_data_length: 0 Index_length: 0 Data_free: 0 Auto_increment: 7 Create_time: 2016-05-14 20:52:58 Update_time: NULL Check_time: NULL Collation: utf8_general_ci Checksum: NULL Create_options: Comment: 1 row in set (0."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "InnoDB行格式对text/blob大变长字段的影响",
+      "item": "http://xgknight.com/posts/2016/05/innodb%E8%A1%8C%E6%A0%BC%E5%BC%8F%E5%AF%B9text/blob%E5%A4%A7%E5%8F%98%E9%95%BF%E5%AD%97%E6%AE%B5%E7%9A%84%E5%BD%B1%E5%93%8D/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "InnoDB行格式对text/blob大变长字段的影响",
+  "name": "InnoDB行格式对text\/blob大变长字段的影响",
+  "description": "最近在排查现网Text与Blob类型，发现有不少，在《高性能MySQL(第3版)》看到对这两种变长数据类型的处理会涉及到在磁盘上创建临时表，性能开销比较大。于是把影响blob型数据存储方式了解了一下：row_format。\n1. InnoDB的Antelop与Barracuda文件格式 Innodb存储引擎保存记录，是以行的形式存放的（与之对应的是像Google BigTable这种列数据库）。在InnoDB 1.0.x版本之前，InnoDB 存储引擎提供了 Compact 和 Redundant 两种格式来存放行记录数据，这也是目前使用最多的一种格式。Redundant 格式是为兼容之前版本而保留的。\nMySQL 5.1 中的 innodb_plugin 引入了新的文件格式：Barracuda（将以前的行格式 compact 和 redundant 合称为Antelope），该文件格式拥有新的两种行格式：compressed和dynamic。\n在 MySQL 5.6 版本中，默认还是 Compact 行格式，也是目前使用最多的一种 ROW FORMAT。用户可以通过命令 SHOW TABLE STATUS LIKE'table_name' 来查看当前表使用的行格式，其中 row_format 列表示当前所使用的行记录结构类型。\nmysql\u0026gt; show variables like \u0026#34;innodb_file_format\u0026#34;; +--------------------+-----------+ | Variable_name | Value | +--------------------+-----------+ | innodb_file_format | Barracuda | +--------------------+-----------+ 1 row in set mysql\u0026gt; show table status like \u0026#34;tablename%\u0026#34;\\G *************************** 1. row *************************** Name: t_rf_compact Engine: InnoDB Version: 10 Row_format: Compact Rows: 4 Avg_row_length: 36864 Data_length: 147456 Max_data_length: 0 Index_length: 0 Data_free: 0 Auto_increment: 7 Create_time: 2016-05-14 20:52:58 Update_time: NULL Check_time: NULL Collation: utf8_general_ci Checksum: NULL Create_options: Comment: 1 row in set (0.",
+  "keywords": [
+    "mysql", "schema设计"
+  ],
+  "articleBody": "最近在排查现网Text与Blob类型，发现有不少，在《高性能MySQL(第3版)》看到对这两种变长数据类型的处理会涉及到在磁盘上创建临时表，性能开销比较大。于是把影响blob型数据存储方式了解了一下：row_format。\n1. InnoDB的Antelop与Barracuda文件格式 Innodb存储引擎保存记录，是以行的形式存放的（与之对应的是像Google BigTable这种列数据库）。在InnoDB 1.0.x版本之前，InnoDB 存储引擎提供了 Compact 和 Redundant 两种格式来存放行记录数据，这也是目前使用最多的一种格式。Redundant 格式是为兼容之前版本而保留的。\nMySQL 5.1 中的 innodb_plugin 引入了新的文件格式：Barracuda（将以前的行格式 compact 和 redundant 合称为Antelope），该文件格式拥有新的两种行格式：compressed和dynamic。\n在 MySQL 5.6 版本中，默认还是 Compact 行格式，也是目前使用最多的一种 ROW FORMAT。用户可以通过命令 SHOW TABLE STATUS LIKE'table_name' 来查看当前表使用的行格式，其中 row_format 列表示当前所使用的行记录结构类型。\nmysql\u003e show variables like \"innodb_file_format\"; +--------------------+-----------+ | Variable_name | Value | +--------------------+-----------+ | innodb_file_format | Barracuda | +--------------------+-----------+ 1 row in set mysql\u003e show table status like \"tablename%\"\\G *************************** 1. row *************************** Name: t_rf_compact Engine: InnoDB Version: 10 Row_format: Compact Rows: 4 Avg_row_length: 36864 Data_length: 147456 Max_data_length: 0 Index_length: 0 Data_free: 0 Auto_increment: 7 Create_time: 2016-05-14 20:52:58 Update_time: NULL Check_time: NULL Collation: utf8_general_ci Checksum: NULL Create_options: Comment: 1 row in set (0.00 sec) 在 msyql 5.7.9 及以后版本，默认行格式由innodb_default_row_format变量决定，它的默认值是DYNAMIC，也可以在 create table 的时候指定ROW_FORMAT=DYNAMIC。\n注意，如果要修改现有表的行模式为compressed或dynamic，必须先将文件格式设置成Barracuda：set global innodb_file_format=Barracuda;，再用ALTER TABLE tablename ROW_FORMAT=COMPRESSED;去修改才能生效，否则修改无效却无提示：\nmysql\u003e ALTER TABLE tablename ROW_FORMAT=COMPRESSED; Query OK, 0 rows affected Records: 0 Duplicates: 0 Warnings: 2 修改失败 mysql\u003e show warnings; +---------+------+-----------------------------------------------------------------------+ | Level | Code | Message | +---------+------+-----------------------------------------------------------------------+ | Warning | 1478 | InnoDB: ROW_FORMAT=COMPRESSED requires innodb_file_format \u003e Antelope. | | Warning | 1478 | InnoDB: assuming ROW_FORMAT=COMPACT. | +---------+------+-----------------------------------------------------------------------+ 2 rows in set 2. 对TEXT/BLOB这类大字段类型的影响 2.1 compact 在 Antelope 两种行格式下，如果blob列值长度 \u003c= 768 bytes，就不会发生行溢出(page overflow)，内容都在数据页(B-tree Node)；如果列值长度 \u003e 768字节，那么前768字节依然在数据页，而剩余的则放在溢出页(off-page)，如下图：\n上面所讲的讲的blob或变长大字段类型包括blob,text,varchar，其中varchar列值长度大于某数N时也会存溢出页，在latin1字符集下N值可以这样计算：innodb的块大小默认为16kb，由于innodb存储引擎表为索引组织表，树底层的叶子节点为一双向链表，因此每个页中至少应该有两行记录，这就决定了innodb在存储一行数据的时候不能够超过8k，减去其它列值所占字节数，约等于N。\n我们知道对于InnoDB来说，内存是极为珍贵的，如果把768字节长度的blob都放在数据页，虽然可以节省部分IO，但相对来说能缓存行数就变少，也就是能缓存的索引值变少了，降低了索引效率。\n2.2 dynamic Barracuda 的两种行格式对blob采用完全行溢出，即聚集索引记录（数据页）只保留20字节的指针，指向真实存放它的溢出段地址： dynamic行格式，列存储是否放到off-page页，主要取决于行大小，它会把行中最长的那一列放到off-page，直到数据页能存放下两行。TEXT/BLOB列 \u003c=40 bytes 时总是存放于数据页。这种方式可以避免compact那样把太多的大列值放到 B-tree Node，因为dynamic格式认为，只要大列值有部分数据放在off-page，那把整个值放入都放入off-page更有效。\ncompressed 物理结构上与dynamic类似，但是对表的数据行使用zlib算法进行了压缩存储。在long blob列类型比较多的情况下用，可以降低off-page的使用，减少存储空间（一般40%左右），但要求更高的CPU，buffer pool里面可能会同时存储数据的压缩版和非压缩版，所以也多占用部分内存。这里 MySQL 5.6 Manual innodb-compression-internals 讲的十分清楚。\n另外，由于ROW_FORMAT=DYNAMIC 和 ROW_FORMAT=COMPRESSED 是从 ROW_FORMAT=COMPACT 变化来的，所以他们处理 CHAR类型存储的方式和 COMPACT 一样。\n3. 对blob型字段存取优化 如果一个查询涉及BLOB值，又需要使用临时表——不管它多小——它都会立即在磁盘上创建临时表。这样效率很低，尤其是对小而快的查询，临时表可能是查询中最大的开销。\n比如：创建一个带Text字段的compact表：\nmysql\u003e CREATE TABLE `t_rf_compact` ( `f_id` int(11) NOT NULL AUTO_INCREMENT, `f_char` char(30) DEFAULT NULL, `f_varchar` varchar(30) NOT NULL DEFAULT '', `f_text` text NOT NULL, PRIMARY KEY (`f_id`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8 ROW_FORMAT=COMPACT; mysql\u003e insert into t_rf_compact(f_char,f_varchar,f_text) values('aa','中中',repeat('b',700)); mysql\u003e insert into t_rf_compact(f_char,f_varchar,f_text) values('aa','文',repeat('c',60000)); 第二条数据会行溢出，前768字节放在Clustered Index数据页，剩余的放扩展存储空间 mysql\u003e explain select t1.f_id from t_rf_compact t1,t_rf_compact t2 where t1.f_id=t2.f_id order by t1.f_id limit 1; +----+-------------+-------+--------+---------------+---------+---------+-------------------+------+-------------+ | id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra | +----+-------------+-------+--------+---------------+---------+---------+-------------------+------+-------------+ | 1 | SIMPLE | t1 | index | PRIMARY | PRIMARY | 4 | NULL | 6 | Using index | | 1 | SIMPLE | t2 | eq_ref | PRIMARY | PRIMARY | 4 | d_ec_crm2.t1.f_id | 1 | Using index | +----+-------------+-------+--------+---------------+---------+---------+-------------------+------+-------------+ 2 rows in set (0.00 sec) mysql\u003e show status like \"%tmp%tables\"; +-------------------------+-------+ | Variable_name | Value | +-------------------------+-------+ | Created_tmp_disk_tables | 7 | | Created_tmp_tables | 36 | +-------------------------+-------+ 2 rows in set (0.00 sec) mysql\u003e select t1.f_id from t_rf_compact t1,t_rf_compact t2 where t1.f_id=t2.f_id order by t1.f_id limit 1; +------+ | f_id | +------+ | 1 | +------+ 1 row in set (0.00 sec) mysql\u003e show status like \"%tmp%tables\"; +-------------------------+-------+ | Variable_name | Value | +-------------------------+-------+ | Created_tmp_disk_tables | 7 | | Created_tmp_tables | 36 | +-------------------------+-------+ 2 rows in set (0.00 sec) 没有临时表产生，所以磁盘临时表无变化。让它产生临时表：（但不涉及text列）\nmysql\u003e explain select t1.f_id from t_rf_compact t1,t_rf_compact t2 where t1.f_id=t2.f_id order by t2.f_id; +----+-------------+-------+--------+---------------+---------+---------+-------------------+------+----------------------------------------------+ | id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra | +----+-------------+-------+--------+---------------+---------+---------+-------------------+------+----------------------------------------------+ | 1 | SIMPLE | t1 | index | PRIMARY | PRIMARY | 4 | NULL | 6 | Using index; Using temporary; Using filesort | | 1 | SIMPLE | t2 | eq_ref | PRIMARY | PRIMARY | 4 | d_ec_crm2.t1.f_id | 1 | Using index | +----+-------------+-------+--------+---------------+---------+---------+-------------------+------+----------------------------------------------+ 2 rows in set (0.00 sec) mysql\u003e select t1.f_id from t_rf_compact t1,t_rf_compact t2 where t1.f_id=t2.f_id order by t2.f_id; mysql\u003e show status like \"%tmp%tables\"; +-------------------------+-------+ | Variable_name | Value | +-------------------------+-------+ | Created_tmp_disk_tables | 7 | | Created_tmp_tables | 37 | +-------------------------+-------+ 2 rows in set (0.00 sec) 虽然有Using temporary，但内存临时表还是够用，磁盘临时表还是无变化。返回TEXT列（也会使用临时表排序）：\nmysql\u003e select t1.f_text from t_rf_compact t1,t_rf_compact t2 where t1.f_id=t2.f_id order by t2.f_id; mysql\u003e show status like \"%tmp%tables\"; +-------------------------+-------+ | Variable_name | Value | +-------------------------+-------+ | Created_tmp_disk_tables | 8 | | Created_tmp_tables | 38 | +-------------------------+-------+ 2 rows in set (0.00 sec) Created_tmp_disk_tables磁盘临时表有增加，与上面结论相符：只有有TEXT/BLOB列参与，如果用到临时表，不管它多小，都会创建在磁盘上，从而带来性能消耗。\n注：磁盘临时表存储引擎一定是 MyISAM，与select @@default_tmp_storage_engine;（5.6.3开始）看到的InnoDB无关，它是控制CREATE TEMPORARY TABLE时的默认引擎。在 5.7.5 开始internal_tmp_disk_storage_engine选项可以定义磁盘临时表的引擎类型。关于临时表与内存表可以参考 [MySQL FAQ]系列 — 什么情况下会用到临时表 -老叶 。\n有两种办法来减轻这种不利的情况：通过 SUBSTRING() 函数把值转换为 VARCHAR，或者让磁盘临时表更快一些。\n让磁盘临时表运行更快的方式是，把它们放在基于内存的文件系统tmpfs，tmpfs文件系统为了降低开销不会刷新内存数据到磁盘，读写速度也很快，而临时表也不需要持久存放。mysql的 tmpdir 参数控制临时文件存放位置，建议如果使用的话要监控空间使用率。另外如果BLOB列非常大或多，可以考虑调大InnoDB日志缓存大小innodb_log_buffer_size。\n如果使用BLOB这类变长大字段类型，需要以下后果考虑：\n大字段在InnoDB里可能浪费大量空间。例如，若存储字段值只是比行的要求多了一个字节，也会使用整个页面来存储剩下的字节，浪费了页面的大部分空间。同样的，如果有一个值只是稍微超过了32个页的大小，实际上就需要使用96个页面。 扩展存储禁用了自适应哈希，因为需要完整的比较列的整个长度，才能发现是不是正确的数据（哈希帮助InnoDB非常快速的找到“猜测的位置”，但是必须检查“猜测的位置”是不是正确）。因为自适应哈希是完全的内存结构，并且直接指向Buffer Pool中访问“最”频繁的页面，但对于扩展存储空间却无法使用Adaptive Hash。 太长的值可能使得在查询中作为WHERE条件不能使用索引，因而执行很慢。在应用WHERE条件之前，MySQL需要把所有的列读出来，所以可能导致MySQL要求InnoDB读取很多扩展存储，然后检查WHERE条件，丢弃所有不需要的数据。查询不需要的列绝对不是好主意，在这种特殊的场景下尤其需要避免这样做。如果发现查询正遇到这个限制带来的问题，可以尝试通过覆盖索引来解决部分问题。 如果一张表里有很多大字段，最好是把它们组合起来单独存到一个列里面，比如说用XML文档格式存储。这让所有的大字段共享一个扩展存储空间，这比每个字段用自己的页要好。 有时候可以把大字段用COMPRESS()压缩后再存为BLOB，或者在发送到MySQL前在应用程序中进行压缩，这可以获得显著的空间优势和性能收益。 —— 《高性能MySQL(第3版)》 P368 对上面的解读就是：\n如果预期长度范围varchar就满足，就避免使用TEXT 对于字段非常大的列可以在应用程序里压缩后再存到mysql，如果列值很长请考虑用单独的表存放 一张表有多个类blob字段，把它们组合起来如long.. long..，再压缩存储。但要考虑是否使用全文索引，是否需要前缀索引。 参考 MySQL 大字段溢出导致数据回写失败\ninnodb使用大字段text，blob的一些优化建议 -玄惭\n[MySQL优化案例]系列 — 优化InnoDB表BLOB列的存储效率 -老叶\nInnoDB 数据表压缩原理与限制 MySQL Manual DYNAMIC and COMPRESSED Row Formats 《MySQL技术内幕·InnoDB存储引擎》 P\n原文链接地址：http://xgknight.com/2016/05/18/mysql-blob-row_format/\n",
+  "wordCount" : "679",
+  "inLanguage": "en",
+  "datePublished": "2016-05-18T16:32:49Z",
+  "dateModified": "2016-05-18T16:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2016/05/innodb%E8%A1%8C%E6%A0%BC%E5%BC%8F%E5%AF%B9text/blob%E5%A4%A7%E5%8F%98%E9%95%BF%E5%AD%97%E6%AE%B5%E7%9A%84%E5%BD%B1%E5%93%8D/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      InnoDB行格式对text/blob大变长字段的影响
+    </h1>
+    <div class="post-meta"><span title='2016-05-18 16:32:49 +0000 UTC'>May 18, 2016</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>最近在排查现网Text与Blob类型，发现有不少，在《高性能MySQL(第3版)》看到对这两种变长数据类型的处理会涉及到在磁盘上创建临时表，性能开销比较大。于是把影响blob型数据存储方式了解了一下：row_format。<!-- raw HTML omitted --></p>
+<h2 id="1-innodb的antelop与barracuda文件格式">1. InnoDB的Antelop与Barracuda文件格式<a hidden class="anchor" aria-hidden="true" href="#1-innodb的antelop与barracuda文件格式">#</a></h2>
+<p>Innodb存储引擎保存记录，是以行的形式存放的（与之对应的是像Google BigTable这种列数据库）。在InnoDB 1.0.x版本之前，InnoDB 存储引擎提供了 <code>Compact</code> 和 <code>Redundant</code> 两种格式来存放行记录数据，这也是目前使用最多的一种格式。Redundant 格式是为兼容之前版本而保留的。</p>
+<p>MySQL 5.1 中的 innodb_plugin 引入了新的<em>文件格式</em>：<code>Barracuda</code>（将以前的<em>行格式</em> compact 和 redundant 合称为<code>Antelope</code>），该文件格式拥有新的两种行格式：<code>compressed</code>和<code>dynamic</code>。</p>
+<p>在 MySQL 5.6 版本中，默认还是 Compact 行格式，也是目前使用最多的一种 ROW FORMAT。用户可以通过命令 <code>SHOW TABLE STATUS LIKE'table_name'</code> 来查看当前表使用的行格式，其中 <em>row_format</em> 列表示当前所使用的行记录结构类型。</p>
+<pre tabindex="0"><code>mysql&gt; show variables like &#34;innodb_file_format&#34;;
++--------------------+-----------+
+| Variable_name      | Value     |
++--------------------+-----------+
+| innodb_file_format | Barracuda |
++--------------------+-----------+
+1 row in set
+
+mysql&gt; show table status like &#34;tablename%&#34;\G
+*************************** 1. row ***************************
+           Name: t_rf_compact
+         Engine: InnoDB
+        Version: 10
+     Row_format: Compact
+           Rows: 4
+ Avg_row_length: 36864
+    Data_length: 147456
+Max_data_length: 0
+   Index_length: 0
+      Data_free: 0
+ Auto_increment: 7
+    Create_time: 2016-05-14 20:52:58
+    Update_time: NULL
+     Check_time: NULL
+      Collation: utf8_general_ci
+       Checksum: NULL
+ Create_options: 
+        Comment: 
+1 row in set (0.00 sec)
+</code></pre><p>在 msyql 5.7.9 及以后版本，默认行格式由<code>innodb_default_row_format</code>变量决定，它的默认值是<code>DYNAMIC</code>，也可以在 create table 的时候指定<code>ROW_FORMAT=DYNAMIC</code>。</p>
+<!-- raw HTML omitted -->
+<p>注意，如果要修改现有表的行模式为<code>compressed</code>或<code>dynamic</code>，必须先将文件格式设置成Barracuda：<code>set global innodb_file_format=Barracuda;</code>，再用<code>ALTER TABLE tablename ROW_FORMAT=COMPRESSED;</code>去修改才能生效，否则修改无效却无提示：</p>
+<pre tabindex="0"><code>mysql&gt; ALTER TABLE tablename ROW_FORMAT=COMPRESSED;
+Query OK, 0 rows affected
+Records: 0  Duplicates: 0  Warnings: 2
+
+修改失败
+mysql&gt; show warnings;
++---------+------+-----------------------------------------------------------------------+
+| Level   | Code | Message                                                               |
++---------+------+-----------------------------------------------------------------------+
+| Warning | 1478 | InnoDB: ROW_FORMAT=COMPRESSED requires innodb_file_format &gt; Antelope. |
+| Warning | 1478 | InnoDB: assuming ROW_FORMAT=COMPACT.                                  |
++---------+------+-----------------------------------------------------------------------+
+2 rows in set
+</code></pre><h2 id="2-对textblob这类大字段类型的影响">2. 对TEXT/BLOB这类大字段类型的影响<a hidden class="anchor" aria-hidden="true" href="#2-对textblob这类大字段类型的影响">#</a></h2>
+<h3 id="21-compact">2.1 compact<a hidden class="anchor" aria-hidden="true" href="#21-compact">#</a></h3>
+<p>在 Antelope 两种行格式下，如果blob列值长度 &lt;= 768 bytes，就不会发生行溢出(page overflow)，内容都在数据页(B-tree Node)；如果列值长度 &gt; 768字节，那么前768字节依然在数据页，而剩余的则放在溢出页(off-page)，如下图：</p>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-compact-768.png" alt=""  />
+</p>
+<p>上面所讲的讲的blob或变长大字段类型包括blob,text,varchar，其中varchar列值长度大于某数N时也会存溢出页，在latin1字符集下N值可以这样计算：innodb的块大小默认为16kb，由于innodb存储引擎表为索引组织表，树底层的叶子节点为一双向链表，因此每个页中至少应该有两行记录，这就决定了innodb在存储一行数据的时候不能够超过8k，减去其它列值所占字节数，约等于N。</p>
+<p>我们知道对于InnoDB来说，内存是极为珍贵的，如果把768字节长度的blob都放在数据页，虽然可以节省部分IO，但相对来说能缓存行数就变少，也就是能缓存的索引值变少了，降低了索引效率。</p>
+<h3 id="22-dynamic">2.2 dynamic<a hidden class="anchor" aria-hidden="true" href="#22-dynamic">#</a></h3>
+<p>Barracuda 的两种行格式对blob采用完全行溢出，即聚集索引记录（数据页）只保留20字节的指针，指向真实存放它的溢出段地址：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-barracuda-20-off-page.png" alt=""  />
+</p>
+<p>dynamic行格式，列存储是否放到off-page页，主要取决于行大小，它会把行中最长的那一列放到off-page，直到数据页能存放下两行。TEXT/BLOB列 &lt;=40 bytes 时总是存放于数据页。这种方式可以避免compact那样把太多的大列值放到 B-tree Node，因为dynamic格式认为，只要大列值有部分数据放在off-page，那把整个值放入都放入off-page更有效。</p>
+<p><strong>compressed</strong> 物理结构上与dynamic类似，但是对表的数据行使用zlib算法进行了压缩存储。在long blob列类型比较多的情况下用，可以降低off-page的使用，减少存储空间（一般40%左右），但要求更高的CPU，buffer pool里面可能会同时存储数据的压缩版和非压缩版，所以也多占用部分内存。这里 <a href="http://dev.mysql.com/doc/refman/5.6/en/innodb-compression-internals.html">MySQL 5.6 Manual innodb-compression-internals</a> 讲的十分清楚。</p>
+<p>另外，由于<code>ROW_FORMAT=DYNAMIC</code> 和 <code>ROW_FORMAT=COMPRESSED</code> 是从 <code>ROW_FORMAT=COMPACT</code> 变化来的，所以他们处理 <code>CHAR</code>类型存储的方式和 COMPACT 一样。</p>
+<h2 id="3-对blob型字段存取优化">3. 对blob型字段存取优化<a hidden class="anchor" aria-hidden="true" href="#3-对blob型字段存取优化">#</a></h2>
+<p>如果一个查询涉及BLOB值，又需要使用临时表——不管它多小——它都会立即在磁盘上创建临时表。这样效率很低，尤其是对小而快的查询，临时表可能是查询中最大的开销。</p>
+<p>比如：创建一个带Text字段的compact表：</p>
+<pre tabindex="0"><code>mysql&gt; CREATE TABLE `t_rf_compact` (
+  `f_id` int(11) NOT NULL AUTO_INCREMENT,
+  `f_char` char(30) DEFAULT NULL,
+  `f_varchar` varchar(30) NOT NULL DEFAULT &#39;&#39;,
+  `f_text` text NOT NULL,
+  PRIMARY KEY (`f_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 ROW_FORMAT=COMPACT;
+
+mysql&gt; insert into t_rf_compact(f_char,f_varchar,f_text) values(&#39;aa&#39;,&#39;中中&#39;,repeat(&#39;b&#39;,700));
+mysql&gt; insert into t_rf_compact(f_char,f_varchar,f_text) values(&#39;aa&#39;,&#39;文&#39;,repeat(&#39;c&#39;,60000));
+第二条数据会行溢出，前768字节放在Clustered Index数据页，剩余的放扩展存储空间
+
+mysql&gt; explain select t1.f_id from t_rf_compact t1,t_rf_compact t2 where t1.f_id=t2.f_id order by t1.f_id limit 1; 
++----+-------------+-------+--------+---------------+---------+---------+-------------------+------+-------------+
+| id | select_type | table | type   | possible_keys | key     | key_len | ref               | rows | Extra       |
++----+-------------+-------+--------+---------------+---------+---------+-------------------+------+-------------+
+|  1 | SIMPLE      | t1    | index  | PRIMARY       | PRIMARY | 4       | NULL              |    6 | Using index |
+|  1 | SIMPLE      | t2    | eq_ref | PRIMARY       | PRIMARY | 4       | d_ec_crm2.t1.f_id |    1 | Using index |
++----+-------------+-------+--------+---------------+---------+---------+-------------------+------+-------------+
+2 rows in set (0.00 sec)
+
+
+mysql&gt; show status like &#34;%tmp%tables&#34;;
++-------------------------+-------+
+| Variable_name           | Value |
++-------------------------+-------+
+| Created_tmp_disk_tables | 7     |
+| Created_tmp_tables      | 36    |
++-------------------------+-------+
+2 rows in set (0.00 sec)
+
+mysql&gt; select t1.f_id from t_rf_compact t1,t_rf_compact t2 where t1.f_id=t2.f_id order by t1.f_id limit 1;
++------+
+| f_id |
++------+
+|    1 |
++------+
+1 row in set (0.00 sec)
+
+mysql&gt; show status like &#34;%tmp%tables&#34;;
++-------------------------+-------+
+| Variable_name           | Value |
++-------------------------+-------+
+| Created_tmp_disk_tables | 7     |
+| Created_tmp_tables      | 36    |
++-------------------------+-------+
+2 rows in set (0.00 sec)
+</code></pre><p>没有临时表产生，所以磁盘临时表无变化。让它产生临时表：（但不涉及text列）</p>
+<pre tabindex="0"><code>mysql&gt; explain select t1.f_id from t_rf_compact t1,t_rf_compact t2 where t1.f_id=t2.f_id order by t2.f_id;
++----+-------------+-------+--------+---------------+---------+---------+-------------------+------+----------------------------------------------+
+| id | select_type | table | type   | possible_keys | key     | key_len | ref               | rows | Extra                                        |
++----+-------------+-------+--------+---------------+---------+---------+-------------------+------+----------------------------------------------+
+|  1 | SIMPLE      | t1    | index  | PRIMARY       | PRIMARY | 4       | NULL              |    6 | Using index; Using temporary; Using filesort |
+|  1 | SIMPLE      | t2    | eq_ref | PRIMARY       | PRIMARY | 4       | d_ec_crm2.t1.f_id |    1 | Using index                                  |
++----+-------------+-------+--------+---------------+---------+---------+-------------------+------+----------------------------------------------+
+2 rows in set (0.00 sec)
+
+mysql&gt; select t1.f_id from t_rf_compact t1,t_rf_compact t2 where t1.f_id=t2.f_id order by t2.f_id;
+
+mysql&gt; show status like &#34;%tmp%tables&#34;;
++-------------------------+-------+
+| Variable_name           | Value |
++-------------------------+-------+
+| Created_tmp_disk_tables | 7     |
+| Created_tmp_tables      | 37    |
++-------------------------+-------+
+2 rows in set (0.00 sec)
+</code></pre><p>虽然有<code>Using temporary</code>，但内存临时表还是够用，磁盘临时表还是无变化。返回TEXT列（也会使用临时表排序）：</p>
+<pre tabindex="0"><code>mysql&gt; select t1.f_text from t_rf_compact t1,t_rf_compact t2 where t1.f_id=t2.f_id order by t2.f_id;
+mysql&gt; show status like &#34;%tmp%tables&#34;;
++-------------------------+-------+
+| Variable_name           | Value |
++-------------------------+-------+
+| Created_tmp_disk_tables | 8     |
+| Created_tmp_tables      | 38    |
++-------------------------+-------+
+2 rows in set (0.00 sec)
+</code></pre><p><code>Created_tmp_disk_tables</code>磁盘临时表有增加，与上面结论相符：只有有TEXT/BLOB列参与，如果用到临时表，不管它多小，都会创建在磁盘上，从而带来性能消耗。</p>
+<p>注：磁盘临时表存储引擎一定是 MyISAM，与<code>select @@default_tmp_storage_engine;</code>（5.6.3开始）看到的<em>InnoDB</em>无关，它是控制<em>CREATE TEMPORARY TABLE</em>时的默认引擎。在 5.7.5 开始<code>internal_tmp_disk_storage_engine</code>选项可以定义磁盘临时表的引擎类型。关于临时表与内存表可以参考 <a href="http://imysql.com/2015/07/11/mysql-faq-how-using-temp-table.shtml">[MySQL FAQ]系列 — 什么情况下会用到临时表 -老叶</a> 。</p>
+<p>有两种办法来减轻这种不利的情况：通过 <code>SUBSTRING()</code> 函数把值转换为 VARCHAR，或者让磁盘临时表更快一些。</p>
+<p>让磁盘临时表运行更快的方式是，把它们放在基于内存的文件系统tmpfs，tmpfs文件系统为了降低开销不会刷新内存数据到磁盘，读写速度也很快，而临时表也不需要持久存放。mysql的 tmpdir 参数控制临时文件存放位置，建议如果使用的话要监控空间使用率。另外如果BLOB列非常大或多，可以考虑调大InnoDB日志缓存大小<code>innodb_log_buffer_size</code>。</p>
+<p>如果使用BLOB这类变长大字段类型，需要以下后果考虑：</p>
+<blockquote>
+<ul>
+<li>大字段在InnoDB里可能浪费大量空间。例如，若存储字段值只是比行的要求多了一个字节，也会使用整个页面来存储剩下的字节，浪费了页面的大部分空间。同样的，如果有一个值只是稍微超过了32个页的大小，实际上就需要使用96个页面。</li>
+</ul>
+</blockquote>
+<ul>
+<li>扩展存储禁用了自适应哈希，因为需要完整的比较列的整个长度，才能发现是不是正确的数据（哈希帮助InnoDB非常快速的找到“猜测的位置”，但是必须检查“猜测的位置”是不是正确）。因为自适应哈希是完全的内存结构，并且直接指向Buffer Pool中访问“最”频繁的页面，但对于扩展存储空间却无法使用Adaptive Hash。</li>
+<li>太长的值可能使得在查询中作为WHERE条件不能使用索引，因而执行很慢。在应用WHERE条件之前，MySQL需要把所有的列读出来，所以可能导致MySQL要求InnoDB读取很多扩展存储，然后检查WHERE条件，丢弃所有不需要的数据。查询不需要的列绝对不是好主意，在这种特殊的场景下尤其需要避免这样做。如果发现查询正遇到这个限制带来的问题，可以尝试通过覆盖索引来解决部分问题。</li>
+<li>如果一张表里有很多大字段，最好是把它们组合起来单独存到一个列里面，比如说用XML文档格式存储。这让所有的大字段共享一个扩展存储空间，这比每个字段用自己的页要好。</li>
+<li>有时候可以把大字段用COMPRESS()压缩后再存为BLOB，或者在发送到MySQL前在应用程序中进行压缩，这可以获得显著的空间优势和性能收益。
+—— 《高性能MySQL(第3版)》 P368</li>
+</ul>
+<p>对上面的解读就是：</p>
+<ul>
+<li>如果预期长度范围varchar就满足，就避免使用TEXT</li>
+<li>对于字段非常大的列可以在应用程序里压缩后再存到mysql，如果列值很长请考虑用单独的表存放</li>
+<li>一张表有多个类blob字段，把它们组合起来如<code>&lt;TEXT&gt;&lt;f_big_col1&gt;long..&lt;/f_big_col1&gt; &lt;f_content&gt;long..&lt;/f_content&gt;&lt;/TEXT&gt;</code>，再压缩存储。但要考虑是否使用全文索引，是否需要前缀索引。</li>
+</ul>
+<h2 id="参考">参考<a hidden class="anchor" aria-hidden="true" href="#参考">#</a></h2>
+<ul>
+<li>
+<p><a href="http://blog.opskumu.com/mysql-blob.html">MySQL 大字段溢出导致数据回写失败</a></p>
+</li>
+<li>
+<p><a href="http://hidba.org/?p=551">innodb使用大字段text，blob的一些优化建议 -玄惭</a></p>
+</li>
+<li>
+<p><a href="http://imysql.com/2014/09/28/mysql-optimization-case-blob-stored-in-innodb-optimization.shtml">[MySQL优化案例]系列 — 优化InnoDB表BLOB列的存储效率 -老叶</a></p>
+</li>
+<li>
+<p><a href="http://blog.chinaunix.net/uid-24485075-id-3523032.html">InnoDB 数据表压缩原理与限制 </a></p>
+</li>
+<li>
+<p><a href="http://dev.mysql.com/doc/refman/5.6/en/innodb-row-format-dynamic.html">MySQL Manual DYNAMIC and COMPRESSED Row Formats </a></p>
+</li>
+<li>
+<p>《MySQL技术内幕·InnoDB存储引擎》 P</p>
+</li>
+</ul>
+<hr>
+<p>原文链接地址：http://xgknight.com/2016/05/18/mysql-blob-row_format/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/schema%E8%AE%BE%E8%AE%A1/">schema设计</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

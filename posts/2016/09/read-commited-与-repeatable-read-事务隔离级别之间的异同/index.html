@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同 | Sean Note</title>
+<meta name="keywords" content="mysql, 事务">
+<meta name="description" content="经常会被问到 InnoDB隔离级别中 READ-COMMITED和REPEATABLE-READ 的区别，今天就整理了一下，不再从“脏读”、“幻读”这样的名词解释一样去回答了。
+1. 行锁 InnoDB行锁实际锁的是索引记录，为了防止死锁的产生以及维护所需要的隔离级别，在执行sql语句的全过程中，innodb必须对所需要修改的行每条索引记录上锁。如此一来，如果你执行的 UPDATE 没有很好的索引，那么会导致锁定许多行：
+update employees set store_id = 0 where store_id = 1; ---TRANSACTION 1EAB04, ACTIVE 7 sec 633 lock struct(s), &lt;strong&gt;heap size 96696&lt;/strong&gt;, 218786 row lock(s), undo log entries 1 MySQL thread id 4, OS thread handle 0x7f8dfc35d700, query id 47 localhost root show engine innodb status 上面的 employees 表 store_id 列没有索引。注意 UPDATE 已经执行完成（没有提交），但依然有 218786 个行锁没有释放，还有一个undo记录。这意味着只有一行被更改，但却持有了额外的锁。堆大小（heap size）代表了分配给锁使用的内存数量。
+在 REPEATABLE-READ 级别，事务持有的 每个锁 在整个事务期间一直被持有。
+在 READ-COMMITED 级别，事务里面特定语句结束之后，不匹配该sql语句扫描条件的锁，会被释放。">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2016/09/read-commited-%E4%B8%8E-repeatable-read-%E4%BA%8B%E5%8A%A1%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E4%B9%8B%E9%97%B4%E7%9A%84%E5%BC%82%E5%90%8C/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同" />
+<meta property="og:description" content="经常会被问到 InnoDB隔离级别中 READ-COMMITED和REPEATABLE-READ 的区别，今天就整理了一下，不再从“脏读”、“幻读”这样的名词解释一样去回答了。
+1. 行锁 InnoDB行锁实际锁的是索引记录，为了防止死锁的产生以及维护所需要的隔离级别，在执行sql语句的全过程中，innodb必须对所需要修改的行每条索引记录上锁。如此一来，如果你执行的 UPDATE 没有很好的索引，那么会导致锁定许多行：
+update employees set store_id = 0 where store_id = 1; ---TRANSACTION 1EAB04, ACTIVE 7 sec 633 lock struct(s), &lt;strong&gt;heap size 96696&lt;/strong&gt;, 218786 row lock(s), undo log entries 1 MySQL thread id 4, OS thread handle 0x7f8dfc35d700, query id 47 localhost root show engine innodb status 上面的 employees 表 store_id 列没有索引。注意 UPDATE 已经执行完成（没有提交），但依然有 218786 个行锁没有释放，还有一个undo记录。这意味着只有一行被更改，但却持有了额外的锁。堆大小（heap size）代表了分配给锁使用的内存数量。
+在 REPEATABLE-READ 级别，事务持有的 每个锁 在整个事务期间一直被持有。
+在 READ-COMMITED 级别，事务里面特定语句结束之后，不匹配该sql语句扫描条件的锁，会被释放。" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2016/09/read-commited-%E4%B8%8E-repeatable-read-%E4%BA%8B%E5%8A%A1%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E4%B9%8B%E9%97%B4%E7%9A%84%E5%BC%82%E5%90%8C/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2016-09-03T16:32:49+00:00" />
+<meta property="article:modified_time" content="2016-09-03T16:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同"/>
+<meta name="twitter:description" content="经常会被问到 InnoDB隔离级别中 READ-COMMITED和REPEATABLE-READ 的区别，今天就整理了一下，不再从“脏读”、“幻读”这样的名词解释一样去回答了。
+1. 行锁 InnoDB行锁实际锁的是索引记录，为了防止死锁的产生以及维护所需要的隔离级别，在执行sql语句的全过程中，innodb必须对所需要修改的行每条索引记录上锁。如此一来，如果你执行的 UPDATE 没有很好的索引，那么会导致锁定许多行：
+update employees set store_id = 0 where store_id = 1; ---TRANSACTION 1EAB04, ACTIVE 7 sec 633 lock struct(s), &lt;strong&gt;heap size 96696&lt;/strong&gt;, 218786 row lock(s), undo log entries 1 MySQL thread id 4, OS thread handle 0x7f8dfc35d700, query id 47 localhost root show engine innodb status 上面的 employees 表 store_id 列没有索引。注意 UPDATE 已经执行完成（没有提交），但依然有 218786 个行锁没有释放，还有一个undo记录。这意味着只有一行被更改，但却持有了额外的锁。堆大小（heap size）代表了分配给锁使用的内存数量。
+在 REPEATABLE-READ 级别，事务持有的 每个锁 在整个事务期间一直被持有。
+在 READ-COMMITED 级别，事务里面特定语句结束之后，不匹配该sql语句扫描条件的锁，会被释放。"/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同",
+      "item": "http://xgknight.com/posts/2016/09/read-commited-%E4%B8%8E-repeatable-read-%E4%BA%8B%E5%8A%A1%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E4%B9%8B%E9%97%B4%E7%9A%84%E5%BC%82%E5%90%8C/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同",
+  "name": "READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同",
+  "description": "经常会被问到 InnoDB隔离级别中 READ-COMMITED和REPEATABLE-READ 的区别，今天就整理了一下，不再从“脏读”、“幻读”这样的名词解释一样去回答了。\n1. 行锁 InnoDB行锁实际锁的是索引记录，为了防止死锁的产生以及维护所需要的隔离级别，在执行sql语句的全过程中，innodb必须对所需要修改的行每条索引记录上锁。如此一来，如果你执行的 UPDATE 没有很好的索引，那么会导致锁定许多行：\nupdate employees set store_id = 0 where store_id = 1; ---TRANSACTION 1EAB04, ACTIVE 7 sec 633 lock struct(s), \u0026lt;strong\u0026gt;heap size 96696\u0026lt;/strong\u0026gt;, 218786 row lock(s), undo log entries 1 MySQL thread id 4, OS thread handle 0x7f8dfc35d700, query id 47 localhost root show engine innodb status 上面的 employees 表 store_id 列没有索引。注意 UPDATE 已经执行完成（没有提交），但依然有 218786 个行锁没有释放，还有一个undo记录。这意味着只有一行被更改，但却持有了额外的锁。堆大小（heap size）代表了分配给锁使用的内存数量。\n在 REPEATABLE-READ 级别，事务持有的 每个锁 在整个事务期间一直被持有。\n在 READ-COMMITED 级别，事务里面特定语句结束之后，不匹配该sql语句扫描条件的锁，会被释放。",
+  "keywords": [
+    "mysql", "事务"
+  ],
+  "articleBody": "经常会被问到 InnoDB隔离级别中 READ-COMMITED和REPEATABLE-READ 的区别，今天就整理了一下，不再从“脏读”、“幻读”这样的名词解释一样去回答了。\n1. 行锁 InnoDB行锁实际锁的是索引记录，为了防止死锁的产生以及维护所需要的隔离级别，在执行sql语句的全过程中，innodb必须对所需要修改的行每条索引记录上锁。如此一来，如果你执行的 UPDATE 没有很好的索引，那么会导致锁定许多行：\nupdate employees set store_id = 0 where store_id = 1; ---TRANSACTION 1EAB04, ACTIVE 7 sec 633 lock struct(s), heap size 96696, 218786 row lock(s), undo log entries 1 MySQL thread id 4, OS thread handle 0x7f8dfc35d700, query id 47 localhost root show engine innodb status 上面的 employees 表 store_id 列没有索引。注意 UPDATE 已经执行完成（没有提交），但依然有 218786 个行锁没有释放，还有一个undo记录。这意味着只有一行被更改，但却持有了额外的锁。堆大小（heap size）代表了分配给锁使用的内存数量。\n在 REPEATABLE-READ 级别，事务持有的 每个锁 在整个事务期间一直被持有。\n在 READ-COMMITED 级别，事务里面特定语句结束之后，不匹配该sql语句扫描条件的锁，会被释放。\n下面是上述相同的 UPDATE 在 READ-COMMITED 级别下的结果：\n---TRANSACTION 1EAB06, ACTIVE 11 sec 631 lock struct(s), heap size 96696, 1 row lock(s), undo log entries 1 MySQL thread id 4, OS thread handle 0x7f8dfc35d700, query id 62 localhost root show engine innodb status 可以看到 heap size 没有变化，但是现在我们只持有一个行锁。无论什么隔离级别下，InnoDB 会为扫描过的每条索引记录创建锁，不同的是在 RC 模式，一旦语句执行完毕（事务未必完成），不符合扫描条件的记录上的锁会被随即释放。释放这些锁后，堆内存并不会马上释放，所以heap size看到与 RR 模式是一样的，但是持有的锁数量明显小了很多。\n这也就意味着在 RC 级别下的事务A，只要A的UPDATE 语句 完成了，其它事务可以修改A中也扫描过的行，但在 RR 级别下不允许。\n2. Read View REPEATABLE-READ 在 REPEATABLE-READ 级别，read view 对象在事务一开启就被创建，这个一致性快照在整个事务期间一直保持打开。在同一个事务里，前后间隔几个小时执行一遍相同的 SELECT，你会得到完全一样的结果，这就是所谓的 MVCC (multiple version concurrency control)，它是通过行版本号和UNDO段来实现的。\n在 REPEATABLE-READ 级别， InnoDB会为范围扫描创建间隙锁（gap locks）：\nselect * from some_table where id \u003e 100 FOR UPDATE; 上面的update将会创建一个 gap lock，用来防止在 id\u003e100 范围内有新行被插入，锁会持续到事务回滚或提交。比如在同一个事务里，上午5点执行 SELECT … FOR UPDATE，下午5点执行 UPDATE some_table where id\u003e100，那么这个update只会修改上午5点 SELECT FOR UPDATE所锁定的行，因为大于100的记录的整个 间隙 被加了锁。\nREAD-COMMITED 在 READ-COMMITED 级别，read view 结构在每个语句开始的时候被创建，这意味着即使在同一个事务中，上午5点执行的 SELECT与下午5点执行的SELECT可能会得到不同的结果。因为 read view 在 READ-COMMITED 级别下仅在 语句执行 期间存在。\n这就是所谓的 “幻读”（phantom read）。\nREAD-COMMITED 隔离级别下是没有gap locks，所以执行上面的 SELECT FOR UPDATE where id\u003e100 并不会阻止其它事务插入新行，如果同一个事务里后面执行 UPDATE … where id\u003e100，就有可能导致实际更新的行数比前面锁定的行数要多。\n补充： 如果了解过 mysqldump 的实现原理，可知它就是充分利用InnoDB的MVCC特性，使用 REPEATABLE-READ 模式获取备份事务的一致性快照，避免锁表和幻读。\n本文主要参考自 percona博客上的一篇文章 https://www.percona.com/blog/2012/08/28/differences-between-read-committed-and-repeatable-read-transaction-isolation-levels/ 。\n本文链接地址：http://xgknight.com/2016/09/03/diffs-between-rr-and-rc-trx_isolation_level/\n",
+  "wordCount" : "218",
+  "inLanguage": "en",
+  "datePublished": "2016-09-03T16:32:49Z",
+  "dateModified": "2016-09-03T16:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2016/09/read-commited-%E4%B8%8E-repeatable-read-%E4%BA%8B%E5%8A%A1%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E4%B9%8B%E9%97%B4%E7%9A%84%E5%BC%82%E5%90%8C/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同
+    </h1>
+    <div class="post-meta"><span title='2016-09-03 16:32:49 +0000 UTC'>September 3, 2016</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>经常会被问到 InnoDB隔离级别中 READ-COMMITED和REPEATABLE-READ 的区别，今天就整理了一下，不再从“脏读”、“幻读”这样的名词解释一样去回答了。</p>
+<h2 id="1-行锁">1. 行锁<a hidden class="anchor" aria-hidden="true" href="#1-行锁">#</a></h2>
+<p>InnoDB行锁实际锁的是索引记录，为了防止死锁的产生以及维护所需要的隔离级别，在执行sql语句的全过程中，innodb必须对所需要修改的行每条索引记录上锁。如此一来，如果你执行的 UPDATE 没有很好的索引，那么会导致锁定许多行：</p>
+<pre tabindex="0"><code>update employees set store_id = 0 where store_id = 1;
+---TRANSACTION 1EAB04, ACTIVE 7 sec
+633 lock struct(s), &lt;strong&gt;heap size 96696&lt;/strong&gt;, 218786 row lock(s), undo log entries 1
+MySQL thread id 4, OS thread handle 0x7f8dfc35d700, query id 47 localhost root
+show engine innodb status
+</code></pre><p>上面的 <code>employees</code> 表 <code>store_id</code> 列没有索引。注意 UPDATE 已经执行完成（没有提交），但依然有 218786 个行锁没有释放，还有一个undo记录。这意味着只有一行被更改，但却持有了额外的锁。堆大小（heap size）代表了分配给锁使用的内存数量。</p>
+<p>在 REPEATABLE-READ 级别，事务持有的 <strong>每个锁</strong> 在整个事务期间一直被持有。</p>
+<p>在 READ-COMMITED 级别，事务里面特定语句结束之后，不匹配该sql语句扫描条件的锁，会被释放。</p>
+<p>下面是上述相同的 UPDATE 在 READ-COMMITED 级别下的结果：</p>
+<pre tabindex="0"><code>---TRANSACTION 1EAB06, ACTIVE 11 sec
+631 lock struct(s), &lt;strong&gt;heap size 96696&lt;/strong&gt;, 1 row lock(s), undo log entries 1
+MySQL thread id 4, OS thread handle 0x7f8dfc35d700, query id 62 localhost root
+show engine innodb status
+</code></pre><p>可以看到 heap size 没有变化，但是现在我们只持有一个行锁。无论什么隔离级别下，InnoDB 会为扫描过的每条索引记录创建锁，不同的是在 RC 模式，一旦语句执行完毕（事务未必完成），不符合扫描条件的记录上的锁会被随即释放。释放这些锁后，堆内存并不会马上释放，所以heap size看到与 RR 模式是一样的，但是持有的锁数量明显小了很多。</p>
+<p>这也就意味着在 RC 级别下的事务A，只要A的UPDATE <strong>语句</strong> 完成了，其它事务可以修改A中也扫描过的行，但在 RR 级别下不允许。</p>
+<h2 id="2-read-view">2. Read View<a hidden class="anchor" aria-hidden="true" href="#2-read-view">#</a></h2>
+<h3 id="repeatable-read">REPEATABLE-READ<a hidden class="anchor" aria-hidden="true" href="#repeatable-read">#</a></h3>
+<p>在 REPEATABLE-READ 级别，<em>read view</em> 对象在事务一开启就被创建，这个一致性快照在整个事务期间一直保持打开。在同一个事务里，前后间隔几个小时执行一遍相同的 SELECT，你会得到完全一样的结果，这就是所谓的 MVCC (multiple version concurrency control)，它是通过行版本号和UNDO段来实现的。</p>
+<p>在 REPEATABLE-READ 级别， InnoDB会为范围扫描创建间隙锁（gap locks）：</p>
+<pre tabindex="0"><code>select * from some_table where id &gt; 100 FOR UPDATE;
+</code></pre><!-- raw HTML omitted -->
+<p>上面的update将会创建一个 gap lock，用来防止在 id&gt;100 范围内有新行被插入，锁会持续到事务回滚或提交。比如在同一个事务里，上午5点执行 SELECT &hellip; FOR UPDATE，下午5点执行 UPDATE some_table where id&gt;100，那么这个update只会修改上午5点 SELECT FOR UPDATE所锁定的行，因为大于100的记录的整个 <strong>间隙</strong> 被加了锁。</p>
+<h3 id="read-commited">READ-COMMITED<a hidden class="anchor" aria-hidden="true" href="#read-commited">#</a></h3>
+<p>在 READ-COMMITED 级别，<em>read view</em> 结构在每个语句开始的时候被创建，这意味着即使在同一个事务中，上午5点执行的 SELECT与下午5点执行的SELECT可能会得到不同的结果。因为 read view 在 READ-COMMITED 级别下仅在 <strong>语句执行</strong> 期间存在。</p>
+<p>这就是所谓的 “幻读”（phantom read）。</p>
+<p>READ-COMMITED 隔离级别下是没有gap locks，所以执行上面的 SELECT FOR UPDATE where id&gt;100 并不会阻止其它事务插入新行，如果同一个事务里后面执行 UPDATE &hellip; where id&gt;100，就有可能导致实际更新的行数比前面锁定的行数要多。</p>
+<p>补充：
+如果了解过 mysqldump 的实现原理，可知它就是充分利用InnoDB的MVCC特性，使用 REPEATABLE-READ 模式获取备份事务的一致性快照，避免锁表和幻读。</p>
+<p>本文主要参考自 percona博客上的一篇文章 <a href="https://www.percona.com/blog/2012/08/28/differences-between-read-committed-and-repeatable-read-transaction-isolation-levels/">https://www.percona.com/blog/2012/08/28/differences-between-read-committed-and-repeatable-read-transaction-isolation-levels/</a> 。</p>
+<hr>
+<p>本文链接地址：http://xgknight.com/2016/09/03/diffs-between-rr-and-rc-trx_isolation_level/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/%E4%BA%8B%E5%8A%A1/">事务</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

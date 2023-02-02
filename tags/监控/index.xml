@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>监控 on Sean Note</title>
+    <link>http://xgknight.com/tags/%E7%9B%91%E6%8E%A7/</link>
+    <description>Recent content in 监控 on Sean Note</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sun, 04 Dec 2016 16:32:49 +0000</lastBuildDate><atom:link href="http://xgknight.com/tags/%E7%9B%91%E6%8E%A7/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>监控MySQL你还应该收集表信息</title>
+      <link>http://xgknight.com/posts/2016/12/%E7%9B%91%E6%8E%A7mysql%E4%BD%A0%E8%BF%98%E5%BA%94%E8%AF%A5%E6%94%B6%E9%9B%86%E8%A1%A8%E4%BF%A1%E6%81%AF/</link>
+      <pubDate>Sun, 04 Dec 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/12/%E7%9B%91%E6%8E%A7mysql%E4%BD%A0%E8%BF%98%E5%BA%94%E8%AF%A5%E6%94%B6%E9%9B%86%E8%A1%A8%E4%BF%A1%E6%81%AF/</guid>
+      <description>1. Story 也许你经常会被问到，库里某个表最近一年的内每个月的数据量增长情况。当然如果你有按月分表比较好办，挨个 show table status，如果只有一个大表，那估计要在大家都休息的时候，寂寞的夜里去跑sql统计了，因为你只能获取当前的表信息，历史信息追查不到了。
+除此以外，作为DBA本身也要对数据库空间增长情况进行预估，用以规划容量。我们说的表信息主要包括：
+表数据大小（DATA_LENGTH） 索引大小(INDEX_LENGTH) 行数（ROWS） 当前自增值（AUTO_INCREMENT，如果有） 目前是没有看到哪个mysql监控工具上提供这样的指标。这些信息不需要采集的太频繁，而且结果也只是个预估值，不一定准确，所以这是站在一个全局、长远的角度去监控(采集)表的。
+本文要介绍的自己写的采集工具，是基于组内现有的一套监控体系：
+InfluxDB：时间序列数据库，存储监控数据 Grafana：数据展示面板 Telegraf：收集信息的agent 看了下 telegraf 的最新的 mysql 插件，一开始很欣慰：支持收集 Table schema statistics 和 Info schema auto increment columns。试用了一下，有数据，但是如前面所说，除了自增值外其他都是预估值，telegraf收集频率过高没啥意义，也许一天2次就足够了，它提供的 IntervalSlow选项固定写死在代码里，只能是放缓 global status 监控频率。不过倒是可以与其它监控指标分开成两份配置文件，各自定义收集间隔来实现。 最后打算自己用python撸一个，上报到influxdb里 :) 2. Concept 完整代码见 GitHub项目地址：DBschema_gather 实现也特别简单，就是查询 information_schema 库的 COLUMNS、TABLES 两个表：
+SELECT IFNULL(@@hostname, @@server_id) SERVER_NAME, %s as HOST, t.TABLE_SCHEMA, t.TABLE_NAME, t.TABLE_ROWS, t.DATA_LENGTH, t.INDEX_LENGTH, t.AUTO_INCREMENT, c.COLUMN_NAME, c.DATA_TYPE, LOCATE(&amp;#39;unsigned&amp;#39;, c.COLUMN_TYPE) COL_UNSIGNED # CONCAT(c.DATA_TYPE, IF(LOCATE(&amp;#39;unsigned&amp;#39;, c.COLUMN_TYPE)=0, &amp;#39;&amp;#39;, &amp;#39;_unsigned&amp;#39;)) FROM information_schema.</description>
+    </item>
+    
+    <item>
+      <title>一种直观记录表结构变更历史的方法</title>
+      <link>http://xgknight.com/posts/2016/11/%E4%B8%80%E7%A7%8D%E7%9B%B4%E8%A7%82%E8%AE%B0%E5%BD%95%E8%A1%A8%E7%BB%93%E6%9E%84%E5%8F%98%E6%9B%B4%E5%8E%86%E5%8F%B2%E7%9A%84%E6%96%B9%E6%B3%95/</link>
+      <pubDate>Mon, 28 Nov 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/11/%E4%B8%80%E7%A7%8D%E7%9B%B4%E8%A7%82%E8%AE%B0%E5%BD%95%E8%A1%A8%E7%BB%93%E6%9E%84%E5%8F%98%E6%9B%B4%E5%8E%86%E5%8F%B2%E7%9A%84%E6%96%B9%E6%B3%95/</guid>
+      <description>1. Story 在没有形成自己的数据库管理平台以前，数据库实例一多（包括生产和测试环境），许多表要执行DDL会变得异常繁杂。
+说个自己的经历，需要改现网的一个索引来看优化的效果，因为存在风险，不会一次全改，先只改1个库，然后逐步放开。前后验证效果可能花上一两周的时间，除非实现完整的记录了当时的ddl语句和对应的库，否则根本难以记得。这就完全依赖于个人的习惯及能力。
+又比如现网出了个问题，开发追查到一个时间点，想确认那个时候有没有对库表进行过更改操作，如果没有记录表结构变更的历史，也就难以提供需要的信息。
+记录差异，很早就思考过能不能用git来做。终于花了一天时间来实现，并验证、修改达到预期的效果，还算满意。
+github项目地址在文后。
+2. Concept 思路很简单，就是利用 mydumper 导出表时会把各表（结构）单独导成一个文件的特性，每天低峰期导出所有对象元数据：表、视图、存储过程、事件、触发器。需要过滤掉 AUTO_INCREMENT 值。
+结构内容存放在一个git仓库下，通过shell脚本提交到 gitlab。所有DDL更改由原来依赖于DBA的主动记录，变成被动采集。
+测试环境和生产环境表结构总会有些差异，为了兼顾同时收集两个环境的数据，设置了 environment 选项，根据当前所在运行的机器，自动判断采集哪些实例信息。
+3. Usage 首先你需要能够存放表结构信息的git仓库，如gitlab，而且建议设置为私有。
+安装 git 和 mydumper mydumper 0.9.1 版本需要编译安装，可以参考这里 file-mydumper-install-ubuntu14-04-sh。当然 yum 或 apt-get 安装其他版本也是一样的。 脚本会尝试自动获取 mydumper 命令的路径。 注意配置git权限的时候，最好不允许其它用户手动提交修改仓库内容。
+配置db实例地址 settings.ini示例：
+[environment] production=puppetmaster test=puppettestmaster [production] production_auth=your_defaultuser:yourpassword db_name1=192.168.1.100:3306 db_name2=192.168.1.101:3306 db_name3=name3.dbhost.com:3306 db_name4=192.168.1.100:3306:myuser:mypassword [test] test_auth=user1:password1 db_name1=10.0.100.1:3306 db_name2=10.0.100.1:3307 db_name3=10.0.100.2:3306 db_name4=10.0.100.3:3306:myuser1:mypassword1 上面的配置采集 production和test两个环境的表结构，识别两个环境是根据 hostname 来决定的。这样做的好吃就是这个脚本在两个环境下运行不需要做任何修改。 [production]节的名字就是 [environment]节指定的名字 production=xx dbname1=就是配置各个db，地址+端口的形式。用户名和密码可以继续用 : 跟上 production_auth=表示 production 环境下，如 dbname1没有配置用户名时，默认采用这个用户名和密码。这样设计主要是简化配置。
+该数据库用户需要 select,show view,event,trigger,procedure 权限。</description>
+    </item>
+    
+  </channel>
+</rss>

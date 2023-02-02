@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>分页 on Sean Note</title>
+    <link>http://xgknight.com/tags/%E5%88%86%E9%A1%B5/</link>
+    <description>Recent content in 分页 on Sean Note</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Wed, 21 Mar 2018 16:32:49 +0000</lastBuildDate><atom:link href="http://xgknight.com/tags/%E5%88%86%E9%A1%B5/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>MySQL分页优化</title>
+      <link>http://xgknight.com/posts/2018/03/mysql%E5%88%86%E9%A1%B5%E4%BC%98%E5%8C%96/</link>
+      <pubDate>Wed, 21 Mar 2018 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2018/03/mysql%E5%88%86%E9%A1%B5%E4%BC%98%E5%8C%96/</guid>
+      <description>关于数据库分页查询的话题，网上谈论的很多，但开发人员在使用上还是习惯以往的思路。
+比如我们有个电话记录表：
+CREATE TABLE `t_tel_record` ( `f_id` bigint(20) unsigned NOT NULL DEFAULT &amp;#39;0&amp;#39; COMMENT &amp;#39;流水号&amp;#39;, `f_qiye_id` bigint(20) NOT NULL DEFAULT &amp;#39;0&amp;#39; COMMENT &amp;#39;企业&amp;#39;, `f_callno` varchar(20) DEFAULT NULL COMMENT &amp;#39;主叫号码&amp;#39;, `f_calltono` varchar(30) DEFAULT NULL COMMENT &amp;#39;被叫号码&amp;#39;, `f_Starttime` datetime NOT NULL COMMENT &amp;#39;开始时间&amp;#39;, `f_Endtime` datetime DEFAULT NULL COMMENT &amp;#39;结束时间&amp;#39;, `f_Calltime` mediumint(8) unsigned NOT NULL DEFAULT &amp;#39;0&amp;#39; COMMENT &amp;#39;通话时间&amp;#39;, `f_user_id` bigint(20) NOT NULL COMMENT &amp;#39;员工用户&amp;#39;, `f_path` varchar(200) DEFAULT NULL COMMENT &amp;#39;语音文件路径&amp;#39;, `f_crm_id` bigint(20) NOT NULL DEFAULT &amp;#39;0&amp;#39; COMMENT &amp;#39;客户库id&amp;#39;, `f_call_type` tinyint(4) unsigned NOT NULL DEFAULT &amp;#39;0&amp;#39; COMMENT &amp;#39;0:未知，1:为呼入类型，2:呼出类型&amp;#39;, PRIMARY KEY (`f_id`), KEY `idx_endtime_userid` (`f_Endtime`,`f_user_id`,`f_qiye_id`), KEY `idx_crmid` (`f_crm_id`), KEY `idx_qiye_user_calltime` (`f_qiye_id`,`f_Starttime`), KEY `idx_calltono` (`f_calltono`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4; 查询第1页的数据： SELECT * FROM t_tel_record WHERE f_qiye_id=xxx ORDER BY f_Starttime DESC LIMIT 0,100 当数据量很大，需要查询第10000页的数据： SELECT * FROM t_tel_record WHERE f_qiye_id=xxx ORDER BY f_Starttime DESC LIMIT 999900,100 -- 或者 OFFSET 999900 LIMIT 100 MySQL的 limit m,n 工作原理就是先读取符合where条件的前面m+n条记录，然后抛弃前m条，返回后面n条，所以m越大，偏移量越大，性能就越差。这也是大部分ORM框架生成的分页sql。</description>
+    </item>
+    
+  </channel>
+</rss>

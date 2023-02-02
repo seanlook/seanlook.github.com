@@ -1,0 +1,874 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>mysql on Sean Note</title>
+    <link>http://xgknight.com/tags/mysql/</link>
+    <description>Recent content in mysql on Sean Note</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Thu, 22 Mar 2018 21:32:49 +0000</lastBuildDate><atom:link href="http://xgknight.com/tags/mysql/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>MySQL复制与数据一致性 分享</title>
+      <link>http://xgknight.com/posts/2018/03/mysql%E5%A4%8D%E5%88%B6%E4%B8%8E%E6%95%B0%E6%8D%AE%E4%B8%80%E8%87%B4%E6%80%A7-%E5%88%86%E4%BA%AB/</link>
+      <pubDate>Thu, 22 Mar 2018 21:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2018/03/mysql%E5%A4%8D%E5%88%B6%E4%B8%8E%E6%95%B0%E6%8D%AE%E4%B8%80%E8%87%B4%E6%80%A7-%E5%88%86%E4%BA%AB/</guid>
+      <description>这是针对公司内部的一个分享，主题是去年10月份就想好的，中间因为一些项目，也包括自己的拖延症，ppt一直没准备好。
+在临近快要辞职的时候，还是想兑现一下承诺，加班加点完成了。
+分享的内容包括：
+binlog介绍 我们有不少项目依赖于binlog同步数据，所以对binlog的格式以及内部结构进行了简单介绍
+innodb事务的提交过程 主要是两阶段提交的一些概念和原理，与下面的组提交原理一起，方便后面对崩溃恢复机制的理解
+组提交 着重介绍组提交的概念，以及它的实现。为下面的并行复制做铺垫
+介绍MySQL复制流程 种类包括异步复制、半同步复制、增强半同步复制和并行复制，顺便结束了复制延迟常见的原因
+基于上面的原理，介绍主库、从库分别在异常宕机的情况下，如何保证数据一致的
+高可用类型 这部分由于时间的关系，没有准备，并且本身也是一个很大课题，所以干脆就去掉了
+演示稿中穿插了一些思考题，感兴趣的朋友不妨思考思考。
+{% pdf http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-replication-and-consistency.pdf 1000 800 %}
+原文连接地址：http://xgknight.com/2018/03/22/mysql-ppt-replication-and-consistency/</description>
+    </item>
+    
+    <item>
+      <title>MySQL分页优化</title>
+      <link>http://xgknight.com/posts/2018/03/mysql%E5%88%86%E9%A1%B5%E4%BC%98%E5%8C%96/</link>
+      <pubDate>Wed, 21 Mar 2018 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2018/03/mysql%E5%88%86%E9%A1%B5%E4%BC%98%E5%8C%96/</guid>
+      <description>关于数据库分页查询的话题，网上谈论的很多，但开发人员在使用上还是习惯以往的思路。
+比如我们有个电话记录表：
+CREATE TABLE `t_tel_record` ( `f_id` bigint(20) unsigned NOT NULL DEFAULT &amp;#39;0&amp;#39; COMMENT &amp;#39;流水号&amp;#39;, `f_qiye_id` bigint(20) NOT NULL DEFAULT &amp;#39;0&amp;#39; COMMENT &amp;#39;企业&amp;#39;, `f_callno` varchar(20) DEFAULT NULL COMMENT &amp;#39;主叫号码&amp;#39;, `f_calltono` varchar(30) DEFAULT NULL COMMENT &amp;#39;被叫号码&amp;#39;, `f_Starttime` datetime NOT NULL COMMENT &amp;#39;开始时间&amp;#39;, `f_Endtime` datetime DEFAULT NULL COMMENT &amp;#39;结束时间&amp;#39;, `f_Calltime` mediumint(8) unsigned NOT NULL DEFAULT &amp;#39;0&amp;#39; COMMENT &amp;#39;通话时间&amp;#39;, `f_user_id` bigint(20) NOT NULL COMMENT &amp;#39;员工用户&amp;#39;, `f_path` varchar(200) DEFAULT NULL COMMENT &amp;#39;语音文件路径&amp;#39;, `f_crm_id` bigint(20) NOT NULL DEFAULT &amp;#39;0&amp;#39; COMMENT &amp;#39;客户库id&amp;#39;, `f_call_type` tinyint(4) unsigned NOT NULL DEFAULT &amp;#39;0&amp;#39; COMMENT &amp;#39;0:未知，1:为呼入类型，2:呼出类型&amp;#39;, PRIMARY KEY (`f_id`), KEY `idx_endtime_userid` (`f_Endtime`,`f_user_id`,`f_qiye_id`), KEY `idx_crmid` (`f_crm_id`), KEY `idx_qiye_user_calltime` (`f_qiye_id`,`f_Starttime`), KEY `idx_calltono` (`f_calltono`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4; 查询第1页的数据： SELECT * FROM t_tel_record WHERE f_qiye_id=xxx ORDER BY f_Starttime DESC LIMIT 0,100 当数据量很大，需要查询第10000页的数据： SELECT * FROM t_tel_record WHERE f_qiye_id=xxx ORDER BY f_Starttime DESC LIMIT 999900,100 -- 或者 OFFSET 999900 LIMIT 100 MySQL的 limit m,n 工作原理就是先读取符合where条件的前面m+n条记录，然后抛弃前m条，返回后面n条，所以m越大，偏移量越大，性能就越差。这也是大部分ORM框架生成的分页sql。</description>
+    </item>
+    
+    <item>
+      <title>MySQL主从复制idempotent模式以及同步错误处理预案</title>
+      <link>http://xgknight.com/posts/2018/03/mysql%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6idempotent%E6%A8%A1%E5%BC%8F%E4%BB%A5%E5%8F%8A%E5%90%8C%E6%AD%A5%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86%E9%A2%84%E6%A1%88/</link>
+      <pubDate>Sun, 11 Mar 2018 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2018/03/mysql%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6idempotent%E6%A8%A1%E5%BC%8F%E4%BB%A5%E5%8F%8A%E5%90%8C%E6%AD%A5%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86%E9%A2%84%E6%A1%88/</guid>
+      <description>1. slave_exec_mode 参数作用 slave_exec_mode 可以在主从复制中遇到 duplicate-key 和 no-key-found 错误时，自动覆盖或者略过binlog里面这个row_event，避免报错停止复制。
+这个参数原本是解决像 NDB Cluster 多节点写入冲突的情况，也可以在普通主从、双主、环形复制等情况下解决冲突，保持幂等性。幂等性怎么定义，感兴趣的可以阅读The differences between IDEMPOTENT and AUTO-REPAIR mode）。
+set global slave_exec_mode=IDEMPOTENT （可以动态修改）使从库运行在 幂等模式，对1062，1032等不同的错误类型，有不同的处理：
+write_row event 遇到主键冲突或唯一索引冲突，这一行被覆写(delete + insert)。 delete时候不是full value match，仅需要主键或唯一索引找到记录则删除 delete_row event 遇到记录不存在，忽略这一行 update_row event 修改唯一索引导致的冲突，忽略这一行 注意：
+idempotent 模式都是对有疑问的行进行replace或ignore，不影响其它row。 idempotent 模式要求表上必须要有主键 binlog必须是 FULL RBR 模式 2. slave-skip-errors 这个参数不能在线修改，只能加到配置文件里面或者启动的时候带上--slave-skip-errors=1032,1062。除非你真的理解它skip掉了什么，否则不建议使用。
+讲一个我所遇到的坑。在我们的一个分库项目中，需要把一个database里面的数据拆成32份，于是做了个主从，把从库里面不需要的那份删除，但复制过来肯定会报 HA_ERR_KEY_NOT_FOUND 错误，于是这也是所期望的，就设置了--slave-skip-errors=1032。
+但接下来就出现 1062:HA_ERR_FOUND_DUPP_KEY 错误！从库只会删数据，不会写入和更新，怎么会出现重复数据？读者不妨试想一下为什么。
+这里做个说明：
+① insert into t values (1, &amp;#39;a&amp;#39;), (2, &amp;#39;b&amp;#39;), (3, &amp;#39;c&amp;#39;); ② begin; ③ delete from t where id=1; ④ delete from t where id in (1, 2, 3); ⑤ insert into t where (3, &amp;#39;c&amp;#39;), (4, &amp;#39;d&amp;#39;), (5, &amp;#39;e&amp;#39;); ⑥ update t set .</description>
+    </item>
+    
+    <item>
+      <title>Binlog可视化搜索：实现类似阿里RDS数据追踪功能</title>
+      <link>http://xgknight.com/posts/2018/01/binlog%E5%8F%AF%E8%A7%86%E5%8C%96%E6%90%9C%E7%B4%A2%E5%AE%9E%E7%8E%B0%E7%B1%BB%E4%BC%BC%E9%98%BF%E9%87%8Crds%E6%95%B0%E6%8D%AE%E8%BF%BD%E8%B8%AA%E5%8A%9F%E8%83%BD/</link>
+      <pubDate>Thu, 25 Jan 2018 15:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2018/01/binlog%E5%8F%AF%E8%A7%86%E5%8C%96%E6%90%9C%E7%B4%A2%E5%AE%9E%E7%8E%B0%E7%B1%BB%E4%BC%BC%E9%98%BF%E9%87%8Crds%E6%95%B0%E6%8D%AE%E8%BF%BD%E8%B8%AA%E5%8A%9F%E8%83%BD/</guid>
+      <description>MySQL Binlog 里面记录了每行数据的变更，开发有时候需要根据这些变更的时间、中间值去查问题，是bug导致的，还是用户操作引发的。然而原始binlog内容不利于检索，有段时间使用阿里RDS企业版DMS数据追踪的功能，也能完成这个工作，甚至生成回滚sql，后由于收费以及容量不够的缘故，放弃不用。
+本文所介绍的就是基于外面开源的各类组件，整合起来，达到类似数据追踪的功能 —— binlog 可视化。 功能类似：10分钟搭建MySQL Binlog分析+可视化方案
+1. 主要技术 项目地址： https://github.com/seanlook/maxwell-graylog
+docker
+使用容器来实现资源的申请和释放，毕竟这类检索binlog内容的需求不多。 本文基于阿里云的容器服务。
+maxwell
+从mysql server获取binlog和字段信息，组装成json流。建议先阅读 http://xgknight.com/2018/01/13/maxwell-binlog/
+官网：http://maxwells-daemon.io/
+graylog
+代替ELK技术栈的日志收集、处理、展示平台。社区版够用，需要自行安装，也可以把 graylog 换成 ELK stack。
+官网：https://www.graylog.org/
+nxlog
+nxlog 是用 C 语言写的一个开源日志收集处理软件，它是一个模块化、多线程、高性能的日志管理解决方案，支持多平台。
+参考：http://blog.csdn.net/weixin_29477879/article/details/52183746
+rabbitmq
+一款开源消息队列中间件，采用Erlang语言开发，RabbitMQ是AMQP(Advanced Message Queueing Protocol)的标准实现。建议先阅读 http://xgknight.com/2018/01/06/rabbitmq-introduce/ 。
+你也可以把消息队列换成kafka。
+2. 使用说明 2.1 举例 查看 some3 库 2018-01-22 13:00:00 ~ 2018-01-22 13:00:00 之间，表 t_ecsome_detail 的binlog变化，graylog根据AMQP协议从rabbitmq取binlog json流
+提前创建一个 Swarm容器集群，名字叫 maxwell。
+在【编排模板】里选择 maxwell-graylog-rabbitmq，【创建应用】下一步修改编排模板： （只修改 environment 里面的变量值）
+mysql-binlogsvr: image: registry-vpc.cn-hangzhou.aliyuncs.com/workec/mysql_binlogsvr:1.1.3 volumes: - maxwellgraylog_db_data:/var/lib/mysql environment: DBINSTANCE_ID: rm-bp19t9it7c2998633 START_TIME: &amp;#39;2018-01-22 13:00:00&amp;#39; END_TIME: &amp;#39;2018-01-22 14:00:00&amp;#39; ACCESS_ID: LTAIXKHm0v6ob5P4 ACCESS_SECRET: F7g***************Nll19no MYSQL_ROOT_PASSWORD: strongpassword maxwell-svr: image: registry-vpc.</description>
+    </item>
+    
+    <item>
+      <title>基于MySQL binlog增量数据同步方案(maxwell&#43;rabbimt&#43;pydbsync)</title>
+      <link>http://xgknight.com/posts/2018/01/%E5%9F%BA%E4%BA%8Emysql-binlog%E5%A2%9E%E9%87%8F%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5%E6%96%B9%E6%A1%88maxwell-rabbimt-pydbsync/</link>
+      <pubDate>Sun, 14 Jan 2018 15:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2018/01/%E5%9F%BA%E4%BA%8Emysql-binlog%E5%A2%9E%E9%87%8F%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5%E6%96%B9%E6%A1%88maxwell-rabbimt-pydbsync/</guid>
+      <description>应用场景：同 http://xgknight.com/2017/09/05/mysql-binlog-subscribe-simple-for-dba/ ，但更灵活：
+实时同步部分表到另外一个数据库实例 比如在数据库迁库时，将当天表的数据同步到新库，模拟阿里云dms数据传输的功能，相当于在测试环境演练，减少失误。 另外还可以从新库反向同步增量数据到老库，解决测试环境多项目测试引起数据库冲突的问题。
+正式切库时的回滚措施 比如数据库迁移项目，切换期间数据写向新库，但如果切换失败需要回滚到老库，就需要把这段时间新增的数据同步回老库（启动消费程序），这就不需要程序段再考虑复杂的回滚设计。
+数据库闪回 关于数据库误操作的闪回方案，见 文章MySQL根据离线binlog快速闪回 。binlog2sql的 -B 选项可以将sql反向组装，生产回滚sql。如果需要完善的闪回功能，要进一步开发，提高易用性。
+binlog搜索功能 目前组内一版的binlog搜索功能，是离线任务处理的方式，好处是不会占用太大空间，缺点是处理时间较长。通过实时binlog解析过滤的方式，入ES可以快速搜索。需要进一步开发完善。 结合graylog可以实现阿里云RDS类似的数据追踪功能。见 http://xgknight.com/2018/01/25/maxwell-graylog/
+rabbitmq介绍：http://xgknight.com/2018/01/06/rabbitmq-introduce/
+maxwell介绍：http://xgknight.com/2018/01/13/maxwell-binlog/
+数据已经生成，要完成 MySQL binlog 增量数据同步，还差一个消费者程序，将rabbitmq里面的消息取出来，在目标库重放：
+** https://github.com/seanlook/pydbsync ** 目前这个增量程序重放动作是：
+binlog里面 insert 和 update 行，都变成 replace into binlog里面 delele ，变成 delete ignore xxx limit 1 alter/create，原封不动 所以如果表上没有主键或者唯一索引，是非常难搞定的，原本的update变成 replace into 多插入一条数据。当然如果把 update 事件改成 update tables set f1=v1,f2=v2 where f1=v1,f2=vv2 limit 1 也没毛病。
+使用python3，安装rabbitmq 的python客户端即可：pip install pika
+config.py
+增量程序的配置文件
+db_info: 指定要写入的目标db rabbitmq_conn_info: 增量数据的来源，rabbitmq连接信息 rabbitmq_queue_bind: 指定怎么划分队列</description>
+    </item>
+    
+    <item>
+      <title>自建Binlog订阅服务 —— Maxwell</title>
+      <link>http://xgknight.com/posts/2018/01/%E8%87%AA%E5%BB%BAbinlog%E8%AE%A2%E9%98%85%E6%9C%8D%E5%8A%A1-maxwell/</link>
+      <pubDate>Sat, 13 Jan 2018 15:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2018/01/%E8%87%AA%E5%BB%BAbinlog%E8%AE%A2%E9%98%85%E6%9C%8D%E5%8A%A1-maxwell/</guid>
+      <description>1. 介绍 Maxwell 是java语言编写的能够读取、解析MySQL binlog，将行更新以json格式发送到 Kafka、RabbitMQ、AWS Kinesis、Google Cloud Pub/Sub、文件，有了增量的数据流，可以想象的应用场景实在太多了，如ETL、维护缓存、收集表级别的dml指标、增量到搜索引擎、数据分区迁移、切库binlog回滚方案，等等。
+它还提供其它功能：
+支持SELECT * FROM table 的方式做全量数据初始化 支持主库发生failover后，自动恢复binlog位置（GTID） 灵活的对数据进行分区，解决数据倾斜的问题。kafka支持 database, table, column等级别的数据分区 它的实现方式是伪装成MySQL Server的从库，接收binlog events，然后根据schemas信息拼装，支持ddl,xid,rows等各种event. maxwell由 zendesk 开源：https://github.com/zendesk/maxwell ，而且维护者相当活跃。
+网上已有人对 Alibaba Cannal, Zendesk Maxwell, Yelp mysql_streamer进行对比，见文后参考 实时抓取MySQL的更新数据到Hadoop。
+类似功能的还有：http://debezium.io/docs/connectors/mysql/
+安装 使用 maxwell 非常简单，只需要jdk环境
+yum install -y java-1.8.0-openjdk-1.8.0.121-1.b13.el6.x86_64 curl -sLo - https://github.com/zendesk/maxwell/releases/download/v1.12.0/maxwell-1.12.0.tar.gz \ | tar zxvf - cd maxwell-1.12.0 # 默认寻找当前目录下的 config.properties 配置文件 要求 mysql server binlog格式是 ROW， row_image 是 FULL。感受一下输出结果
+mysql&amp;gt; update test.e set m = 5.</description>
+    </item>
+    
+    <item>
+      <title>MySQL数据库表结构同步之SchemaSync</title>
+      <link>http://xgknight.com/posts/2017/11/mysql%E6%95%B0%E6%8D%AE%E5%BA%93%E8%A1%A8%E7%BB%93%E6%9E%84%E5%90%8C%E6%AD%A5%E4%B9%8Bschemasync/</link>
+      <pubDate>Thu, 02 Nov 2017 15:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/11/mysql%E6%95%B0%E6%8D%AE%E5%BA%93%E8%A1%A8%E7%BB%93%E6%9E%84%E5%90%8C%E6%AD%A5%E4%B9%8Bschemasync/</guid>
+      <description>SchemaSync是个能够在mysql数据库之间，比较并生成表结构差异的工具，项目地址 https://github.com/mmatuson/SchemaSync 。
+SchemaSync介绍与使用 因为工作中经常需要在各个环境之间同步表结构，特别是生产与测试环境之间，长时间的运行后，总会有不一致的。测试环境的表结构一般是测试验证功能之后没有问题，然后通过工单的形式由DBA在生产环境修改。但生产库的结构，如修改索引，紧急修改字段长度，久而久之就会与测试环境有差异，需要同步到测试环境。
+又或者有多套测试环境之间要保持结构同步，又比如同一类db（分库）的情况下，比较schema之间的对象差异。
+SchemaSync不仅限于表结构，它可以处理的对象还有：视图、事件、存储过程、函数、触发器、外键，与 mysql-utilities 相当。但 SchemaSync 更适合于实践：
+默认不会同步 AUTO_INCREMENT 和 COMMENT`，有选项可以控制 对不存在的对象会生成对应的CREATE，对多余的对象会生成DROP 对生成 alter&amp;hellip;column 的sql，是有列顺序的 安装简单，相比mysqldiff，要安装mysql-connector-python和一整套mysql-utilities工具 当然前两点在我自己的 mysqldiff 版本里，已经加入了支持，见 MySQL数据库表结构同步之mysqldiff
+SchemaSync安装：
+（使用virtualenv） $ pip install mysql-python pymysql schemaobject schemasync SchemaObject也是同一个作者的，专门用于操作数据库对象的库，于是schemasync只需要获取对象，比较差异，然后调用schemaobect生成sql。（SchemaObject依赖pymysql，SchemaSync依赖MySQLdb，其实可以用同一个）
+SchemaSync用法：
+$ schemasync --help Usage: schemasync [options] &amp;lt;source&amp;gt; &amp;lt;target&amp;gt; source/target format: mysql://user:pass@host:port/database A MySQL Schema Synchronization Utility Options: -h, --help show this help message and exit -V, --version show version and exit. -r, --revision increment the migration script version number if a file with the same name already exists.</description>
+    </item>
+    
+    <item>
+      <title>MySQL order by limit 走错索引(range-&gt;indexscan)</title>
+      <link>http://xgknight.com/posts/2017/10/mysql-order-by-limit-%E8%B5%B0%E9%94%99%E7%B4%A2%E5%BC%95range-indexscan/</link>
+      <pubDate>Thu, 26 Oct 2017 15:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/10/mysql-order-by-limit-%E8%B5%B0%E9%94%99%E7%B4%A2%E5%BC%95range-indexscan/</guid>
+      <description>生产库遇到过好几例本文要讨论的案例，而且比较棘手。简而言之，有类似这样的查询 SELECT * FROM t1 where t1.f2&amp;gt;1 and t2.f2&amp;lt;100 order by t1.id，id是主键，条件里面有个range查询，就会造成优化器是选择主键，还是选择filesort问题，有些特殊情况就会选错索引，比如为了回避内存排序，选择了主键扫描，导致原本走范围过滤再sort 500ms勉强可以结束的查询，5分钟不出结果。
+下面具体来这个案例。
+1. 背景 阿里云RDS，5.6.16-log。 表 d_ec_someextend.t_tbl_test_time_08:
+CREATE TABLE `t_tbl_test_time_08` ( `f_some_id` int(11) unsigned DEFAULT &amp;#39;0&amp;#39;, `f_qiye_id` int(11) DEFAULT &amp;#39;0&amp;#39;, `f_type` tinyint(3) DEFAULT &amp;#39;0&amp;#39; COMMENT &amp;#39;有效联系类型 1: QQ联系，2:拨打电话，3:发送邮件，4:发送短信，5:添加跟进记录，6:拜访客户，7:EC联系，8:更新客户阶段&amp;#39;, `f_contact_time` timestamp NULL DEFAULT &amp;#39;1970-01-01 16:00:01&amp;#39;, UNIQUE KEY `some_qiye_type` (`f_some_id`,`f_qiye_id`,`f_type`), KEY `f_contact_time` (`f_contact_time`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4; 表索引信息：
+mysql&amp;gt; show table status like &amp;#34;t_tbl_test_time_08&amp;#34;; +-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+ | Name | Engine | Version | Row_format | Rows | Avg_row_length | Data_length | Max_data_length | Index_length | Data_free | Auto_increment | Create_time | Update_time | Check_time | Collation | Checksum | Create_options | Comment | Block_format | +-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+ | t_tbl_test_time_08 | InnoDB | 10 | Compact | 19264318 | 45 | 882900992 | 0 | 2176843776 | 752877568 | NULL | 2017-10-25 20:27:08 | NULL | NULL | utf8mb4_general_ci | NULL | | | Original | +-----------------------+--------+---------+------------+----------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+-------------+------------+--------------------+----------+----------------+---------+--------------+ 1 row in set mysql&amp;gt; show index from t_tbl_test_time_08; +--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+ | Table | Non_unique | Key_name | Seq_in_index | Column_name | Collation | Cardinality | Sub_part | Packed | Null | Index_type | Comment | Index_comment | +--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+ | t_tbl_test_time_08 | 0 | some_qiye_type | 1 | f_some_id | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 0 | some_qiye_type | 2 | f_qiye_id | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 0 | some_qiye_type | 3 | f_type | A | 19264318 | NULL | NULL | YES | BTREE | | | | t_tbl_test_time_08 | 1 | f_contact_time | 1 | f_contact_time | A | 9632159 | NULL | NULL | YES | BTREE | | | +--------------------+------------+-----------------+--------------+----------------+-----------+-------------+----------+--------+------+------------+---------+---------------+ 4 rows in set 问题查询：</description>
+    </item>
+    
+    <item>
+      <title>“大”事务引起的锁等待分析案例</title>
+      <link>http://xgknight.com/posts/2017/10/%E5%A4%A7%E4%BA%8B%E5%8A%A1%E5%BC%95%E8%B5%B7%E7%9A%84%E9%94%81%E7%AD%89%E5%BE%85%E5%88%86%E6%9E%90%E6%A1%88%E4%BE%8B/</link>
+      <pubDate>Tue, 17 Oct 2017 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/10/%E5%A4%A7%E4%BA%8B%E5%8A%A1%E5%BC%95%E8%B5%B7%E7%9A%84%E9%94%81%E7%AD%89%E5%BE%85%E5%88%86%E6%9E%90%E6%A1%88%E4%BE%8B/</guid>
+      <description>1. 现象 生产环境数据库在某一刻突然发现大量活跃连接，而且大部分状态是 updating 。问题出现在周六上午，持续了大概三四分钟，得益于我们自己的快照程序，拿到了当时现场的的processlist, 锁等待关系，innodb status 信息：(经过脱敏处理)
+innodb_status.txt片段： var_mydb_snapshot.html （也可以通过 pt-stalk 收集）
+首先在 Lock Waits Info 一节，看到每行的trx_id(事务)的role分为 Blocker(引起阻塞的线程) 与 Blockee（被阻塞者）；最后一列 blocking_trx_id 在role是Blockee时才有值，代表谁阻塞了当前事务。 根据上面的关系，可以得出以下结论：
+事务 19705811640 运行了231s，阻塞了19706118937、19706124453、19706124752，而这些事务都在做同一个UPDATE语句 被锁定的记录是 mydb.mytable1表的主键索引值为 5317885 行 事务 19706124752 既被阻塞，也阻塞了别人19706125253 不难发现 19705811640 应该最先运行的事务，且对其它事务产生了链式阻塞，它的thread_id是 9898630，来源IP 但是当你兴冲冲的找到引起阻塞的事务 19705811640 在做什么事情时，发现它没有任何sql的信息，lock info以及processlist里面都是None。那么有哪些情况会导致在会话是活跃的，但sql的内容为空：
+执行show processlist的时候，刚好在事务里面两个sql的中间 sql已经执行完成，但长时间没有提交 2. 初步分析 其实这个现象已经遇到过很多次了，第1个原因常发生在 大量单条记录更新 的情况，一个sql在一个事务里循环执行10000次，即使每条都很快，但大部分时间都在网络传输上，（可以改成批量的形式）。在本案例基本上能确定的是第2个原因：事务开启之后，sql也执行了，但中间又做别的事情去了。那么怎样才能知道这个事务是什么内容呢？两个方向去找：
+从来源ip上的应用程序的日志里分析 binlog里面分析 应用程序日志里可以看 10:21:00 ~ 10:26:00 之间，mydb.mytable1 表上主键id=5317885 在做什么事情。因为我们上了听云，在听云APM里面也可以清楚的看到这个时间点的哪个方法慢： 响应时间230多秒，从“相关SQL”里面看到操作的记录内容，确定就是它了(根据innodb status快照时间 - ACTIVE 230.874 sec，倒推得到的时间与这里刚好吻合)。从接口名称也清楚的知道是在进行禁用用户的操作，猜想： 禁用用户的逻辑上有先挪到回收站，再删资料、删权限、删关系，清理缓存等等一系列操作，放在事务里保证他们的原子性，似乎是合理的。但为什么执行了将近4分钟还没有提交呢，分析相关的sql效率都很高。
+有三种情况：
+这个事务执行到一半，它需要操作的数据被别人锁住，等待了这么久 类似事务要操作5000条数据，但是一条一条的操作，然后一起提交（已出现过类似的例子） 事务务执行完成很快，但调用其它接口迟迟没有返回，导致事务没提交。 不会是1和2，因为从一开始的分析看到事务 19705811640 都是在阻塞别人，而不是受害者。那么结合上图中有个有两个操作redis的接口执行时间占比96%，可以下定论了：</description>
+    </item>
+    
+    <item>
+      <title>table_open_cache 与 table_definition_cache 对MySQL(内存)的影响</title>
+      <link>http://xgknight.com/posts/2017/10/table_open_cache-%E4%B8%8E-table_definition_cache-%E5%AF%B9mysql%E5%86%85%E5%AD%98%E7%9A%84%E5%BD%B1%E5%93%8D/</link>
+      <pubDate>Fri, 13 Oct 2017 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/10/table_open_cache-%E4%B8%8E-table_definition_cache-%E5%AF%B9mysql%E5%86%85%E5%AD%98%E7%9A%84%E5%BD%B1%E5%93%8D/</guid>
+      <description>1. 现象，内存使用大 首先说一下最近遇到的一个现象，因为分库的缘故，单实例里面的表的数量增加了20倍，总数将近达到10000个。在开发环境明显感觉到执行简单查询都很慢，在processlist里面看到状态 opening table 达到好几秒但数据库并没有什么负载。本能的想到应该要加大 table_open_cache，可是加大后发现MySQL刚启动 RES 就占用了2.5G内存，之前才500-600M的样子。
+只是将 table_open_cache 从默认的2000，增加到10000（先不论这个值合不合理），就独占了2G的内存，这对于生产环境内存浪费是不可接受的。还好，关于这个问题的讨论有不少，感兴趣的话可以阅读 #bug 68287, #bug 68514, 12015-percona-5-6-14-56-very-high-memory-usage。
+Oracle官方工程师并不认为这是个bug，导致初始化分配这么多内存的原因是，开启了 Performance_Schema 。P_S测量数据库的性能指标，需要提前一次性分配内存，而不是随着数据库运行逐渐申请内存。
+下表是不同参数组合下内存占用的测试结果： （注：可以通过这个来查看PFS里面哪些占内存比较多，mysql -hxxxx -Pxxx -uxx -pxx -e &amp;quot;show engine performance_schema status&amp;quot;|grep memory|sort -nr -k3 |head ）
+对于 table_open_cache 设置的非常大的情况下，即使还有许多cache多余，但P_S都需要分配这个数量的内存。解决这个内存大的问题有3个方向：
+table_open_cache, table_definition_cache, max_connections 设置合理 关闭 performance_schema 保持 PFS 开启，关闭测量 max_table_instances和max_table_handles performance_schema_max_table_instances: 最大测量多少个表对象
+对应 (pfs_table_share).memory，我的环境里固定 277600000 bytes performance_schema_max_table_handles: 最大打开表的总数
+对应(pfs_table).memory，随着 table_open_cache 的增大而增大 关闭的方法是在my.cnf里面设置以上变量为 0 。默认是 -1 ，表示 autosize，即根据 table_open_cache/table_def_cache/max_connections 的值自动设置，相关代码 pfs_autosize.cc：
+PFS_sizing_data *estimate_hints(PFS_global_param *param) { if ((param-&amp;gt;m_hints.</description>
+    </item>
+    
+    <item>
+      <title>MySQL实例阻塞分析一例(线程statistics状态)</title>
+      <link>http://xgknight.com/posts/2017/09/mysql%E5%AE%9E%E4%BE%8B%E9%98%BB%E5%A1%9E%E5%88%86%E6%9E%90%E4%B8%80%E4%BE%8B%E7%BA%BF%E7%A8%8Bstatistics%E7%8A%B6%E6%80%81/</link>
+      <pubDate>Sat, 23 Sep 2017 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/09/mysql%E5%AE%9E%E4%BE%8B%E9%98%BB%E5%A1%9E%E5%88%86%E6%9E%90%E4%B8%80%E4%BE%8B%E7%BA%BF%E7%A8%8Bstatistics%E7%8A%B6%E6%80%81/</guid>
+      <description>1. 现象 某日下午下班后低峰期，现网MySQL一个库突然报出大量慢sql，状态是 statistics，但是过后拿这些sql去执行的时候，实际很快。处于 statistics 状态的线程有个特征：查询的都是视图，但看监控那个时间段并没有明显的update/detele/insert。通过我们的快照程序，去分析当时的 innodb status，发现如下信息：
+SEMAPHORES ---------- OS WAIT ARRAY INFO: reservation count 17208994 --Thread 139964610234112 has waited at srv0srv.cc line 2132 for 14.00 seconds the semaphore: X-lock (wait_ex) on RW-latch at 0x1635a00 created in file dict0dict.cc line 900 a writer (thread id 139964610234112) has reserved it in mode wait exclusive number of readers 1, waiters flag 0, lock_word: ffffffffffffffff Last time read locked in file row0purge.cc line 720 Last time write locked in file /home/admin/146_20161018140650857_13830810_code/rpm_workspace/storage/innobase/srv/srv0srv.</description>
+    </item>
+    
+    <item>
+      <title>一个简单的数据订阅程序(for DBA)</title>
+      <link>http://xgknight.com/posts/2017/09/%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E6%95%B0%E6%8D%AE%E8%AE%A2%E9%98%85%E7%A8%8B%E5%BA%8Ffor-dba/</link>
+      <pubDate>Tue, 05 Sep 2017 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/09/%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E6%95%B0%E6%8D%AE%E8%AE%A2%E9%98%85%E7%A8%8B%E5%BA%8Ffor-dba/</guid>
+      <description>本程序基于大众点评github项目 binlog2sql 二次开发而来，可以实现对源库的binlog实时接收，并组装成增量sql。
+原项目默认是把sql输出到控制台，二次开发后的版本把sql放入redis队列，根据需要由另一个程序消费到目标库，模拟了一个“从库”。 在测试时--stop-never在qa环境没有作用，添加了在 BinLogStreamReader 实例里面加入 blocking=True 来保证源源不断的接受binlog而不中断。
+另外也加入了更改目标库名的功能，比如原库叫d_my1，生成的sql目标库名是 d_my2 。
+项目地址：https://github.com/seanlook/binlog2sql
+应用场景 目前想到以下应用场景：
+实时同步部分表到另外一个数据库实例 比如在数据库迁库时，将当天表的数据同步到新库，模拟阿里云dms数据传输的功能，相当于在测试环境演练，减少失误。 另外还可以从新库反向同步增量数据到老库，解决测试环境多项目测试引起数据库冲突的问题。
+正式切库时的回滚措施 比如数据库迁移项目，切换期间数据写向新库，但如果切换失败需要回滚到老库，就需要把这段时间新增的数据同步回老库（启动消费程序），这就不需要程序段再考虑复杂的回滚设计。
+数据库闪回 关于数据库误操作的闪回方案，见 文章MySQL根据离线binlog快速闪回 。binlog2sql的 -B 选项可以将sql反向组装，生产回滚sql。如果需要完善的闪回功能，要进一步开发，提高易用性。
+binlog搜索功能 目前组内一版的binlog搜索功能，是离线任务处理的方式，好处是不会占用太大空间，缺点是处理时间较长。通过实时binlog解析过滤的方式，入ES可以快速搜索。需要进一步开发完善。
+使用方法 安装好python2.7虚拟环境，安装必要模块：pymysql, mysql-replication, redis, rq
+pip install -r requirements.txt 注意：pymysqlreplication 库在处理 &amp;lsquo;0000-00-00 00:00:00&amp;rsquo; 时有些不尽人意，可能会导致生产的sql在目标库执行失败，还有对datetime(6)类型有个bug，也对它进行了修复，地址：https://github.com/seanlook/python-mysql-replication 。
+准备一个redis用于存放sql队列，在环境变量里面设置redis地址
+export REDIS_URL=&amp;#39;redis://localhost:6379&amp;#39; 在主库执行 show master status 得到binlog开始的文件名和postion，然后开始订阅：
+binlog2sql原版使用时： $ ~/.pyenv/versions/2.7.10/envs/py2_binlog/bin/python binlog2sql.py -h192.168.1.185 -P3306 -uecuser -pecuser \ -d d_ec_contact --tables t_crm_contact_at \ --start-file=&amp;#39;mysql-bin.000001&amp;#39; --start-datetime=&amp;#39;2017-08-30 12:30:00&amp;#39; --start-position=6529058 \ --stop-never &amp;gt; contact0.</description>
+    </item>
+    
+    <item>
+      <title>网易云跟帖迁移评论到disqus</title>
+      <link>http://xgknight.com/posts/2017/08/%E7%BD%91%E6%98%93%E4%BA%91%E8%B7%9F%E5%B8%96%E8%BF%81%E7%A7%BB%E8%AF%84%E8%AE%BA%E5%88%B0disqus/</link>
+      <pubDate>Tue, 29 Aug 2017 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/08/%E7%BD%91%E6%98%93%E4%BA%91%E8%B7%9F%E5%B8%96%E8%BF%81%E7%A7%BB%E8%AF%84%E8%AE%BA%E5%88%B0disqus/</guid>
+      <description>早前折腾博客的时候，在众多评论系统中选择了多说，用了2年结果多说倒闭了，也算是影响了网络上众多的站点。
+于是在16年的时候把评论换成了网易云跟帖，以为有网易这个靠山，体验虽然差点但是不会轻易关闭。云跟帖还提供了从多说直接导入的工具，随意旧的评论直接弄过来了。
+可谁想不到一年，网易云跟帖也关闭了。
+现在不怎么去折腾博客这玩意了，往里面写写东西才是王道，所以就决定直接把评论系统换成国外的 disqus，总不至于国内种种原因关闭了，代价就是要懂得科学上网，考虑博客的受众都是IT同仁，也就只好这样了。
+然而被坑了，网上有许多文章和工具可以从多说迁移到disqus，但是几乎没看到从网易云跟帖迁移到disqus，三者导出的评论格式不一样。云跟帖导出的是 json，disqus导入是扩展的Wordpress格式。
+在拖了3个月后，找到了从网易云跟帖备份出来的旧评论文件，简单用python转换了一下，现在可以用了。
+WXR格式：https://help.disqus.com/customer/portal/articles/472150-custom-xml-import-format
+转换代码gist地址：https://gist.coding.net/u/seanlook/c395cda7c5f4421b85efcd898a8fdf21 (comments_convert.py)
+云跟帖导出文件命名为 gentie163.py，懒得用python处理，直接修改这个文件的内容为 python 字典定义：
+sed -i &amp;#39;s/&amp;#34;url&amp;#34;:&amp;#34;xgknight.com/&amp;#34;url&amp;#34;:&amp;#34;http:\/\/xgknight.com/g&amp;#39; gentie163.py sed -i &amp;#39;s/false/False/g&amp;#39; gentie163.py sed -i &amp;#39;s/:null/:&amp;#34;&amp;#34;/g&amp;#39; gentie163.py sed -i &amp;#39;s/^/comments = /&amp;#39; gentie163.py 字典直接转xml比较容易：http://python3-cookbook.readthedocs.io/zh_CN/latest/c06/p05_turning_dictionary_into_xml.html#
+转换后的文件为 data_output.xml:
+# python3 comments_convert.py 在这个页面导入：https://seanlook.disqus.com/admin/discussions/import/platform/generic/
+可在页面 https://import.disqus.com/ 看到import进度，包括失败信息。（不要重复导入）
+说明：
+disqus每篇文章有个thread_idendifier，这里处理直接根据文章的时间戳转换来用，不影响 dsq:remote是设置单点登录，没去深究，直接丢弃这个属性了 头像信息丢失(因为sso) 本文链接地址：http://xgknight.com/2017/08/29/blog_migrate_gentie163_disqus/</description>
+    </item>
+    
+    <item>
+      <title>MySQL数据库表结构同步之mysqldiff</title>
+      <link>http://xgknight.com/posts/2017/08/mysql%E6%95%B0%E6%8D%AE%E5%BA%93%E8%A1%A8%E7%BB%93%E6%9E%84%E5%90%8C%E6%AD%A5%E4%B9%8Bmysqldiff/</link>
+      <pubDate>Sat, 05 Aug 2017 15:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/08/mysql%E6%95%B0%E6%8D%AE%E5%BA%93%E8%A1%A8%E7%BB%93%E6%9E%84%E5%90%8C%E6%AD%A5%E4%B9%8Bmysqldiff/</guid>
+      <description>mysqldiff mysql官方有个 mysql-utilities 工具集，其中 mysqldiff 可用于比较两个db之间的表结构。 mysqldiff的语法格式是：
+$ mysqldiff --server1=user:pass@host:port:socket --server2=user:pass@host:port:socket db1.object1:db2.object1 db3:db4 这个语法有两个用法：
+db1:db2：如果只指定数据库，那么就将两个数据库中互相缺少的对象显示出来，不比较对象里面的差异。这里的对象包括表、存储过程、函数、触发器等。 如果db1与db2名字相同，可以只指定 db1 db1.object1:db2.object1：如果指定了具体表对象，那么就会详细对比两个表的差异，包括表名、字段名、备注、索引、大小写等所有的表相关的对象。
+如果两边db和对象名都相同，可以只指定 db1.object1 接下来看一些主要的参数：
+--server1：配置server1的连接。 --server2：配置server2的连接。 --character-set：配置连接时用的字符集，如果不显示配置默认使用character_set_client。 --width：配置显示的宽度。 --skip-table-options：保持表的选项不变，即对比的差异里面不包括表名、AUTO_INCREMENT、ENGINE、CHARSET等差异。 -d DIFFTYPE,--difftype=DIFFTYPE：差异的信息显示的方式，有 [unified|context|differ|sql]，默认是unified。如果使用sql，那么就直接生成差异的SQL，这样非常方便。 --changes-for=：修改对象。例如 &amp;ndash;changes-for=server2，那么对比以sever1为主，生成的差异的修改也是针对server2的对象的修改。 --show-reverse：在生成的差异修改里面，同时会包含server2和server1的修改。 --force：完成所有的比较，不会在遇到一个差异之后退出 -vv：便于调试，输出许多信息 -q：quiet模式，关闭多余的信息输出 问题修复与增强 但是试用下来，发现有以下几大问题
+对象在一方不存在时，比对结果是 object does not exist，而我们通常需要的是，生产 CREATE/DROP XXX 语句 要比对一个db下面所有的对象（table, view, event, proc, func, trigger），要手动挨个 db1.t1, db2.v2&amp;hellip;，而 db1:db2只是检查对象是否存在，不会自动比较db1与db2下的所有对象 比较时，auto_increment应该忽略，但是 mysqldiff 只提供 --skip-table-options ，忽略全部表选项，包括 auto_increment, engine, charset等等。 严重bug T1: idx1(f1,f2), T2: idx1(f1)，这种索引会生成 ADD INDEX idx(f2) T1: idx2(f1,f2), idx3(f3,f4), T2: idx4(f5)，这种组合索引，有可能生成的会乱序 这两个bug与mysqldiff的设计有关系，个人觉得它把比较和生产差异sql完全分开，复杂化了。它得到差异结果之后，生成sql又从db捞各种元数据来组装，其实从差异diff里面就可以获得组装需要的数据，也不容易出现隐藏的bug。参考实现 https://github.</description>
+    </item>
+    
+    <item>
+      <title>ProxySQL PPT分享</title>
+      <link>http://xgknight.com/posts/2017/07/proxysql-ppt%E5%88%86%E4%BA%AB/</link>
+      <pubDate>Wed, 19 Jul 2017 21:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/07/proxysql-ppt%E5%88%86%E4%BA%AB/</guid>
+      <description>前些天在公司内部进行了一次 ProxySQL主题的介绍 《ProxySQL数据库中间件使用实践》，因为proxysql是我调研并引入公司的，有必要跟本组开发同学，进行一个正式的介绍和使用说明，以及我们当前的应用情况。
+分享比较偷懒，直接拿来proxysql作者renecannao在 Percona Live Europe 2016 上的PPT，是一个非常全面又具有点睛作用的演示稿了。
+{% pdf http://github.com/seanlook/sean-notes-comment/raw/main/static/ProxySQL-Tutorials-PerconaLive.pdf 1000 800 %}
+PPT来源：https://www.percona.com/live/17/sessions/proxysql-tutorial
+另外一个觉得也还不错：https://www.slideshare.net/MyDBOPS/proxysql-for-mysql
+&amp;ndash; 我只是ppt的搬运工
+原文连接地址：http://xgknight.com/2017/07/19/proxysql-tutorials-ec/</description>
+    </item>
+    
+    <item>
+      <title>ProxySQL之改进patch：记录查询sql完整样例与合并digest多个?</title>
+      <link>http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E6%94%B9%E8%BF%9Bpatch%E8%AE%B0%E5%BD%95%E6%9F%A5%E8%AF%A2sql%E5%AE%8C%E6%95%B4%E6%A0%B7%E4%BE%8B%E4%B8%8E%E5%90%88%E5%B9%B6digest%E5%A4%9A%E4%B8%AA/</link>
+      <pubDate>Thu, 27 Apr 2017 15:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E6%94%B9%E8%BF%9Bpatch%E8%AE%B0%E5%BD%95%E6%9F%A5%E8%AF%A2sql%E5%AE%8C%E6%95%B4%E6%A0%B7%E4%BE%8B%E4%B8%8E%E5%90%88%E5%B9%B6digest%E5%A4%9A%E4%B8%AA/</guid>
+      <description>近期一直在思考sql上线审核该怎么做，刚好接触到 ProxySQL 这个中间件，内置了一个计算sql指纹的功能，但是没有记录原始的sql语句。当前正有个紧急的拆库项目也希望知道库上所有的查询。于是把ProxySQL的代码下了回来研究了几天，改了把，加入了两个功能：
+在 stats_mysql_query_digest 表上增加 query_text 字段，当第一次出现这个digest_text时，把原始sql记录下来。 修改计算指纹的模块，对 IN或者 VALUES 后面的多个 ? 合并。这个是目前 c_tokenizer.c 文件里没有做的，用到底1点上可以避免重复记录。 效果： 多个 ? 被折叠成 ?,，有些意外情况时 ??，因为后面一些多余空格的缘故，没有像 pt-fingerprint 那样完全模糊化，像这里digest就保留了大小写、去除重复空格、保留 ` 分隔符。但仅有的几种意外情况是可以接受的。
+后面的 query_text 列也有些未知情况，就是末尾会加上一些奇怪的字符，还在排除，但大体不影响需求。
+代码是基于最新 v1.3.6 稳定版修改的，查看变更 https://github.com/sysown/proxysql/compare/v1.3.6...seanlook:v1.3.7-querysample_digest
+多个 ? 合并只涉及到 c_tokenizer.c 文件，分别在flag=4（处理 &#39;abc&#39;,&#39;def&#39; 的情况）和flag=5（处理 1,2, 3 的情况）加入判断：
+// wrap two more ? to one ?, if (*(p_r_t-2) == &amp;#39;?&amp;#39; &amp;amp;&amp;amp; (*(p_r_t-1) ==&amp;#39; &amp;#39; || *(p_r_t-1) == &amp;#39;,&amp;#39; || *(p_r_t-1) == &amp;#39;?&amp;#39;)){ *(p_r-1) = &amp;#39;,&amp;#39;; } else *p_r++ = &amp;#39;?</description>
+    </item>
+    
+    <item>
+      <title>ProxySQL之性能测试对比</title>
+      <link>http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E6%80%A7%E8%83%BD%E6%B5%8B%E8%AF%95%E5%AF%B9%E6%AF%94/</link>
+      <pubDate>Thu, 20 Apr 2017 21:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E6%80%A7%E8%83%BD%E6%B5%8B%E8%AF%95%E5%AF%B9%E6%AF%94/</guid>
+      <description>本文会通过sysbench对ProxySQL进行基准测试，并与直连的性能进行对比。与此同时也对 Maxscale 和 Qihu360 Atlas 放在一起参考。 提示：压测前确保把query cache完全关掉。
+1. proxysql vs 直连 1.1 select nontrx ./bin/sysbench --test=/root/sysbench2/sysbench/tests/db/oltp.lua --mysql-host=10.0.100.36 --mysql-port=6033 --mysql-user=myuser --mysql-password=mypass \ --mysql-db=db15 --oltp-tables-count=20 --oltp-table-size=5000000 --report-interval=20 --oltp-dist-type=uniform --rand-init=on --max-requests=0 --oltp-test-mode=nontrx --oltp-nontrx-mode=select \ --oltp-read-only=on --oltp-skip-trx=on --max-time=120 --num-threads=2 run num-threads依次加大 2 5 10 20 50 100 200 400 {% iframe http://www.tubiaoxiu.com/p.html?s=106165b0eeca215a&amp;amp;web_mode 900 700 %}
+sysbench线程并发数达到10以下，性能损失在30%以上；达到20，性能损失减少到10%左右。看到proxysql承载的并发数越高，性能损失越少；最好的时候在50线程数，相比直连损失5%。
+1.2 oltp dml 混合读写测试。proxysql结果图应该与上面相差无几，因为是主要好在计算 query digest 和规则匹配，与select无异，可参考下节的图示。
+sysbench 压测命令：
+./bin/sysbench --test=/root/sysbench2/sysbench/tests/db/oltp.lua --mysql-host=10.0.100.34 --mysql-port=3306 --mysql-user=myuser --mysql-password=mypass \ --mysql-db=db15 --oltp-tables-count=20 --oltp-table-size=5000000 --report-interval=20 --oltp-dist-type=uniform --rand-init=on --max-requests=0 --oltp-read-only=off --max-time=120 \ --num-threads=2 run num-threads依次加大 2 5 10 16 20 50 100 200 400 分别对PrxoySQL, Maxscale, Atlas, 直连，四种情况做基准测试 2.</description>
+    </item>
+    
+    <item>
+      <title>ProxySQL之连接复用（multiplexing）以及相关问题说明</title>
+      <link>http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E8%BF%9E%E6%8E%A5%E5%A4%8D%E7%94%A8multiplexing%E4%BB%A5%E5%8F%8A%E7%9B%B8%E5%85%B3%E9%97%AE%E9%A2%98%E8%AF%B4%E6%98%8E/</link>
+      <pubDate>Mon, 17 Apr 2017 21:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E8%BF%9E%E6%8E%A5%E5%A4%8D%E7%94%A8multiplexing%E4%BB%A5%E5%8F%8A%E7%9B%B8%E5%85%B3%E9%97%AE%E9%A2%98%E8%AF%B4%E6%98%8E/</guid>
+      <description>ProxySQL在连接池(persistent connection poll)的基础上，还有一个连接复用的概念 multiplexing connection，官方的wiki里没有很明确的说明，但在作者的一些 blog post 和 issue 里能找到解答： https://github.com/sysown/proxysql/issues/939#issuecomment-287489317
+由于SQL可以路由，一个客户端连接上来，可能会到多个 hostgroup 发起连接。复用的意思是，一个后端DB的连接，可以“同时”被多个客户端使用。
+传统的连接池，会在客户端断开连接（会话）后，把连接放回到池里。在ProxySQL中，由于连接复用，连接会在sql语句执行结束后，便将连接放回到池里（客户端会话可能并没有断开），这样便可大大提高后端连接的使用效率，而避免前段请求过大导致后端连接数疯长。
+但这样做有时候并不安全，比如应用端连接时指定了 set NAMES xxx，然后执行查询，那么由于multiplexing可能导致两个语句发到不同的DB上执行，继而没有按照预期的字符集执行。proxysql考虑到了这种情况：
+连接会话里创建了临时表，CREATE TEMPORARY table xxxx... select @开头的变量，如select @@hostname 手动开启了事务，start transaction, commit, rollback等等 连接设置了自己的用户变量，比如set names xxx, set autocommit x, set sql_mode=xxx, set v_uservar=xx等等 第1,2,3点会根据路由规则，会自动禁用multiplex，发到对应hostgroup后，连接未断开之前不会复用到其它客户端。具体是发到主库还是从库，与匹配的规则有关。 issue #941 和 #917 都有提到临时表丢失的问题，可以用不同的rule来避免
+下面对上面几点一一说明。
+1. 临时表与用户变量（验证 1, 2） 以下注意连接的会话窗口及执行顺序，admin打头的是在proxysql管理接口上执行。
+-- [session 1] mysql client proxysql (ecdba@10.0.100.36:6033) [(none)]&amp;gt; select 1; +---+ | 1 | +---+ | 1 | +---+ -- [session 2] proxysql admin cli select * from stats_mysql_processlist; Empty set (0.</description>
+    </item>
+    
+    <item>
+      <title>ProxySQL之读写分离与分库路由演示</title>
+      <link>http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%E4%B8%8E%E5%88%86%E5%BA%93%E8%B7%AF%E7%94%B1%E6%BC%94%E7%A4%BA/</link>
+      <pubDate>Mon, 17 Apr 2017 15:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%E4%B8%8E%E5%88%86%E5%BA%93%E8%B7%AF%E7%94%B1%E6%BC%94%E7%A4%BA/</guid>
+      <description>本文演示使用ProxySQL来完成读写分离和后端分库的一个实际配置过程，安装及配置项介绍见前文 ProxySQL之安装及配置详解。
+环境
+instance0: 10.0.100.100 (db0,db2,db4,db6) instance1: 10.0.100.101 (db1,db3,db5,db7) instance2: 10.0.100.102 (db2,db6,db10,db14) instance3: 10.0.100.103 (db3,db7,db11,db15) instance0 slave: 192.168.10.4:3316 instance1 slave: 192.168.10.4:3326 instance2 slave: 192.168.10.4:3336 instance3 slave: 192.168.10.4:3346 proxysql node0: 10.0.100.36 现在想达到这样一个目的：客户端应用连接上 proxysql 的ip:port，连接时指定分库db名，执行sql时自动路由到对应的实例、对应的库。考虑下面的部署结构： 任何一个proxysql节点都是对等的，路由请求到后端instance的各个database上。
+1. 配置后端DB -- proxysql admin cli insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (100, &amp;#39;10.0.100.100&amp;#39;, 3307, 1, &amp;#39;db0,ReadWrite&amp;#39;), (1000, &amp;#39;10.0.100.100&amp;#39;, 3307, 1, &amp;#39;db0,ReadWrite&amp;#39;),(1000, &amp;#39;192.168.10.4&amp;#39;, 3316, 9, &amp;#39;db0,ReadOnly&amp;#39;); insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (101, &amp;#39;10.0.100.101&amp;#39;, 3307, 1, &amp;#39;db1,ReadWrite&amp;#39;), (1001, &amp;#39;10.0.100.101&amp;#39;, 3307, 1, &amp;#39;db1,ReadWrite&amp;#39;),(1001, &amp;#39;192.</description>
+    </item>
+    
+    <item>
+      <title>ProxySQL之安装及配置详解</title>
+      <link>http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E5%AE%89%E8%A3%85%E5%8F%8A%E9%85%8D%E7%BD%AE%E8%AF%A6%E8%A7%A3/</link>
+      <pubDate>Mon, 10 Apr 2017 21:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E5%AE%89%E8%A3%85%E5%8F%8A%E9%85%8D%E7%BD%AE%E8%AF%A6%E8%A7%A3/</guid>
+      <description>ProxySQL是一个高性能的MySQL中间件，拥有强大的规则引擎。具有以下特性：
+连接池，而且是 multiplexing 主机和用户的最大连接数限制 自动下线后端DB 延迟超过阀值 ping 延迟超过阀值 网络不通或宕机 强大的规则路由引擎 实现读写分离 查询重写 sql流量镜像 支持prepared statement 支持Query Cache 支持负载均衡，与gelera结合自动failover 集这么多优秀特性于一身，那么缺点呢就是项目不够成熟，好在作者一直在及时更新，并且受到 Percona 官方的支持。
+1. 安装 从 https://github.com/sysown/proxysql/releases 下载相应的版本。这里我选择 proxysql-1.3.5-1-centos67.x86_64.rpm，也是当前最新稳定版。
+yum localinstall proxysql-1.3.5-1-centos67.x86_64.rpm -y 可以马上启动了：
+/etc/init.d/proxysql start Starting ProxySQL: DONE! proxysql有个配置文件 /etc/proxysql.cnf，只在第一次启动的时候有用，后续所有的配置修改都是对SQLite数据库操作，并且不会更新到proxysql.cnf文件中。ProxySQL绝大部分配置都可以在线修改，配置存储在 /var/lib/proxysql/proxysql.db 中，后面会介绍它的在线配置的设计方式。
+proxysql 启动后会像 mysqld 一样，马上fork一个子进程，真正处理请求，而父进程负责监控子进程运行状况，如果crash了就拉起来。
+编译安装 安装高版本 gcc-4.8 # cd /etc/yum.repos.d # wget https://copr.fedoraproject.org/coprs/rhscl/devtoolset-3/repo/epel-6/rhscl-devtoolset-3-epel-6.repo \ -O /etc/yum.repos.d/rhscl-devtoolset-3-epel-6.repo # yum install -y scl-utils policycoreutils-python # yum --disablerepo=&amp;#39;*&amp;#39; --enablerepo=&amp;#39;rhscl-devtoolset-3&amp;#39; install devtoolset-3-gcc devtoolset-3-gcc-c++ devtoolset-3-binutils # yum --enablerepo=testing-devtools-2-centos-6 install devtoolset-3-gcc devtoolset-3-gcc-c++ devtoolset-3-binutils 上一步会把 GCC 安装到以下目录 /opt/rh/devtoolset-3/root/usr/bin 接下来需要修改系统的配置，使默认的 gcc 和 g++ 命令使用的是新安装的版本。启用SCL环境中新版本GCC： # scl enable devtoolset-3 bash 现在查看 g++ 的版本号： # gcc --version 编译安装proxysql # cd proxysql-master # make # make install 2.</description>
+    </item>
+    
+    <item>
+      <title>一次艰辛的字符集转换历程 ACMUG分享</title>
+      <link>http://xgknight.com/posts/2017/03/%E4%B8%80%E6%AC%A1%E8%89%B0%E8%BE%9B%E7%9A%84%E5%AD%97%E7%AC%A6%E9%9B%86%E8%BD%AC%E6%8D%A2%E5%8E%86%E7%A8%8B-acmug%E5%88%86%E4%BA%AB/</link>
+      <pubDate>Mon, 27 Mar 2017 21:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/03/%E4%B8%80%E6%AC%A1%E8%89%B0%E8%BE%9B%E7%9A%84%E5%AD%97%E7%AC%A6%E9%9B%86%E8%BD%AC%E6%8D%A2%E5%8E%86%E7%A8%8B-acmug%E5%88%86%E4%BA%AB/</guid>
+      <description>本文的ppt是3月25日在中国MySQL用户组2017深圳活动上，我所做的一个主题分享，关于实际生产使用mysql过程中与字符集有关的一些坑。
+这个总结其实自己去年一直也想去做，前后花了2个多月的时间，最后所有库无痛完成迁移转化。在2017年二月中下旬的时候微信上请教周董（去哪儿周彦韦大师）一个问题，因为以前也聊过一些，所以他突然问我要不要在3月份的活动上做个主题分享。当时有点不敢想，毕竟之前2次有关培训都是在公司内部的，而这次对外的分享，且不说台下听众有牛人存在，演讲嘉宾里面可各个都是大师级别的，所以当时没有马上答应。过了两天，偶然想到关于字符集这个经历可以讲一讲，不是为了展示自己有多牛B，只是分享下整个问题的处理经验，放低姿态。列了个提纲发给了周董，10分钟不到周董说定了。向经理请示了下没问题，这下赶着鸭子都得上了……
+毕竟第一次公开在这样的场合演讲，说不紧张肯定是假的，所以早早的就在准备ppt，一边回顾，一边画图。上阵前一天晚上还在对演示稿微调，并尽量控制时间。
+闲话不多说，PPT奉上：
+{% pdf http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-ppt-charset-conversion-acmug-sean.pdf 1000 800 %}
+IT大咖说有录视频：
+http://www.itdks.com/dakashuo/detail/700 后来自己复看了一下，没啥大毛病，内容都交代清楚了，就是感觉确实舞台经验，表述上还有待加强。
+同时这里是当天的活动掠影，阅读原文可看视频：
+ACMUG 2017 Tech Tour 深圳站掠影 http://mp.weixin.qq.com/s/-QNRhnN0kBtLkiWVIUS-QQ 下方是中国MySQL用户组(ACMUG)的公众号，欢迎关注： 原文连接地址：http://xgknight.com/2017/03/27/mysql-ppt-charset-conversion-acmug/</description>
+    </item>
+    
+    <item>
+      <title>index merge 引起的死锁分析</title>
+      <link>http://xgknight.com/posts/2017/03/index-merge-%E5%BC%95%E8%B5%B7%E7%9A%84%E6%AD%BB%E9%94%81%E5%88%86%E6%9E%90/</link>
+      <pubDate>Sat, 11 Mar 2017 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/03/index-merge-%E5%BC%95%E8%B5%B7%E7%9A%84%E6%AD%BB%E9%94%81%E5%88%86%E6%9E%90/</guid>
+      <description>&lt;p&gt;在看线上一个 MySQL innodb status 时，发现有死锁信息，而且出现的频率还不低。于是分析了一下，把过程记录下来。&lt;/p&gt;
+&lt;h2 id=&#34;1-概要&#34;&gt;1. 概要&lt;/h2&gt;
+&lt;p&gt;表结构脱敏处理：&lt;/p&gt;
+&lt;pre tabindex=&#34;0&#34;&gt;&lt;code&gt;CREATE TABLE t_mytb1 (
+  f_id int(11) unsigned NOT NULL AUTO_INCREMENT,
+  f_fid int(11) unsigned NOT NULL DEFAULT &amp;#39;0&amp;#39;,
+  f_sid int(11) unsigned NOT NULL DEFAULT &amp;#39;0&amp;#39;,
+  f_mode varchar(32) NOT NULL DEFAULT &amp;#39;&amp;#39;,
+  f_read int(11) unsigned NOT NULL DEFAULT &amp;#39;0&amp;#39;,
+  f_xxx1 int(11) unsigned NOT NULL DEFAULT &amp;#39;0&amp;#39;,
+  f_xxx2 int(11) unsigned NOT NULL DEFAULT &amp;#39;0&amp;#39;,
+  f_wx_zone int(11) unsigned NOT NULL DEFAULT &amp;#39;0&amp;#39;,
+  PRIMARY KEY (f_id),
+  KEY idx_sid (f_sid),
+  KEY idx_fid (f_fid)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+&lt;/code&gt;&lt;/pre&gt;&lt;p&gt;死锁信息：&lt;/p&gt;
+&lt;pre tabindex=&#34;0&#34;&gt;&lt;code&gt;LATEST DETECTED DEADLOCK
+------------------------
+2017-02-28 13:58:29 7f25a3efd700
+*** (1) TRANSACTION:
+TRANSACTION 4907718431, ACTIVE 0.010 sec fetching rows
+mysql tables in use 3, locked 3
+LOCK WAIT 154 lock struct(s), heap size 30248, 10 row lock(s)
+LOCK BLOCKING MySQL thread id: 13589250 block 13589247
+MySQL thread id 13589247, OS thread handle 0x7f25a17e3700, query id 27061926722 11.xx.52.xx ecweb Searching rows for update
+UPDATE `d_db1`.`t_mytb1` SET `f_read` = f_read+1 WHERE (f_fid=91243) AND (f_sid=100) AND (f_mode=&amp;#39;浏览器&amp;#39;)
+*** (1) WAITING FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 13288 page no 375 n bits 352 index `PRIMARY` of table `d_db1`.`t_mytb1` trx id 4907718431 lock_mode X locks rec but not gap waiting
+Record lock, heap no 245 PHYSICAL RECORD: n_fields 10; compact format; info bits 0
+ 0: len 4; hex 0000a63b; asc    ;;;
+ 1: len 6; hex 0001246304a7; asc   $c  ;;
+ 2: len 7; hex 7f000ac0162428; asc      $(;;
+ 3: len 4; hex 00016470; asc   dp;;
+ 4: len 4; hex 00000064; asc    d;;
+ 5: len 9; hex e6b58fe8a788e599a8; asc          ;;
+ 6: len 4; hex 0000244f; asc   $O;;
+ 7: len 4; hex 0000007c; asc    |;;
+ 8: len 4; hex 00000000; asc     ;;
+ 9: len 4; hex 00000000; asc     ;;
+
+*** (2) TRANSACTION:
+TRANSACTION 4907718435, ACTIVE 0.007 sec fetching rows
+mysql tables in use 3, locked 3
+154 lock struct(s), heap size 30248, 3 row lock(s)
+MySQL thread id 13589250, OS thread handle 0x7f25a3efd700, query id 27061926757 11.xx.104.xxx ecweb Searching rows for update
+UPDATE `d_db1`.`t_mytb1` SET `f_read` = f_read+1 WHERE (f_fid=91248) AND (f_sid=100) AND (f_mode=&amp;#39;浏览器&amp;#39;)
+*** (2) HOLDS THE LOCK(S):
+RECORD LOCKS space id 13288 page no 375 n bits 352 index `PRIMARY` of table `d_db1`.`t_mytb1` trx id 4907718435 lock_mode X locks rec but not gap
+Record lock, heap no 245 PHYSICAL RECORD: n_fields 10; compact format; info bits 0
+ 0: len 4; hex 0000a63b; asc    ;;;  -- 42555
+ 1: len 6; hex 0001246304a7; asc   $c  ;;  -- 4905436327
+ 2: len 7; hex 7f000ac0162428; asc      $(;;
+ 3: len 4; hex 00016470; asc   dp;;  -- 91248
+ 4: len 4; hex 00000064; asc    d;;  -- 100
+ 5: len 9; hex e6b58fe8a788e599a8; asc          ;;
+ 6: len 4; hex 0000244f; asc   $O;;  -- 9295
+ 7: len 4; hex 0000007c; asc    |;;  -- 124
+ 8: len 4; hex 00000000; asc     ;;
+ 9: len 4; hex 00000000; asc     ;;
+
+*** (2) WAITING FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 13288 page no 202 n bits 1272 index `idx_sid` of table `d_db1`.`t_mytb1` trx id 4907718435 lock_mode X locks rec but not gap waiting
+Record lock, heap no 705 PHYSICAL RECORD: n_fields 2; compact format; info bits 0
+ 0: len 4; hex 00000064; asc    d;;  -- 100
+ 1: len 4; hex 0000a633; asc    3;;  -- 42547
+
+*** WE ROLL BACK TRANSACTION (2)
+&lt;/code&gt;&lt;/pre&gt;&lt;p&gt;乍一看很奇怪，tx1和tx2 两个 UPDATE 各自以 f_fid 为条件更新的记录互不影响才对，即使 91243，91248 两个值有可能出现在同一条数据上（因为f_fid上是二级索引），那顶多也就是个更新锁等待，谁后来谁等待，怎么会出现互相争用对方已持有的锁，被死锁检测机制捕获？&lt;/p&gt;
+&lt;p&gt;当然,把 update 语句拿到数据库中 EXPLAIN 一下就可以看出端倪。这里不妨先分析一下输出的锁情况：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;先看 Tx2 (对应trx id 4907718435)&lt;/strong&gt; :&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;code&gt;RECORD LOCKS space id 13288 page no 375 n bits 352&lt;/code&gt; 告诉我们是表空间id 13288 (可从 &lt;code&gt;information_schema.INNODB_SYS_DATAFILES&lt;/code&gt; 查到对应ibd文件) 即 t_mytb1 表，第 375 号页面的 245 位置的记录被锁，并且是 idx PRIMARY 上的记录锁（注：本实例隔离级别为RC）。 Tx2正持有这把记录锁。
+因为是聚集索引，显示了完整记录&lt;/li&gt;
+&lt;/ol&gt;
+&lt;pre tabindex=&#34;0&#34;&gt;&lt;code&gt;0: 主键f_id=42555
+1: DB_TRX_ID = 4905436327
+2: DB_ROLL_PTR指向undo记录的地址
+3: f_fid=91248
+4: f_sid=100
+   ...
+&lt;/code&gt;&lt;/pre&gt;&lt;ol start=&#34;2&#34;&gt;
+&lt;li&gt;然而Tx2还在等待一个记录锁（lock_mode X locks rec but not gap waiting），但这把锁来自二级索引 &lt;code&gt;idx_sid&lt;/code&gt; 索引上的记录锁。在 RC 级别下没有GAP lock，行锁除了加在符合条件的二级索引 f_sid=100 上外，还会对主键加record lock。
+二级索引值：&lt;/li&gt;
+&lt;/ol&gt;</description>
+    </item>
+    
+    <item>
+      <title>MySQL根据离线binlog快速“闪回”</title>
+      <link>http://xgknight.com/posts/2017/03/mysql%E6%A0%B9%E6%8D%AE%E7%A6%BB%E7%BA%BFbinlog%E5%BF%AB%E9%80%9F%E9%97%AA%E5%9B%9E/</link>
+      <pubDate>Fri, 03 Mar 2017 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/03/mysql%E6%A0%B9%E6%8D%AE%E7%A6%BB%E7%BA%BFbinlog%E5%BF%AB%E9%80%9F%E9%97%AA%E5%9B%9E/</guid>
+      <description>&lt;p&gt;昨天突然有个客户说误操作，自己删除了大量数据，CTO直接将我拉到一个讨论组里，说要帮他们恢复数据。他们自己挖的坑，打算让开发那边根据业务日志去恢复，被告知只记录的删除主键这样的信息，物理删除，无能为力。&lt;/p&gt;
+&lt;p&gt;上服务器看了下记录的日志，发现好几台上面都有被误删的记录输出。阿里RDS虽然可以克隆一个恢复到删除时间点前的实例，但这散落的几万个id找起来费力，还有就是几个表之间关联的数据也要恢复，觉得麻烦。&lt;/p&gt;
+&lt;p&gt;想到 MySQL 的闪回方案。以前看过好几篇相关文章，甚至差点自己用python撸一个来解析binlog，反转得到回滚sql，实在没空，这下要急用了。赶紧找了下网上“现成的方案”。&lt;/p&gt;
+&lt;p&gt;正文开始&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;MySQL（含阿里RDS）快速闪回可以说是对数据库误操作的后悔药，flashback功能可以将数据库返回到误操作之前。但是即使oracle数据库也只支持短时间内的闪回。&lt;/p&gt;
+&lt;p&gt;网上现有开源的MySQL闪回实现，原理都是解析binlog，生成反向sql: (必须为row模式)&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;对于 delete 操作，生成insert （DELETE_ROWS_EVENT）&lt;/li&gt;
+&lt;li&gt;对于 update 操作，交换binlog里面值的顺序 （UPDATE_ROWS_EVENT）&lt;/li&gt;
+&lt;li&gt;对于 insert 操作，反向生成delete （WRITE_ROWS_EVENT）&lt;/li&gt;
+&lt;li&gt;对于多个event，要逆向生成sql&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;开源实现：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;https://github.com/58daojia-dba/mysqlbinlog_flashback&#34;&gt;https://github.com/58daojia-dba/mysqlbinlog_flashback&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://github.com/danfengcao/binlog2sql/&#34;&gt;https://github.com/danfengcao/binlog2sql/&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;上面两种实现方式，都是通过 python-mysql-replication 包，模拟出原库的一个从库，然后 &lt;code&gt;show binary logs&lt;/code&gt; 来获取binlog，发起同步binlog的请求，再解析EVENT。但是阿里云 RDS 的binlog在同步给从库之后，** 很快就被 purge 掉了 &lt;strong&gt;。如果要恢复 ** 昨天&lt;/strong&gt; 的 ** 部分数据 **，两种方案都是拿不到binlog的。也就是闪回的时间有限。&lt;/p&gt;
+&lt;p&gt;还有一些比较简单的实现，就是解析 binlog 物理文件，实现回滚，如 &lt;code&gt;binlog-rollback.pl&lt;/code&gt; ，试过，但是速度太慢。&lt;/p&gt;
+&lt;p&gt;为了不影响速度，又想使用比较成熟的闪回方案，我们可以这样做：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;借助一个自建的 mysqld 实例，将已purge掉的binlog拷贝到该实例的目录下&lt;/li&gt;
+&lt;li&gt;在自建实例里，提前创建好需要恢复的表（结构），因为工具需要连接上来从 &lt;code&gt;information_schema.columns&lt;/code&gt; 获取元数据信息&lt;/li&gt;
+&lt;li&gt;拷贝的时候，可以替换掉mysql实例自己的binlog文件名，保持连续&lt;/li&gt;
+&lt;li&gt;可能要修改 &lt;code&gt;mysql-bin.index&lt;/code&gt;，确保文件名还能被mysqld识别到&lt;/li&gt;
+&lt;li&gt;重启mysql实例，&lt;code&gt;show binary logs&lt;/code&gt; 看一下是否在列表里面&lt;/li&gt;
+&lt;li&gt;接下来就可以使用上面任何一种工具，模拟从库，指定一个binlog文件，开始时间，结束时间，得到回滚SQL&lt;/li&gt;
+&lt;li&gt;再根据业务逻辑，筛选出需要的sql&lt;/li&gt;
+&lt;/ol&gt;</description>
+    </item>
+    
+    <item>
+      <title>关于MySQL自增主键的几点问题（下）</title>
+      <link>http://xgknight.com/posts/2017/02/%E5%85%B3%E4%BA%8Emysql%E8%87%AA%E5%A2%9E%E4%B8%BB%E9%94%AE%E7%9A%84%E5%87%A0%E7%82%B9%E9%97%AE%E9%A2%98%E4%B8%8B/</link>
+      <pubDate>Fri, 17 Feb 2017 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/02/%E5%85%B3%E4%BA%8Emysql%E8%87%AA%E5%A2%9E%E4%B8%BB%E9%94%AE%E7%9A%84%E5%87%A0%E7%82%B9%E9%97%AE%E9%A2%98%E4%B8%8B/</guid>
+      <description>AUTO-INC waiting 锁等待 这是生产环境出现的现象，某日下午5点业务高峰期，我们的 慢查询快照抓取程序 报出大量线程阻塞，但是1分钟以后就好了。于是分析了当时的 processlist 和 innodb status 现场记录，发现有大量的 AUTO-INC waiting：
+![auto-inc-lock-wait][1]
+当时想这是得多大的并发量，才会导致 AUTO_INCREMENT 列的自增id分配出现性能问题，不太愿意相信这个事实（后面就再也没出现过）。了解一番之后（见 关于MySQLz自增主键问题（上篇）），发现这个表级别的 AUTO-INC lock 就不应该在业务中存在，因为 innodb_autoinc_lock_mode为1，普通业务都是 simple inserts，获取自增id是靠内存里维护的一个互斥量（mutex counter）。
+问题拿到知数堂优化班上课群里讨论过，也只是猜测是不是慢查询多了导致负载高，或者当时磁盘遇到什么物理故障阿里云那边自动恢复了。再后来怀疑是不是因为插入时带了 auto_increment 列的值（我们有个redis incr实现的自增id服务，虽然这一列有 AAUTO_INCREMENT 定义，但实际已经从发号器取id了），会导致锁的性质会变？
+为了弄清这个疑问，特意去看了下mysql源码，发现如果插入的自增值比表当前AUTOINC值要大，是直接update mutex counter：
+看源码的时候也打消了另一个疑虑：show engine innodb status 看到的 AUTO-INC 有没有可能不区分 表级自增锁和互斥量计数器 两种自增方案，只是告诉你自增id获取忙不过来？ 实际不是的，代码里面有明确的定义是 autoinc_lock还是autoinc_mutex：
+// dict0dict.cc : #ifndef UNIV_HOTBACKUP /********************************************************************//** Acquire the autoinc lock. */ UNIV_INTERN void dict_table_autoinc_lock( /*====================*/ dict_table_t*	table)	/*!&amp;lt; in/out: table */ { mutex_enter(&amp;amp;table-&amp;gt;autoinc_mutex); } /********************************************************************//** Unconditionally set the autoinc counter.</description>
+    </item>
+    
+    <item>
+      <title>关于MySQL自增主键的几点问题（上）</title>
+      <link>http://xgknight.com/posts/2017/02/%E5%85%B3%E4%BA%8Emysql%E8%87%AA%E5%A2%9E%E4%B8%BB%E9%94%AE%E7%9A%84%E5%87%A0%E7%82%B9%E9%97%AE%E9%A2%98%E4%B8%8A/</link>
+      <pubDate>Thu, 16 Feb 2017 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/02/%E5%85%B3%E4%BA%8Emysql%E8%87%AA%E5%A2%9E%E4%B8%BB%E9%94%AE%E7%9A%84%E5%87%A0%E7%82%B9%E9%97%AE%E9%A2%98%E4%B8%8A/</guid>
+      <description>前段时间遇到一个InnoDB表自增锁导致的问题，最近刚好有一个同行网友也问到自增锁的疑问，所以抽空系统的总结一下，这两个问题下篇会有阐述。
+1. 划分三种插入类型 这里区分一下几种插入数据行的类型，便于后面描述：（纯逻辑上的划分）
+&amp;ldquo;Simple inserts&amp;rdquo;
+简单插入，就是在处理sql语句的时候，能够提前预估到插入的行数，包括 INSERT / REPLACE 的单行、多行插入，但不含嵌套子查询以及 INSERT ... ON DUPLICATE KEY UPDATE。
+&amp;ldquo;Bulk inserts&amp;rdquo;
+本文暂且叫做 大块插入，不能提前预知语句要插入的行数，也就无法知道分配多少个自增值，包括 INSERT ... SELECT, REPLACE ... SELECT, 以及 LOAD DATA 导入语句。InnoDB会每处理一行记录就为 AUTO_INCREMENT 列分配一个值。
+&amp;ldquo;Mixed-mode inserts&amp;rdquo;
+混合插入，比如在 “简单插入” 多行记录的时候，有的新行有指定自增值，有的没有，所以获得最坏情况下需要插入的数量，然后一次性分配足够的auto_increment id。比如:
+# c1 是 t1 的 AUTO_INCREMENT 列 INSERT INTO t1 (c1,c2) VALUES (1,&amp;#39;a&amp;#39;), (NULL,&amp;#39;b&amp;#39;), (5,&amp;#39;c&amp;#39;), (NULL,&amp;#39;d&amp;#39;); 又比如 INSERT ... ON DUPLICATE KEY UPDATE，它在 update 阶段有可能分配新的自增id，也可能不会。
+2. 三种自增模式：innodb_autoinc_lock_mode 在以 5.6 版本，自增id累加模式分为：
+** 传统模式**</description>
+    </item>
+    
+    <item>
+      <title>监控MySQL你还应该收集表信息</title>
+      <link>http://xgknight.com/posts/2016/12/%E7%9B%91%E6%8E%A7mysql%E4%BD%A0%E8%BF%98%E5%BA%94%E8%AF%A5%E6%94%B6%E9%9B%86%E8%A1%A8%E4%BF%A1%E6%81%AF/</link>
+      <pubDate>Sun, 04 Dec 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/12/%E7%9B%91%E6%8E%A7mysql%E4%BD%A0%E8%BF%98%E5%BA%94%E8%AF%A5%E6%94%B6%E9%9B%86%E8%A1%A8%E4%BF%A1%E6%81%AF/</guid>
+      <description>1. Story 也许你经常会被问到，库里某个表最近一年的内每个月的数据量增长情况。当然如果你有按月分表比较好办，挨个 show table status，如果只有一个大表，那估计要在大家都休息的时候，寂寞的夜里去跑sql统计了，因为你只能获取当前的表信息，历史信息追查不到了。
+除此以外，作为DBA本身也要对数据库空间增长情况进行预估，用以规划容量。我们说的表信息主要包括：
+表数据大小（DATA_LENGTH） 索引大小(INDEX_LENGTH) 行数（ROWS） 当前自增值（AUTO_INCREMENT，如果有） 目前是没有看到哪个mysql监控工具上提供这样的指标。这些信息不需要采集的太频繁，而且结果也只是个预估值，不一定准确，所以这是站在一个全局、长远的角度去监控(采集)表的。
+本文要介绍的自己写的采集工具，是基于组内现有的一套监控体系：
+InfluxDB：时间序列数据库，存储监控数据 Grafana：数据展示面板 Telegraf：收集信息的agent 看了下 telegraf 的最新的 mysql 插件，一开始很欣慰：支持收集 Table schema statistics 和 Info schema auto increment columns。试用了一下，有数据，但是如前面所说，除了自增值外其他都是预估值，telegraf收集频率过高没啥意义，也许一天2次就足够了，它提供的 IntervalSlow选项固定写死在代码里，只能是放缓 global status 监控频率。不过倒是可以与其它监控指标分开成两份配置文件，各自定义收集间隔来实现。 最后打算自己用python撸一个，上报到influxdb里 :) 2. Concept 完整代码见 GitHub项目地址：DBschema_gather 实现也特别简单，就是查询 information_schema 库的 COLUMNS、TABLES 两个表：
+SELECT IFNULL(@@hostname, @@server_id) SERVER_NAME, %s as HOST, t.TABLE_SCHEMA, t.TABLE_NAME, t.TABLE_ROWS, t.DATA_LENGTH, t.INDEX_LENGTH, t.AUTO_INCREMENT, c.COLUMN_NAME, c.DATA_TYPE, LOCATE(&amp;#39;unsigned&amp;#39;, c.COLUMN_TYPE) COL_UNSIGNED # CONCAT(c.DATA_TYPE, IF(LOCATE(&amp;#39;unsigned&amp;#39;, c.COLUMN_TYPE)=0, &amp;#39;&amp;#39;, &amp;#39;_unsigned&amp;#39;)) FROM information_schema.</description>
+    </item>
+    
+    <item>
+      <title>一种直观记录表结构变更历史的方法</title>
+      <link>http://xgknight.com/posts/2016/11/%E4%B8%80%E7%A7%8D%E7%9B%B4%E8%A7%82%E8%AE%B0%E5%BD%95%E8%A1%A8%E7%BB%93%E6%9E%84%E5%8F%98%E6%9B%B4%E5%8E%86%E5%8F%B2%E7%9A%84%E6%96%B9%E6%B3%95/</link>
+      <pubDate>Mon, 28 Nov 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/11/%E4%B8%80%E7%A7%8D%E7%9B%B4%E8%A7%82%E8%AE%B0%E5%BD%95%E8%A1%A8%E7%BB%93%E6%9E%84%E5%8F%98%E6%9B%B4%E5%8E%86%E5%8F%B2%E7%9A%84%E6%96%B9%E6%B3%95/</guid>
+      <description>1. Story 在没有形成自己的数据库管理平台以前，数据库实例一多（包括生产和测试环境），许多表要执行DDL会变得异常繁杂。
+说个自己的经历，需要改现网的一个索引来看优化的效果，因为存在风险，不会一次全改，先只改1个库，然后逐步放开。前后验证效果可能花上一两周的时间，除非实现完整的记录了当时的ddl语句和对应的库，否则根本难以记得。这就完全依赖于个人的习惯及能力。
+又比如现网出了个问题，开发追查到一个时间点，想确认那个时候有没有对库表进行过更改操作，如果没有记录表结构变更的历史，也就难以提供需要的信息。
+记录差异，很早就思考过能不能用git来做。终于花了一天时间来实现，并验证、修改达到预期的效果，还算满意。
+github项目地址在文后。
+2. Concept 思路很简单，就是利用 mydumper 导出表时会把各表（结构）单独导成一个文件的特性，每天低峰期导出所有对象元数据：表、视图、存储过程、事件、触发器。需要过滤掉 AUTO_INCREMENT 值。
+结构内容存放在一个git仓库下，通过shell脚本提交到 gitlab。所有DDL更改由原来依赖于DBA的主动记录，变成被动采集。
+测试环境和生产环境表结构总会有些差异，为了兼顾同时收集两个环境的数据，设置了 environment 选项，根据当前所在运行的机器，自动判断采集哪些实例信息。
+3. Usage 首先你需要能够存放表结构信息的git仓库，如gitlab，而且建议设置为私有。
+安装 git 和 mydumper mydumper 0.9.1 版本需要编译安装，可以参考这里 file-mydumper-install-ubuntu14-04-sh。当然 yum 或 apt-get 安装其他版本也是一样的。 脚本会尝试自动获取 mydumper 命令的路径。 注意配置git权限的时候，最好不允许其它用户手动提交修改仓库内容。
+配置db实例地址 settings.ini示例：
+[environment] production=puppetmaster test=puppettestmaster [production] production_auth=your_defaultuser:yourpassword db_name1=192.168.1.100:3306 db_name2=192.168.1.101:3306 db_name3=name3.dbhost.com:3306 db_name4=192.168.1.100:3306:myuser:mypassword [test] test_auth=user1:password1 db_name1=10.0.100.1:3306 db_name2=10.0.100.1:3307 db_name3=10.0.100.2:3306 db_name4=10.0.100.3:3306:myuser1:mypassword1 上面的配置采集 production和test两个环境的表结构，识别两个环境是根据 hostname 来决定的。这样做的好吃就是这个脚本在两个环境下运行不需要做任何修改。 [production]节的名字就是 [environment]节指定的名字 production=xx dbname1=就是配置各个db，地址+端口的形式。用户名和密码可以继续用 : 跟上 production_auth=表示 production 环境下，如 dbname1没有配置用户名时，默认采用这个用户名和密码。这样设计主要是简化配置。
+该数据库用户需要 select,show view,event,trigger,procedure 权限。</description>
+    </item>
+    
+    <item>
+      <title>MySQL非主从环境下数据一致性校验及修复程序</title>
+      <link>http://xgknight.com/posts/2016/11/mysql%E9%9D%9E%E4%B8%BB%E4%BB%8E%E7%8E%AF%E5%A2%83%E4%B8%8B%E6%95%B0%E6%8D%AE%E4%B8%80%E8%87%B4%E6%80%A7%E6%A0%A1%E9%AA%8C%E5%8F%8A%E4%BF%AE%E5%A4%8D%E7%A8%8B%E5%BA%8F/</link>
+      <pubDate>Sun, 20 Nov 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/11/mysql%E9%9D%9E%E4%B8%BB%E4%BB%8E%E7%8E%AF%E5%A2%83%E4%B8%8B%E6%95%B0%E6%8D%AE%E4%B8%80%E8%87%B4%E6%80%A7%E6%A0%A1%E9%AA%8C%E5%8F%8A%E4%BF%AE%E5%A4%8D%E7%A8%8B%E5%BA%8F/</guid>
+      <description>1. 简介 项目地址：https://github.com/seanlook/px-table-checksum
+主从环境下数据一致性校验经常会用 pt-table-checksum 工具，它的原理及实施过程之前写过一篇文章：生产环境使用 pt-table-checksum 检查MySQL数据一致性。但是DBA工作中还会有些针对两个表检查是否一致，而这两个表之间并没有主从关系，pt工具是基于binlog把在主库进行的检查动作，在从库重放一遍，此时就不适用了。
+总会有这样特殊的需求，比如从阿里云RDS实例迁移到自建mysql实例，它的数据传输服务实现方式是基于表的批量数据提取，加上binlog订阅，但强制row模式会导致pt-table-checksum没有权限把会话临时改成statement。另一种需求是，整库进行字符集转换：库表定义都是utf8，但应用连接使用了默认的 latin1，要将连接字符集和表字符集统一起来，只能以latin1导出数据，再以utf8导入，这种情况数据一致性校验，且不说binlog解析程序不支持statement（如canal），新旧库本身内容不同，pt-table-checksum 算出的校验值也会不一样，失效。
+所以才萌生了参考 pt-table-checksum 自己写了一个：px-table-checksum 。
+2. 实现方法 整体思路是借鉴pt-table-checksum，从源库批量（即chunk）取出一块数据如1000行，计算CRC32值，同样的语句在目标库运行一遍，结果都存入另一个库，最后检查对应编号的chunk crc值是否一致。知道不一致还不行，得能否快速方便的修复差异，所以继续根据那些不一致的chunk，去目标库和源库找到不一致的行，是缺失，还是多余，还是被修改了，然后生成修复sql，根据指示是否自动修复。
+那么问题就在于：
+如何确定批次，也就是下一个chunk该怎么取？ 我还没想做到pt-table-checksum那样，可以根据负载动态调整chunk大小，甚至活跃线程数超过阀值就暂停检查，上来工作量就太大了。目前每次计算的chunk的行数是固定的，可以配置1000或2000等。 所以就要用到分页查询，根据（自增或联合）主键、唯一索引，每次limit 1000后升序取最后一条，作为下一批的起始。所以要分析表上的键情况，组合查询条件。目前仅能检查有主键或唯一所以的表。
+如何保证源库和目标库，运行的sql一样？ 之前一版是目标库和源库，以多线程各自计算chunk，入库，后来才意识到严重的bug：比如同样是取1000行，如果目标库少数据，那么下一个chunk起始就不一样，比较的结果简直一塌糊涂。 所以必须保证相同编号的chunk，起点必须相同，所以想到用队列，存放在源库跑过的所有校验sql，模拟pt工具在目标库重放。考虑到要多线程同时比较多个表，队列可能吃内存过大，于是使用了redis队列。
+直接在数据库中计算crc32，还是取出数据在内存里计算？ 翻了pt-table-checksum的源码，它是在数据库里计算的。但是第一节里说过，如果目标库和源库要使用不同的字符集才能读出正确的数据，只能查询出来之后再比较。所以 px-table-checksum 两种都支持，只需指定一个配置项。
+同时检查多个表，源库sql挤在队列，目标库拿出来执行时过了1s，此时源库那条数据又被修改了一次同步到了目标库，会导致计算结果不一致，实则一致，怎么处理 无法处理，是px-table-checksum相比pt-table-checksum最大的缺陷。 但为了尽可能减少此类问题（比如主从延迟也可能会），特意设计了多个redis队列，目标库多个检查线程，即比如同时指定检查8个表，源库检查会有8个线程对应，但可以根据表的写入情况，配置4个redis队列（目前是随机入列），10个目标库检查线程，来减少不准确因素。 但站在我的角度往往来说，不一致的数据会被记录下来，如果不多，人工核对一下；如果较多，就再跑一遍检查，如果两次都有同一条数据不一致，那就有情况了。
+3. 限制 如果检查期间源表数据，变化频繁，有可能检查的结果不准确 也就是上面第4点的问题。很明显，这个程序每个检查的事务是分开的，不像pt工具能严格保证每条检查sql的事务顺序。但有不一致的数据再排查一下就ok了。实际在我线上使用过程中，99.9%是准确的。 表上必须有主键或唯一索引 程序会检查，如果没有会退出。
+varbinay,blob等二进制字段不支持修复 其实也不是完全不支持，要看怎么用的。开发如果有把字符先转成字节，再存入mysql，这种就不支持修复。是有办法可以处理，那就是从源库查时用 hex()函数，修复sql里面unhex()写回去。
+4. 使用说明 该python程序基于2.7开发，2.6、3.x上没有测试。使用前需要安装 MySQLdb和hotqueue：
+$ sudo pip install MySQL-python hotqueue 要比较的表和选项，使用全配置化，即不通过命令行的方式指定（原谅命令行参数使用方式会额外增加代码量）。
+4.1 px-table-checksum.py 主程序，运行python px-table-checksum.py 执行一致性检查，但一定了解下面的配置文件选项。
+4.2 settings_checksum.py 配置选项
+CHUNK_SIZE: 每次提取的chunk行数
+REDIS_INFO: 指定使用redis队列地址
+REDIS_QUEUE_CNT: redis队列数量，消费者（目标库）有一一对应的线程守着队列
+REDIS_POOL_CNT: 生产者（源库）redis客户端连接池。这个设计是为了缓解GIL带来的问题，把入列端与出列端分开，因为如果表多可能短时间有大量sql入队列，避免hotqueue争用</description>
+    </item>
+    
+    <item>
+      <title>让mysqldump变成并发导出导入的魔法</title>
+      <link>http://xgknight.com/posts/2016/11/%E8%AE%A9mysqldump%E5%8F%98%E6%88%90%E5%B9%B6%E5%8F%91%E5%AF%BC%E5%87%BA%E5%AF%BC%E5%85%A5%E7%9A%84%E9%AD%94%E6%B3%95/</link>
+      <pubDate>Thu, 17 Nov 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/11/%E8%AE%A9mysqldump%E5%8F%98%E6%88%90%E5%B9%B6%E5%8F%91%E5%AF%BC%E5%87%BA%E5%AF%BC%E5%85%A5%E7%9A%84%E9%AD%94%E6%B3%95/</guid>
+      <description>1. 简介 取名mypumpkin，是python封装的一个让mysqldump以多线程的方式导出库表，再以mysql命令多线程导入新库，用于成倍加快导出，特别是导入的速度。这一切只需要在 mysqldump 或 mysql 命令前面加上 mypumpkin.py 即可，所以称作魔法。
+项目地址：https://github.com/seanlook/mypumpkin
+该程序源于需要对现网单库几百G的数据进行转移到新库，并对中间进行一些特殊操作（如字符集转换），无法容忍mysqldump导入速度。有人可能会提到为什么不用 mydumper，其实也尝试过它但还是放弃了，原因有：
+不能设置字符集 mydumper强制使用 binary 方式来连接库以达到不关心备份恢复时的字符集问题，然而我的场景下需要特意以不同的字符集导出、再导入。写这个程序的时候正好在公众号看到网易有推送的一篇文章 (解密网易MySQL实例迁移高效完成背后的黑科技)，提到他们对mydumper的改进已支持字符集设置，可是在0.9.1版本的patch里还是没找到。 没有像 mysqldump 那样灵活控制过滤选项（导哪些表、忽略哪些表） 因为数据量之巨大，而且将近70%是不变更的历史表数据，这些表是可以提前导出转换的；又有少量单表大于50G的，最好是分库导出转换。mydumper 不具备 mysqldump 这样的灵活性 对忽略导出gtid信息、触发器等其它支持 阿里云rds 5.6 导出必须要设置 set-gtid-purged=OFF 另外有人还可能提到 mysqlpump —— 它才是我认为mysqldump应该具有的模样，语法兼容，基于表的并发导出。但是只有 mysql服务端 5.7.9 以上才支持，这就是现实和理想的距离。。。
+2. 实现方法 首先说明，mysqldump的导出速度并不慢，经测试能达到50M/s的速度，10G数据花费3分钟的样子，可以看到瓶颈在于网络和磁盘IO，再怎样的导出工具也快不了多少，但是导入却花了60分钟，磁盘和网络大概只用到了20%，瓶颈在目标库写入速度（而一般顺序写入达不到IOPS限制），所以mypumpkin就诞生了 —— 兼顾myloader的导入速度和mysqldump导出的灵活性。
+用python构造1个队列，将需要导出的所有表一次放到队列中，同时启动N个python线程，各自从这个Queue里取出表名，subprocess调用操作系统的mysqldump命令，导出数据到以 dbname.tablename.sql 命名的文件中。load in 与 dump out 类似，根据指定的库名或表名，从dump_dir目录找到所有sql文件，压进队列，N个线程同时调用mysql构造新的命令，模拟 &amp;lt; 操作。
+参数解析从原来自己解析，到改用argparse模块，几乎做了一次重构。 对于没有指定--tables的情况，程序会主动去库里查询一下所有表名，然后过滤进队列。
+load in目标库，选项做到与dump out一样丰富，可以指定导入哪些db、哪些表、忽略哪些表。
+其中的重点是做到与原mysqldump兼容，因为需要对与表有关的选项（-B, -A, --tables, --ignore=），进行分析并组合成新的执行命令，考虑的异常情况非常多。
+3. 限制 重要：导出的数据不保证库级别的一致性 对历史不变表，是不影响的 具体到一个表能保证一致性，这是mysqldump本身采用哪些选项决定的 不同表导出动作在不同的mysqldump命令中，无法保证事务。 在我的案例场景下，是有开发同学辅助使用一套binlog解析程序，等完成后重放所有变更，来保证最终一致性。 另，许多情况下我们导数据，并不需要完整的或者一致的数据，只是用于离线分析或临时导出，重点是快速拿数据给到开发。 不寻常选项识别 程序已经尽力做到与mysqldump命令兼容，只需要加上 mypumpkin.</description>
+    </item>
+    
+    <item>
+      <title>mysql使用utf8mb4经验吐血总结</title>
+      <link>http://xgknight.com/posts/2016/10/mysql%E4%BD%BF%E7%94%A8utf8mb4%E7%BB%8F%E9%AA%8C%E5%90%90%E8%A1%80%E6%80%BB%E7%BB%93/</link>
+      <pubDate>Sun, 23 Oct 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/10/mysql%E4%BD%BF%E7%94%A8utf8mb4%E7%BB%8F%E9%AA%8C%E5%90%90%E8%A1%80%E6%80%BB%E7%BB%93/</guid>
+      <description>1. utf8 与 utf8mb4 异同 先看 官方手册 https://dev.mysql.com/doc/refman/5.6/en/charset-unicode-utf8mb4.html 的说明：
+The character set named utf8 uses a maximum of three bytes per character and contains only BMP characters. The utf8mb4 character set uses a maximum of four bytes per character supports supplementary characters: - For a BMP character, utf8 and utf8mb4 have identical storage characteristics: same code values, same encoding, same length. - For a supplementary character, utf8 cannot store the character at all, whereas utf8mb4 requires four bytes to store it.</description>
+    </item>
+    
+    <item>
+      <title>遇到腾讯云CDB连接字符集设置一个坑</title>
+      <link>http://xgknight.com/posts/2016/10/%E9%81%87%E5%88%B0%E8%85%BE%E8%AE%AF%E4%BA%91cdb%E8%BF%9E%E6%8E%A5%E5%AD%97%E7%AC%A6%E9%9B%86%E8%AE%BE%E7%BD%AE%E4%B8%80%E4%B8%AA%E5%9D%91/</link>
+      <pubDate>Mon, 17 Oct 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/10/%E9%81%87%E5%88%B0%E8%85%BE%E8%AE%AF%E4%BA%91cdb%E8%BF%9E%E6%8E%A5%E5%AD%97%E7%AC%A6%E9%9B%86%E8%AE%BE%E7%BD%AE%E4%B8%80%E4%B8%AA%E5%9D%91/</guid>
+      <description>最近一个与qq有关的服务迁到腾讯云上，相应的数据库也要从原阿里云RDS迁移到腾讯云CDB上，经过一番摸索，不带任何政治色彩的说，CDB跟RDS相比弱的不止一条街。比如看个错误日志还要提工单，数据库访问没有白名单，数据传输服务竞不支持源库的开启GTID，自带的后台管理是phpMyAdmin，要临时看查询日志也要提工单，当然这些都是可以容忍通过其它方法解决的，但是如果使用上带来了mysql数据库本身的影响，就用的不太爽了。
+最近2个月一直在弄与字符集相关的工作，却还是在cdb踩到一个大坑。情况是这样的，我们旧的RDS上的数据库表定义都是utf8，但由于历史原因，开发一直使用 latin1 去连接的。现在要把这样的一个db迁移到CDB，腾讯云的数据传输服务出了点问题，于是想了办法用阿里云的DTS反向迁。现象是：
+用Navicat客户端latin1连接，旧数据显示都ok 但程序端看到历史数据全是乱码，新数据正常 而且新数据通过navicat去看用 utf8 连接才正常 在mysql命令行下手动 set names latin1 读取旧数据ok，但新数据乱码 这明显是新写入的时候就是以 utf8 连接的，读取的时候新旧数据也以 utf8 连接。但应用端已明确设置使用 latin1 连接来读写。为了验证是否CDB的问题，在相同环境下自建了个mysql实例，一切都ok。
+腾讯云工程师先是怀疑迁移有问题，后来说可能是character_set_server设置的问题，我站在2个月来处理字符集的经验看了虽然不太可能，还是配合截了几个图，在工单、电话了里撕了几个来回：
+因为跟腾讯有合作关系，上头就直接联系到了腾讯云的人，这才找到问题根源：都是--skip-character-set-client-handshake惹的祸。
+--character-set-client-handshake Do not ignore character set information sent by the client. To ignore client information and use the default server character set, use --skip-character-set-client-handshake; this makes MySQL behave like MySQL 4.0 一看到这个选项就恍然大悟了，官方文档FAQ里有专门介绍：A.11.11（个人感觉最后一段贴的结果有问题），大意是说为了兼容 mysql 4.0 的习惯，mysqld启动时加上 --skip-character-set-client-handshake 来忽略客户端字符集的设置，强制使用服务端character-set-server的设置。
+但这个选项默认是没有开启的，当你在web控制台修改了实例字符集时，CDB自作自作主张修改了这个参数并重启 character_set_client_handshake = 0 。而这个参数在 show variables 看不到的，隐藏的比较深。正好我建实例的时候选择了utf8，然后修改为utf8mb4，但应用端要求latin1，便中枪了。
+主要是以前没听过这个参数，后来发现老叶也有篇文章讲到它 MySQL字符集的一个坑，其实是很小的东西，结果排查验证问题前后花了2天。。。</description>
+    </item>
+    
+    <item>
+      <title>你可能需要一个实时抓取MySQL慢查询现场的程序</title>
+      <link>http://xgknight.com/posts/2016/09/%E4%BD%A0%E5%8F%AF%E8%83%BD%E9%9C%80%E8%A6%81%E4%B8%80%E4%B8%AA%E5%AE%9E%E6%97%B6%E6%8A%93%E5%8F%96mysql%E6%85%A2%E6%9F%A5%E8%AF%A2%E7%8E%B0%E5%9C%BA%E7%9A%84%E7%A8%8B%E5%BA%8F/</link>
+      <pubDate>Tue, 27 Sep 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/09/%E4%BD%A0%E5%8F%AF%E8%83%BD%E9%9C%80%E8%A6%81%E4%B8%80%E4%B8%AA%E5%AE%9E%E6%97%B6%E6%8A%93%E5%8F%96mysql%E6%85%A2%E6%9F%A5%E8%AF%A2%E7%8E%B0%E5%9C%BA%E7%9A%84%E7%A8%8B%E5%BA%8F/</guid>
+      <description>Python完成的一个小程序，初衷用于杀掉 MySQL 上的异常线程，如慢查询、处于Sleep状态的，但上线运行以后，以另一种模式运行来实时发现现网的慢查询特别有用，挖掘了许多潜在问题。 项目地址：https://github.com/seanlook/myquerykill
+在使用阿里云RDS的过程中，数据库出现异常，需要快速恢复。网上有许多类似的kill脚本，都是通过 mysqladmin 实现的。然而 Ali-RDS 环境有以下限制：
+不提供 SUPER 权限的用户，也就是用户只能 kill 自己的线程 当连接数暴增时，外部用户无法登陆，包括控制台 为了解决上面两大问题，该 python 脚本通过在db实例上，使用多线程的方式，为每个用户保留一个连接，并实时读取指令配置文件 mysqk.ini，发现有 kill 需求时，利用对应用户已有连接找到 information_schema.processlist 中符合条件的线程，并 kill 。
+说明：该脚本在9月份做过一次重写，7月份的版本（分支 old_0.5.0）是每实例每用户，对应一个线程，db实例一多线程数也太多，看得始终不太优雅，于是改成了一个db实例一个线程，维护同时维护多个用户的会话。同时新版也加入了更多的功能，如按时间窗口检查，包含或排除特定连接，邮件通知，配置项覆盖。
+1. 特性 始终通过 mysql ping 维持一个长连接，并有断开自动重来机制，解决没有连接可用的尴尬 每个db实例有自己的线程，避免需要单独登陆个别用户去kill的繁复操作。 如果你具有 SUPER 权限，也可以简化配置做到兼容 能够分开应对需要杀死线程的场景： 长时间运行超过 N 秒的 Sleep 状态的事务 （一般不建议，但有时候kill它，可以快速释放连接给管理员使用） 排除一些线程不能kill，如 Binlog dump。可配置 包含特定关键字的线程要kill 出现符合条件的线程时，会对当时的processlist, engine status，lock_wait 做一个快照，并邮件发出。妈妈再也不愁没有事故现场了。 有试运行dry_run模式，即执行所有的检查过程但不真正kill 这便是开头所讲的，实时关注生产环境慢查询，而不是等出现问题被动去看slow log，严重的情况连接数可能已经爆了 支持只在时间窗口内运行，考虑到晚上一些长任务不检查 密码加密 2. 快速上手 需要pip安装MySQL-python和pycrypto两个库，只在python 2.7上有测试。
+在 settings.py 里面设置连接的用户名和密码信息。这里假设同一批db的要check的认证信息是一样的，指定的用户既用于登录认证，也用于告知脚本哪些用户需要被检查。 密码要通过 prpcryptec.py 加密，加密的密钥需写入脚本本身的 KEY_DB_AUTH变量。（担心泄露的话，把mysqk.py编译成 pyc 来跑）</description>
+    </item>
+    
+    <item>
+      <title>READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同</title>
+      <link>http://xgknight.com/posts/2016/09/read-commited-%E4%B8%8E-repeatable-read-%E4%BA%8B%E5%8A%A1%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E4%B9%8B%E9%97%B4%E7%9A%84%E5%BC%82%E5%90%8C/</link>
+      <pubDate>Sat, 03 Sep 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/09/read-commited-%E4%B8%8E-repeatable-read-%E4%BA%8B%E5%8A%A1%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E4%B9%8B%E9%97%B4%E7%9A%84%E5%BC%82%E5%90%8C/</guid>
+      <description>经常会被问到 InnoDB隔离级别中 READ-COMMITED和REPEATABLE-READ 的区别，今天就整理了一下，不再从“脏读”、“幻读”这样的名词解释一样去回答了。
+1. 行锁 InnoDB行锁实际锁的是索引记录，为了防止死锁的产生以及维护所需要的隔离级别，在执行sql语句的全过程中，innodb必须对所需要修改的行每条索引记录上锁。如此一来，如果你执行的 UPDATE 没有很好的索引，那么会导致锁定许多行：
+update employees set store_id = 0 where store_id = 1; ---TRANSACTION 1EAB04, ACTIVE 7 sec 633 lock struct(s), &amp;lt;strong&amp;gt;heap size 96696&amp;lt;/strong&amp;gt;, 218786 row lock(s), undo log entries 1 MySQL thread id 4, OS thread handle 0x7f8dfc35d700, query id 47 localhost root show engine innodb status 上面的 employees 表 store_id 列没有索引。注意 UPDATE 已经执行完成（没有提交），但依然有 218786 个行锁没有释放，还有一个undo记录。这意味着只有一行被更改，但却持有了额外的锁。堆大小（heap size）代表了分配给锁使用的内存数量。
+在 REPEATABLE-READ 级别，事务持有的 每个锁 在整个事务期间一直被持有。
+在 READ-COMMITED 级别，事务里面特定语句结束之后，不匹配该sql语句扫描条件的锁，会被释放。</description>
+    </item>
+    
+    <item>
+      <title>浅析MySQL事务隔离级别与锁 分享</title>
+      <link>http://xgknight.com/posts/2016/08/%E6%B5%85%E6%9E%90mysql%E4%BA%8B%E5%8A%A1%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E4%B8%8E%E9%94%81-%E5%88%86%E4%BA%AB/</link>
+      <pubDate>Tue, 30 Aug 2016 21:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/08/%E6%B5%85%E6%9E%90mysql%E4%BA%8B%E5%8A%A1%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E4%B8%8E%E9%94%81-%E5%88%86%E4%BA%AB/</guid>
+      <description>这段时间在公司内部准备了一个分享，主题是关于 MySQL事务与锁，准备过程内容很多，也深入弄清楚了一些以前比较迷糊的地方，加上后面的讨论也就一个半小时。
+主要涉及的是乐观锁与悲观锁，InnoDB多版本并发控制的实现，以及隔离级别与各种情况加锁分析，因为涉及的主要还是开发人员，所以不是很深奥。也算花了不少心血，分享一下。
+slideshare: http://www.slideshare.net/ssuser5a0bc0/my-sql-seanlook
+{% pdf http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-ppt-trx_isolation-lock-seanlook.pdf 900 512 %}
+原文连接地址：http://xgknight.com/2016/08/30/mysql-ppt-trx_isolation-lock/</description>
+    </item>
+    
+    <item>
+      <title>Advanced MySQL Query Tuning .pdf</title>
+      <link>http://xgknight.com/posts/2016/06/advanced-mysql-query-tuning-.pdf/</link>
+      <pubDate>Sat, 11 Jun 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/06/advanced-mysql-query-tuning-.pdf/</guid>
+      <description>端午在家无聊，又不想学习。于是在Youtube随便逛，看到一个很不错的分享，来自 Percona Database Performance。下面是演示稿：
+slideshare: http://www.slideshare.net/ssuser5a0bc0/webinar-2013-advancedquerytuning
+{% pdf https://www.slideshare.net/slideshow/embed_code/key/3HLJJcJmM9KLGT %}
+Youtube: https://www.youtube.com/watch?v=TPFibi2G_oo
+能 条件 的可以看看。
+Percona webinars上有许多类似的分享，传送门： https://www.percona.com/resources/webinars ，不少是他们CEO Peter Zaitsev 亲自上马的。
+原文连接地址：http://xgknight.com/2016/06/11/mysql-advanced-query-tuning-percona/</description>
+    </item>
+    
+    <item>
+      <title>pt-online-schema-change使用说明、限制与比较</title>
+      <link>http://xgknight.com/posts/2016/05/pt-online-schema-change%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E%E9%99%90%E5%88%B6%E4%B8%8E%E6%AF%94%E8%BE%83/</link>
+      <pubDate>Fri, 27 May 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/05/pt-online-schema-change%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E%E9%99%90%E5%88%B6%E4%B8%8E%E6%AF%94%E8%BE%83/</guid>
+      <description>如果正在看这篇文章，相信你已经知道自己的需求了。
+在 mysql 5.5 版本以前，修改表结构如添加索引、修改列，需要锁表，期间不能写入，对于大表这简直是灾难。从5.5特别是5.6里，情况有了好转，支持Online DDL，相关介绍见 这篇文章，而我在实际alter table过程中还是会引起 data meta lock 问题。pt-online-schema-change是Percona-toolkit一员，通过改进原生ddl的方式，达到不锁表在线修改表结构。
+1. pt-osc工作过程 创建一个和要执行 alter 操作的表一样的新的空表结构(是alter之前的结构) 在新表执行alter table 语句（速度应该很快） 在原表中创建触发器3个触发器分别对应insert,update,delete操作 以一定块大小从原表拷贝数据到临时表，拷贝过程中通过原表上的触发器在原表进行的写操作都会更新到新建的临时表 Rename 原表到old表中，在把临时表Rename为原表 如果有参考该表的外键，根据alter-foreign-keys-method参数的值，检测外键相关的表，做相应设置的处理 默认最后将旧原表删除 2. 常用选项说明 只介绍部分常用的选项
+--host=xxx --user=xxx --password=xxx 连接实例信息，缩写-h xxx -u xxx -p xxx，密码可以使用参数--ask-pass 手动输入。
+--alter 结构变更语句，不需要 ALTER TABLE关键字。与原始ddl一样可以指定多个更改，用逗号分隔。
+绝大部分情况下表上需要有主键或唯一索引，因为工具在运行当中为了保证新表也是最新的，需要旧表上创建 DELETE和UPDATE 触发器，同步到新表的时候有主键会更快。个别情况是，当alter操作就是在c1列上建立主键时，DELETE触发器将基于c1列。
+子句不支持 rename 去给表重命名。
+alter命令原表就不支持给索引重命名，需要先drop再add，在pt-osc也一样。(mysql 5.7 支持 RENAME INDEX old_index_name TO new_index_name) 但给字段重命名，千万不要drop-add，整列数据会丢失，使用change col1 col1_new type constraint（保持类型和约束一致，否则相当于修改 column type，不能online）
+子句如果是add column并且定义了not null，那么必须指定default值，否则会失败。
+如果要删除外键（名 fk_foo），使用工具的时候外键名要加下划线，比如--alter &amp;quot;DROP FOREIGN KEY _fk_foo&amp;quot;</description>
+    </item>
+    
+    <item>
+      <title>使用pt-osc修改主键时注意</title>
+      <link>http://xgknight.com/posts/2016/05/%E4%BD%BF%E7%94%A8pt-osc%E4%BF%AE%E6%94%B9%E4%B8%BB%E9%94%AE%E6%97%B6%E6%B3%A8%E6%84%8F/</link>
+      <pubDate>Fri, 27 May 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/05/%E4%BD%BF%E7%94%A8pt-osc%E4%BF%AE%E6%94%B9%E4%B8%BB%E9%94%AE%E6%97%B6%E6%B3%A8%E6%84%8F/</guid>
+      <description>使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：
+原表上有个复合主键，现在要添加一个自增id作为主键，如何进行 会涉及到以下修改动作：
+删除复合主键定义 添加新的自增主键 原复合主键字段，修改成唯一索引 如果你够聪明，应该会把这三个操作放在同一个 alter table 命令执行。percona手册里有两个地方对修改主键进行了特殊注解：
+&amp;ndash;alter A notable exception is when a PRIMARY KEY or UNIQUE INDEX is being created from existing columns as part of the ALTER clause; in that case it will use these column(s) for the DELETE trigger.
+&amp;ndash;[no]check-alter
+DROP PRIMARY KEY If &amp;ndash;alter contain DROP PRIMARY KEY (case- and space-insensitive), a warning is printed and the tool exits unless &amp;ndash;dry-run is specified.</description>
+    </item>
+    
+    <item>
+      <title>mysql 5.6 原生Online DDL解析</title>
+      <link>http://xgknight.com/posts/2016/05/mysql-5.6-%E5%8E%9F%E7%94%9Fonline-ddl%E8%A7%A3%E6%9E%90/</link>
+      <pubDate>Tue, 24 May 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/05/mysql-5.6-%E5%8E%9F%E7%94%9Fonline-ddl%E8%A7%A3%E6%9E%90/</guid>
+      <description>做MySQL的都知道，数据库操作里面，DDL操作（比如CREATE,DROP,ALTER等）代价是非常高的，特别是在单表上千万的情况下，加个索引或改个列类型，就有可能堵塞整个表的读写。
+然后 mysql 5.6 开始，大家期待的Online DDL出现了，可以实现修改表结构的同时，依然允许DML操作(select,insert,update,delete)。在这个特性出现以前，用的比较多的工具是pt-online-schema-change，比较请参考pt-online-schema-change使用说明、限制与比较或 ONLINE DDL VS PT-ONLINE-SCHEMA-CHANGE 。
+1. Online DDL 在 MySQL 5.1 （带InnoDB Plugin）和5.5中，有个新特性叫 Fast Index Creation（下称 FIC），就是在添加或者删除二级索引的时候，可以不用复制原表。对于之前的版本对于索引的添加删除这类DDL操作，MySQL数据库的操作过程为如下：
+首先新建Temp table，表结构是 ALTAR TABLE 新定义的结构 然后把原表中数据导入到这个Temp table 删除原表 最后把临时表rename为原来的表名 为了保持数据的一致性，中间复制数据（Copy Table）全程锁表只读，如果有写请求进来将无法提供服务，连接数爆张。
+引入FIC之后，创建二级索引时会对原表加上一个S锁，创建过程不需要重建表（no-rebuild）；删除InnoDB二级索引只需要更新内部视图，并标记这个索引的空间可用，去掉数据库元数据上该索引的定义即可。这个过程也只允许读操作，不能写入，但大大加快了修改索引的速度（不含主键索引，InnoDB IOT的特性决定了修改主键依然需要 Copy Table ）。
+FIC只对索引的创建删除有效，MySQL 5.6 Online DDL把这种特性扩展到了添加列、删除列、修改列类型、列重命名、设置默认值等等，实际效果要看所使用的选项和操作类别来定。
+1.1 Online DDL选项 MySQL 在线DDL分为 INPLACE 和 COPY 两种方式，通过在ALTER语句的ALGORITHM参数指定。
+ALGORITHM=INPLACE，可以避免重建表带来的IO和CPU消耗，保证ddl期间依然有良好的性能和并发。 ALGORITHM=COPY，需要拷贝原始表，所以不允许并发DML写操作，可读。这种copy方式的效率还是不如 inplace ，因为前者需要记录undo和redo log，而且因为临时占用buffer pool引起短时间内性能受影响。 上面只是 Online DDL 内部的实现方式，此外还有 LOCK 选项控制是否锁表，根据不同的DDL操作类型有不同的表现：默认mysql尽可能不去锁表，但是像修改主键这样的昂贵操作不得不选择锁表。
+LOCK=NONE，即DDL期间允许并发读写涉及的表，比如为了保证 ALTER TABLE 时不影响用户注册或支付，可以明确指定，好处是如果不幸该 alter语句不支持对该表的继续写入，则会提示失败，而不会直接发到库上执行。ALGORITHM=COPY默认LOCK级别 LOCK=SHARED，即DDL期间表上的写操作会被阻塞，但不影响读取。 LOCK=DEFAULT，让mysql自己去判断lock的模式，原则是mysql尽可能不去锁表 LOCK=EXCLUSIVE，即DDL期间该表不可用，堵塞任何读写请求。如果你想alter操作在最短的时间内完成，或者表短时间内不可用能接受，可以手动指定。 但是有一点需要说明，无论任何模式下，online ddl开始之前都需要一个短时间排它锁(exclusive)来准备环境，所以alter命令发出后，会首先等待该表上的其它操作完成，在alter命令之后的请求会出现等待waiting meta data lock。同样在ddl结束之前，也要等待alter期间所有的事务完成，也会堵塞一小段时间。所以尽量在ALTER TABLE之前确保没有大事务在执行，否则一样出现连环锁表。</description>
+    </item>
+    
+    <item>
+      <title>InnoDB行格式对text/blob大变长字段的影响</title>
+      <link>http://xgknight.com/posts/2016/05/innodb%E8%A1%8C%E6%A0%BC%E5%BC%8F%E5%AF%B9text/blob%E5%A4%A7%E5%8F%98%E9%95%BF%E5%AD%97%E6%AE%B5%E7%9A%84%E5%BD%B1%E5%93%8D/</link>
+      <pubDate>Wed, 18 May 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/05/innodb%E8%A1%8C%E6%A0%BC%E5%BC%8F%E5%AF%B9text/blob%E5%A4%A7%E5%8F%98%E9%95%BF%E5%AD%97%E6%AE%B5%E7%9A%84%E5%BD%B1%E5%93%8D/</guid>
+      <description>最近在排查现网Text与Blob类型，发现有不少，在《高性能MySQL(第3版)》看到对这两种变长数据类型的处理会涉及到在磁盘上创建临时表，性能开销比较大。于是把影响blob型数据存储方式了解了一下：row_format。
+1. InnoDB的Antelop与Barracuda文件格式 Innodb存储引擎保存记录，是以行的形式存放的（与之对应的是像Google BigTable这种列数据库）。在InnoDB 1.0.x版本之前，InnoDB 存储引擎提供了 Compact 和 Redundant 两种格式来存放行记录数据，这也是目前使用最多的一种格式。Redundant 格式是为兼容之前版本而保留的。
+MySQL 5.1 中的 innodb_plugin 引入了新的文件格式：Barracuda（将以前的行格式 compact 和 redundant 合称为Antelope），该文件格式拥有新的两种行格式：compressed和dynamic。
+在 MySQL 5.6 版本中，默认还是 Compact 行格式，也是目前使用最多的一种 ROW FORMAT。用户可以通过命令 SHOW TABLE STATUS LIKE&#39;table_name&#39; 来查看当前表使用的行格式，其中 row_format 列表示当前所使用的行记录结构类型。
+mysql&amp;gt; show variables like &amp;#34;innodb_file_format&amp;#34;; +--------------------+-----------+ | Variable_name | Value | +--------------------+-----------+ | innodb_file_format | Barracuda | +--------------------+-----------+ 1 row in set mysql&amp;gt; show table status like &amp;#34;tablename%&amp;#34;\G *************************** 1. row *************************** Name: t_rf_compact Engine: InnoDB Version: 10 Row_format: Compact Rows: 4 Avg_row_length: 36864 Data_length: 147456 Max_data_length: 0 Index_length: 0 Data_free: 0 Auto_increment: 7 Create_time: 2016-05-14 20:52:58 Update_time: NULL Check_time: NULL Collation: utf8_general_ci Checksum: NULL Create_options: Comment: 1 row in set (0.</description>
+    </item>
+    
+    <item>
+      <title>InnoDB表主键设计方案</title>
+      <link>http://xgknight.com/posts/2016/05/innodb%E8%A1%A8%E4%B8%BB%E9%94%AE%E8%AE%BE%E8%AE%A1%E6%96%B9%E6%A1%88/</link>
+      <pubDate>Fri, 13 May 2016 15:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/05/innodb%E8%A1%A8%E4%B8%BB%E9%94%AE%E8%AE%BE%E8%AE%A1%E6%96%B9%E6%A1%88/</guid>
+      <description>关于MySQL InnoDB表的主键设计，有必要从开发规范 http://xgknight.com/2016/05/11/mysql-dev-principle-ec/ 里拿出来，单独展开说一下。 InnoDB是一个聚集索引组织表，即行数据是按照聚集索引在物理磁盘上存储的，并且是块状结构，默认一个block是16kB。
+图片来《高性能MySQL》
+首先在设计表结构时，表一定要显式定义主键，自增主键，或者联合主键，或全局ID。 （所有与主键，包括其它索引，相关的字段，都要定义为NOT NULL，这是因为如果允许NULL，那么在索引的每条记录上，都要多用一个标记去记录这个列是否是NULL，占用多余的存储空间）
+1. 自增主键特性 对于高并发的插入速度较快，因为每次插入新记录，都是在之前记录的右边顺序插入，不需要频繁的分裂。 表上要建立多个二级索引时，索引记录都会带上主键，根据主键去定位行数据。自增主键一般是int或bigint型，多个二级索引上面占用的空间较小。
+2. 联合主键特性 每次新记录插入，都要寻找到合适的“缝隙”，插入，当插入位置空间不够时，需要做页分裂，这个需要维护成本。 二级索引带上的主键值，是联合主键的总长度，所以一个单列索引占用的空间里面，主键部分占了大部分，空间利用率不高，而且这种是 optimize table 解决不了的。 （提示：聚集索引叶子节点，就是行数据本身，所以，不需要另外的空间存储主键）
+但是联合主键有一个好处：逻辑上一批数据，在物理上很有可能相邻存储，有可能检索的数据，在一个block里面，减少了读取并缓存磁盘块的数量，一个是速度的提升，一个是减小内存的消耗。 比如 (f_c_id,f_m_id,f_type) 作为联合主键，f_c_id=22299有20w条记录，每条记录平均160bytes，一个页能存16kB，即100条记录（不考虑预留），那么f_c_id=22299需要2000个page，而且是相邻的page。
+举例，应用检索数据 f_c_id=22299, f_m_id IN(12345,23456) ，假设数据在块1和块10，缓存到内存。不多久检索f_c_id=22299, f_m_id=12399，刚好在块1。
+如果是自增id，那么就没有这个顺序， 而是根据插入数据时间来的，那么这两条记录可能在物理上很远的地方，要多读取磁盘。
+3. 全局ID 全局ID跟自增ID特性基本相同，但是它的值是从另外的服务获取的数字增长类型，不要UUID。
+只在有分库（一般有全局统计需求），或其它可能需要全局唯一性的情况下，才使用，否则没必要引入多余的服务依赖。
+另外，定义全局ID时，注意字段范围要满足要求，小心溢出；不要加上多余的 AUTO_INCREMENT 定义。
+使用全局id还有一个好处：在做数据迁移或拆库时，可以无缝切换，因为新旧数据id不用担心重复。
+4. 设计原则：自增主键 VS 联合主键 所有索引字段，特别主键，无论自增或联合主键，一定定义为 not null 表没有特殊情况下，都使用自增主键，尽量不用联合主键 特别是“可能作为联合主键”里面有的字段，会频繁update的情况，更不能做联合主键 在业务层具有唯一性的属性，如果不依赖于数据库的唯一索引来编码，也不用使用Unique Key。如果需要数据库维护唯一性，可使用Unique Key，比如将上面的联合主键定义为联合索引，再另外定义一个自增主键 如果表上有一个单列字段，已具有唯一性，可直接定义成主键，不必设置自增id 尽量用int或bigint型，如果不能，也要控制主键varchar列的长度在30以内。不要用带汉字或url类似的字段作为主键 根据上面的顺序走完，还是想用联合主键的，以下任意条件满足，可用： 表上的插入数据并发量不高 有明显的上文【联合主键】部分说到的，热点数据相邻存储的场景 出了联合主键外，其它索引的只有1-2个 与DBA协商后同意 参考： http://imysql.com/2015/10/29/mysql-faq-clustered-index.shtml
+原文连接地址：http://xgknight.com/2016/05/13/mysql-innodb-primary_key/</description>
+    </item>
+    
+    <item>
+      <title>MySQL数据库开发规范-EC</title>
+      <link>http://xgknight.com/posts/2016/05/mysql%E6%95%B0%E6%8D%AE%E5%BA%93%E5%BC%80%E5%8F%91%E8%A7%84%E8%8C%83-ec/</link>
+      <pubDate>Wed, 11 May 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/05/mysql%E6%95%B0%E6%8D%AE%E5%BA%93%E5%BC%80%E5%8F%91%E8%A7%84%E8%8C%83-ec/</guid>
+      <description>updated: 2017-11-12 本文所提规范，在我博客上可以找到多篇案例。
+最近一段时间一边在线上抓取SQL来优化，一边在整理这个开发规范，尽量减少新的问题SQL进入生产库。今天也是对公司的开发做了一次培训，PPT就不放上来了，里面有十来个生产SQL的案例。因为规范大部分还是具有通用性，所以也借鉴了像去哪儿和赶集的规范，但实际在撰写本文的过程中，每一条规范的背后无不是在工作中有参照的反面例子的。如果时间可以的话，会抽出一部分或分析其原理，或用案例证明。
+1. 命名规范 库名、表名、字段名必须使用小写字母，并采用下划线分割 MySQL有配置参数lower_case_table_names=1，即库表名以小写存储，大小写不敏感。如果是0，则库表名以实际情况存储，大小写敏感；如果是2，以实际情况存储，但以小写比较。 如果大小写混合使用，可能存在abc，Abc，ABC等多个表共存，容易导致混乱。 字段名显示区分大小写，但实际使⽤时不区分，即不可以建立两个名字一样但大小写不一样的字段。 为了统一规范， 库名、表名、字段名使用小写字母，不允许 - 号。 库名以 d_ 开头，表名以 t_ 开头，字段名以 f_ 开头 比如表 t_crm_relation，中间的 crm 代表业务模块名 库名，如果不是分库，两个不同db实例里面的db名，不能相同，以免混淆 视图以view_开头，事件以event_开头，触发器以trig_开头，存储过程以proc_开头，函数以func_开头 普通索引以idx_col1_col2命名，唯一索引以uk_col1_col2命名（可去掉f_公共部分）。如 idx_companyid_corpid_contacttime(f_company_id,f_corp_id,f_contact_time) 如果某些特殊情况需要在sql里面指定索引，select * from t_test using index(idx_i_abc)，这种所以如果可以，命名的时候加上 i 分隔，如idx_i_corpid, uk_i_user，方便DBA在修改索引的时候会注意到这个 i 标识，不能随意修改这个索引(名称)，否则查询会出错。当然这种情况尽量不要出现。 库名、表名、字段名禁止超过32个字符，需见名知意 库名、表名、字段名支持最多64个字符，但为了统一规范、易于辨识以及减少传输量，禁止超过32个字符
+临时用的库、表名须以tmp位前缀，日期为后缀 如 tmp_t_crm_relation_0425。备份表也类似，形如 bak_t_xxxx_20160425 ，这样便于查找和知道有效期。 正常业务里用的临时表、中间表，后缀尽量不要包含 tmp 命名，以免造成歧义。
+按日期时间分表须符合_YYYY[MM][DD]格式 这也是为将来有可能分表做准备的，比如t_crm_ec_record_201403，但像 t_crm_contact_at201506就打破了这种规范。 不具有时间特性的，直接以 t_tbname_001 这样的方式命名。
+2. 库表基础规范 使用Innodb存储引擎 5.5版本开始mysql默认存储引擎就是InnoDB，5.7版本开始，系统表都放弃MyISAM了。
+表字符集统一使用UTF8MB4 UTF8字符集存储汉字占用3个字节，存储英文字符占用一个字节 校对字符集使用默认的 utf8mb4_general_ci。特别对于使用GUI设计表结构时，要检查它生成的sql定义 连接的客户端也使用utf8，建立连接时指定charset或SET NAMES UTF8;。（对于已经在项目中长期使用latin1的，救不了了） 如果遇到EMOJ等表情符号的存储需求，可申请使用UTF8MB4字符集 所有表都要添加注释 尽量给字段也添加注释 类status型需指明主要值的含义，如&amp;quot;0-离线，1-在线&amp;quot; 控制单表字段数量 单表字段数上限30左右，再多的话考虑垂直分表，一是冷热数据分离，二是大字段分离，三是常在一起做条件和返回列的不分离。 表字段控制少而精，可以提高IO效率，内存缓存更多有效数据，从而提高响应速度和并发能力，后续 alter table 也更快。 所有表都必须要显式指定主键 主键尽量采用自增方式，InnoDB表实际是一棵索引组织表，顺序存储可以提高存取效率，充分利用磁盘空间。还有对一些复杂查询可能需要自连接来优化时需要用到。 只有需要全局唯一主键时，使用外部自增id服务 如果没有主键或唯一索引，update/delete是通过所有字段来定位操作的行，相当于每行就是一次全表扫描 少数情况可以使用联合唯一主键，需与DBA协商 对于主键字段值是从其它地方插入（非自己使用AUTO_INCREMENT生产），去掉auto_increment定义。比如一些31天表、历史月份表上，不要auto_increment属性；再必须全局id服务获取的主键。 不强制使用外键参考 即使2个表的字段有明确的外键参考关系，也不使用 FOREIGN KEY ，因为新纪录会去主键表做校验，影响性能。</description>
+    </item>
+    
+    <item>
+      <title>小心MySQL的隐式类型转换陷阱</title>
+      <link>http://xgknight.com/posts/2016/05/%E5%B0%8F%E5%BF%83mysql%E7%9A%84%E9%9A%90%E5%BC%8F%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E9%99%B7%E9%98%B1/</link>
+      <pubDate>Thu, 05 May 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/05/%E5%B0%8F%E5%BF%83mysql%E7%9A%84%E9%9A%90%E5%BC%8F%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E9%99%B7%E9%98%B1/</guid>
+      <description>1. 隐式类型转换实例 今天生产库上突然出现MySQL线程数告警，IOPS很高，实例会话里面出现许多类似下面的sql：(修改了相关字段和值)
+SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233) 用 explain 看了下扫描行数和索引选择情况：
+mysql&amp;gt;explain SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233); +------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+ | id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra | +------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+ | 1 | SIMPLE | t_tb1 | ref | uid_type_frid,idx_corpid_qq1id | uid_type_frid | 8 | const | 1386 | Using index condition; Using where | +------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+ 共返回 1 行记录,花费 11.</description>
+    </item>
+    
+    <item>
+      <title>MySQL数字类型int与tinyint、float与decimal如何选择</title>
+      <link>http://xgknight.com/posts/2016/04/mysql%E6%95%B0%E5%AD%97%E7%B1%BB%E5%9E%8Bint%E4%B8%8Etinyintfloat%E4%B8%8Edecimal%E5%A6%82%E4%BD%95%E9%80%89%E6%8B%A9/</link>
+      <pubDate>Fri, 29 Apr 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/04/mysql%E6%95%B0%E5%AD%97%E7%B1%BB%E5%9E%8Bint%E4%B8%8Etinyintfloat%E4%B8%8Edecimal%E5%A6%82%E4%BD%95%E9%80%89%E6%8B%A9/</guid>
+      <description>最近在准备给开发做一个mysql数据库开发规范方面培训，一步一步来，结合在生产环境发现的数据库方面的问题，从几个常用的数据类型说起。
+int、tinyint与bigint 它们都是（精确）整型数据类型，但是占用字节数和表达的范围不同。首先没有这个表就说不过去了：
+Type Storage Minimum Value Maximum Value (Bytes) (Signed/Unsigned) (Signed/Unsigned) TINYINT 1 -128 127 0 255 SMALLINT 2 -32768 32767 0 65535 MEDIUMINT 3 -8388608 8388607 0 16777215 INT 4 -2147483648 2147483647 0 4294967295 BIGINT 8 -9223372036854775808 9223372036854775807 0 18446744073709551615 只需要知道对应类型占多少字节就能推算出范围了，比如int占 4 bytes,即4*8=32bits，大约10位数字，也能理解为什么int默认显示位数是11。
+遇到比较多的是tinyint和bigint，tinyint一般用于存放status,type这种数值小的数据，不够用时可能会用smallint。bigint一般用于自增主键。
+为了避免数据库被过度设计，布尔、枚举类型也采用tinyint。
+还有一点也是经常被提到的关于 int(M) 中M的理解，int型数据无论是int(4)还是int(11)，都已经占用了 4 bytes 存储空间，M表示的只是显示宽度(display width, max value 255)，并不是定义int的长度。
+例如：
+mysql&amp;gt; CREATE TABLE `tc_integer` ( `f_id` bigint(20) PRIMARY KEY AUTO_INCREMENT, `f_type` tinyint, `f_flag` tinyint(1), `f_num` smallint(5) unsigned ZEROFILL ) ENGINE=InnoDB DEFAULT CHARSET=utf8; mysql&amp;gt; desc tc_integer; +----------------+-------------------------------+------+-----+---------+----------------+ | Field | Type | Null | Key | Default | Extra | +----------------+-------------------------------+------+-----+---------+----------------+ | f_id | bigint(20) | NO | PRI | NULL | auto_increment | | f_type | tinyint(4) | YES | | NULL | | | f_flag | tinyint(1) | YES | | NULL | | | f_num | smallint(5) unsigned zerofill | YES | | NULL | | +----------------+-------------------------------+------+-----+---------+----------------+ 4 rows in set (0.</description>
+    </item>
+    
+    <item>
+      <title>MySQL字符数据类型char与varchar的区别</title>
+      <link>http://xgknight.com/posts/2016/04/mysql%E5%AD%97%E7%AC%A6%E6%95%B0%E6%8D%AE%E7%B1%BB%E5%9E%8Bchar%E4%B8%8Evarchar%E7%9A%84%E5%8C%BA%E5%88%AB/</link>
+      <pubDate>Thu, 28 Apr 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/04/mysql%E5%AD%97%E7%AC%A6%E6%95%B0%E6%8D%AE%E7%B1%BB%E5%9E%8Bchar%E4%B8%8Evarchar%E7%9A%84%E5%8C%BA%E5%88%AB/</guid>
+      <description>数据类型差不多是接触mysql一开始就了解的内容，最近遇到几个现象如varchar自动转mediumtext，blob存储性能的问题，不得不回头明确一下关于MySQL常用数据类型的选择。
+mysql手册这里 已经讲的很清楚了。它们都是定义字符串型字段时常用的类型，但它们存储和检索的方式有不同，最大长度和尾部的空格是否保留也有差别。
+char类型是使用固定长度空间进行存储，范围0-255。比如CHAR(30)能放30个字符，存放abcd时，尾部会以空格补齐，实际占用空间 30 * 3bytes (utf8)。检索它的时候尾部空格会被去除。
+char善于存储经常改变的值，或者长度相对固定的值，比如type、ip地址或md5之类的数据，不容易产生碎片。关于它的效率可以参考这里。
+varchar类型保存可变长度字符串，范围0-65535（但受到单行最大64kb的限制）。比如用 varchar(30) 去存放abcd，实际使用5个字节，因为还需要使用额外1个字节来标识字串长度（0-255使用1个字节，超过255需要2个字节）。
+varchar善于存储值的长短不一的列，也是用的最多的一种类型，节省磁盘空间。update时varchar列时，如果新数据比原数据大，数据库需要重新开辟空间，这一点会有性能略有损耗，但innodb引擎下查询效率比char高一点。这也是innodb官方推荐的类型。
+如果存储时真实长度超过了char或者varchar定义的最大长度呢？
+在SQL严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示错误，即插入失败 在SQL非严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示warning，但可以成功 如果尾部要被截断的是空格，无论SQL所处模式，varchar都可以插入成功但提示warning；char也可以插入成功，并且无任何提示 这里特意提到SQL的严格模式，是因为在工作中也遇到过一些坑，参考MySQL的sql_mode严格模式注意点。
+贴上官方的一个表格：
+Value CHAR(4) Storage Required VARCHAR(4) Storage Required &#39;&#39; &amp;rsquo; &#39; 4 bytes &#39;&#39; 1 byte &amp;lsquo;ab&amp;rsquo; &amp;lsquo;ab &#39; 4 bytes &amp;lsquo;ab&amp;rsquo; 3 bytes &amp;lsquo;abcd&amp;rsquo; &amp;lsquo;abcd&amp;rsquo; 4 bytes &amp;lsquo;abcd&amp;rsquo; 5 bytes &amp;lsquo;abcdefgh&amp;rsquo; &amp;lsquo;abcd&amp;rsquo; 4 bytes &amp;lsquo;abcd&amp;rsquo; 5 bytes 另外，mysql字段值比较时默认是不区分大小写的，这是由于他们的校对规则（一般是 utf8_general_ci）决定的，按字符比较，所以查询时 值尾部 的空格也是被忽略的，除非建表时对列指定 BINARY （校对字符集变成utf8_bin）或者select * from vc where binary v=&#39;ab &#39;;，就会按字节比较，即比较时区分大小写和尾部空格。
+需要注意的是，使用varchar不能因为长度可变就随意分大空间，比如90个字节能放够的列定义成varchar(200)，因为开辟内存时是以200字节进行的，遇到需要filesort或tmp table作业可能会带来不利影响。</description>
+    </item>
+    
+    <item>
+      <title>MySQL sql_mode 说明（及处理一起 sql_mode 引发的问题）</title>
+      <link>http://xgknight.com/posts/2016/04/mysql-sql_mode-%E8%AF%B4%E6%98%8E%E5%8F%8A%E5%A4%84%E7%90%86%E4%B8%80%E8%B5%B7-sql_mode-%E5%BC%95%E5%8F%91%E7%9A%84%E9%97%AE%E9%A2%98/</link>
+      <pubDate>Fri, 22 Apr 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/04/mysql-sql_mode-%E8%AF%B4%E6%98%8E%E5%8F%8A%E5%A4%84%E7%90%86%E4%B8%80%E8%B5%B7-sql_mode-%E5%BC%95%E5%8F%91%E7%9A%84%E9%97%AE%E9%A2%98/</guid>
+      <description>1. MySQL莫名变成了 Strict SQL Mode 最近测试组那边反应数据库部分写入失败，app层提示是插入成功，但表里面里面没有产生数据，而两个写入操作的另外一个表有数据。因为 insert 失败在数据库层面是看不出来的，于是找php的同事看下错误信息：
+[Err] 1364 - Field `f_company_id` doesn&amp;#39;t have a default value 很明显2个 insert 操作，第一条成功，第二条失败了，但因为没有控制在一个事务当中，导致app里面依然提示成功，这是客户入库操作，心想如果线上也有这个问题得是多大的代价。
+不说开发的问题，好端端的mysql怎么突然就部分表写入失败呢？根据上面的问题很快能猜到是 sql_mode 问题： NOT NULL 列没有默认值但代码里也没给值，在非严格模式下，int列默认为0，string列默认为&amp;rsquo;&amp;lsquo;了，所以不成问题；但在严格模式下，是直接返回失败的。
+一看，果然：
+mysql&amp;gt; show variables like &amp;#34;sql_mode&amp;#34;; +---------------+--------------------------------------------+ | Variable_name | Value | +---------------+--------------------------------------------+ | sql_mode | STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION | +---------------+--------------------------------------------+ 但是一直是没问题的的，就突然出现了，有谁会去改 sql_mode 呢，生产环境产生这个问题的风险有多大？所以必须揪出来。
+先 set global sql_mode=&#39;&#39; ，让他们用着先（文后会给解决问题根本的办法），同时打开general_log看是哪一个用户有类似设置 sql_mode 命令：
+1134456 Query SET autocommit=1 1134456 Query Set sql_mode=&amp;#39;NO_ENGINE_SUBSITUTION,STRICT_TRANS_TABLES&amp;#39; 1134457 Connect ecuser@10.0.200.173 on 1134457 Query /* mysql-connector-java-5.</description>
+    </item>
+    
+    <item>
+      <title>MySQL避免索引列使用 OR 条件</title>
+      <link>http://xgknight.com/posts/2016/04/mysql%E9%81%BF%E5%85%8D%E7%B4%A2%E5%BC%95%E5%88%97%E4%BD%BF%E7%94%A8-or-%E6%9D%A1%E4%BB%B6/</link>
+      <pubDate>Tue, 05 Apr 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/04/mysql%E9%81%BF%E5%85%8D%E7%B4%A2%E5%BC%95%E5%88%97%E4%BD%BF%E7%94%A8-or-%E6%9D%A1%E4%BB%B6/</guid>
+      <description>这个亏已经吃过很多次了，在开发以前的sql代码里面，许多以 or 作为where条件的查询，甚至更新。这里举例来说明使用 or 的弊端，以及改进办法。
+select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 926067 and (f_mobile =&amp;#39;1234567891&amp;#39; or f_phone =&amp;#39;1234567891&amp;#39; ) limit 1 从查询语句很容易看出，f_mobile和f_phone两个字段都有可能存电话号码，一般思路都是用 or 去一条sql解决，但表数据量一大简直是灾难： t_tbanme1上有索引idx_id_mobile(f_xxx_id,f_mobile), idx_phone(f_phone),idx_id_email(f_id,f_email)，explain 的结果却使用了 idx_id_email 索引，有时候运气好可能走 idx_id_mobile f_xxx_id
+因为mysql的每条查询，每个表上只能选择一个索引。如果使用了 idx_id_mobile 索引，恰好有一条数据，因为有 limit 1 ，那么恭喜很快得到结果；但如果 f_mobile 没有数据，那 f_phone 字段只能在f_id条件下挨个查找，扫描12w行。 or 跟 and 不一样，甚至有开发认为添加 (f_xxx_id,f_mobile,f_phone)不就完美了吗，要吐血了~
+那么优化sql呢，很简单（注意f_mobile,f_phone上都要有相应的索引），方法一：
+(select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 900000 and f_mobile =&amp;#39;1234567891&amp;#39; limit 1 ) UNION ALL (select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 900000 and f_phone =&amp;#39;1234567891&amp;#39; limit 1 ) 两条独立的sql都能用上索引，分查询各自limit，如果都有结果集返回，随便取一条就行。</description>
+    </item>
+    
+    <item>
+      <title>使用sysbench对mysql压力测试</title>
+      <link>http://xgknight.com/posts/2016/03/%E4%BD%BF%E7%94%A8sysbench%E5%AF%B9mysql%E5%8E%8B%E5%8A%9B%E6%B5%8B%E8%AF%95/</link>
+      <pubDate>Mon, 28 Mar 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/03/%E4%BD%BF%E7%94%A8sysbench%E5%AF%B9mysql%E5%8E%8B%E5%8A%9B%E6%B5%8B%E8%AF%95/</guid>
+      <description>sysbench是一个模块化的、跨平台、多线程基准测试工具，主要用于评估测试各种不同系统参数下的数据库负载情况。关于这个项目的详细介绍请看：https://github.com/akopytov/sysbench 。 它主要包括以下几种方式的测试：
+cpu性能 磁盘io性能 调度程序性能 内存分配及传输速度 POSIX线程性能 数据库性能(OLTP基准测试) sysbench的数据库OLTP测试支持MySQL、PostgreSQL、Oracle，目前主要用于Linux操作系统，开源社区已经将sysbench移植到了Windows，并支持SQL Server的基准测试。
+废话不多说，开始。
+1. sysbench安装 mysql版本: mysql-community-server-5.6.29 OS: CentOS 6.7 X86_64 sysbench 0.5相比0.4版本有一些变化，包括oltp测试结合了lua脚本，还多了一些隐藏选项，本文会涉及得到一部分。 目前许多仓库里已编译好的二进制sysbench还是0.4.x版本，不过现在主流也还是github上的0.5，可以从 这里下载0.5版本的rpm包直接安装，不过我选择自己编译，因为只有这个办法是通用的。
+// 先安装编译依赖环境 $ sudo yum install gcc gcc-c++ automake make libtool mysql-community-devel $ cd /tmp &amp;amp;&amp;amp; git clone https://github.com/akopytov/sysbench.git $ cd /tmp/sysbench &amp;amp;&amp;amp; ./autogen.sh $ ./configure --prefix=/usr/local/sysbench-0.5 $ ./make &amp;amp;&amp;amp; sudo make install // 0.5版本需要oltp.lua测试脚本 // 如果是rpm包方式安装的，在 /usr/share/doc/sysbench/tests/db/ 下可找到 $ cd /usr/local/sysbench &amp;amp;&amp;amp; sudo mkdir -p share/tests/db $ cp /tmp/sysbench/sysbench/tests/db/*.</description>
+    </item>
+    
+  </channel>
+</rss>

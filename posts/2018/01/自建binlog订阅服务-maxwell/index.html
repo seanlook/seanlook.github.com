@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>自建Binlog订阅服务 —— Maxwell | Sean Note</title>
+<meta name="keywords" content="mysql, binlog">
+<meta name="description" content="1. 介绍 Maxwell 是java语言编写的能够读取、解析MySQL binlog，将行更新以json格式发送到 Kafka、RabbitMQ、AWS Kinesis、Google Cloud Pub/Sub、文件，有了增量的数据流，可以想象的应用场景实在太多了，如ETL、维护缓存、收集表级别的dml指标、增量到搜索引擎、数据分区迁移、切库binlog回滚方案，等等。
+它还提供其它功能：
+支持SELECT * FROM table 的方式做全量数据初始化 支持主库发生failover后，自动恢复binlog位置（GTID） 灵活的对数据进行分区，解决数据倾斜的问题。kafka支持 database, table, column等级别的数据分区 它的实现方式是伪装成MySQL Server的从库，接收binlog events，然后根据schemas信息拼装，支持ddl,xid,rows等各种event. maxwell由 zendesk 开源：https://github.com/zendesk/maxwell ，而且维护者相当活跃。
+网上已有人对 Alibaba Cannal, Zendesk Maxwell, Yelp mysql_streamer进行对比，见文后参考 实时抓取MySQL的更新数据到Hadoop。
+类似功能的还有：http://debezium.io/docs/connectors/mysql/
+安装 使用 maxwell 非常简单，只需要jdk环境
+yum install -y java-1.8.0-openjdk-1.8.0.121-1.b13.el6.x86_64 curl -sLo - https://github.com/zendesk/maxwell/releases/download/v1.12.0/maxwell-1.12.0.tar.gz \ | tar zxvf - cd maxwell-1.12.0 # 默认寻找当前目录下的 config.properties 配置文件 要求 mysql server binlog格式是 ROW， row_image 是 FULL。感受一下输出结果
+mysql&gt; update test.e set m = 5.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2018/01/%E8%87%AA%E5%BB%BAbinlog%E8%AE%A2%E9%98%85%E6%9C%8D%E5%8A%A1-maxwell/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="自建Binlog订阅服务 —— Maxwell" />
+<meta property="og:description" content="1. 介绍 Maxwell 是java语言编写的能够读取、解析MySQL binlog，将行更新以json格式发送到 Kafka、RabbitMQ、AWS Kinesis、Google Cloud Pub/Sub、文件，有了增量的数据流，可以想象的应用场景实在太多了，如ETL、维护缓存、收集表级别的dml指标、增量到搜索引擎、数据分区迁移、切库binlog回滚方案，等等。
+它还提供其它功能：
+支持SELECT * FROM table 的方式做全量数据初始化 支持主库发生failover后，自动恢复binlog位置（GTID） 灵活的对数据进行分区，解决数据倾斜的问题。kafka支持 database, table, column等级别的数据分区 它的实现方式是伪装成MySQL Server的从库，接收binlog events，然后根据schemas信息拼装，支持ddl,xid,rows等各种event. maxwell由 zendesk 开源：https://github.com/zendesk/maxwell ，而且维护者相当活跃。
+网上已有人对 Alibaba Cannal, Zendesk Maxwell, Yelp mysql_streamer进行对比，见文后参考 实时抓取MySQL的更新数据到Hadoop。
+类似功能的还有：http://debezium.io/docs/connectors/mysql/
+安装 使用 maxwell 非常简单，只需要jdk环境
+yum install -y java-1.8.0-openjdk-1.8.0.121-1.b13.el6.x86_64 curl -sLo - https://github.com/zendesk/maxwell/releases/download/v1.12.0/maxwell-1.12.0.tar.gz \ | tar zxvf - cd maxwell-1.12.0 # 默认寻找当前目录下的 config.properties 配置文件 要求 mysql server binlog格式是 ROW， row_image 是 FULL。感受一下输出结果
+mysql&gt; update test.e set m = 5." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2018/01/%E8%87%AA%E5%BB%BAbinlog%E8%AE%A2%E9%98%85%E6%9C%8D%E5%8A%A1-maxwell/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2018-01-13T15:32:49+00:00" />
+<meta property="article:modified_time" content="2018-01-13T15:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="自建Binlog订阅服务 —— Maxwell"/>
+<meta name="twitter:description" content="1. 介绍 Maxwell 是java语言编写的能够读取、解析MySQL binlog，将行更新以json格式发送到 Kafka、RabbitMQ、AWS Kinesis、Google Cloud Pub/Sub、文件，有了增量的数据流，可以想象的应用场景实在太多了，如ETL、维护缓存、收集表级别的dml指标、增量到搜索引擎、数据分区迁移、切库binlog回滚方案，等等。
+它还提供其它功能：
+支持SELECT * FROM table 的方式做全量数据初始化 支持主库发生failover后，自动恢复binlog位置（GTID） 灵活的对数据进行分区，解决数据倾斜的问题。kafka支持 database, table, column等级别的数据分区 它的实现方式是伪装成MySQL Server的从库，接收binlog events，然后根据schemas信息拼装，支持ddl,xid,rows等各种event. maxwell由 zendesk 开源：https://github.com/zendesk/maxwell ，而且维护者相当活跃。
+网上已有人对 Alibaba Cannal, Zendesk Maxwell, Yelp mysql_streamer进行对比，见文后参考 实时抓取MySQL的更新数据到Hadoop。
+类似功能的还有：http://debezium.io/docs/connectors/mysql/
+安装 使用 maxwell 非常简单，只需要jdk环境
+yum install -y java-1.8.0-openjdk-1.8.0.121-1.b13.el6.x86_64 curl -sLo - https://github.com/zendesk/maxwell/releases/download/v1.12.0/maxwell-1.12.0.tar.gz \ | tar zxvf - cd maxwell-1.12.0 # 默认寻找当前目录下的 config.properties 配置文件 要求 mysql server binlog格式是 ROW， row_image 是 FULL。感受一下输出结果
+mysql&gt; update test.e set m = 5."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "自建Binlog订阅服务 —— Maxwell",
+      "item": "http://xgknight.com/posts/2018/01/%E8%87%AA%E5%BB%BAbinlog%E8%AE%A2%E9%98%85%E6%9C%8D%E5%8A%A1-maxwell/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "自建Binlog订阅服务 —— Maxwell",
+  "name": "自建Binlog订阅服务 —— Maxwell",
+  "description": "1. 介绍 Maxwell 是java语言编写的能够读取、解析MySQL binlog，将行更新以json格式发送到 Kafka、RabbitMQ、AWS Kinesis、Google Cloud Pub/Sub、文件，有了增量的数据流，可以想象的应用场景实在太多了，如ETL、维护缓存、收集表级别的dml指标、增量到搜索引擎、数据分区迁移、切库binlog回滚方案，等等。\n它还提供其它功能：\n支持SELECT * FROM table 的方式做全量数据初始化 支持主库发生failover后，自动恢复binlog位置（GTID） 灵活的对数据进行分区，解决数据倾斜的问题。kafka支持 database, table, column等级别的数据分区 它的实现方式是伪装成MySQL Server的从库，接收binlog events，然后根据schemas信息拼装，支持ddl,xid,rows等各种event. maxwell由 zendesk 开源：https://github.com/zendesk/maxwell ，而且维护者相当活跃。\n网上已有人对 Alibaba Cannal, Zendesk Maxwell, Yelp mysql_streamer进行对比，见文后参考 实时抓取MySQL的更新数据到Hadoop。\n类似功能的还有：http://debezium.io/docs/connectors/mysql/\n安装 使用 maxwell 非常简单，只需要jdk环境\nyum install -y java-1.8.0-openjdk-1.8.0.121-1.b13.el6.x86_64 curl -sLo - https://github.com/zendesk/maxwell/releases/download/v1.12.0/maxwell-1.12.0.tar.gz \\ | tar zxvf - cd maxwell-1.12.0 # 默认寻找当前目录下的 config.properties 配置文件 要求 mysql server binlog格式是 ROW， row_image 是 FULL。感受一下输出结果\nmysql\u0026gt; update test.e set m = 5.",
+  "keywords": [
+    "mysql", "binlog"
+  ],
+  "articleBody": "1. 介绍 Maxwell 是java语言编写的能够读取、解析MySQL binlog，将行更新以json格式发送到 Kafka、RabbitMQ、AWS Kinesis、Google Cloud Pub/Sub、文件，有了增量的数据流，可以想象的应用场景实在太多了，如ETL、维护缓存、收集表级别的dml指标、增量到搜索引擎、数据分区迁移、切库binlog回滚方案，等等。\n它还提供其它功能：\n支持SELECT * FROM table 的方式做全量数据初始化 支持主库发生failover后，自动恢复binlog位置（GTID） 灵活的对数据进行分区，解决数据倾斜的问题。kafka支持 database, table, column等级别的数据分区 它的实现方式是伪装成MySQL Server的从库，接收binlog events，然后根据schemas信息拼装，支持ddl,xid,rows等各种event. maxwell由 zendesk 开源：https://github.com/zendesk/maxwell ，而且维护者相当活跃。\n网上已有人对 Alibaba Cannal, Zendesk Maxwell, Yelp mysql_streamer进行对比，见文后参考 实时抓取MySQL的更新数据到Hadoop。\n类似功能的还有：http://debezium.io/docs/connectors/mysql/\n安装 使用 maxwell 非常简单，只需要jdk环境\nyum install -y java-1.8.0-openjdk-1.8.0.121-1.b13.el6.x86_64 curl -sLo - https://github.com/zendesk/maxwell/releases/download/v1.12.0/maxwell-1.12.0.tar.gz \\ | tar zxvf - cd maxwell-1.12.0 # 默认寻找当前目录下的 config.properties 配置文件 要求 mysql server binlog格式是 ROW， row_image 是 FULL。感受一下输出结果\nmysql\u003e update test.e set m = 5.444, c = now(3) where id = 1; { \"database\":\"test\", \"table\":\"e\", \"type\":\"update\", \"ts\":1477053234, \"commit\": true, ... \"data\":{ \"id\":1, \"m\":5.444, \"c\":\"2016-10-21 05:33:54.631000\", \"comment\":\"I am a creature of light.\" }, \"old\":{ \"m\":4.2341, \"c\":\"2016-10-21 05:33:37.523000\" } } mysql\u003e create table test.e ( ... ) { \"type\":\"table-create\", \"database\":\"test\", \"table\":\"e\", \"def\":{ \"database\":\"test\", \"charset\":\"utf8mb4\", \"table\":\"e\", \"columns\":[ {\"type\":\"int\", \"name\":\"id\", \"signed\":true}, {\"type\":\"double\", \"name\":\"m\"}, {\"type\":\"timestamp\", \"name\":\"c\", \"column-length\":6}, {\"type\":\"varchar\", \"name\":\"comment\", \"charset\":\"latin1\"} ], \"primary-key\":[ \"id\" ] }, \"ts\":1477053126000, \"sql\":\"create table test.e ( id int(10) not null primary key auto_increment, m double, c timestamp(6), comment varchar(255) charset 'latin1' )\", \"position\":\"master.000006:800050\" } data是 After image, old 是 Before image。 insert 只有后镜像，delete只有前镜像（data） type是语句类型：insert, update, delete, database-create, database-alter, database-drop, table-create, table-alter, table-drop 。\n基本配置 config.properties 配置文件里面的所有选项，都可以在启动 maxweill ./bin/maxwell 是指定，覆盖配置文件的内容。这里只讲一些常用的。\nmysql options host 指定从哪个地址的mysql获取binlog\nreplication_host 如果指定了 replication_host，那么它是真正的binlog来源的mysql server地址，而那么上面的host用于存放maxwell表结构和binlog位置的地址。 将两者分开，可以避免 replication_user 往生产库里写数据。\nschema_host 从哪个host获取表结构。binlog里面没有字段信息，所以maxwell需要从数据库查出schema，存起来。 schema_host一般用不到，但在binlog-proxy场景下就很实用。比如要将已经离线的binlog通过maxwell生成json流，于是自建一个mysql server里面没有结构，只用于发送binlog，此时表机构就可以制动从 schema_host 获取。\ngtid_mode 如果 mysql server 启用了GTID，maxwell也可以基于gtid取event。如果mysql server发生failover，maxwell不需要手动指定newfile:postion\n正常情况下，replication_host 和 schema_host都不需要指定，只有一个 --host。\nschema_database 使用这个db来存放 maxwell 需要的表，比如要复制的databases, tables, columns, postions, heartbeats. filtering include_dbs 只发送binlog里面这些databases的变更，以,号分隔，中间不要包含空格。 也支持java风格的正则，如 include_tables=db1,/db\\\\d+/，表示 db1, db2, db3…这样的。（下面的filter都支持这种regex） 提示：这里的dbs指定的是真实db。比如binlog里面可能 use db1 但 update db2.ttt，那么maxwell生成的json database 内容是db2。\nexclude_dbs 排除指定的这些 databbases\ninclude_tables 只发送这些表的数据变更。不只需要指定 database.\nexclude_tables 排除指定的这些表\nexclude_columns 不输出这些字段。如果字段名在row中不存在，则忽略这个filter。\ninclude_column_values 1.12.0新引入的过滤项。只输出满足 column=values 的行，比如 include_column_values=bar=x,foo=y，如果有bar字段，那么只输出值为x的行，如果有foo字段，那么只输出值为y的行。\n如果没有对应字段，如只有bar=x没有foo字段，那么也成立。（即不是 或，也不是 与）\nblacklist_dbs 一般不用。blacklist_dbs字面上难以与exclude_dbs 分开，官网的说明也是模棱两可。\n从代码里面看出的意思是，屏蔽指定的这些dbs,tables的结构变更，与行变更过滤，没有关系。它应对的场景是，某个表上频繁的有ddl，比如truncate。\n因为往往我们只需要观察部分表的变更，所以要注意这些 include 与 exclude 的关系，记住三点：\n只要 include 有值，那么不在include里面的都排除 只要在 exclude 里面的，都排除 其它都正常输出 举个比较极端的例子：\n# database: db1,db2,db3,mydb ① include_dbs=db1,/db\\\\d+/ ② exclude_dbs=db2 ③ inlcude_tables=t1,t2,t3 ④ exclude_tables=t3 配置了 include_dbs，那么mydb不在里面，所以排除； 配置了 exclude_dbs，那么db2排除。剩下db1,db3 同样对 tables，剩下t1,t2 所以db1.t1, db1.t2, db3.t1, db3.t2是筛选后剩下可输出的。如果没有指定include_dbs，那么mydb.t1也可以输出。\nformatting output_ddl 是否在输出的json流中，包含ddl语句。默认 false output_binlog_position 是否在输出的json流中，包含binlog filename:postion。默认 false output_commit_info 是否在输出的json流里面，包含 commit 和 xid 信息。默认 true\n比如一个事物里，包含多个表的变更，或一个表上多条数据的变更，那么他们都具有相同的 xid，最后一个row event输出 commit:true 字段。这有利于消费者实现 事务回放，而不仅仅是行级别的回放。 output_thread_id 同样，binlog里面也包含了 thread_id ，可以包含在输出中。默认 false\n消费者可以用它来实现更粗粒度的事务回放。还有一个场景是用户审计，用户每次登陆之后将登陆ip、登陆时间、用户名、thread_id记录到一个表中，可轻松根据thread_id关联到binlog里面这条记录是哪个用户修改的。 monitoring 如果是长时间运行的maxwell，添加monitor配置，maxwell提供了http api返回监控数据。\n其它 init_position 手动指定maxwell要从哪个binlog，哪个位置开始。指定的格式FILE:POSITION:HEARTBEAT。只支持在启动maxwell的命令指定，比如 --init_postion=mysql-bin.0000456:4:0。 maxwell 默认从连接上mysql server的当前位置开始解析，如果指定 init_postion，要确保文件确实存在，如果binlog已经被purge掉了，可能需要想其它办法。见 Binlog可视化搜索：实现类似阿里RDS数据追踪功能 2. 选择合适的生产者 Maxwell是将binlog解析成json这种比较通用的格式，那么要去用它可以选择输出到哪里，比如Kafka, rabbitmq, file等，总之送到消息队列里去。每种 Producer 有自己对应的选项。\n2.1 file producer=file output_file=/tmp/mysql_binlog_data.log 比较简单，直接指定输出到哪个文件output_file。有什么日志收集系统，可以直接从这里拿。\n2.2 rabbitmq rabbitmq 是非常流行的一个AMQP协议的消息队列服务，相关介绍请参考 rabbitmq入门\nproducer=rabbitmq rabbitmq_host=10.81.xx.xxx rabbitmq_user=admin rabbitmq_pass=admin rabbitmq_virtual_host=/some0 rabbitmq_exchange=maxwell.some rabbitmq_exchange_type=topic rabbitmq_exchange_durable=true rabbitmq_exchange_autodelete=false rabbitmq_routing_key_template=%db%.%table% 上面的参数都很容易理解，1.12.0版本新加入rabbitmq_message_persistent控制发布消息持久化的参数。 rabbitmq_routing_key_template是按照 db.tbl 的格式指定 routing_key，在创建队列时，可以根据不同的表进入不同的队列，提高并行消费而不乱序的能力。\n因为rabbitmq搭建起来非常简单，所以我习惯用这个。\n2.3 kafka kafka是maxwell支持最完善的一个producer，并且内置了 多个版本的 kafka client(0.8.2.2, 0.9.0.1, 0.10.0.1, 0.10.2.1 or 0.11.0.1)，默认 kafka_version=0.11.0.1\nproducer=kafka # 指定kafka brokers 地址 kafka.bootstrap.servers=hosta:9092,hostb:9092 # kafka主题可以是固定的，可以是 `maxwell_%{database}_%{table}` 这种按表去自动创建的动态topic kafka_topic=maxwell # ddl单独使用的topic ddl_kafka_topic=maxwell_ddl # kafka和kenesis都支持分区，可以选择根据 database, table, primary_key, 或者column的值去做partition # maxwell默认使用database，在启动的时候会去检查是否topic是否有足够多数量的partitions，所以要提前创建好 # bin/kafka-topics.sh --zookeeper ZK_HOST:2181 --create \\ # --topic maxwell --partitions 20 --replication-factor 2 producer_partition_by=database # 如果指定了 producer_partition_by=column, 就需要指定下面两个参数 # 根据user_id,create_date两列的值去分区，partition_key形如 1178532016-10-10 18:29:04 producer_partition_columns=user_id,create_date # 如果不存在user_id或create_date，则按照database分区: producer_partition_by_fallback=database maxwell会读取kafka.开头的参数，设置到连接参数里，比如kafka.acks=1,kafka.retries=3等\n2.4 redis redis也有简单的发布订阅(pub/sub)功能\nproducer=redis redis_host=10.47.xx.xxx redis_port=6379 # redis_auth=redis_auth redis_database=0 redis_pub_channel=maxwell 但是试用一番之后，发现如果订阅没有连上去的话，所有pub的消息是会丢失的。所以最好使用push/pop去实现。\n3. 注意事项 下面的是在使用过程中遇到的一些小问题，做下总结。\ntimestamp column maxwell对时间类型（datetime, timestamp, date）都是当做字符串处理的，这也是为了保证数据一致(比如0000-00-00 00:00:00这样的时间在timestamp里是非法的，但mysql却认，解析成java或者python类型就是null/None)。\n如果MySQL表上的字段是 timestamp 类型，是有时区的概念，binlog解析出来的是标准UTC时间，但用户看到的是本地时间。比如 f_create_time timestamp 创建时间是北京时间2018-01-05 21:01:01，那么mysql实际存储的是2018-01-05 13:01:01，binlog里面也是这个时间字符串。如果不做消费者不做时区转换，会少8个小时。被这个狠狠坑了一把。\n与其每个客户端都要考虑这个问题，我觉得更合理的做法是提供时区参数，然后maxwell自动处理时区问题，否则要么客户端先需要知道哪些列是timestamp类型，或者连接上原库缓存上这些类型。\nbinary column maxwell可以处理binary类型的列，如blob、varbinary，它的做法就是对二进制列使用 base64_encode，当做字符串输出到json。消费者拿到这个列数据后，不能直接拼装，需要 base64_decode。\n表结构不同步 如果是拿比较老的binlog，放到新的mysql server上去用maxwell拉去，有可能表结构已经发生了变化，比如binlog里面字段比 schema_host 里面的字段多一个。目前这种情况没有发现异常，比如阿里RDS默认会为 无主键无唯一索引的表，增加一个__##alibaba_rds_rowid##__，在 show create table 和 schema里面都看不到这个隐藏主键，但binlog里面会有，同步到从库。\n另外我们有通过git去管理结构版本，如果真有这种场景，也可以应对。\n大事务binlog 当一个事物产生的binlog量非常大的时候，比如迁移日表数据，maxwell为了控制内存使用，会自动将处理不过来的binlog放到文件系统\nUsing kafka version: 0.11.0.1 21:16:07,109 WARN MaxwellMetrics - Metrics will not be exposed: metricsReportingType not configured. 21:16:07,380 INFO SchemaStoreSchema - Creating maxwell database 21:16:07,540 INFO Maxwell - Maxwell v?? is booting (RabbitmqProducer), starting at Position[BinlogPosition[mysql-bin.006235:24980714], lastHeartbeat=0] 21:16:07,649 INFO AbstractSchemaStore - Maxwell is capturing initial schema 21:16:08,267 INFO BinlogConnectorReplicator - Setting initial binlog pos to: mysql-bin.006235:24980714 21:16:08,324 INFO BinaryLogClient - Connected to rm-xxxxxxxxxxx.mysql.rds.aliyuncs.com:3306 at mysql-bin.006235/24980714 (sid:637 9, cid:9182598) 21:16:08,325 INFO BinlogConnectorLifecycleListener - Binlog connected. 03:15:36,104 INFO ListWithDiskBuffer - Overflowed in-memory buffer, spilling over into /tmp/maxwell7935334910787514257events 03:17:14,880 INFO ListWithDiskBuffer - Overflowed in-memory buffer, spilling over into /tmp/maxwell3143086481692829045events 但是遇到另外一个问题，overflow随后就出现异常EventDataDeserializationException: Failed to deserialize data of EventHeaderV4，当我另起一个maxwell指点之前的binlog postion开始解析，却有没有抛异常。事后的数据也表明并没有数据丢失。\n问题产生的原因还不明，Caused by: java.net.SocketException: Connection reset，感觉像读取 binlog 流的时候还没读取到完整的event，异常关闭了连接。这个问题比较顽固，github上面类似问题都没有达到明确的解决。（这也从侧面告诉我们，大表数据迁移，也要批量进行，不要一个insert into .. select 搞定）\n03:18:20,586 INFO ListWithDiskBuffer - Overflowed in-memory buffer, spilling over into /tmp/maxwell5229190074667071141events 03:19:31,289 WARN BinlogConnectorLifecycleListener - Communication failure. com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializationException: Failed to deserialize data of EventHeaderV4{time stamp=1514920657000, eventType=WRITE_ROWS, serverId=2115082720, headerLength=19, dataLength=8155, nextPosition=520539918, flags=0} at com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer.deserializeEventData(EventDeserializer.java:216) ~[mys ql-binlog-connector-java-0.13.0.jar:0.13.0] at com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer.nextEvent(EventDeserializer.java:184) ~[mysql-binlog-c onnector-java-0.13.0.jar:0.13.0] at com.github.shyiko.mysql.binlog.BinaryLogClient.listenForEventPackets(BinaryLogClient.java:890) [mysql-binlog-connector-java-0 .13.0.jar:0.13.0] at com.github.shyiko.mysql.binlog.BinaryLogClient.connect(BinaryLogClient.java:559) [mysql-binlog-connector-java-0.13.0.jar:0.13 .0] at com.github.shyiko.mysql.binlog.BinaryLogClient$7.run(BinaryLogClient.java:793) [mysql-binlog-connector-java-0.13.0.jar:0.13.0 ] at java.lang.Thread.run(Thread.java:745) [?:1.8.0_121] Caused by: java.net.SocketException: Connection reset at java.net.SocketInputStream.read(SocketInputStream.java:210) ~[?:1.8.0_121] at java.net.SocketInputStream.read(SocketInputStream.java:141) ~[?:1.8.0_121] at com.github.shyiko.mysql.binlog.io.BufferedSocketInputStream.read(BufferedSocketInputStream.java:51) ~[mysql-binlog-connector- java-0.13.0.jar:0.13.0] at com.github.shyiko.mysql.binlog.io.ByteArrayInputStream.readWithinBlockBoundaries(ByteArrayInputStream.java:202) ~[mysql-binlo g-connector-java-0.13.0.jar:0.13.0] at com.github.shyiko.mysql.binlog.io.ByteArrayInputStream.read(ByteArrayInputStream.java:184) ~[mysql-binlog-connector-java-0.13 .0.jar:0.13.0] at com.github.shyiko.mysql.binlog.io.ByteArrayInputStream.readInteger(ByteArrayInputStream.java:46) ~[mysql-binlog-connector-jav a-0.13.0.jar:0.13.0] at com.github.shyiko.mysql.binlog.event.deserialization.AbstractRowsEventDataDeserializer.deserializeLong(AbstractRowsEventDataD eserializer.java:212) ~[mysql-binlog-connector-java-0.13.0.jar:0.13.0] at com.github.shyiko.mysql.binlog.event.deserialization.AbstractRowsEventDataDeserializer.deserializeCell(AbstractRowsEventDataD eserializer.java:150) ~[mysql-binlog-connector-java-0.13.0.jar:0.13.0] at com.github.shyiko.mysql.binlog.event.deserialization.AbstractRowsEventDataDeserializer.deserializeRow(AbstractRowsEventDataDeserializer.java:132) ~[mysql-binlog-connector-java-0.13.0.jar:0.13.0] at com.github.shyiko.mysql.binlog.event.deserialization.WriteRowsEventDataDeserializer.deserializeRows(WriteRowsEventDataDeserializer.java:64) ~[mysql-binlog-connector-java-0.13.0.jar:0.13.0] at com.github.shyiko.mysql.binlog.event.deserialization.WriteRowsEventDataDeserializer.deserialize(WriteRowsEventDataDeserializer.java:56) ~[mysql-binlog-connector-java-0.13.0.jar:0.13.0] at com.github.shyiko.mysql.binlog.event.deserialization.WriteRowsEventDataDeserializer.deserialize(WriteRowsEventDataDeserializer.java:32) ~[mysql-binlog-connector-java-0.13.0.jar:0.13.0] at com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer.deserializeEventData(EventDeserializer.java:210) ~[mysql-binlog-connector-java-0.13.0.jar:0.13.0] ... 5 more 03:19:31,514 INFO BinlogConnectorLifecycleListener - Binlog disconnected. 03:19:31,590 WARN BinlogConnectorReplicator - replicator stopped at position: mysql-bin.006236:520531744 -- restarting 03:19:31,595 INFO BinaryLogClient - Connected to rm-xxxxxx.mysql.rds.aliyuncs.com:3306 at mysql-bin.006236/520531744 (sid:6379, cid:9220521) tableMapCache 前面讲过，如果我只想获取某几个表的binlog变更，需要用 include_tables 来过滤，但如果mysql server上现在删了一个表t1，但我的binlog是从昨天开始读取，被删的那个表t1在maxwell启动的时候是拉取不到表结构的。然后昨天的binlog里面有 t1 的变更，因为找不到表结构给来组装成json，会抛异常。\n手动在 maxwell.tables/columns 里面插入记录是可行的。但这个问题的根本是，maxwell在binlog过滤的时候，只在处理row_event的时候，而对 tableMapCache 要求binlog里面的所有表都要有。\n自己提交了一个commit，可以在做 tableMapCache 的时候也仅要求缓存 include_dbs/tables 这些表： https://github.com/seanlook/maxwell/commit/2618b70303078bf910a1981b69943cca75ee04fb\n提高消费性能 再用rabbitmq时，routing_key 是 %db%.%table%，但某些表产生的binlog增量非常大，就会导致各队列消息量很不平均，目前因为还没做到事务xid或者thread_id级别的并发回放，所以最小队列粒度也是表，尽量单独放一个队列，其它数据量小的合在一起。\n参考\nhttp://maxwells-daemon.io/config/ 实时抓取MySQL的更新数据到Hadoop MySQL CDC, Streaming Binary Logs and Asynchronous Triggers 原文连接地址：http://xgknight.com/2018/01/13/maxwell-binlog/\n",
+  "wordCount" : "758",
+  "inLanguage": "en",
+  "datePublished": "2018-01-13T15:32:49Z",
+  "dateModified": "2018-01-13T15:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2018/01/%E8%87%AA%E5%BB%BAbinlog%E8%AE%A2%E9%98%85%E6%9C%8D%E5%8A%A1-maxwell/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      自建Binlog订阅服务 —— Maxwell
+    </h1>
+    <div class="post-meta"><span title='2018-01-13 15:32:49 +0000 UTC'>January 13, 2018</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><h2 id="1-介绍">1. 介绍<a hidden class="anchor" aria-hidden="true" href="#1-介绍">#</a></h2>
+<p>Maxwell 是java语言编写的能够读取、解析MySQL binlog，将行更新以json格式发送到 Kafka、RabbitMQ、AWS Kinesis、Google Cloud Pub/Sub、文件，有了增量的数据流，可以想象的应用场景实在太多了，如ETL、维护缓存、收集表级别的dml指标、增量到搜索引擎、数据分区迁移、切库binlog回滚方案，等等。</p>
+<p>它还提供其它功能：</p>
+<ul>
+<li>支持<code>SELECT * FROM table</code> 的方式做全量数据初始化</li>
+<li>支持主库发生failover后，自动恢复binlog位置（GTID）</li>
+<li>灵活的对数据进行分区，解决数据倾斜的问题。kafka支持 database, table, column等级别的数据分区</li>
+<li>它的实现方式是伪装成MySQL Server的从库，接收binlog events，然后根据schemas信息拼装，支持ddl,xid,rows等各种event.</li>
+</ul>
+<p>maxwell由 zendesk 开源：https://github.com/zendesk/maxwell ，而且维护者相当活跃。</p>
+<p>网上已有人对 Alibaba Cannal, Zendesk Maxwell, Yelp mysql_streamer进行对比，见文后参考 实时抓取MySQL的更新数据到Hadoop。</p>
+<p>类似功能的还有：http://debezium.io/docs/connectors/mysql/</p>
+<h3 id="安装">安装<a hidden class="anchor" aria-hidden="true" href="#安装">#</a></h3>
+<p>使用 maxwell 非常简单，只需要jdk环境</p>
+<pre tabindex="0"><code>yum install -y java-1.8.0-openjdk-1.8.0.121-1.b13.el6.x86_64
+
+curl -sLo - https://github.com/zendesk/maxwell/releases/download/v1.12.0/maxwell-1.12.0.tar.gz \
+       | tar zxvf -
+cd maxwell-1.12.0
+
+# 默认寻找当前目录下的 config.properties 配置文件
+</code></pre><p>要求 mysql server binlog格式是 <code>ROW</code>， row_image 是 <code>FULL</code>。感受一下输出结果</p>
+<pre tabindex="0"><code>mysql&gt; update test.e set m = 5.444, c = now(3) where id = 1;
+{
+   &#34;database&#34;:&#34;test&#34;,
+   &#34;table&#34;:&#34;e&#34;,
+   &#34;type&#34;:&#34;update&#34;,
+   &#34;ts&#34;:1477053234,
+   &#34;commit&#34;: true,
+   ...
+   &#34;data&#34;:{
+      &#34;id&#34;:1,
+      &#34;m&#34;:5.444,
+      &#34;c&#34;:&#34;2016-10-21 05:33:54.631000&#34;,
+      &#34;comment&#34;:&#34;I am a creature of light.&#34;
+   },
+   &#34;old&#34;:{
+      &#34;m&#34;:4.2341,
+      &#34;c&#34;:&#34;2016-10-21 05:33:37.523000&#34;
+   }
+}
+
+mysql&gt; create table test.e ( ... )
+{
+   &#34;type&#34;:&#34;table-create&#34;,
+   &#34;database&#34;:&#34;test&#34;,
+   &#34;table&#34;:&#34;e&#34;,
+   &#34;def&#34;:{
+      &#34;database&#34;:&#34;test&#34;,
+      &#34;charset&#34;:&#34;utf8mb4&#34;,
+      &#34;table&#34;:&#34;e&#34;,
+      &#34;columns&#34;:[
+         {&#34;type&#34;:&#34;int&#34;, &#34;name&#34;:&#34;id&#34;, &#34;signed&#34;:true},
+         {&#34;type&#34;:&#34;double&#34;, &#34;name&#34;:&#34;m&#34;},
+         {&#34;type&#34;:&#34;timestamp&#34;, &#34;name&#34;:&#34;c&#34;, &#34;column-length&#34;:6},
+         {&#34;type&#34;:&#34;varchar&#34;, &#34;name&#34;:&#34;comment&#34;, &#34;charset&#34;:&#34;latin1&#34;}
+      ],
+      &#34;primary-key&#34;:[
+         &#34;id&#34;
+      ]
+   },
+   &#34;ts&#34;:1477053126000,
+   &#34;sql&#34;:&#34;create table test.e ( id int(10) not null primary key auto_increment, m double, c timestamp(6), comment varchar(255) charset &#39;latin1&#39; )&#34;,
+   &#34;position&#34;:&#34;master.000006:800050&#34;
+}
+</code></pre><p><code>data</code>是 After image, <code>old</code> 是 Before image。 insert 只有后镜像，delete只有前镜像（<code>data</code>）
+<code>type</code>是语句类型：<code>insert</code>, <code>update</code>, <code>delete</code>, <code>database-create</code>, <code>database-alter</code>, <code>database-drop</code>, <code>table-create</code>, <code>table-alter</code>, <code>table-drop</code> 。</p>
+<!-- raw HTML omitted -->
+<h2 id="基本配置">基本配置<a hidden class="anchor" aria-hidden="true" href="#基本配置">#</a></h2>
+<p>config.properties 配置文件里面的所有选项，都可以在启动 maxweill <code>./bin/maxwell</code> 是指定，覆盖配置文件的内容。这里只讲一些常用的。</p>
+<h3 id="mysql-options">mysql options<a hidden class="anchor" aria-hidden="true" href="#mysql-options">#</a></h3>
+<ul>
+<li>
+<p>host
+指定从哪个地址的mysql获取binlog</p>
+</li>
+<li>
+<p>replication_host
+如果指定了 <code>replication_host</code>，那么它是真正的binlog来源的mysql server地址，而那么上面的<code>host</code>用于存放maxwell表结构和binlog位置的地址。
+将两者分开，可以避免 replication_user 往生产库里写数据。</p>
+</li>
+<li>
+<p>schema_host
+从哪个host获取表结构。binlog里面没有字段信息，所以maxwell需要从数据库查出schema，存起来。
+schema_host一般用不到，但在binlog-proxy场景下就很实用。比如要将已经离线的binlog通过maxwell生成json流，于是自建一个mysql server里面没有结构，只用于发送binlog，此时表机构就可以制动从 <code>schema_host</code> 获取。</p>
+</li>
+<li>
+<p>gtid_mode
+如果 mysql server 启用了GTID，maxwell也可以基于gtid取event。如果mysql server发生failover，maxwell不需要手动指定newfile:postion</p>
+</li>
+</ul>
+<p>正常情况下，replication_host 和 schema_host都不需要指定，只有一个 <code>--host</code>。</p>
+<ul>
+<li>schema_database
+使用这个db来存放 maxwell 需要的表，比如要复制的databases, tables, columns, postions, heartbeats.</li>
+</ul>
+<h3 id="filtering">filtering<a hidden class="anchor" aria-hidden="true" href="#filtering">#</a></h3>
+<ul>
+<li>
+<p>include_dbs
+只发送binlog里面这些databases的变更，以<code>,</code>号分隔，中间不要包含空格。
+也支持java风格的正则，如 <code>include_tables=db1,/db\\d+/</code>，表示 db1, db2, db3&hellip;这样的。（下面的filter都支持这种regex）
+提示：这里的dbs指定的是真实db。比如binlog里面可能 <code>use db1</code> 但 <code>update db2.ttt</code>，那么maxwell生成的json <code>database</code> 内容是db2。</p>
+</li>
+<li>
+<p>exclude_dbs
+排除指定的这些 databbases</p>
+</li>
+<li>
+<p>include_tables
+只发送这些表的数据变更。不只需要指定 database.</p>
+</li>
+<li>
+<p>exclude_tables
+排除指定的这些表</p>
+</li>
+<li>
+<p>exclude_columns
+不输出这些字段。如果字段名在row中不存在，则忽略这个filter。</p>
+</li>
+<li>
+<p>include_column_values
+1.12.0新引入的过滤项。只输出满足 column=values 的行，比如 <code>include_column_values=bar=x,foo=y</code>，如果有<code>bar</code>字段，那么只输出值为<code>x</code>的行，如果有<code>foo</code>字段，那么只输出值为<code>y</code>的行。<br>
+如果没有对应字段，如只有<code>bar=x</code>没有<code>foo</code>字段，那么也成立。（即不是 或，也不是 与）</p>
+</li>
+<li>
+<p>blacklist_dbs
+一般不用。<code>blacklist_dbs</code>字面上难以与<code>exclude_dbs</code> 分开，官网的说明也是模棱两可。<br>
+从代码里面看出的意思是，屏蔽指定的这些dbs,tables的<strong>结构变更</strong>，与行变更过滤，没有关系。它应对的场景是，某个表上频繁的有ddl，比如truncate。</p>
+</li>
+</ul>
+<p>因为往往我们只需要观察部分表的变更，所以要注意这些 include 与 exclude 的关系，记住三点：</p>
+<ol>
+<li>只要 include 有值，那么不在include里面的都排除</li>
+<li>只要在 exclude 里面的，都排除</li>
+<li>其它都正常输出</li>
+</ol>
+<p>举个比较极端的例子：</p>
+<pre tabindex="0"><code># database: db1,db2,db3,mydb
+① include_dbs=db1,/db\\d+/
+② exclude_dbs=db2
+③ inlcude_tables=t1,t2,t3
+④ exclude_tables=t3
+</code></pre><p>配置了 include_dbs，那么mydb不在里面，所以排除；
+配置了 exclude_dbs，那么db2排除。剩下db1,db3
+同样对 tables，剩下t1,t2
+所以db1.t1, db1.t2, db3.t1, db3.t2是筛选后剩下可输出的。如果没有指定include_dbs，那么mydb.t1也可以输出。</p>
+<h3 id="formatting">formatting<a hidden class="anchor" aria-hidden="true" href="#formatting">#</a></h3>
+<ul>
+<li>output_ddl
+是否在输出的json流中，包含ddl语句。<strong>默认 false</strong></li>
+<li>output_binlog_position
+是否在输出的json流中，包含binlog filename:postion。默认 false</li>
+<li>output_commit_info
+是否在输出的json流里面，包含 commit 和 xid 信息。默认 true<br>
+比如一个事物里，包含多个表的变更，或一个表上多条数据的变更，那么他们都具有相同的 xid，最后一个row event输出 commit:true 字段。这有利于消费者实现 事务回放，而不仅仅是行级别的回放。</li>
+<li>output_thread_id
+同样，binlog里面也包含了 thread_id ，可以包含在输出中。默认 false<br>
+消费者可以用它来实现更粗粒度的事务回放。还有一个场景是用户审计，用户每次登陆之后将登陆ip、登陆时间、用户名、thread_id记录到一个表中，可轻松根据thread_id关联到binlog里面这条记录是哪个用户修改的。</li>
+</ul>
+<h3 id="monitoring">monitoring<a hidden class="anchor" aria-hidden="true" href="#monitoring">#</a></h3>
+<p>如果是长时间运行的maxwell，添加monitor配置，maxwell提供了http api返回监控数据。</p>
+<h3 id="其它">其它<a hidden class="anchor" aria-hidden="true" href="#其它">#</a></h3>
+<ul>
+<li>init_position
+手动指定maxwell要从哪个binlog，哪个位置开始。指定的格式<code>FILE:POSITION:HEARTBEAT</code>。只支持在启动maxwell的命令指定，比如 <code>--init_postion=mysql-bin.0000456:4:0</code>。
+maxwell 默认从连接上mysql server的当前位置开始解析，如果指定 init_postion，要确保文件确实存在，如果binlog已经被purge掉了，可能需要想其它办法。见 <a href="xx">Binlog可视化搜索：实现类似阿里RDS数据追踪功能</a></li>
+</ul>
+<h2 id="2-选择合适的生产者">2. 选择合适的生产者<a hidden class="anchor" aria-hidden="true" href="#2-选择合适的生产者">#</a></h2>
+<p>Maxwell是将binlog解析成json这种比较通用的格式，那么要去用它可以选择输出到哪里，比如Kafka, rabbitmq, file等，总之送到消息队列里去。每种 Producer 有自己对应的选项。</p>
+<h3 id="21-file">2.1 file<a hidden class="anchor" aria-hidden="true" href="#21-file">#</a></h3>
+<pre tabindex="0"><code>producer=file
+output_file=/tmp/mysql_binlog_data.log
+</code></pre><p>比较简单，直接指定输出到哪个文件<code>output_file</code>。有什么日志收集系统，可以直接从这里拿。</p>
+<h3 id="22-rabbitmq">2.2 rabbitmq<a hidden class="anchor" aria-hidden="true" href="#22-rabbitmq">#</a></h3>
+<p>rabbitmq 是非常流行的一个AMQP协议的消息队列服务，相关介绍请参考 <a href="xx">rabbitmq入门</a></p>
+<pre tabindex="0"><code>producer=rabbitmq
+
+rabbitmq_host=10.81.xx.xxx
+rabbitmq_user=admin
+rabbitmq_pass=admin
+rabbitmq_virtual_host=/some0
+rabbitmq_exchange=maxwell.some
+rabbitmq_exchange_type=topic
+rabbitmq_exchange_durable=true
+rabbitmq_exchange_autodelete=false
+rabbitmq_routing_key_template=%db%.%table%
+</code></pre><p>上面的参数都很容易理解，1.12.0版本新加入<code>rabbitmq_message_persistent</code>控制发布消息持久化的参数。
+<code>rabbitmq_routing_key_template</code>是按照 db.tbl 的格式指定 routing_key，在创建队列时，可以根据不同的表进入不同的队列，提高并行消费而不乱序的能力。</p>
+<p>因为rabbitmq搭建起来非常简单，所以我习惯用这个。</p>
+<h3 id="23-kafka">2.3 kafka<a hidden class="anchor" aria-hidden="true" href="#23-kafka">#</a></h3>
+<p>kafka是maxwell支持最完善的一个producer，并且内置了 多个版本的 kafka client(0.8.2.2, 0.9.0.1, 0.10.0.1, 0.10.2.1 or 0.11.0.1)，默认 <code>kafka_version=0.11.0.1</code></p>
+<pre tabindex="0"><code>producer=kafka
+
+# 指定kafka brokers 地址
+kafka.bootstrap.servers=hosta:9092,hostb:9092
+
+# kafka主题可以是固定的，可以是 `maxwell_%{database}_%{table}` 这种按表去自动创建的动态topic
+kafka_topic=maxwell
+
+# ddl单独使用的topic
+ddl_kafka_topic=maxwell_ddl
+
+# kafka和kenesis都支持分区，可以选择根据 database, table, primary_key, 或者column的值去做partition
+# maxwell默认使用database，在启动的时候会去检查是否topic是否有足够多数量的partitions，所以要提前创建好
+#  bin/kafka-topics.sh --zookeeper ZK_HOST:2181 --create \
+#                      --topic maxwell --partitions 20 --replication-factor 2
+producer_partition_by=database
+
+# 如果指定了 producer_partition_by=column, 就需要指定下面两个参数
+# 根据user_id,create_date两列的值去分区，partition_key形如 1178532016-10-10 18:29:04
+producer_partition_columns=user_id,create_date
+# 如果不存在user_id或create_date，则按照database分区:
+producer_partition_by_fallback=database  
+</code></pre><p>maxwell会读取<code>kafka.</code>开头的参数，设置到连接参数里，比如<code>kafka.acks=1</code>,<code>kafka.retries=3</code>等</p>
+<h3 id="24-redis">2.4 redis<a hidden class="anchor" aria-hidden="true" href="#24-redis">#</a></h3>
+<p>redis也有简单的发布订阅(<code>pub/sub</code>)功能</p>
+<pre tabindex="0"><code>producer=redis
+
+redis_host=10.47.xx.xxx
+redis_port=6379
+# redis_auth=redis_auth
+redis_database=0
+redis_pub_channel=maxwell
+</code></pre><p>但是试用一番之后，发现如果订阅没有连上去的话，所有pub的消息是会丢失的。所以最好使用<code>push/pop</code>去实现。</p>
+<h2 id="3-注意事项">3. 注意事项<a hidden class="anchor" aria-hidden="true" href="#3-注意事项">#</a></h2>
+<p>下面的是在使用过程中遇到的一些小问题，做下总结。</p>
+<h3 id="timestamp-column">timestamp column<a hidden class="anchor" aria-hidden="true" href="#timestamp-column">#</a></h3>
+<p>maxwell对时间类型（datetime, timestamp, date）都是当做字符串处理的，这也是为了保证数据一致(比如<code>0000-00-00 00:00:00</code>这样的时间在timestamp里是非法的，但mysql却认，解析成java或者python类型就是null/None)。</p>
+<p>如果MySQL表上的字段是 timestamp 类型，是有时区的概念，binlog解析出来的是标准UTC时间，但用户看到的是本地时间。比如 <code>f_create_time timestamp</code> 创建时间是北京时间<code>2018-01-05 21:01:01</code>，那么mysql实际存储的是<code>2018-01-05 13:01:01</code>，binlog里面也是这个时间字符串。如果不做消费者不做时区转换，会少8个小时。被这个狠狠坑了一把。</p>
+<p>与其每个客户端都要考虑这个问题，我觉得更合理的做法是提供时区参数，然后maxwell自动处理时区问题，否则要么客户端先需要知道哪些列是timestamp类型，或者连接上原库缓存上这些类型。</p>
+<h3 id="binary-column">binary column<a hidden class="anchor" aria-hidden="true" href="#binary-column">#</a></h3>
+<p>maxwell可以处理binary类型的列，如<code>blob</code>、<code>varbinary</code>，它的做法就是对二进制列使用 base64_encode，当做字符串输出到json。消费者拿到这个列数据后，不能直接拼装，需要 base64_decode。</p>
+<h3 id="表结构不同步">表结构不同步<a hidden class="anchor" aria-hidden="true" href="#表结构不同步">#</a></h3>
+<p>如果是拿比较老的binlog，放到新的mysql server上去用maxwell拉去，有可能表结构已经发生了变化，比如binlog里面字段比 schema_host 里面的字段多一个。目前这种情况没有发现异常，比如阿里RDS默认会为 无主键无唯一索引的表，增加一个<code>__##alibaba_rds_rowid##__</code>，在 show create table 和 schema里面都看不到这个隐藏主键，但binlog里面会有，同步到从库。</p>
+<p>另外我们有通过git去管理结构版本，如果真有这种场景，也可以应对。</p>
+<h3 id="大事务binlog">大事务binlog<a hidden class="anchor" aria-hidden="true" href="#大事务binlog">#</a></h3>
+<p>当一个事物产生的binlog量非常大的时候，比如迁移日表数据，maxwell为了控制内存使用，会自动将处理不过来的binlog放到文件系统</p>
+<pre tabindex="0"><code>Using kafka version: 0.11.0.1
+21:16:07,109 WARN  MaxwellMetrics - Metrics will not be exposed: metricsReportingType not configured.
+21:16:07,380 INFO  SchemaStoreSchema - Creating maxwell database
+21:16:07,540 INFO  Maxwell - Maxwell v?? is booting (RabbitmqProducer), starting at Position[BinlogPosition[mysql-bin.006235:24980714],
+lastHeartbeat=0]
+21:16:07,649 INFO  AbstractSchemaStore - Maxwell is capturing initial schema
+21:16:08,267 INFO  BinlogConnectorReplicator - Setting initial binlog pos to: mysql-bin.006235:24980714
+21:16:08,324 INFO  BinaryLogClient - Connected to rm-xxxxxxxxxxx.mysql.rds.aliyuncs.com:3306 at mysql-bin.006235/24980714 (sid:637
+9, cid:9182598)
+21:16:08,325 INFO  BinlogConnectorLifecycleListener - Binlog connected.
+03:15:36,104 INFO  ListWithDiskBuffer - Overflowed in-memory buffer, spilling over into /tmp/maxwell7935334910787514257events
+03:17:14,880 INFO  ListWithDiskBuffer - Overflowed in-memory buffer, spilling over into /tmp/maxwell3143086481692829045events
+</code></pre><p>但是遇到另外一个问题，overflow随后就出现异常<code>EventDataDeserializationException: Failed to deserialize data of EventHeaderV4</code>，当我另起一个maxwell指点之前的binlog postion开始解析，却有没有抛异常。事后的数据也表明并没有数据丢失。</p>
+<p>问题产生的原因还不明，Caused by: java.net.SocketException: Connection reset，感觉像读取 binlog 流的时候还没读取到完整的event，异常关闭了连接。这个问题比较顽固，github上面类似问题都没有达到明确的解决。（这也从侧面告诉我们，大表数据迁移，也要批量进行，不要一个insert into .. select 搞定）</p>
+<pre tabindex="0"><code>03:18:20,586 INFO  ListWithDiskBuffer - Overflowed in-memory buffer, spilling over into /tmp/maxwell5229190074667071141events
+03:19:31,289 WARN  BinlogConnectorLifecycleListener - Communication failure.
+com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializationException: Failed to deserialize data of EventHeaderV4{time
+stamp=1514920657000, eventType=WRITE_ROWS, serverId=2115082720, headerLength=19, dataLength=8155, nextPosition=520539918, flags=0}
+        at com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer.deserializeEventData(EventDeserializer.java:216) ~[mys
+ql-binlog-connector-java-0.13.0.jar:0.13.0]
+        at com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer.nextEvent(EventDeserializer.java:184) ~[mysql-binlog-c
+onnector-java-0.13.0.jar:0.13.0]
+        at com.github.shyiko.mysql.binlog.BinaryLogClient.listenForEventPackets(BinaryLogClient.java:890) [mysql-binlog-connector-java-0
+.13.0.jar:0.13.0]
+        at com.github.shyiko.mysql.binlog.BinaryLogClient.connect(BinaryLogClient.java:559) [mysql-binlog-connector-java-0.13.0.jar:0.13
+.0]
+        at com.github.shyiko.mysql.binlog.BinaryLogClient$7.run(BinaryLogClient.java:793) [mysql-binlog-connector-java-0.13.0.jar:0.13.0
+]
+        at java.lang.Thread.run(Thread.java:745) [?:1.8.0_121]
+Caused by: java.net.SocketException: Connection reset
+        at java.net.SocketInputStream.read(SocketInputStream.java:210) ~[?:1.8.0_121]
+        at java.net.SocketInputStream.read(SocketInputStream.java:141) ~[?:1.8.0_121]
+        at com.github.shyiko.mysql.binlog.io.BufferedSocketInputStream.read(BufferedSocketInputStream.java:51) ~[mysql-binlog-connector-
+java-0.13.0.jar:0.13.0]
+        at com.github.shyiko.mysql.binlog.io.ByteArrayInputStream.readWithinBlockBoundaries(ByteArrayInputStream.java:202) ~[mysql-binlo
+g-connector-java-0.13.0.jar:0.13.0]
+        at com.github.shyiko.mysql.binlog.io.ByteArrayInputStream.read(ByteArrayInputStream.java:184) ~[mysql-binlog-connector-java-0.13
+.0.jar:0.13.0]
+        at com.github.shyiko.mysql.binlog.io.ByteArrayInputStream.readInteger(ByteArrayInputStream.java:46) ~[mysql-binlog-connector-jav
+a-0.13.0.jar:0.13.0]
+        at com.github.shyiko.mysql.binlog.event.deserialization.AbstractRowsEventDataDeserializer.deserializeLong(AbstractRowsEventDataD
+eserializer.java:212) ~[mysql-binlog-connector-java-0.13.0.jar:0.13.0]
+        at com.github.shyiko.mysql.binlog.event.deserialization.AbstractRowsEventDataDeserializer.deserializeCell(AbstractRowsEventDataD
+eserializer.java:150) ~[mysql-binlog-connector-java-0.13.0.jar:0.13.0]
+        at com.github.shyiko.mysql.binlog.event.deserialization.AbstractRowsEventDataDeserializer.deserializeRow(AbstractRowsEventDataDeserializer.java:132) ~[mysql-binlog-connector-java-0.13.0.jar:0.13.0]
+        at com.github.shyiko.mysql.binlog.event.deserialization.WriteRowsEventDataDeserializer.deserializeRows(WriteRowsEventDataDeserializer.java:64) ~[mysql-binlog-connector-java-0.13.0.jar:0.13.0]
+        at com.github.shyiko.mysql.binlog.event.deserialization.WriteRowsEventDataDeserializer.deserialize(WriteRowsEventDataDeserializer.java:56) ~[mysql-binlog-connector-java-0.13.0.jar:0.13.0]
+        at com.github.shyiko.mysql.binlog.event.deserialization.WriteRowsEventDataDeserializer.deserialize(WriteRowsEventDataDeserializer.java:32) ~[mysql-binlog-connector-java-0.13.0.jar:0.13.0]
+        at com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer.deserializeEventData(EventDeserializer.java:210) ~[mysql-binlog-connector-java-0.13.0.jar:0.13.0]
+        ... 5 more
+03:19:31,514 INFO  BinlogConnectorLifecycleListener - Binlog disconnected.
+03:19:31,590 WARN  BinlogConnectorReplicator - replicator stopped at position: mysql-bin.006236:520531744 -- restarting
+03:19:31,595 INFO  BinaryLogClient - Connected to rm-xxxxxx.mysql.rds.aliyuncs.com:3306 at mysql-bin.006236/520531744 (sid:6379, cid:9220521)
+</code></pre><h3 id="tablemapcache">tableMapCache<a hidden class="anchor" aria-hidden="true" href="#tablemapcache">#</a></h3>
+<p>前面讲过，如果我只想获取某几个表的binlog变更，需要用 <code>include_tables</code> 来过滤，但如果mysql server上现在删了一个表t1，但我的binlog是从昨天开始读取，被删的那个表t1在maxwell启动的时候是拉取不到表结构的。然后昨天的binlog里面有 t1 的变更，因为找不到表结构给来组装成json，会抛异常。</p>
+<p>手动在 maxwell.tables/columns 里面插入记录是可行的。但这个问题的根本是，maxwell在binlog过滤的时候，只在处理row_event的时候，而对 tableMapCache 要求binlog里面的所有表都要有。</p>
+<p>自己提交了一个commit，可以在做 tableMapCache 的时候也仅要求缓存 include_dbs/tables 这些表： <a href="https://github.com/seanlook/maxwell/commit/2618b70303078bf910a1981b69943cca75ee04fb">https://github.com/seanlook/maxwell/commit/2618b70303078bf910a1981b69943cca75ee04fb</a></p>
+<h3 id="提高消费性能">提高消费性能<a hidden class="anchor" aria-hidden="true" href="#提高消费性能">#</a></h3>
+<p>再用rabbitmq时，routing_key 是 <code>%db%.%table%</code>，但某些表产生的binlog增量非常大，就会导致各队列消息量很不平均，目前因为还没做到事务xid或者thread_id级别的并发回放，所以最小队列粒度也是表，尽量单独放一个队列，其它数据量小的合在一起。</p>
+<p><strong>参考</strong></p>
+<ul>
+<li><a href="http://maxwells-daemon.io/config/">http://maxwells-daemon.io/config/</a></li>
+<li><a href="http://bigdatadecode.club/%E5%AE%9E%E6%97%B6%E6%8A%93%E5%8F%96MySQL%E7%9A%84%E6%9B%B4%E6%96%B0%E6%95%B0%E6%8D%AE%E5%88%B0Hadoop.html">实时抓取MySQL的更新数据到Hadoop</a></li>
+<li><a href="https://www.percona.com/blog/2016/09/13/mysql-cdc-streaming-binary-logs-and-asynchronous-triggers/">MySQL CDC, Streaming Binary Logs and Asynchronous Triggers</a></li>
+</ul>
+<hr>
+<p>原文连接地址：http://xgknight.com/2018/01/13/maxwell-binlog/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/binlog/">binlog</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

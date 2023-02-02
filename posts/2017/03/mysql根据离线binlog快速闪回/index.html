@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>MySQL根据离线binlog快速“闪回” | Sean Note</title>
+<meta name="keywords" content="mysql">
+<meta name="description" content="昨天突然有个客户说误操作，自己删除了大量数据，CTO直接将我拉到一个讨论组里，说要帮他们恢复数据。他们自己挖的坑，打算让开发那边根据业务日志去恢复，被告知只记录的删除主键这样的信息，物理删除，无能为力。
+上服务器看了下记录的日志，发现好几台上面都有被误删的记录输出。阿里RDS虽然可以克隆一个恢复到删除时间点前的实例，但这散落的几万个id找起来费力，还有就是几个表之间关联的数据也要恢复，觉得麻烦。
+想到 MySQL 的闪回方案。以前看过好几篇相关文章，甚至差点自己用python撸一个来解析binlog，反转得到回滚sql，实在没空，这下要急用了。赶紧找了下网上“现成的方案”。
+正文开始
+
+MySQL（含阿里RDS）快速闪回可以说是对数据库误操作的后悔药，flashback功能可以将数据库返回到误操作之前。但是即使oracle数据库也只支持短时间内的闪回。
+网上现有开源的MySQL闪回实现，原理都是解析binlog，生成反向sql: (必须为row模式)
+
+对于 delete 操作，生成insert （DELETE_ROWS_EVENT）
+对于 update 操作，交换binlog里面值的顺序 （UPDATE_ROWS_EVENT）
+对于 insert 操作，反向生成delete （WRITE_ROWS_EVENT）
+对于多个event，要逆向生成sql
+
+开源实现：
+
+https://github.com/58daojia-dba/mysqlbinlog_flashback
+https://github.com/danfengcao/binlog2sql/
+
+上面两种实现方式，都是通过 python-mysql-replication 包，模拟出原库的一个从库，然后 show binary logs 来获取binlog，发起同步binlog的请求，再解析EVENT。但是阿里云 RDS 的binlog在同步给从库之后，** 很快就被 purge 掉了 。如果要恢复 ** 昨天 的 ** 部分数据 **，两种方案都是拿不到binlog的。也就是闪回的时间有限。
+还有一些比较简单的实现，就是解析 binlog 物理文件，实现回滚，如 binlog-rollback.pl ，试过，但是速度太慢。
+为了不影响速度，又想使用比较成熟的闪回方案，我们可以这样做：
+
+借助一个自建的 mysqld 实例，将已purge掉的binlog拷贝到该实例的目录下
+在自建实例里，提前创建好需要恢复的表（结构），因为工具需要连接上来从 information_schema.columns 获取元数据信息
+拷贝的时候，可以替换掉mysql实例自己的binlog文件名，保持连续
+可能要修改 mysql-bin.index，确保文件名还能被mysqld识别到
+重启mysql实例，show binary logs 看一下是否在列表里面
+接下来就可以使用上面任何一种工具，模拟从库，指定一个binlog文件，开始时间，结束时间，得到回滚SQL
+再根据业务逻辑，筛选出需要的sql
+">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2017/03/mysql%E6%A0%B9%E6%8D%AE%E7%A6%BB%E7%BA%BFbinlog%E5%BF%AB%E9%80%9F%E9%97%AA%E5%9B%9E/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="MySQL根据离线binlog快速“闪回”" />
+<meta property="og:description" content="昨天突然有个客户说误操作，自己删除了大量数据，CTO直接将我拉到一个讨论组里，说要帮他们恢复数据。他们自己挖的坑，打算让开发那边根据业务日志去恢复，被告知只记录的删除主键这样的信息，物理删除，无能为力。
+上服务器看了下记录的日志，发现好几台上面都有被误删的记录输出。阿里RDS虽然可以克隆一个恢复到删除时间点前的实例，但这散落的几万个id找起来费力，还有就是几个表之间关联的数据也要恢复，觉得麻烦。
+想到 MySQL 的闪回方案。以前看过好几篇相关文章，甚至差点自己用python撸一个来解析binlog，反转得到回滚sql，实在没空，这下要急用了。赶紧找了下网上“现成的方案”。
+正文开始
+
+MySQL（含阿里RDS）快速闪回可以说是对数据库误操作的后悔药，flashback功能可以将数据库返回到误操作之前。但是即使oracle数据库也只支持短时间内的闪回。
+网上现有开源的MySQL闪回实现，原理都是解析binlog，生成反向sql: (必须为row模式)
+
+对于 delete 操作，生成insert （DELETE_ROWS_EVENT）
+对于 update 操作，交换binlog里面值的顺序 （UPDATE_ROWS_EVENT）
+对于 insert 操作，反向生成delete （WRITE_ROWS_EVENT）
+对于多个event，要逆向生成sql
+
+开源实现：
+
+https://github.com/58daojia-dba/mysqlbinlog_flashback
+https://github.com/danfengcao/binlog2sql/
+
+上面两种实现方式，都是通过 python-mysql-replication 包，模拟出原库的一个从库，然后 show binary logs 来获取binlog，发起同步binlog的请求，再解析EVENT。但是阿里云 RDS 的binlog在同步给从库之后，** 很快就被 purge 掉了 。如果要恢复 ** 昨天 的 ** 部分数据 **，两种方案都是拿不到binlog的。也就是闪回的时间有限。
+还有一些比较简单的实现，就是解析 binlog 物理文件，实现回滚，如 binlog-rollback.pl ，试过，但是速度太慢。
+为了不影响速度，又想使用比较成熟的闪回方案，我们可以这样做：
+
+借助一个自建的 mysqld 实例，将已purge掉的binlog拷贝到该实例的目录下
+在自建实例里，提前创建好需要恢复的表（结构），因为工具需要连接上来从 information_schema.columns 获取元数据信息
+拷贝的时候，可以替换掉mysql实例自己的binlog文件名，保持连续
+可能要修改 mysql-bin.index，确保文件名还能被mysqld识别到
+重启mysql实例，show binary logs 看一下是否在列表里面
+接下来就可以使用上面任何一种工具，模拟从库，指定一个binlog文件，开始时间，结束时间，得到回滚SQL
+再根据业务逻辑，筛选出需要的sql
+" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2017/03/mysql%E6%A0%B9%E6%8D%AE%E7%A6%BB%E7%BA%BFbinlog%E5%BF%AB%E9%80%9F%E9%97%AA%E5%9B%9E/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2017-03-03T16:32:49+00:00" />
+<meta property="article:modified_time" content="2017-03-03T16:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="MySQL根据离线binlog快速“闪回”"/>
+<meta name="twitter:description" content="昨天突然有个客户说误操作，自己删除了大量数据，CTO直接将我拉到一个讨论组里，说要帮他们恢复数据。他们自己挖的坑，打算让开发那边根据业务日志去恢复，被告知只记录的删除主键这样的信息，物理删除，无能为力。
+上服务器看了下记录的日志，发现好几台上面都有被误删的记录输出。阿里RDS虽然可以克隆一个恢复到删除时间点前的实例，但这散落的几万个id找起来费力，还有就是几个表之间关联的数据也要恢复，觉得麻烦。
+想到 MySQL 的闪回方案。以前看过好几篇相关文章，甚至差点自己用python撸一个来解析binlog，反转得到回滚sql，实在没空，这下要急用了。赶紧找了下网上“现成的方案”。
+正文开始
+
+MySQL（含阿里RDS）快速闪回可以说是对数据库误操作的后悔药，flashback功能可以将数据库返回到误操作之前。但是即使oracle数据库也只支持短时间内的闪回。
+网上现有开源的MySQL闪回实现，原理都是解析binlog，生成反向sql: (必须为row模式)
+
+对于 delete 操作，生成insert （DELETE_ROWS_EVENT）
+对于 update 操作，交换binlog里面值的顺序 （UPDATE_ROWS_EVENT）
+对于 insert 操作，反向生成delete （WRITE_ROWS_EVENT）
+对于多个event，要逆向生成sql
+
+开源实现：
+
+https://github.com/58daojia-dba/mysqlbinlog_flashback
+https://github.com/danfengcao/binlog2sql/
+
+上面两种实现方式，都是通过 python-mysql-replication 包，模拟出原库的一个从库，然后 show binary logs 来获取binlog，发起同步binlog的请求，再解析EVENT。但是阿里云 RDS 的binlog在同步给从库之后，** 很快就被 purge 掉了 。如果要恢复 ** 昨天 的 ** 部分数据 **，两种方案都是拿不到binlog的。也就是闪回的时间有限。
+还有一些比较简单的实现，就是解析 binlog 物理文件，实现回滚，如 binlog-rollback.pl ，试过，但是速度太慢。
+为了不影响速度，又想使用比较成熟的闪回方案，我们可以这样做：
+
+借助一个自建的 mysqld 实例，将已purge掉的binlog拷贝到该实例的目录下
+在自建实例里，提前创建好需要恢复的表（结构），因为工具需要连接上来从 information_schema.columns 获取元数据信息
+拷贝的时候，可以替换掉mysql实例自己的binlog文件名，保持连续
+可能要修改 mysql-bin.index，确保文件名还能被mysqld识别到
+重启mysql实例，show binary logs 看一下是否在列表里面
+接下来就可以使用上面任何一种工具，模拟从库，指定一个binlog文件，开始时间，结束时间，得到回滚SQL
+再根据业务逻辑，筛选出需要的sql
+"/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "MySQL根据离线binlog快速“闪回”",
+      "item": "http://xgknight.com/posts/2017/03/mysql%E6%A0%B9%E6%8D%AE%E7%A6%BB%E7%BA%BFbinlog%E5%BF%AB%E9%80%9F%E9%97%AA%E5%9B%9E/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "MySQL根据离线binlog快速“闪回”",
+  "name": "MySQL根据离线binlog快速“闪回”",
+  "description": "昨天突然有个客户说误操作，自己删除了大量数据，CTO直接将我拉到一个讨论组里，说要帮他们恢复数据。他们自己挖的坑，打算让开发那边根据业务日志去恢复，被告知只记录的删除主键这样的信息，物理删除，无能为力。\n上服务器看了下记录的日志，发现好几台上面都有被误删的记录输出。阿里RDS虽然可以克隆一个恢复到删除时间点前的实例，但这散落的几万个id找起来费力，还有就是几个表之间关联的数据也要恢复，觉得麻烦。\n想到 MySQL 的闪回方案。以前看过好几篇相关文章，甚至差点自己用python撸一个来解析binlog，反转得到回滚sql，实在没空，这下要急用了。赶紧找了下网上“现成的方案”。\n正文开始\nMySQL（含阿里RDS）快速闪回可以说是对数据库误操作的后悔药，flashback功能可以将数据库返回到误操作之前。但是即使oracle数据库也只支持短时间内的闪回。\n网上现有开源的MySQL闪回实现，原理都是解析binlog，生成反向sql: (必须为row模式)\n对于 delete 操作，生成insert （DELETE_ROWS_EVENT） 对于 update 操作，交换binlog里面值的顺序 （UPDATE_ROWS_EVENT） 对于 insert 操作，反向生成delete （WRITE_ROWS_EVENT） 对于多个event，要逆向生成sql 开源实现：\nhttps://github.com/58daojia-dba/mysqlbinlog_flashback https://github.com/danfengcao/binlog2sql/ 上面两种实现方式，都是通过 python-mysql-replication 包，模拟出原库的一个从库，然后 show binary logs 来获取binlog，发起同步binlog的请求，再解析EVENT。但是阿里云 RDS 的binlog在同步给从库之后，** 很快就被 purge 掉了 。如果要恢复 ** 昨天 的 ** 部分数据 **，两种方案都是拿不到binlog的。也就是闪回的时间有限。\n还有一些比较简单的实现，就是解析 binlog 物理文件，实现回滚，如 binlog-rollback.pl ，试过，但是速度太慢。\n为了不影响速度，又想使用比较成熟的闪回方案，我们可以这样做：\n借助一个自建的 mysqld 实例，将已purge掉的binlog拷贝到该实例的目录下 在自建实例里，提前创建好需要恢复的表（结构），因为工具需要连接上来从 information_schema.columns 获取元数据信息 拷贝的时候，可以替换掉mysql实例自己的binlog文件名，保持连续 可能要修改 mysql-bin.index，确保文件名还能被mysqld识别到 重启mysql实例，show binary logs 看一下是否在列表里面 接下来就可以使用上面任何一种工具，模拟从库，指定一个binlog文件，开始时间，结束时间，得到回滚SQL 再根据业务逻辑，筛选出需要的sql ",
+  "keywords": [
+    "mysql"
+  ],
+  "articleBody": "昨天突然有个客户说误操作，自己删除了大量数据，CTO直接将我拉到一个讨论组里，说要帮他们恢复数据。他们自己挖的坑，打算让开发那边根据业务日志去恢复，被告知只记录的删除主键这样的信息，物理删除，无能为力。\n上服务器看了下记录的日志，发现好几台上面都有被误删的记录输出。阿里RDS虽然可以克隆一个恢复到删除时间点前的实例，但这散落的几万个id找起来费力，还有就是几个表之间关联的数据也要恢复，觉得麻烦。\n想到 MySQL 的闪回方案。以前看过好几篇相关文章，甚至差点自己用python撸一个来解析binlog，反转得到回滚sql，实在没空，这下要急用了。赶紧找了下网上“现成的方案”。\n正文开始\nMySQL（含阿里RDS）快速闪回可以说是对数据库误操作的后悔药，flashback功能可以将数据库返回到误操作之前。但是即使oracle数据库也只支持短时间内的闪回。\n网上现有开源的MySQL闪回实现，原理都是解析binlog，生成反向sql: (必须为row模式)\n对于 delete 操作，生成insert （DELETE_ROWS_EVENT） 对于 update 操作，交换binlog里面值的顺序 （UPDATE_ROWS_EVENT） 对于 insert 操作，反向生成delete （WRITE_ROWS_EVENT） 对于多个event，要逆向生成sql 开源实现：\nhttps://github.com/58daojia-dba/mysqlbinlog_flashback https://github.com/danfengcao/binlog2sql/ 上面两种实现方式，都是通过 python-mysql-replication 包，模拟出原库的一个从库，然后 show binary logs 来获取binlog，发起同步binlog的请求，再解析EVENT。但是阿里云 RDS 的binlog在同步给从库之后，** 很快就被 purge 掉了 。如果要恢复 ** 昨天 的 ** 部分数据 **，两种方案都是拿不到binlog的。也就是闪回的时间有限。\n还有一些比较简单的实现，就是解析 binlog 物理文件，实现回滚，如 binlog-rollback.pl ，试过，但是速度太慢。\n为了不影响速度，又想使用比较成熟的闪回方案，我们可以这样做：\n借助一个自建的 mysqld 实例，将已purge掉的binlog拷贝到该实例的目录下 在自建实例里，提前创建好需要恢复的表（结构），因为工具需要连接上来从 information_schema.columns 获取元数据信息 拷贝的时候，可以替换掉mysql实例自己的binlog文件名，保持连续 可能要修改 mysql-bin.index，确保文件名还能被mysqld识别到 重启mysql实例，show binary logs 看一下是否在列表里面 接下来就可以使用上面任何一种工具，模拟从库，指定一个binlog文件，开始时间，结束时间，得到回滚SQL 再根据业务逻辑，筛选出需要的sql 总之就是借助另外一个mysql，把binlog event传输过来。温馨提示：\n两个实例间版本不要跨度太大 注意文件权限 如果原库开启了gtid，这个自建实例也要开启gtid 示例：\npython mysqlbinlog_back.py --host=\"localhost\" --username=\"ecuser\" --password=\"ecuser\" --port=3306 \\ --schema=dbname --tables=\"t_xx1,t_xx2,t_xx3\" -S \"mysql-bin.000019\" -E \"2017-03-02 13:00:00\" -N \"2017-03-02 14:09:00\" -I -U ===log will also write to .//mysqlbinlog_flashback.log=== parameter={'start_binlog_file': 'mysql-bin.000019', 'stream': None, 'keep_data': True, 'file': {'data_create': None, 'flashback': None, 'data': None}, 'add_schema_name': False, 'start_time': None, 'keep_current_data': False, 'start_to_timestamp': 1488430800, 'mysql_setting': {'passwd': 'ecuser', 'host': 'localhost', 'charset': 'utf8', 'port': 3306, 'user': 'ecuser'}, 'table_name': 't_xx1,t_xx2,t_xx3', 'skip_delete': False, 'schema': 'dbname', 'stat': {'flash_sql': {}}, 'table_name_array': ['t_xx1', 't_xx2', 't_xx3'], 'one_binlog_file': False, 'output_file_path': './log', 'start_position': 4, 'skip_update': True, 'dump_event': False, 'end_to_timestamp': 1488434940, 'skip_insert': True, 'schema_array': ['dbname'] } scan 10000 events ....from binlogfile=mysql-bin.000019,timestamp=2017-03-02T11:42:14 scan 20000 events ....from binlogfile=mysql-bin.000019,timestamp=2017-03-02T11:42:29 ... 提示： binlog为ROW格式，dml影响的每一行都会记录两个event：Table_map和Row_log。而table_map里面的table_id并不会影响它在哪个实例上应用，这个id可以认为是逻辑上，记录表结构版本的机制 —— 当它在 table_definition_cache 没有找到表定义时，id自增1，分配给要记录到binlog的表。\nmysqlbinlog_back.py 使用经验 ：\n务必指定库名、表明，开始的binlog文件名，起始时间，结束时间。可以加快scan的速度。 根据恢复的需要，选择 -I, -U, -D，指定回滚哪些类型的操作。 如果只是恢复部分表数据（非完全闪回），做不到关联表的正确恢复。比如需要恢复delete数据，但无法恢复业务里因为delete引起其它表更新的数据，除非完全闪回。 不支持表字段是 enum 类型的，比如 t_xx3 的f_do_type字段。可以把自建实例上的enum定义改成int。 参考\nhttp://dinglin.iteye.com/blog/1539167 http://www.penglixun.com/tech/database/mysql_flashback_feature.html/comment-page-1#comment-1207998 http://www.cnblogs.com/yuyue2014/p/3721172.html 本文链接地址：http://xgknight.com/2017/03/03/mysql-flashback_use_purged-binlog/\n",
+  "wordCount" : "194",
+  "inLanguage": "en",
+  "datePublished": "2017-03-03T16:32:49Z",
+  "dateModified": "2017-03-03T16:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2017/03/mysql%E6%A0%B9%E6%8D%AE%E7%A6%BB%E7%BA%BFbinlog%E5%BF%AB%E9%80%9F%E9%97%AA%E5%9B%9E/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      MySQL根据离线binlog快速“闪回”
+    </h1>
+    <div class="post-meta"><span title='2017-03-03 16:32:49 +0000 UTC'>March 3, 2017</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>昨天突然有个客户说误操作，自己删除了大量数据，CTO直接将我拉到一个讨论组里，说要帮他们恢复数据。他们自己挖的坑，打算让开发那边根据业务日志去恢复，被告知只记录的删除主键这样的信息，物理删除，无能为力。</p>
+<p>上服务器看了下记录的日志，发现好几台上面都有被误删的记录输出。阿里RDS虽然可以克隆一个恢复到删除时间点前的实例，但这散落的几万个id找起来费力，还有就是几个表之间关联的数据也要恢复，觉得麻烦。</p>
+<p>想到 MySQL 的闪回方案。以前看过好几篇相关文章，甚至差点自己用python撸一个来解析binlog，反转得到回滚sql，实在没空，这下要急用了。赶紧找了下网上“现成的方案”。</p>
+<p>正文开始</p>
+<hr>
+<p>MySQL（含阿里RDS）快速闪回可以说是对数据库误操作的后悔药，flashback功能可以将数据库返回到误操作之前。但是即使oracle数据库也只支持短时间内的闪回。</p>
+<p>网上现有开源的MySQL闪回实现，原理都是解析binlog，生成反向sql: (必须为row模式)</p>
+<ol>
+<li>对于 delete 操作，生成insert （DELETE_ROWS_EVENT）</li>
+<li>对于 update 操作，交换binlog里面值的顺序 （UPDATE_ROWS_EVENT）</li>
+<li>对于 insert 操作，反向生成delete （WRITE_ROWS_EVENT）</li>
+<li>对于多个event，要逆向生成sql</li>
+</ol>
+<p>开源实现：</p>
+<ul>
+<li><a href="https://github.com/58daojia-dba/mysqlbinlog_flashback">https://github.com/58daojia-dba/mysqlbinlog_flashback</a></li>
+<li><a href="https://github.com/danfengcao/binlog2sql/">https://github.com/danfengcao/binlog2sql/</a></li>
+</ul>
+<p>上面两种实现方式，都是通过 python-mysql-replication 包，模拟出原库的一个从库，然后 <code>show binary logs</code> 来获取binlog，发起同步binlog的请求，再解析EVENT。但是阿里云 RDS 的binlog在同步给从库之后，** 很快就被 purge 掉了 <strong>。如果要恢复 ** 昨天</strong> 的 ** 部分数据 **，两种方案都是拿不到binlog的。也就是闪回的时间有限。</p>
+<p>还有一些比较简单的实现，就是解析 binlog 物理文件，实现回滚，如 <code>binlog-rollback.pl</code> ，试过，但是速度太慢。</p>
+<p>为了不影响速度，又想使用比较成熟的闪回方案，我们可以这样做：</p>
+<ol>
+<li>借助一个自建的 mysqld 实例，将已purge掉的binlog拷贝到该实例的目录下</li>
+<li>在自建实例里，提前创建好需要恢复的表（结构），因为工具需要连接上来从 <code>information_schema.columns</code> 获取元数据信息</li>
+<li>拷贝的时候，可以替换掉mysql实例自己的binlog文件名，保持连续</li>
+<li>可能要修改 <code>mysql-bin.index</code>，确保文件名还能被mysqld识别到</li>
+<li>重启mysql实例，<code>show binary logs</code> 看一下是否在列表里面</li>
+<li>接下来就可以使用上面任何一种工具，模拟从库，指定一个binlog文件，开始时间，结束时间，得到回滚SQL</li>
+<li>再根据业务逻辑，筛选出需要的sql</li>
+</ol>
+<p>总之就是借助另外一个mysql，把binlog event传输过来。温馨提示：</p>
+<ol>
+<li>两个实例间版本不要跨度太大</li>
+<li>注意文件权限</li>
+<li>如果原库开启了gtid，这个自建实例也要开启gtid</li>
+</ol>
+<p>示例：</p>
+<pre tabindex="0"><code>python mysqlbinlog_back.py --host=&#34;localhost&#34; --username=&#34;ecuser&#34; --password=&#34;ecuser&#34; --port=3306 \
+--schema=dbname --tables=&#34;t_xx1,t_xx2,t_xx3&#34; -S &#34;mysql-bin.000019&#34; -E &#34;2017-03-02 13:00:00&#34; -N &#34;2017-03-02 14:09:00&#34; -I -U
+
+===log will also  write to .//mysqlbinlog_flashback.log===
+parameter={&#39;start_binlog_file&#39;: &#39;mysql-bin.000019&#39;, &#39;stream&#39;: None, &#39;keep_data&#39;: True,
+ &#39;file&#39;: {&#39;data_create&#39;: None, &#39;flashback&#39;: None, &#39;data&#39;: None}, &#39;add_schema_name&#39;: False, &#39;start_time&#39;: None, &#39;keep_current_data&#39;: False, &#39;start_to_timestamp&#39;: 1488430800,
+ &#39;mysql_setting&#39;: {&#39;passwd&#39;: &#39;ecuser&#39;, &#39;host&#39;: &#39;localhost&#39;, &#39;charset&#39;: &#39;utf8&#39;, &#39;port&#39;: 3306, &#39;user&#39;: &#39;ecuser&#39;},
+ &#39;table_name&#39;: &#39;t_xx1,t_xx2,t_xx3&#39;, &#39;skip_delete&#39;: False, &#39;schema&#39;: &#39;dbname&#39;, &#39;stat&#39;: {&#39;flash_sql&#39;: {}},
+ &#39;table_name_array&#39;: [&#39;t_xx1&#39;, &#39;t_xx2&#39;, &#39;t_xx3&#39;],
+ &#39;one_binlog_file&#39;: False, &#39;output_file_path&#39;: &#39;./log&#39;, &#39;start_position&#39;: 4, &#39;skip_update&#39;: True,
+ &#39;dump_event&#39;: False, &#39;end_to_timestamp&#39;: 1488434940, &#39;skip_insert&#39;: True, &#39;schema_array&#39;: [&#39;dbname&#39;]
+}
+scan 10000 events ....from binlogfile=mysql-bin.000019,timestamp=2017-03-02T11:42:14
+scan 20000 events ....from binlogfile=mysql-bin.000019,timestamp=2017-03-02T11:42:29
+...
+</code></pre><p>提示：
+binlog为ROW格式，dml影响的每一行都会记录两个event：Table_map和Row_log。而table_map里面的table_id并不会影响它在哪个实例上应用，这个id可以认为是逻辑上，记录表结构版本的机制 —— 当它在 table_definition_cache 没有找到表定义时，id自增1，分配给要记录到binlog的表。</p>
+<p><strong>mysqlbinlog_back.py 使用经验</strong> ：</p>
+<ul>
+<li>务必指定库名、表明，开始的binlog文件名，起始时间，结束时间。可以加快scan的速度。</li>
+<li>根据恢复的需要，选择 -I, -U, -D，指定回滚哪些类型的操作。</li>
+<li>如果只是恢复部分表数据（非完全闪回），做不到关联表的正确恢复。比如需要恢复delete数据，但无法恢复业务里因为delete引起其它表更新的数据，除非完全闪回。</li>
+<li>不支持表字段是 enum 类型的，比如 t_xx3 的f_do_type字段。可以把自建实例上的enum定义改成int。</li>
+</ul>
+<p><strong>参考</strong></p>
+<ol>
+<li><a href="http://dinglin.iteye.com/blog/1539167">http://dinglin.iteye.com/blog/1539167</a></li>
+<li><a href="http://www.penglixun.com/tech/database/mysql_flashback_feature.html/comment-page-1#comment-1207998">http://www.penglixun.com/tech/database/mysql_flashback_feature.html/comment-page-1#comment-1207998</a></li>
+<li><a href="http://www.cnblogs.com/yuyue2014/p/3721172.html">http://www.cnblogs.com/yuyue2014/p/3721172.html</a></li>
+</ol>
+<hr>
+<p>本文链接地址：http://xgknight.com/2017/03/03/mysql-flashback_use_purged-binlog/</p>
+<hr>
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

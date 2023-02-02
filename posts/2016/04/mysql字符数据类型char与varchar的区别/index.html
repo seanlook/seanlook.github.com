@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>MySQL字符数据类型char与varchar的区别 | Sean Note</title>
+<meta name="keywords" content="mysql, schema设计">
+<meta name="description" content="数据类型差不多是接触mysql一开始就了解的内容，最近遇到几个现象如varchar自动转mediumtext，blob存储性能的问题，不得不回头明确一下关于MySQL常用数据类型的选择。
+mysql手册这里 已经讲的很清楚了。它们都是定义字符串型字段时常用的类型，但它们存储和检索的方式有不同，最大长度和尾部的空格是否保留也有差别。
+char类型是使用固定长度空间进行存储，范围0-255。比如CHAR(30)能放30个字符，存放abcd时，尾部会以空格补齐，实际占用空间 30 * 3bytes (utf8)。检索它的时候尾部空格会被去除。
+char善于存储经常改变的值，或者长度相对固定的值，比如type、ip地址或md5之类的数据，不容易产生碎片。关于它的效率可以参考这里。
+varchar类型保存可变长度字符串，范围0-65535（但受到单行最大64kb的限制）。比如用 varchar(30) 去存放abcd，实际使用5个字节，因为还需要使用额外1个字节来标识字串长度（0-255使用1个字节，超过255需要2个字节）。
+varchar善于存储值的长短不一的列，也是用的最多的一种类型，节省磁盘空间。update时varchar列时，如果新数据比原数据大，数据库需要重新开辟空间，这一点会有性能略有损耗，但innodb引擎下查询效率比char高一点。这也是innodb官方推荐的类型。
+如果存储时真实长度超过了char或者varchar定义的最大长度呢？
+在SQL严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示错误，即插入失败 在SQL非严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示warning，但可以成功 如果尾部要被截断的是空格，无论SQL所处模式，varchar都可以插入成功但提示warning；char也可以插入成功，并且无任何提示 这里特意提到SQL的严格模式，是因为在工作中也遇到过一些坑，参考MySQL的sql_mode严格模式注意点。
+贴上官方的一个表格：
+Value CHAR(4) Storage Required VARCHAR(4) Storage Required &#39;&#39; &rsquo; &#39; 4 bytes &#39;&#39; 1 byte &lsquo;ab&rsquo; &lsquo;ab &#39; 4 bytes &lsquo;ab&rsquo; 3 bytes &lsquo;abcd&rsquo; &lsquo;abcd&rsquo; 4 bytes &lsquo;abcd&rsquo; 5 bytes &lsquo;abcdefgh&rsquo; &lsquo;abcd&rsquo; 4 bytes &lsquo;abcd&rsquo; 5 bytes 另外，mysql字段值比较时默认是不区分大小写的，这是由于他们的校对规则（一般是 utf8_general_ci）决定的，按字符比较，所以查询时 值尾部 的空格也是被忽略的，除非建表时对列指定 BINARY （校对字符集变成utf8_bin）或者select * from vc where binary v=&#39;ab &#39;;，就会按字节比较，即比较时区分大小写和尾部空格。
+需要注意的是，使用varchar不能因为长度可变就随意分大空间，比如90个字节能放够的列定义成varchar(200)，因为开辟内存时是以200字节进行的，遇到需要filesort或tmp table作业可能会带来不利影响。">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2016/04/mysql%E5%AD%97%E7%AC%A6%E6%95%B0%E6%8D%AE%E7%B1%BB%E5%9E%8Bchar%E4%B8%8Evarchar%E7%9A%84%E5%8C%BA%E5%88%AB/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="MySQL字符数据类型char与varchar的区别" />
+<meta property="og:description" content="数据类型差不多是接触mysql一开始就了解的内容，最近遇到几个现象如varchar自动转mediumtext，blob存储性能的问题，不得不回头明确一下关于MySQL常用数据类型的选择。
+mysql手册这里 已经讲的很清楚了。它们都是定义字符串型字段时常用的类型，但它们存储和检索的方式有不同，最大长度和尾部的空格是否保留也有差别。
+char类型是使用固定长度空间进行存储，范围0-255。比如CHAR(30)能放30个字符，存放abcd时，尾部会以空格补齐，实际占用空间 30 * 3bytes (utf8)。检索它的时候尾部空格会被去除。
+char善于存储经常改变的值，或者长度相对固定的值，比如type、ip地址或md5之类的数据，不容易产生碎片。关于它的效率可以参考这里。
+varchar类型保存可变长度字符串，范围0-65535（但受到单行最大64kb的限制）。比如用 varchar(30) 去存放abcd，实际使用5个字节，因为还需要使用额外1个字节来标识字串长度（0-255使用1个字节，超过255需要2个字节）。
+varchar善于存储值的长短不一的列，也是用的最多的一种类型，节省磁盘空间。update时varchar列时，如果新数据比原数据大，数据库需要重新开辟空间，这一点会有性能略有损耗，但innodb引擎下查询效率比char高一点。这也是innodb官方推荐的类型。
+如果存储时真实长度超过了char或者varchar定义的最大长度呢？
+在SQL严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示错误，即插入失败 在SQL非严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示warning，但可以成功 如果尾部要被截断的是空格，无论SQL所处模式，varchar都可以插入成功但提示warning；char也可以插入成功，并且无任何提示 这里特意提到SQL的严格模式，是因为在工作中也遇到过一些坑，参考MySQL的sql_mode严格模式注意点。
+贴上官方的一个表格：
+Value CHAR(4) Storage Required VARCHAR(4) Storage Required &#39;&#39; &rsquo; &#39; 4 bytes &#39;&#39; 1 byte &lsquo;ab&rsquo; &lsquo;ab &#39; 4 bytes &lsquo;ab&rsquo; 3 bytes &lsquo;abcd&rsquo; &lsquo;abcd&rsquo; 4 bytes &lsquo;abcd&rsquo; 5 bytes &lsquo;abcdefgh&rsquo; &lsquo;abcd&rsquo; 4 bytes &lsquo;abcd&rsquo; 5 bytes 另外，mysql字段值比较时默认是不区分大小写的，这是由于他们的校对规则（一般是 utf8_general_ci）决定的，按字符比较，所以查询时 值尾部 的空格也是被忽略的，除非建表时对列指定 BINARY （校对字符集变成utf8_bin）或者select * from vc where binary v=&#39;ab &#39;;，就会按字节比较，即比较时区分大小写和尾部空格。
+需要注意的是，使用varchar不能因为长度可变就随意分大空间，比如90个字节能放够的列定义成varchar(200)，因为开辟内存时是以200字节进行的，遇到需要filesort或tmp table作业可能会带来不利影响。" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2016/04/mysql%E5%AD%97%E7%AC%A6%E6%95%B0%E6%8D%AE%E7%B1%BB%E5%9E%8Bchar%E4%B8%8Evarchar%E7%9A%84%E5%8C%BA%E5%88%AB/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2016-04-28T16:32:49+00:00" />
+<meta property="article:modified_time" content="2016-04-28T16:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="MySQL字符数据类型char与varchar的区别"/>
+<meta name="twitter:description" content="数据类型差不多是接触mysql一开始就了解的内容，最近遇到几个现象如varchar自动转mediumtext，blob存储性能的问题，不得不回头明确一下关于MySQL常用数据类型的选择。
+mysql手册这里 已经讲的很清楚了。它们都是定义字符串型字段时常用的类型，但它们存储和检索的方式有不同，最大长度和尾部的空格是否保留也有差别。
+char类型是使用固定长度空间进行存储，范围0-255。比如CHAR(30)能放30个字符，存放abcd时，尾部会以空格补齐，实际占用空间 30 * 3bytes (utf8)。检索它的时候尾部空格会被去除。
+char善于存储经常改变的值，或者长度相对固定的值，比如type、ip地址或md5之类的数据，不容易产生碎片。关于它的效率可以参考这里。
+varchar类型保存可变长度字符串，范围0-65535（但受到单行最大64kb的限制）。比如用 varchar(30) 去存放abcd，实际使用5个字节，因为还需要使用额外1个字节来标识字串长度（0-255使用1个字节，超过255需要2个字节）。
+varchar善于存储值的长短不一的列，也是用的最多的一种类型，节省磁盘空间。update时varchar列时，如果新数据比原数据大，数据库需要重新开辟空间，这一点会有性能略有损耗，但innodb引擎下查询效率比char高一点。这也是innodb官方推荐的类型。
+如果存储时真实长度超过了char或者varchar定义的最大长度呢？
+在SQL严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示错误，即插入失败 在SQL非严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示warning，但可以成功 如果尾部要被截断的是空格，无论SQL所处模式，varchar都可以插入成功但提示warning；char也可以插入成功，并且无任何提示 这里特意提到SQL的严格模式，是因为在工作中也遇到过一些坑，参考MySQL的sql_mode严格模式注意点。
+贴上官方的一个表格：
+Value CHAR(4) Storage Required VARCHAR(4) Storage Required &#39;&#39; &rsquo; &#39; 4 bytes &#39;&#39; 1 byte &lsquo;ab&rsquo; &lsquo;ab &#39; 4 bytes &lsquo;ab&rsquo; 3 bytes &lsquo;abcd&rsquo; &lsquo;abcd&rsquo; 4 bytes &lsquo;abcd&rsquo; 5 bytes &lsquo;abcdefgh&rsquo; &lsquo;abcd&rsquo; 4 bytes &lsquo;abcd&rsquo; 5 bytes 另外，mysql字段值比较时默认是不区分大小写的，这是由于他们的校对规则（一般是 utf8_general_ci）决定的，按字符比较，所以查询时 值尾部 的空格也是被忽略的，除非建表时对列指定 BINARY （校对字符集变成utf8_bin）或者select * from vc where binary v=&#39;ab &#39;;，就会按字节比较，即比较时区分大小写和尾部空格。
+需要注意的是，使用varchar不能因为长度可变就随意分大空间，比如90个字节能放够的列定义成varchar(200)，因为开辟内存时是以200字节进行的，遇到需要filesort或tmp table作业可能会带来不利影响。"/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "MySQL字符数据类型char与varchar的区别",
+      "item": "http://xgknight.com/posts/2016/04/mysql%E5%AD%97%E7%AC%A6%E6%95%B0%E6%8D%AE%E7%B1%BB%E5%9E%8Bchar%E4%B8%8Evarchar%E7%9A%84%E5%8C%BA%E5%88%AB/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "MySQL字符数据类型char与varchar的区别",
+  "name": "MySQL字符数据类型char与varchar的区别",
+  "description": "数据类型差不多是接触mysql一开始就了解的内容，最近遇到几个现象如varchar自动转mediumtext，blob存储性能的问题，不得不回头明确一下关于MySQL常用数据类型的选择。\nmysql手册这里 已经讲的很清楚了。它们都是定义字符串型字段时常用的类型，但它们存储和检索的方式有不同，最大长度和尾部的空格是否保留也有差别。\nchar类型是使用固定长度空间进行存储，范围0-255。比如CHAR(30)能放30个字符，存放abcd时，尾部会以空格补齐，实际占用空间 30 * 3bytes (utf8)。检索它的时候尾部空格会被去除。\nchar善于存储经常改变的值，或者长度相对固定的值，比如type、ip地址或md5之类的数据，不容易产生碎片。关于它的效率可以参考这里。\nvarchar类型保存可变长度字符串，范围0-65535（但受到单行最大64kb的限制）。比如用 varchar(30) 去存放abcd，实际使用5个字节，因为还需要使用额外1个字节来标识字串长度（0-255使用1个字节，超过255需要2个字节）。\nvarchar善于存储值的长短不一的列，也是用的最多的一种类型，节省磁盘空间。update时varchar列时，如果新数据比原数据大，数据库需要重新开辟空间，这一点会有性能略有损耗，但innodb引擎下查询效率比char高一点。这也是innodb官方推荐的类型。\n如果存储时真实长度超过了char或者varchar定义的最大长度呢？\n在SQL严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示错误，即插入失败 在SQL非严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示warning，但可以成功 如果尾部要被截断的是空格，无论SQL所处模式，varchar都可以插入成功但提示warning；char也可以插入成功，并且无任何提示 这里特意提到SQL的严格模式，是因为在工作中也遇到过一些坑，参考MySQL的sql_mode严格模式注意点。\n贴上官方的一个表格：\nValue CHAR(4) Storage Required VARCHAR(4) Storage Required '' \u0026rsquo; ' 4 bytes '' 1 byte \u0026lsquo;ab\u0026rsquo; \u0026lsquo;ab ' 4 bytes \u0026lsquo;ab\u0026rsquo; 3 bytes \u0026lsquo;abcd\u0026rsquo; \u0026lsquo;abcd\u0026rsquo; 4 bytes \u0026lsquo;abcd\u0026rsquo; 5 bytes \u0026lsquo;abcdefgh\u0026rsquo; \u0026lsquo;abcd\u0026rsquo; 4 bytes \u0026lsquo;abcd\u0026rsquo; 5 bytes 另外，mysql字段值比较时默认是不区分大小写的，这是由于他们的校对规则（一般是 utf8_general_ci）决定的，按字符比较，所以查询时 值尾部 的空格也是被忽略的，除非建表时对列指定 BINARY （校对字符集变成utf8_bin）或者select * from vc where binary v='ab ';，就会按字节比较，即比较时区分大小写和尾部空格。\n需要注意的是，使用varchar不能因为长度可变就随意分大空间，比如90个字节能放够的列定义成varchar(200)，因为开辟内存时是以200字节进行的，遇到需要filesort或tmp table作业可能会带来不利影响。",
+  "keywords": [
+    "mysql", "schema设计"
+  ],
+  "articleBody": "数据类型差不多是接触mysql一开始就了解的内容，最近遇到几个现象如varchar自动转mediumtext，blob存储性能的问题，不得不回头明确一下关于MySQL常用数据类型的选择。\nmysql手册这里 已经讲的很清楚了。它们都是定义字符串型字段时常用的类型，但它们存储和检索的方式有不同，最大长度和尾部的空格是否保留也有差别。\nchar类型是使用固定长度空间进行存储，范围0-255。比如CHAR(30)能放30个字符，存放abcd时，尾部会以空格补齐，实际占用空间 30 * 3bytes (utf8)。检索它的时候尾部空格会被去除。\nchar善于存储经常改变的值，或者长度相对固定的值，比如type、ip地址或md5之类的数据，不容易产生碎片。关于它的效率可以参考这里。\nvarchar类型保存可变长度字符串，范围0-65535（但受到单行最大64kb的限制）。比如用 varchar(30) 去存放abcd，实际使用5个字节，因为还需要使用额外1个字节来标识字串长度（0-255使用1个字节，超过255需要2个字节）。\nvarchar善于存储值的长短不一的列，也是用的最多的一种类型，节省磁盘空间。update时varchar列时，如果新数据比原数据大，数据库需要重新开辟空间，这一点会有性能略有损耗，但innodb引擎下查询效率比char高一点。这也是innodb官方推荐的类型。\n如果存储时真实长度超过了char或者varchar定义的最大长度呢？\n在SQL严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示错误，即插入失败 在SQL非严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示warning，但可以成功 如果尾部要被截断的是空格，无论SQL所处模式，varchar都可以插入成功但提示warning；char也可以插入成功，并且无任何提示 这里特意提到SQL的严格模式，是因为在工作中也遇到过一些坑，参考MySQL的sql_mode严格模式注意点。\n贴上官方的一个表格：\nValue CHAR(4) Storage Required VARCHAR(4) Storage Required '' ’ ' 4 bytes '' 1 byte ‘ab’ ‘ab ' 4 bytes ‘ab’ 3 bytes ‘abcd’ ‘abcd’ 4 bytes ‘abcd’ 5 bytes ‘abcdefgh’ ‘abcd’ 4 bytes ‘abcd’ 5 bytes 另外，mysql字段值比较时默认是不区分大小写的，这是由于他们的校对规则（一般是 utf8_general_ci）决定的，按字符比较，所以查询时 值尾部 的空格也是被忽略的，除非建表时对列指定 BINARY （校对字符集变成utf8_bin）或者select * from vc where binary v='ab ';，就会按字节比较，即比较时区分大小写和尾部空格。\n需要注意的是，使用varchar不能因为长度可变就随意分大空间，比如90个字节能放够的列定义成varchar(200)，因为开辟内存时是以200字节进行的，遇到需要filesort或tmp table作业可能会带来不利影响。\n最后研究一下字符集对存储长度影响，以 create table tc_utf8(c1 int primary key auto_increment, c2 char(30), c3 varchar(N)) charset=utf8; 为例：\n字符集为utf8，于是中文每个字符占3个字节，英文还是1个字节，所以N最大为 (65535-1-2-4-30*3)/3 = 21812，即最多能存放21812个英文、数字、汉字。其中65535是单行最大限制，减1是NULL标识位，减2的是头部的2个字节标识长度，减30*3的原因是char(30)占用90个字节，最后除以3还是因为utf8最长用3个字节表示一个字符。\n但有人会说，utf8的英文字符只需要1个字节表示，并不占用3个字节，在存ASCII字符的情况下N是不是可以更大呢。答案是否定的，因为定义表的时候mysql事先并不知道c3要存的是英文还在中文，只能以最大来计。mysql也是以这种方式来确保行最大 65535 bytes 限制：数据行只要出现一个ascii字符（如英文字母、数字），就永远达不到65535，数据行全中文则刚好满。\n还有一种特殊情况：\nmysql\u003e show variables like \"char%\"; +--------------------------+----------------------------+ | Variable_name | Value | +--------------------------+----------------------------+ | character_set_client | utf8 | | character_set_connection | utf8 | | character_set_database | utf8 | | character_set_filesystem | binary | | character_set_results | utf8 | | character_set_server | latin1 | | character_set_system | utf8 | | character_sets_dir | /usr/share/mysql/charsets/ | +--------------------------+----------------------------+ 8 rows in set (0.12 sec) mysql\u003e select @@sql_mode; +------------------------+ | @@sql_mode | +------------------------+ | NO_ENGINE_SUBSTITUTION | +------------------------+ 1 rows in set (0.13 sec) mysql\u003e create table tc_utf8_21812(c1 int primary key auto_increment, c2 char(30), c3 varchar(21812)) charset=utf8; Query OK, 0 rows affected (0.10 sec) mysql\u003e create table tc_utf8_21813(c1 int primary key auto_increment, c2 char(30), c3 varchar(21845)) charset=utf8; Row size too large. The maximum row size for the used table type, not counting BLOBs, is 65535. This includes storage overhead, check the manual. You have to change some columns to TEXT or BLOBs mysql\u003e create table tc_utf8_21846(c1 int primary key auto_increment, c2 char(30), c3 varchar(21846)) charset=utf8; Query OK, 0 rows affected, 1 warnings (0.10 sec) mysql\u003e show warnings; +-------+------+---------------------------------------------+ | Level | Code | Message | +-------+------+---------------------------------------------+ | Note | 1246 | Converting column 'c3' from VARCHAR to TEXT | +-------+------+---------------------------------------------+ 1 rows in set (0.14 sec) 即在非严格模式下，因为N=21813 \u003e 21812，所以报 Row size too large 错误。但N=21846 \u003e (65535/3)时，只是出现warnings，varchar自动变成了mediumtext 类型。\n细心的朋友可能注意到上面开始我看了一下字符集 show variabels like \"char%\";，因为接下来要说明另外一个问题：客户端字符集与database不一样的情况。\n我们回到 N\u003c=21812 的正常情况：\nCREATE TABLE `tc_utf8` ( `c1` int(11) NOT NULL AUTO_INCREMENT, `c2` char(30) DEFAULT NULL, `c3` varchar(30) DEFAULT NULL, PRIMARY KEY (`c1`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8; 插入一些数据：\nmysql\u003e set names utf8; mysql\u003e insert into tc_utf8(c2,c3) values('en_30',repeat('a',30)); Query OK, 1 rows affected (17.87 sec) mysql\u003e insert into tc_utf8(c2,c3) values('en_31',repeat('b',31)); Query OK, 1 rows affected, 1 warnings (0.10 sec) mysql\u003e show warnings; +---------+------+-----------------------------------------+ | Level | Code | Message | +---------+------+-----------------------------------------+ | Warning | 1265 | Data truncated for column 'c3' at row 1 | +---------+------+-----------------------------------------+ 1 rows in set (0.14 sec) mysql\u003e insert into tc_utf8(c2,c3) values('zh_30',repeat('中',30)); Query OK, 1 rows affected (0.18 sec) mysql\u003e insert into tc_utf8(c2,c3) values('zh_31',repeat('文',31)); Query OK, 1 rows affected, 1 warnings (0.09 sec) 意料之中，汉字同样被截断 ysql\u003e select c2,c3,length(c3),char_length(c3) from tc_utf8; +-------+------------+-----------------+------------------------------------------------------------------------+ | c2 | length(c3) | char_length(c3) | c3 | +-------+------------+-----------------+------------------------------------------------------------------------+ | en_30 | 30 | 30 | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | | en_31 | 30 | 30 | bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb | | zh_30 | 90 | 30 | 中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中 | | zh_31 | 90 | 30 | 文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文 | +-------+------------+-----------------+------------------------------------------------------------------------+ 4 rows in set (0.00 sec) 上面的en_30代表insert的时候存入30个英文字符。可以看到30个a占用30个字节，30个汉字占用90个字节，大于30的会被截断，证实了文章一开头的说法。\nmysql\u003e set names latin1; mysql\u003e insert into tc_utf8(c2,c3) values('zh_30_latin1',repeat('中',30)); Query OK, 1 rows affected, 1 warnings (0.10 sec) mysql\u003e show warnings; +---------+------+-----------------------------------------+ | Level | Code | Message | +---------+------+-----------------------------------------+ | Warning | 1265 | Data truncated for column 'c3' at row 1 | +---------+------+-----------------------------------------+ 1 rows in set (0.14 sec) mysql\u003e insert into tc_utf8(c2,c3) values('zh_10_latin1',repeat('中',10)); Query OK, 1 rows affected (0.10 sec) mysql\u003e insert into tc_utf8(c2,c3) values('zh_10_latin1',repeat('文',10)); Query OK, 1 rows affected (0.11 sec) mysql\u003e insert into tc_utf8(c2,c3) values('zh_11_latin1',repeat('文',11)); Query OK, 1 rows affected, 1 warnings (0.12 sec) 截断 上面的实验显示，db table是utf8，但客户端连接时使用latin1，在非严格模式下 varchar(30) 只能存10个汉字，多余的尾部被截断了\n我们来看一下占用字节的情况：（2,3行的乱码是意料之中的）\nmysql\u003e select c1,c2,c3,length(c3),char_length(c3) from tc_utf8; +----+--------------+--------------------------------+------------+-----------------+ | c1 | c2 | c3 | length(c3) | char_length(c3) | +----+--------------+--------------------------------+------------+-----------------+ | 1 | en_30 | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | 30 | 30 | | 2 | en_31 | bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb | 30 | 30 | | 3 | zh_30 | ?????????????????????????????? | 90 | 30 | | 4 | zh_31 | ?????????????????????????????? | 90 | 30 | | 5 | zh_30_latin1 | 中中中中中中中中中中 | 60 | 30 | | 6 | zh_10_latin1 | 中中中中中中中中中中 | 60 | 30 | | 7 | zh_10_latin1 | 文文文文文文文文文文 | 80 | 30 | | 9 | zh_11_latin1 | 文文文文文文文文文文 | 80 | 30 | +----+--------------+--------------------------------+------------+-----------------+ 8 rows in set (0.14 sec) 看到char_length函数算出的中、英文字符个数都是30，但一个“中”占6字节，一个“文”占8字节，是不是很诧异，这中间有数次的编码转换过程，有兴趣 可以参考 http://mysql.rjweb.org/doc.php/charcoll ，是可以模拟出来的。\n在严格模式下就没这么复杂了，所以尽量使用 STRICT_TRANS_TABLES ，避免意外的情况带入生产环境。早期设计的时候就要保持客户端与数据库字符集一致。\n参考 MySQL manual:The CHAR and VARCHAR Types MySQL字符集指南–进阶篇V0.7 MySQL字符集与校对规则 MySQL String Length http://sunny90.com/a/database/2014/0819/24.html 本文链接地址：http://xgknight.com/2016/04/28/mysql-char-varchar-set/\n",
+  "wordCount" : "716",
+  "inLanguage": "en",
+  "datePublished": "2016-04-28T16:32:49Z",
+  "dateModified": "2016-04-28T16:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2016/04/mysql%E5%AD%97%E7%AC%A6%E6%95%B0%E6%8D%AE%E7%B1%BB%E5%9E%8Bchar%E4%B8%8Evarchar%E7%9A%84%E5%8C%BA%E5%88%AB/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      MySQL字符数据类型char与varchar的区别
+    </h1>
+    <div class="post-meta"><span title='2016-04-28 16:32:49 +0000 UTC'>April 28, 2016</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>数据类型差不多是接触mysql一开始就了解的内容，最近遇到几个现象如varchar自动转mediumtext，blob存储性能的问题，不得不回头明确一下关于MySQL常用数据类型的选择。</p>
+<p><a href="http://dev.mysql.com/doc/refman/5.6/en/char.html">mysql手册这里</a> 已经讲的很清楚了。它们都是定义字符串型字段时常用的类型，但它们存储和检索的方式有不同，最大长度和尾部的空格是否保留也有差别。</p>
+<p><code>char</code>类型是使用固定长度空间进行存储，范围0-255。比如<code>CHAR(30)</code>能放30个字符，存放abcd时，尾部会以空格补齐，实际占用空间 30 * 3bytes (utf8)。检索它的时候尾部空格会被去除。</p>
+<p>char善于存储经常改变的值，或者长度相对固定的值，比如type、ip地址或md5之类的数据，不容易产生碎片。关于它的效率可以参考<a href="http://bbs.chinaunix.net/thread-1696053-1-1.html">这里</a>。</p>
+<p><code>varchar</code>类型保存可变长度字符串，范围0-65535（但受到单行最大64kb的限制）。比如用 <code>varchar(30)</code> 去存放abcd，实际使用5个字节，因为还需要使用额外1个字节来标识字串长度（0-255使用1个字节，超过255需要2个字节）。</p>
+<p>varchar善于存储值的长短不一的列，也是用的最多的一种类型，节省磁盘空间。update时varchar列时，如果新数据比原数据大，数据库需要重新开辟空间，这一点会有性能略有损耗，但innodb引擎下查询效率比char高一点。这也是innodb官方推荐的类型。</p>
+<p>如果存储时真实长度超过了char或者varchar定义的最大长度呢？</p>
+<ul>
+<li>在SQL严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示错误，即插入失败</li>
+<li>在SQL非严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示warning，但可以成功</li>
+<li>如果尾部要被截断的是空格，无论SQL所处模式，varchar都可以插入成功但提示warning；char也可以插入成功，并且无任何提示</li>
+</ul>
+<p>这里特意提到SQL的严格模式，是因为在工作中也遇到过一些坑，参考<a href="">MySQL的sql_mode严格模式注意点</a>。</p>
+<p>贴上官方的一个表格：</p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>CHAR(4)</th>
+<th>Storage Required</th>
+<th>VARCHAR(4)</th>
+<th>Storage Required</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>''</td>
+<td>&rsquo;    '</td>
+<td>4 bytes</td>
+<td>''</td>
+<td>1 byte</td>
+</tr>
+<tr>
+<td>&lsquo;ab&rsquo;</td>
+<td>&lsquo;ab  '</td>
+<td>4 bytes</td>
+<td>&lsquo;ab&rsquo;</td>
+<td>3 bytes</td>
+</tr>
+<tr>
+<td>&lsquo;abcd&rsquo;</td>
+<td>&lsquo;abcd&rsquo;</td>
+<td>4 bytes</td>
+<td>&lsquo;abcd&rsquo;</td>
+<td>5 bytes</td>
+</tr>
+<tr>
+<td>&lsquo;abcdefgh&rsquo;</td>
+<td>&lsquo;abcd&rsquo;</td>
+<td>4 bytes</td>
+<td>&lsquo;abcd&rsquo;</td>
+<td>5 bytes</td>
+</tr>
+</tbody>
+</table>
+<p>另外，mysql字段值比较时默认是不区分大小写的，这是由于他们的校对规则（一般是 utf8_general_ci）决定的，按字符比较，所以查询时 值尾部 的空格也是被忽略的，除非建表时对列指定 <code>BINARY</code> （校对字符集变成utf8_bin）或者<code>select * from vc where binary v='ab  ';</code>，就会按字节比较，即比较时区分大小写和尾部空格。</p>
+<p>需要注意的是，使用varchar不能因为长度可变就随意分大空间，比如90个字节能放够的列定义成varchar(200)，因为开辟内存时是以200字节进行的，遇到需要filesort或tmp table作业可能会带来不利影响。</p>
+<!-- raw HTML omitted -->
+<p>最后研究一下字符集对存储长度影响，以 <code>create table tc_utf8(c1 int primary key auto_increment, c2 char(30), c3 varchar(N)) charset=utf8;</code> 为例：</p>
+<p>字符集为utf8，于是中文每个字符占3个字节，英文还是1个字节，所以N最大为 (65535-1-2-4-30*3)/3 = 21812，即最多能存放21812个英文、数字、汉字。其中65535是单行最大限制，减1是NULL标识位，减2的是头部的2个字节标识长度，减30*3的原因是char(30)占用90个字节，最后除以3还是因为utf8最长用3个字节表示一个字符。</p>
+<p>但有人会说，utf8的英文字符只需要1个字节表示，并不占用3个字节，在存ASCII字符的情况下N是不是可以更大呢。答案是否定的，因为定义表的时候mysql事先并不知道c3要存的是英文还在中文，只能以最大来计。mysql也是以这种方式来确保行最大 65535 bytes 限制：数据行只要出现一个ascii字符（如英文字母、数字），就永远达不到65535，数据行全中文则刚好满。</p>
+<p>还有一种特殊情况：</p>
+<pre tabindex="0"><code>mysql&gt; show variables like &#34;char%&#34;;
++--------------------------+----------------------------+
+| Variable_name            | Value                      |
++--------------------------+----------------------------+
+| character_set_client     | utf8                       |
+| character_set_connection | utf8                       |
+| character_set_database   | utf8                       |
+| character_set_filesystem | binary                     |
+| character_set_results    | utf8                       |
+| character_set_server     | latin1                     |
+| character_set_system     | utf8                       |
+| character_sets_dir       | /usr/share/mysql/charsets/ |
++--------------------------+----------------------------+
+8 rows in set (0.12 sec)
+
+mysql&gt; select @@sql_mode;
++------------------------+
+| @@sql_mode             |
++------------------------+
+| NO_ENGINE_SUBSTITUTION |
++------------------------+
+1 rows in set (0.13 sec)
+
+mysql&gt; create table tc_utf8_21812(c1 int primary key auto_increment, c2 char(30), c3 varchar(21812)) charset=utf8;
+Query OK, 0 rows affected (0.10 sec)
+
+mysql&gt; create table tc_utf8_21813(c1 int primary key auto_increment, c2 char(30), c3 varchar(21845)) charset=utf8;
+Row size too large. The maximum row size for the used table type, not counting BLOBs, is 65535. This includes storage overhead, check the manual. You have to change some columns to TEXT or BLOBs
+
+mysql&gt; create table tc_utf8_21846(c1 int primary key auto_increment, c2 char(30), c3 varchar(21846)) charset=utf8;
+Query OK, 0 rows affected, 1 warnings (0.10 sec)
+
+mysql&gt; show warnings;
++-------+------+---------------------------------------------+
+| Level | Code | Message                                     |
++-------+------+---------------------------------------------+
+| Note  | 1246 | Converting column &#39;c3&#39; from VARCHAR to TEXT |
++-------+------+---------------------------------------------+
+1 rows in set (0.14 sec)
+</code></pre><p>即在非严格模式下，因为N=21813 &gt; 21812，所以报 Row size too large 错误。但N=21846 &gt; (65535/3)时，只是出现warnings，varchar自动变成了mediumtext 类型。</p>
+<p>细心的朋友可能注意到上面开始我看了一下字符集 <code>show variabels like &quot;char%&quot;;</code>，因为接下来要说明另外一个问题：客户端字符集与database不一样的情况。</p>
+<p>我们回到 N&lt;=21812 的正常情况：</p>
+<pre tabindex="0"><code>CREATE TABLE `tc_utf8` (
+  `c1` int(11) NOT NULL AUTO_INCREMENT,
+  `c2` char(30) DEFAULT NULL,
+  `c3` varchar(30) DEFAULT NULL,
+  PRIMARY KEY (`c1`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+</code></pre><p>插入一些数据：</p>
+<pre tabindex="0"><code>mysql&gt; set names utf8;
+mysql&gt; insert into tc_utf8(c2,c3) values(&#39;en_30&#39;,repeat(&#39;a&#39;,30));
+Query OK, 1 rows affected (17.87 sec)
+
+mysql&gt; insert into tc_utf8(c2,c3) values(&#39;en_31&#39;,repeat(&#39;b&#39;,31));
+Query OK, 1 rows affected, 1 warnings (0.10 sec)
+
+mysql&gt; show warnings;
++---------+------+-----------------------------------------+
+| Level   | Code | Message                                 |
++---------+------+-----------------------------------------+
+| Warning | 1265 | Data truncated for column &#39;c3&#39; at row 1 |
++---------+------+-----------------------------------------+
+1 rows in set (0.14 sec)
+
+mysql&gt; insert into tc_utf8(c2,c3) values(&#39;zh_30&#39;,repeat(&#39;中&#39;,30));
+Query OK, 1 rows affected (0.18 sec)
+
+mysql&gt; insert into tc_utf8(c2,c3) values(&#39;zh_31&#39;,repeat(&#39;文&#39;,31));
+Query OK, 1 rows affected, 1 warnings (0.09 sec)
+
+意料之中，汉字同样被截断
+
+ysql&gt; select c2,c3,length(c3),char_length(c3) from tc_utf8;
++-------+------------+-----------------+------------------------------------------------------------------------+
+| c2    | length(c3) | char_length(c3) | c3                                                                     |
++-------+------------+-----------------+------------------------------------------------------------------------+
+| en_30 |         30 |              30 | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa                                         |
+| en_31 |         30 |              30 | bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb                                         |
+| zh_30 |         90 |              30 | 中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中 |
+| zh_31 |         90 |              30 | 文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文 |
++-------+------------+-----------------+------------------------------------------------------------------------+
+4 rows in set (0.00 sec)
+</code></pre><p>上面的en_30代表insert的时候存入<em>30</em>个<em>英文</em>字符。可以看到30个a占用30个字节，30个汉字占用90个字节，大于30的会被截断，证实了文章一开头的说法。</p>
+<pre tabindex="0"><code>mysql&gt; set names latin1;
+
+mysql&gt; insert into tc_utf8(c2,c3) values(&#39;zh_30_latin1&#39;,repeat(&#39;中&#39;,30));
+Query OK, 1 rows affected, 1 warnings (0.10 sec)
+
+mysql&gt; show warnings;
++---------+------+-----------------------------------------+
+| Level   | Code | Message                                 |
++---------+------+-----------------------------------------+
+| Warning | 1265 | Data truncated for column &#39;c3&#39; at row 1 |
++---------+------+-----------------------------------------+
+1 rows in set (0.14 sec)
+
+mysql&gt; insert into tc_utf8(c2,c3) values(&#39;zh_10_latin1&#39;,repeat(&#39;中&#39;,10));
+Query OK, 1 rows affected (0.10 sec)
+
+mysql&gt; insert into tc_utf8(c2,c3) values(&#39;zh_10_latin1&#39;,repeat(&#39;文&#39;,10));
+Query OK, 1 rows affected (0.11 sec)
+
+mysql&gt; insert into tc_utf8(c2,c3) values(&#39;zh_11_latin1&#39;,repeat(&#39;文&#39;,11));
+Query OK, 1 rows affected, 1 warnings (0.12 sec)
+
+截断
+</code></pre><p>上面的实验显示，db table是utf8，但客户端连接时使用latin1，在非严格模式下 varchar(30) <strong>只能存10</strong>个汉字，多余的尾部被截断了</p>
+<p>我们来看一下占用字节的情况：（2,3行的乱码是意料之中的）</p>
+<pre tabindex="0"><code>mysql&gt; select c1,c2,c3,length(c3),char_length(c3) from tc_utf8;
++----+--------------+--------------------------------+------------+-----------------+
+| c1 | c2           | c3                             | length(c3) | char_length(c3) |
++----+--------------+--------------------------------+------------+-----------------+
+| 1  | en_30        | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | 30         | 30              |
+| 2  | en_31        | bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb | 30         | 30              |
+| 3  | zh_30        | ?????????????????????????????? | 90         | 30              |
+| 4  | zh_31        | ?????????????????????????????? | 90         | 30              |
+| 5  | zh_30_latin1 | 中中中中中中中中中中 | 60         | 30              |
+| 6  | zh_10_latin1 | 中中中中中中中中中中 | 60         | 30              |
+| 7  | zh_10_latin1 | 文文文文文文文文文文 | 80         | 30              |
+| 9  | zh_11_latin1 | 文文文文文文文文文文 | 80         | 30              |
++----+--------------+--------------------------------+------------+-----------------+
+8 rows in set (0.14 sec)
+</code></pre><p>看到char_length函数算出的中、英文字符个数都是30，但一个“中”占6字节，一个“文”占8字节，是不是很诧异，这中间有数次的编码转换过程，有兴趣 可以参考 <a href="http://mysql.rjweb.org/doc.php/charcoll">http://mysql.rjweb.org/doc.php/charcoll</a> ，是可以模拟出来的。</p>
+<p>在严格模式下就没这么复杂了，所以尽量使用 STRICT_TRANS_TABLES ，避免意外的情况带入生产环境。早期设计的时候就要保持客户端与数据库字符集一致。</p>
+<h2 id="参考">参考<a hidden class="anchor" aria-hidden="true" href="#参考">#</a></h2>
+<ul>
+<li><a href="http://dev.mysql.com/doc/refman/5.7/en/char.html">MySQL manual:The CHAR and VARCHAR Types</a></li>
+<li><a href="http://get.ftqq.com/723.get">MySQL字符集指南&ndash;进阶篇V0.7</a></li>
+<li><a href="http://mysql.rjweb.org/doc.php/charcoll">MySQL字符集与校对规则</a></li>
+<li><a href="http://www.mysqltutorial.org/mysql-string-length/">MySQL String Length</a></li>
+<li><a href="http://sunny90.com/a/database/2014/0819/24.html">http://sunny90.com/a/database/2014/0819/24.html</a></li>
+</ul>
+<hr>
+<p>本文链接地址：http://xgknight.com/2016/04/28/mysql-char-varchar-set/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/schema%E8%AE%BE%E8%AE%A1/">schema设计</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

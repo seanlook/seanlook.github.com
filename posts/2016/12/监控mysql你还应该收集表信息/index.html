@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>监控MySQL你还应该收集表信息 | Sean Note</title>
+<meta name="keywords" content="mysql, 监控">
+<meta name="description" content="1. Story 也许你经常会被问到，库里某个表最近一年的内每个月的数据量增长情况。当然如果你有按月分表比较好办，挨个 show table status，如果只有一个大表，那估计要在大家都休息的时候，寂寞的夜里去跑sql统计了，因为你只能获取当前的表信息，历史信息追查不到了。
+除此以外，作为DBA本身也要对数据库空间增长情况进行预估，用以规划容量。我们说的表信息主要包括：
+表数据大小（DATA_LENGTH） 索引大小(INDEX_LENGTH) 行数（ROWS） 当前自增值（AUTO_INCREMENT，如果有） 目前是没有看到哪个mysql监控工具上提供这样的指标。这些信息不需要采集的太频繁，而且结果也只是个预估值，不一定准确，所以这是站在一个全局、长远的角度去监控(采集)表的。
+本文要介绍的自己写的采集工具，是基于组内现有的一套监控体系：
+InfluxDB：时间序列数据库，存储监控数据 Grafana：数据展示面板 Telegraf：收集信息的agent 看了下 telegraf 的最新的 mysql 插件，一开始很欣慰：支持收集 Table schema statistics 和 Info schema auto increment columns。试用了一下，有数据，但是如前面所说，除了自增值外其他都是预估值，telegraf收集频率过高没啥意义，也许一天2次就足够了，它提供的 IntervalSlow选项固定写死在代码里，只能是放缓 global status 监控频率。不过倒是可以与其它监控指标分开成两份配置文件，各自定义收集间隔来实现。 最后打算自己用python撸一个，上报到influxdb里 :) 2. Concept 完整代码见 GitHub项目地址：DBschema_gather 实现也特别简单，就是查询 information_schema 库的 COLUMNS、TABLES 两个表：
+SELECT IFNULL(@@hostname, @@server_id) SERVER_NAME, %s as HOST, t.TABLE_SCHEMA, t.TABLE_NAME, t.TABLE_ROWS, t.DATA_LENGTH, t.INDEX_LENGTH, t.AUTO_INCREMENT, c.COLUMN_NAME, c.DATA_TYPE, LOCATE(&#39;unsigned&#39;, c.COLUMN_TYPE) COL_UNSIGNED # CONCAT(c.DATA_TYPE, IF(LOCATE(&#39;unsigned&#39;, c.COLUMN_TYPE)=0, &#39;&#39;, &#39;_unsigned&#39;)) FROM information_schema.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2016/12/%E7%9B%91%E6%8E%A7mysql%E4%BD%A0%E8%BF%98%E5%BA%94%E8%AF%A5%E6%94%B6%E9%9B%86%E8%A1%A8%E4%BF%A1%E6%81%AF/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="监控MySQL你还应该收集表信息" />
+<meta property="og:description" content="1. Story 也许你经常会被问到，库里某个表最近一年的内每个月的数据量增长情况。当然如果你有按月分表比较好办，挨个 show table status，如果只有一个大表，那估计要在大家都休息的时候，寂寞的夜里去跑sql统计了，因为你只能获取当前的表信息，历史信息追查不到了。
+除此以外，作为DBA本身也要对数据库空间增长情况进行预估，用以规划容量。我们说的表信息主要包括：
+表数据大小（DATA_LENGTH） 索引大小(INDEX_LENGTH) 行数（ROWS） 当前自增值（AUTO_INCREMENT，如果有） 目前是没有看到哪个mysql监控工具上提供这样的指标。这些信息不需要采集的太频繁，而且结果也只是个预估值，不一定准确，所以这是站在一个全局、长远的角度去监控(采集)表的。
+本文要介绍的自己写的采集工具，是基于组内现有的一套监控体系：
+InfluxDB：时间序列数据库，存储监控数据 Grafana：数据展示面板 Telegraf：收集信息的agent 看了下 telegraf 的最新的 mysql 插件，一开始很欣慰：支持收集 Table schema statistics 和 Info schema auto increment columns。试用了一下，有数据，但是如前面所说，除了自增值外其他都是预估值，telegraf收集频率过高没啥意义，也许一天2次就足够了，它提供的 IntervalSlow选项固定写死在代码里，只能是放缓 global status 监控频率。不过倒是可以与其它监控指标分开成两份配置文件，各自定义收集间隔来实现。 最后打算自己用python撸一个，上报到influxdb里 :) 2. Concept 完整代码见 GitHub项目地址：DBschema_gather 实现也特别简单，就是查询 information_schema 库的 COLUMNS、TABLES 两个表：
+SELECT IFNULL(@@hostname, @@server_id) SERVER_NAME, %s as HOST, t.TABLE_SCHEMA, t.TABLE_NAME, t.TABLE_ROWS, t.DATA_LENGTH, t.INDEX_LENGTH, t.AUTO_INCREMENT, c.COLUMN_NAME, c.DATA_TYPE, LOCATE(&#39;unsigned&#39;, c.COLUMN_TYPE) COL_UNSIGNED # CONCAT(c.DATA_TYPE, IF(LOCATE(&#39;unsigned&#39;, c.COLUMN_TYPE)=0, &#39;&#39;, &#39;_unsigned&#39;)) FROM information_schema." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2016/12/%E7%9B%91%E6%8E%A7mysql%E4%BD%A0%E8%BF%98%E5%BA%94%E8%AF%A5%E6%94%B6%E9%9B%86%E8%A1%A8%E4%BF%A1%E6%81%AF/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2016-12-04T16:32:49+00:00" />
+<meta property="article:modified_time" content="2016-12-04T16:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="监控MySQL你还应该收集表信息"/>
+<meta name="twitter:description" content="1. Story 也许你经常会被问到，库里某个表最近一年的内每个月的数据量增长情况。当然如果你有按月分表比较好办，挨个 show table status，如果只有一个大表，那估计要在大家都休息的时候，寂寞的夜里去跑sql统计了，因为你只能获取当前的表信息，历史信息追查不到了。
+除此以外，作为DBA本身也要对数据库空间增长情况进行预估，用以规划容量。我们说的表信息主要包括：
+表数据大小（DATA_LENGTH） 索引大小(INDEX_LENGTH) 行数（ROWS） 当前自增值（AUTO_INCREMENT，如果有） 目前是没有看到哪个mysql监控工具上提供这样的指标。这些信息不需要采集的太频繁，而且结果也只是个预估值，不一定准确，所以这是站在一个全局、长远的角度去监控(采集)表的。
+本文要介绍的自己写的采集工具，是基于组内现有的一套监控体系：
+InfluxDB：时间序列数据库，存储监控数据 Grafana：数据展示面板 Telegraf：收集信息的agent 看了下 telegraf 的最新的 mysql 插件，一开始很欣慰：支持收集 Table schema statistics 和 Info schema auto increment columns。试用了一下，有数据，但是如前面所说，除了自增值外其他都是预估值，telegraf收集频率过高没啥意义，也许一天2次就足够了，它提供的 IntervalSlow选项固定写死在代码里，只能是放缓 global status 监控频率。不过倒是可以与其它监控指标分开成两份配置文件，各自定义收集间隔来实现。 最后打算自己用python撸一个，上报到influxdb里 :) 2. Concept 完整代码见 GitHub项目地址：DBschema_gather 实现也特别简单，就是查询 information_schema 库的 COLUMNS、TABLES 两个表：
+SELECT IFNULL(@@hostname, @@server_id) SERVER_NAME, %s as HOST, t.TABLE_SCHEMA, t.TABLE_NAME, t.TABLE_ROWS, t.DATA_LENGTH, t.INDEX_LENGTH, t.AUTO_INCREMENT, c.COLUMN_NAME, c.DATA_TYPE, LOCATE(&#39;unsigned&#39;, c.COLUMN_TYPE) COL_UNSIGNED # CONCAT(c.DATA_TYPE, IF(LOCATE(&#39;unsigned&#39;, c.COLUMN_TYPE)=0, &#39;&#39;, &#39;_unsigned&#39;)) FROM information_schema."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "监控MySQL你还应该收集表信息",
+      "item": "http://xgknight.com/posts/2016/12/%E7%9B%91%E6%8E%A7mysql%E4%BD%A0%E8%BF%98%E5%BA%94%E8%AF%A5%E6%94%B6%E9%9B%86%E8%A1%A8%E4%BF%A1%E6%81%AF/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "监控MySQL你还应该收集表信息",
+  "name": "监控MySQL你还应该收集表信息",
+  "description": "1. Story 也许你经常会被问到，库里某个表最近一年的内每个月的数据量增长情况。当然如果你有按月分表比较好办，挨个 show table status，如果只有一个大表，那估计要在大家都休息的时候，寂寞的夜里去跑sql统计了，因为你只能获取当前的表信息，历史信息追查不到了。\n除此以外，作为DBA本身也要对数据库空间增长情况进行预估，用以规划容量。我们说的表信息主要包括：\n表数据大小（DATA_LENGTH） 索引大小(INDEX_LENGTH) 行数（ROWS） 当前自增值（AUTO_INCREMENT，如果有） 目前是没有看到哪个mysql监控工具上提供这样的指标。这些信息不需要采集的太频繁，而且结果也只是个预估值，不一定准确，所以这是站在一个全局、长远的角度去监控(采集)表的。\n本文要介绍的自己写的采集工具，是基于组内现有的一套监控体系：\nInfluxDB：时间序列数据库，存储监控数据 Grafana：数据展示面板 Telegraf：收集信息的agent 看了下 telegraf 的最新的 mysql 插件，一开始很欣慰：支持收集 Table schema statistics 和 Info schema auto increment columns。试用了一下，有数据，但是如前面所说，除了自增值外其他都是预估值，telegraf收集频率过高没啥意义，也许一天2次就足够了，它提供的 IntervalSlow选项固定写死在代码里，只能是放缓 global status 监控频率。不过倒是可以与其它监控指标分开成两份配置文件，各自定义收集间隔来实现。 最后打算自己用python撸一个，上报到influxdb里 :) 2. Concept 完整代码见 GitHub项目地址：DBschema_gather 实现也特别简单，就是查询 information_schema 库的 COLUMNS、TABLES 两个表：\nSELECT IFNULL(@@hostname, @@server_id) SERVER_NAME, %s as HOST, t.TABLE_SCHEMA, t.TABLE_NAME, t.TABLE_ROWS, t.DATA_LENGTH, t.INDEX_LENGTH, t.AUTO_INCREMENT, c.COLUMN_NAME, c.DATA_TYPE, LOCATE(\u0026#39;unsigned\u0026#39;, c.COLUMN_TYPE) COL_UNSIGNED # CONCAT(c.DATA_TYPE, IF(LOCATE(\u0026#39;unsigned\u0026#39;, c.COLUMN_TYPE)=0, \u0026#39;\u0026#39;, \u0026#39;_unsigned\u0026#39;)) FROM information_schema.",
+  "keywords": [
+    "mysql", "监控"
+  ],
+  "articleBody": "1. Story 也许你经常会被问到，库里某个表最近一年的内每个月的数据量增长情况。当然如果你有按月分表比较好办，挨个 show table status，如果只有一个大表，那估计要在大家都休息的时候，寂寞的夜里去跑sql统计了，因为你只能获取当前的表信息，历史信息追查不到了。\n除此以外，作为DBA本身也要对数据库空间增长情况进行预估，用以规划容量。我们说的表信息主要包括：\n表数据大小（DATA_LENGTH） 索引大小(INDEX_LENGTH) 行数（ROWS） 当前自增值（AUTO_INCREMENT，如果有） 目前是没有看到哪个mysql监控工具上提供这样的指标。这些信息不需要采集的太频繁，而且结果也只是个预估值，不一定准确，所以这是站在一个全局、长远的角度去监控(采集)表的。\n本文要介绍的自己写的采集工具，是基于组内现有的一套监控体系：\nInfluxDB：时间序列数据库，存储监控数据 Grafana：数据展示面板 Telegraf：收集信息的agent 看了下 telegraf 的最新的 mysql 插件，一开始很欣慰：支持收集 Table schema statistics 和 Info schema auto increment columns。试用了一下，有数据，但是如前面所说，除了自增值外其他都是预估值，telegraf收集频率过高没啥意义，也许一天2次就足够了，它提供的 IntervalSlow选项固定写死在代码里，只能是放缓 global status 监控频率。不过倒是可以与其它监控指标分开成两份配置文件，各自定义收集间隔来实现。 最后打算自己用python撸一个，上报到influxdb里 :) 2. Concept 完整代码见 GitHub项目地址：DBschema_gather 实现也特别简单，就是查询 information_schema 库的 COLUMNS、TABLES 两个表：\nSELECT IFNULL(@@hostname, @@server_id) SERVER_NAME, %s as HOST, t.TABLE_SCHEMA, t.TABLE_NAME, t.TABLE_ROWS, t.DATA_LENGTH, t.INDEX_LENGTH, t.AUTO_INCREMENT, c.COLUMN_NAME, c.DATA_TYPE, LOCATE('unsigned', c.COLUMN_TYPE) COL_UNSIGNED # CONCAT(c.DATA_TYPE, IF(LOCATE('unsigned', c.COLUMN_TYPE)=0, '', '_unsigned')) FROM information_schema.`TABLES` t LEFT JOIN information_schema.`COLUMNS` c ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME AND c.EXTRA = 'auto_increment' WHERE t.TABLE_SCHEMA NOT IN ( 'mysql', 'information_schema', 'performance_schema', 'sys' ) AND t.TABLE_TYPE = 'BASE TABLE' 关于 auto_increment，我们除了关注当前增长到哪了，还会在意相比 int / bigint 的最大值，还有多少可用空间。于是计算了 autoIncrUsage 这一列，用于保存当前已使用的比例。\n然后使用 InfluxDB 的python客户端，批量存入influxdb。如果没有InfluxDB，结果会打印出json —— 这是Zabbix、Open-Falcon这些监控工具普遍支持的格式。\n最后就是使用 Grafana 从 influxdb 数据源画图。\n3. Usage 环境 在 python 2.7 环境下编写的，2.6，3.x没测。 运行需要MySQLdb、influxdb两个库： $ sudo pip install mysql-python influxdb 配置 settings_dbs.py 配置文件 DBLIST_INFO：列表存放需要采集的哪些MySQL实例表信息，元组内分别是连接地址、端口、用户名、密码 用户需要select表的权限，否则看不到对应的信息. InfluxDB_INFO：influxdb的连接信息，注意提前创建好数据库名 mysql_info 设置为 None 可输出结果为json. 创建influxdb上的数据库和存储策略 存放2年，1个复制集：（按需调整） CREATE DATABASE \"mysql_info\" CREATE RETENTION POLICY \"mysql_info_schema\" ON \"mysql_info\" DURATION 730d REPLICATION 1 DEFAULT 看大的信息类似于： 放crontab跑 可以单独放在用于监控的服务器上，不过建议在生产环境可以运行在mysql实例所在主机上，安全起见。 一般库在晚上会有数据迁移的动作，可以在迁移前后分别运行 mysql_schema_info.py 来收集一次。不建议太频繁。 40 23,5,12,18 * * * /opt/DBschema_info/mysql_schema_info.py \u003e\u003e /tmp/collect_DBschema_info.log 2\u003e\u00261 生成图表 导入项目下的 grafana_table_stats.json 到 Grafana面板中。效果如下： 表数据大小和行数\n每天行数变化增量,auto_increment使用率\n4. More 分库分表情况下，全局唯一ID在表里无法计算 autoIncrUsage 实现上其实很简单，更主要的是唤醒收集这些信息的意识 可以增加 Graphite 输出格式 原文链接地址：http://xgknight.com/2016/12/04/mysql-schema-gather-statistics/\n",
+  "wordCount" : "192",
+  "inLanguage": "en",
+  "datePublished": "2016-12-04T16:32:49Z",
+  "dateModified": "2016-12-04T16:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2016/12/%E7%9B%91%E6%8E%A7mysql%E4%BD%A0%E8%BF%98%E5%BA%94%E8%AF%A5%E6%94%B6%E9%9B%86%E8%A1%A8%E4%BF%A1%E6%81%AF/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      监控MySQL你还应该收集表信息
+    </h1>
+    <div class="post-meta"><span title='2016-12-04 16:32:49 +0000 UTC'>December 4, 2016</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><h2 id="1-story">1. Story<a hidden class="anchor" aria-hidden="true" href="#1-story">#</a></h2>
+<p>也许你经常会被问到，库里某个表最近一年的内每个月的数据量增长情况。当然如果你有按月分表比较好办，挨个 <code>show table status</code>，如果只有一个大表，那估计要在大家都休息的时候，寂寞的夜里去跑sql统计了，因为你只能获取当前的表信息，历史信息追查不到了。</p>
+<p>除此以外，作为DBA本身也要对数据库空间增长情况进行预估，用以规划容量。我们说的表信息主要包括：</p>
+<ol>
+<li>表数据大小（DATA_LENGTH）</li>
+<li>索引大小(INDEX_LENGTH)</li>
+<li>行数（ROWS）</li>
+<li>当前自增值（AUTO_INCREMENT，如果有）</li>
+</ol>
+<p>目前是没有看到哪个mysql监控工具上提供这样的指标。这些信息不需要采集的太频繁，而且结果也只是个预估值，不一定准确，所以这是站在一个全局、长远的角度去监控(采集)表的。</p>
+<p>本文要介绍的自己写的采集工具，是基于组内现有的一套监控体系：</p>
+<ul>
+<li><code>InfluxDB</code>：时间序列数据库，存储监控数据</li>
+<li><code>Grafana</code>：数据展示面板</li>
+<li><code>Telegraf</code>：收集信息的agent
+看了下 telegraf 的最新的 <a href="https://github.com/influxdata/telegraf/tree/master/plugins/inputs/mysql">mysql 插件</a>，一开始很欣慰：支持收集 Table schema statistics 和 Info schema auto increment columns。试用了一下，有数据，但是如前面所说，除了自增值外其他都是预估值，telegraf收集频率过高没啥意义，也许一天2次就足够了，它提供的 <code>IntervalSlow</code>选项固定写死在代码里，只能是放缓 global status 监控频率。不过倒是可以与其它监控指标分开成两份配置文件，各自定义收集间隔来实现。
+最后打算自己用python撸一个，上报到influxdb里 :)</li>
+</ul>
+<h2 id="2-concept">2. Concept<a hidden class="anchor" aria-hidden="true" href="#2-concept">#</a></h2>
+<p>完整代码见 GitHub项目地址：<a href="https://github.com/seanlook/DBschema_gather">DBschema_gather</a>
+实现也特别简单，就是查询 <code>information_schema</code> 库的 <code>COLUMNS</code>、<code>TABLES</code> 两个表：</p>
+<!-- raw HTML omitted -->
+<pre tabindex="0"><code>SELECT
+    IFNULL(@@hostname, @@server_id) SERVER_NAME,
+    %s as HOST,
+    t.TABLE_SCHEMA,
+    t.TABLE_NAME,
+    t.TABLE_ROWS,
+    t.DATA_LENGTH,
+    t.INDEX_LENGTH,
+    t.AUTO_INCREMENT,
+  c.COLUMN_NAME,
+  c.DATA_TYPE,
+  LOCATE(&#39;unsigned&#39;, c.COLUMN_TYPE) COL_UNSIGNED
+  # CONCAT(c.DATA_TYPE, IF(LOCATE(&#39;unsigned&#39;, c.COLUMN_TYPE)=0, &#39;&#39;, &#39;_unsigned&#39;))
+FROM
+    information_schema.`TABLES` t
+LEFT JOIN information_schema.`COLUMNS` c ON t.TABLE_SCHEMA = c.TABLE_SCHEMA
+AND t.TABLE_NAME = c.TABLE_NAME
+AND c.EXTRA = &#39;auto_increment&#39;
+WHERE
+    t.TABLE_SCHEMA NOT IN (
+        &#39;mysql&#39;,
+        &#39;information_schema&#39;,
+        &#39;performance_schema&#39;,
+        &#39;sys&#39;
+    )
+AND t.TABLE_TYPE = &#39;BASE TABLE&#39;
+</code></pre><p>关于 <code>auto_increment</code>，我们除了关注当前增长到哪了，还会在意相比 <code>int / bigint</code> 的最大值，还有多少可用空间。于是计算了 <code>autoIncrUsage</code> 这一列，用于保存当前已使用的比例。</p>
+<p>然后使用 InfluxDB 的python客户端，批量存入influxdb。如果没有InfluxDB，结果会打印出json —— 这是Zabbix、Open-Falcon这些监控工具普遍支持的格式。</p>
+<p>最后就是使用 Grafana 从 influxdb 数据源画图。</p>
+<h2 id="3-usage">3. Usage<a hidden class="anchor" aria-hidden="true" href="#3-usage">#</a></h2>
+<ol>
+<li>环境
+在 python 2.7 环境下编写的，2.6，3.x没测。
+运行需要<code>MySQLdb</code>、<code>influxdb</code>两个库：</li>
+</ol>
+<pre tabindex="0"><code>$ sudo pip install mysql-python influxdb
+</code></pre><ol start="2">
+<li>配置
+<code>settings_dbs.py</code> 配置文件</li>
+</ol>
+<ul>
+<li><code>DBLIST_INFO</code>：列表存放需要采集的哪些MySQL实例表信息，元组内分别是连接地址、端口、用户名、密码
+用户需要select表的权限，否则看不到对应的信息.</li>
+<li><code>InfluxDB_INFO</code>：influxdb的连接信息，注意提前创建好数据库名 <code>mysql_info</code>
+设置为 <code>None</code> 可输出结果为json.</li>
+</ul>
+<ol start="3">
+<li>创建influxdb上的数据库和存储策略
+存放2年，1个复制集：（按需调整）</li>
+</ol>
+<pre tabindex="0"><code>CREATE DATABASE &#34;mysql_info&#34;
+CREATE RETENTION POLICY &#34;mysql_info_schema&#34; ON &#34;mysql_info&#34; DURATION 730d REPLICATION 1 DEFAULT
+</code></pre><p>看大的信息类似于：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-schema-statistics.png" alt="schema-influxdb-data"  />
+</p>
+<ol start="4">
+<li>放crontab跑
+可以单独放在用于监控的服务器上，不过建议在生产环境可以运行在mysql实例所在主机上，安全起见。
+一般库在晚上会有数据迁移的动作，可以在迁移前后分别运行 <code>mysql_schema_info.py</code> 来收集一次。不建议太频繁。</li>
+</ol>
+<pre tabindex="0"><code>40 23,5,12,18 * * * /opt/DBschema_info/mysql_schema_info.py &gt;&gt; /tmp/collect_DBschema_info.log 2&gt;&amp;1
+</code></pre><ol start="5">
+<li>生成图表</li>
+</ol>
+<p>导入项目下的 <code>grafana_table_stats.json</code> 到 Grafana面板中。效果如下：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-schema-statistics2.png" alt="表数据大小和行数"  />
+
+<em>表数据大小和行数</em></p>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-schema-statistics3.png" alt="每天行数变化增量,auto_increment使用率"  />
+
+<em>每天行数变化增量,auto_increment使用率</em></p>
+<h2 id="4-more">4. More<a hidden class="anchor" aria-hidden="true" href="#4-more">#</a></h2>
+<ol>
+<li>分库分表情况下，全局唯一ID在表里无法计算 autoIncrUsage</li>
+<li>实现上其实很简单，更主要的是唤醒收集这些信息的意识</li>
+<li>可以增加 Graphite 输出格式</li>
+</ol>
+<hr>
+<p>原文链接地址：http://xgknight.com/2016/12/04/mysql-schema-gather-statistics/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/%E7%9B%91%E6%8E%A7/">监控</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

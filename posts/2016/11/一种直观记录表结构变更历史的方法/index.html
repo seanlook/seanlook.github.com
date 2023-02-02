@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>一种直观记录表结构变更历史的方法 | Sean Note</title>
+<meta name="keywords" content="mysql, 监控">
+<meta name="description" content="1. Story 在没有形成自己的数据库管理平台以前，数据库实例一多（包括生产和测试环境），许多表要执行DDL会变得异常繁杂。
+说个自己的经历，需要改现网的一个索引来看优化的效果，因为存在风险，不会一次全改，先只改1个库，然后逐步放开。前后验证效果可能花上一两周的时间，除非实现完整的记录了当时的ddl语句和对应的库，否则根本难以记得。这就完全依赖于个人的习惯及能力。
+又比如现网出了个问题，开发追查到一个时间点，想确认那个时候有没有对库表进行过更改操作，如果没有记录表结构变更的历史，也就难以提供需要的信息。
+记录差异，很早就思考过能不能用git来做。终于花了一天时间来实现，并验证、修改达到预期的效果，还算满意。
+github项目地址在文后。
+2. Concept 思路很简单，就是利用 mydumper 导出表时会把各表（结构）单独导成一个文件的特性，每天低峰期导出所有对象元数据：表、视图、存储过程、事件、触发器。需要过滤掉 AUTO_INCREMENT 值。
+结构内容存放在一个git仓库下，通过shell脚本提交到 gitlab。所有DDL更改由原来依赖于DBA的主动记录，变成被动采集。
+测试环境和生产环境表结构总会有些差异，为了兼顾同时收集两个环境的数据，设置了 environment 选项，根据当前所在运行的机器，自动判断采集哪些实例信息。
+3. Usage 首先你需要能够存放表结构信息的git仓库，如gitlab，而且建议设置为私有。
+安装 git 和 mydumper mydumper 0.9.1 版本需要编译安装，可以参考这里 file-mydumper-install-ubuntu14-04-sh。当然 yum 或 apt-get 安装其他版本也是一样的。 脚本会尝试自动获取 mydumper 命令的路径。 注意配置git权限的时候，最好不允许其它用户手动提交修改仓库内容。
+配置db实例地址 settings.ini示例：
+[environment] production=puppetmaster test=puppettestmaster [production] production_auth=your_defaultuser:yourpassword db_name1=192.168.1.100:3306 db_name2=192.168.1.101:3306 db_name3=name3.dbhost.com:3306 db_name4=192.168.1.100:3306:myuser:mypassword [test] test_auth=user1:password1 db_name1=10.0.100.1:3306 db_name2=10.0.100.1:3307 db_name3=10.0.100.2:3306 db_name4=10.0.100.3:3306:myuser1:mypassword1 上面的配置采集 production和test两个环境的表结构，识别两个环境是根据 hostname 来决定的。这样做的好吃就是这个脚本在两个环境下运行不需要做任何修改。 [production]节的名字就是 [environment]节指定的名字 production=xx dbname1=就是配置各个db，地址&#43;端口的形式。用户名和密码可以继续用 : 跟上 production_auth=表示 production 环境下，如 dbname1没有配置用户名时，默认采用这个用户名和密码。这样设计主要是简化配置。
+该数据库用户需要 select,show view,event,trigger,procedure 权限。">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2016/11/%E4%B8%80%E7%A7%8D%E7%9B%B4%E8%A7%82%E8%AE%B0%E5%BD%95%E8%A1%A8%E7%BB%93%E6%9E%84%E5%8F%98%E6%9B%B4%E5%8E%86%E5%8F%B2%E7%9A%84%E6%96%B9%E6%B3%95/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="一种直观记录表结构变更历史的方法" />
+<meta property="og:description" content="1. Story 在没有形成自己的数据库管理平台以前，数据库实例一多（包括生产和测试环境），许多表要执行DDL会变得异常繁杂。
+说个自己的经历，需要改现网的一个索引来看优化的效果，因为存在风险，不会一次全改，先只改1个库，然后逐步放开。前后验证效果可能花上一两周的时间，除非实现完整的记录了当时的ddl语句和对应的库，否则根本难以记得。这就完全依赖于个人的习惯及能力。
+又比如现网出了个问题，开发追查到一个时间点，想确认那个时候有没有对库表进行过更改操作，如果没有记录表结构变更的历史，也就难以提供需要的信息。
+记录差异，很早就思考过能不能用git来做。终于花了一天时间来实现，并验证、修改达到预期的效果，还算满意。
+github项目地址在文后。
+2. Concept 思路很简单，就是利用 mydumper 导出表时会把各表（结构）单独导成一个文件的特性，每天低峰期导出所有对象元数据：表、视图、存储过程、事件、触发器。需要过滤掉 AUTO_INCREMENT 值。
+结构内容存放在一个git仓库下，通过shell脚本提交到 gitlab。所有DDL更改由原来依赖于DBA的主动记录，变成被动采集。
+测试环境和生产环境表结构总会有些差异，为了兼顾同时收集两个环境的数据，设置了 environment 选项，根据当前所在运行的机器，自动判断采集哪些实例信息。
+3. Usage 首先你需要能够存放表结构信息的git仓库，如gitlab，而且建议设置为私有。
+安装 git 和 mydumper mydumper 0.9.1 版本需要编译安装，可以参考这里 file-mydumper-install-ubuntu14-04-sh。当然 yum 或 apt-get 安装其他版本也是一样的。 脚本会尝试自动获取 mydumper 命令的路径。 注意配置git权限的时候，最好不允许其它用户手动提交修改仓库内容。
+配置db实例地址 settings.ini示例：
+[environment] production=puppetmaster test=puppettestmaster [production] production_auth=your_defaultuser:yourpassword db_name1=192.168.1.100:3306 db_name2=192.168.1.101:3306 db_name3=name3.dbhost.com:3306 db_name4=192.168.1.100:3306:myuser:mypassword [test] test_auth=user1:password1 db_name1=10.0.100.1:3306 db_name2=10.0.100.1:3307 db_name3=10.0.100.2:3306 db_name4=10.0.100.3:3306:myuser1:mypassword1 上面的配置采集 production和test两个环境的表结构，识别两个环境是根据 hostname 来决定的。这样做的好吃就是这个脚本在两个环境下运行不需要做任何修改。 [production]节的名字就是 [environment]节指定的名字 production=xx dbname1=就是配置各个db，地址&#43;端口的形式。用户名和密码可以继续用 : 跟上 production_auth=表示 production 环境下，如 dbname1没有配置用户名时，默认采用这个用户名和密码。这样设计主要是简化配置。
+该数据库用户需要 select,show view,event,trigger,procedure 权限。" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2016/11/%E4%B8%80%E7%A7%8D%E7%9B%B4%E8%A7%82%E8%AE%B0%E5%BD%95%E8%A1%A8%E7%BB%93%E6%9E%84%E5%8F%98%E6%9B%B4%E5%8E%86%E5%8F%B2%E7%9A%84%E6%96%B9%E6%B3%95/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2016-11-28T16:32:49+00:00" />
+<meta property="article:modified_time" content="2016-11-28T16:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="一种直观记录表结构变更历史的方法"/>
+<meta name="twitter:description" content="1. Story 在没有形成自己的数据库管理平台以前，数据库实例一多（包括生产和测试环境），许多表要执行DDL会变得异常繁杂。
+说个自己的经历，需要改现网的一个索引来看优化的效果，因为存在风险，不会一次全改，先只改1个库，然后逐步放开。前后验证效果可能花上一两周的时间，除非实现完整的记录了当时的ddl语句和对应的库，否则根本难以记得。这就完全依赖于个人的习惯及能力。
+又比如现网出了个问题，开发追查到一个时间点，想确认那个时候有没有对库表进行过更改操作，如果没有记录表结构变更的历史，也就难以提供需要的信息。
+记录差异，很早就思考过能不能用git来做。终于花了一天时间来实现，并验证、修改达到预期的效果，还算满意。
+github项目地址在文后。
+2. Concept 思路很简单，就是利用 mydumper 导出表时会把各表（结构）单独导成一个文件的特性，每天低峰期导出所有对象元数据：表、视图、存储过程、事件、触发器。需要过滤掉 AUTO_INCREMENT 值。
+结构内容存放在一个git仓库下，通过shell脚本提交到 gitlab。所有DDL更改由原来依赖于DBA的主动记录，变成被动采集。
+测试环境和生产环境表结构总会有些差异，为了兼顾同时收集两个环境的数据，设置了 environment 选项，根据当前所在运行的机器，自动判断采集哪些实例信息。
+3. Usage 首先你需要能够存放表结构信息的git仓库，如gitlab，而且建议设置为私有。
+安装 git 和 mydumper mydumper 0.9.1 版本需要编译安装，可以参考这里 file-mydumper-install-ubuntu14-04-sh。当然 yum 或 apt-get 安装其他版本也是一样的。 脚本会尝试自动获取 mydumper 命令的路径。 注意配置git权限的时候，最好不允许其它用户手动提交修改仓库内容。
+配置db实例地址 settings.ini示例：
+[environment] production=puppetmaster test=puppettestmaster [production] production_auth=your_defaultuser:yourpassword db_name1=192.168.1.100:3306 db_name2=192.168.1.101:3306 db_name3=name3.dbhost.com:3306 db_name4=192.168.1.100:3306:myuser:mypassword [test] test_auth=user1:password1 db_name1=10.0.100.1:3306 db_name2=10.0.100.1:3307 db_name3=10.0.100.2:3306 db_name4=10.0.100.3:3306:myuser1:mypassword1 上面的配置采集 production和test两个环境的表结构，识别两个环境是根据 hostname 来决定的。这样做的好吃就是这个脚本在两个环境下运行不需要做任何修改。 [production]节的名字就是 [environment]节指定的名字 production=xx dbname1=就是配置各个db，地址&#43;端口的形式。用户名和密码可以继续用 : 跟上 production_auth=表示 production 环境下，如 dbname1没有配置用户名时，默认采用这个用户名和密码。这样设计主要是简化配置。
+该数据库用户需要 select,show view,event,trigger,procedure 权限。"/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "一种直观记录表结构变更历史的方法",
+      "item": "http://xgknight.com/posts/2016/11/%E4%B8%80%E7%A7%8D%E7%9B%B4%E8%A7%82%E8%AE%B0%E5%BD%95%E8%A1%A8%E7%BB%93%E6%9E%84%E5%8F%98%E6%9B%B4%E5%8E%86%E5%8F%B2%E7%9A%84%E6%96%B9%E6%B3%95/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "一种直观记录表结构变更历史的方法",
+  "name": "一种直观记录表结构变更历史的方法",
+  "description": "1. Story 在没有形成自己的数据库管理平台以前，数据库实例一多（包括生产和测试环境），许多表要执行DDL会变得异常繁杂。\n说个自己的经历，需要改现网的一个索引来看优化的效果，因为存在风险，不会一次全改，先只改1个库，然后逐步放开。前后验证效果可能花上一两周的时间，除非实现完整的记录了当时的ddl语句和对应的库，否则根本难以记得。这就完全依赖于个人的习惯及能力。\n又比如现网出了个问题，开发追查到一个时间点，想确认那个时候有没有对库表进行过更改操作，如果没有记录表结构变更的历史，也就难以提供需要的信息。\n记录差异，很早就思考过能不能用git来做。终于花了一天时间来实现，并验证、修改达到预期的效果，还算满意。\ngithub项目地址在文后。\n2. Concept 思路很简单，就是利用 mydumper 导出表时会把各表（结构）单独导成一个文件的特性，每天低峰期导出所有对象元数据：表、视图、存储过程、事件、触发器。需要过滤掉 AUTO_INCREMENT 值。\n结构内容存放在一个git仓库下，通过shell脚本提交到 gitlab。所有DDL更改由原来依赖于DBA的主动记录，变成被动采集。\n测试环境和生产环境表结构总会有些差异，为了兼顾同时收集两个环境的数据，设置了 environment 选项，根据当前所在运行的机器，自动判断采集哪些实例信息。\n3. Usage 首先你需要能够存放表结构信息的git仓库，如gitlab，而且建议设置为私有。\n安装 git 和 mydumper mydumper 0.9.1 版本需要编译安装，可以参考这里 file-mydumper-install-ubuntu14-04-sh。当然 yum 或 apt-get 安装其他版本也是一样的。 脚本会尝试自动获取 mydumper 命令的路径。 注意配置git权限的时候，最好不允许其它用户手动提交修改仓库内容。\n配置db实例地址 settings.ini示例：\n[environment] production=puppetmaster test=puppettestmaster [production] production_auth=your_defaultuser:yourpassword db_name1=192.168.1.100:3306 db_name2=192.168.1.101:3306 db_name3=name3.dbhost.com:3306 db_name4=192.168.1.100:3306:myuser:mypassword [test] test_auth=user1:password1 db_name1=10.0.100.1:3306 db_name2=10.0.100.1:3307 db_name3=10.0.100.2:3306 db_name4=10.0.100.3:3306:myuser1:mypassword1 上面的配置采集 production和test两个环境的表结构，识别两个环境是根据 hostname 来决定的。这样做的好吃就是这个脚本在两个环境下运行不需要做任何修改。 [production]节的名字就是 [environment]节指定的名字 production=xx dbname1=就是配置各个db，地址+端口的形式。用户名和密码可以继续用 : 跟上 production_auth=表示 production 环境下，如 dbname1没有配置用户名时，默认采用这个用户名和密码。这样设计主要是简化配置。\n该数据库用户需要 select,show view,event,trigger,procedure 权限。",
+  "keywords": [
+    "mysql", "监控"
+  ],
+  "articleBody": "1. Story 在没有形成自己的数据库管理平台以前，数据库实例一多（包括生产和测试环境），许多表要执行DDL会变得异常繁杂。\n说个自己的经历，需要改现网的一个索引来看优化的效果，因为存在风险，不会一次全改，先只改1个库，然后逐步放开。前后验证效果可能花上一两周的时间，除非实现完整的记录了当时的ddl语句和对应的库，否则根本难以记得。这就完全依赖于个人的习惯及能力。\n又比如现网出了个问题，开发追查到一个时间点，想确认那个时候有没有对库表进行过更改操作，如果没有记录表结构变更的历史，也就难以提供需要的信息。\n记录差异，很早就思考过能不能用git来做。终于花了一天时间来实现，并验证、修改达到预期的效果，还算满意。\ngithub项目地址在文后。\n2. Concept 思路很简单，就是利用 mydumper 导出表时会把各表（结构）单独导成一个文件的特性，每天低峰期导出所有对象元数据：表、视图、存储过程、事件、触发器。需要过滤掉 AUTO_INCREMENT 值。\n结构内容存放在一个git仓库下，通过shell脚本提交到 gitlab。所有DDL更改由原来依赖于DBA的主动记录，变成被动采集。\n测试环境和生产环境表结构总会有些差异，为了兼顾同时收集两个环境的数据，设置了 environment 选项，根据当前所在运行的机器，自动判断采集哪些实例信息。\n3. Usage 首先你需要能够存放表结构信息的git仓库，如gitlab，而且建议设置为私有。\n安装 git 和 mydumper mydumper 0.9.1 版本需要编译安装，可以参考这里 file-mydumper-install-ubuntu14-04-sh。当然 yum 或 apt-get 安装其他版本也是一样的。 脚本会尝试自动获取 mydumper 命令的路径。 注意配置git权限的时候，最好不允许其它用户手动提交修改仓库内容。\n配置db实例地址 settings.ini示例：\n[environment] production=puppetmaster test=puppettestmaster [production] production_auth=your_defaultuser:yourpassword db_name1=192.168.1.100:3306 db_name2=192.168.1.101:3306 db_name3=name3.dbhost.com:3306 db_name4=192.168.1.100:3306:myuser:mypassword [test] test_auth=user1:password1 db_name1=10.0.100.1:3306 db_name2=10.0.100.1:3307 db_name3=10.0.100.2:3306 db_name4=10.0.100.3:3306:myuser1:mypassword1 上面的配置采集 production和test两个环境的表结构，识别两个环境是根据 hostname 来决定的。这样做的好吃就是这个脚本在两个环境下运行不需要做任何修改。 [production]节的名字就是 [environment]节指定的名字 production=xx dbname1=就是配置各个db，地址+端口的形式。用户名和密码可以继续用 : 跟上 production_auth=表示 production 环境下，如 dbname1没有配置用户名时，默认采用这个用户名和密码。这样设计主要是简化配置。\n该数据库用户需要 select,show view,event,trigger,procedure 权限。\nsettings_parser.py 用于解析上面的配置文件，输出collect_tableMeta.sh易处理的格式。 每天运行 可使用 python settings_parser.py 测试解析配置是否正常。 在配置文件里两个环境下（一般网络不互通）分别加上定时任务： # Puppet Name: collect_DBschema 5 5 * * * /opt/DBschema/collect_tableMeta.sh \u003e\u003e /tmp/collect_DBschema.log 2\u003e\u00261 展示效果 A 是新增，M 是修改，D 是删除，一目了然。点开可以前后对比。 4. More 思路和实现都不难，主要是意识，和如何快速找到解决当前需求的办法。一切都是为了效率 :)\n目前所能想到更多的：\n有内容push到git仓库后，使用 web hook 发出邮件。 根据A,B两个表的结构，快速得到A修改成B的样子的DDL。 event 权限问题。event权限没有所谓的读和修改之分，阿里云RDS就把它从 只读 账号里拿除了，导致收集不到事件定义。所以它的高权限账号管理模式还是很有作用的。 密码明文。\n最近公司邀请了一个安全公司给做培训，数据库安全里面，密码明文配置在文件里面是广泛存在的，难搞。 GitHub地址：https://github.com/seanlook/DBschema_gather\n原文链接地址：http://xgknight.com/2016/11/28/mysql-schema-gather-structure/\n",
+  "wordCount" : "117",
+  "inLanguage": "en",
+  "datePublished": "2016-11-28T16:32:49Z",
+  "dateModified": "2016-11-28T16:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2016/11/%E4%B8%80%E7%A7%8D%E7%9B%B4%E8%A7%82%E8%AE%B0%E5%BD%95%E8%A1%A8%E7%BB%93%E6%9E%84%E5%8F%98%E6%9B%B4%E5%8E%86%E5%8F%B2%E7%9A%84%E6%96%B9%E6%B3%95/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      一种直观记录表结构变更历史的方法
+    </h1>
+    <div class="post-meta"><span title='2016-11-28 16:32:49 +0000 UTC'>November 28, 2016</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><h2 id="1-story">1. Story<a hidden class="anchor" aria-hidden="true" href="#1-story">#</a></h2>
+<p>在没有形成自己的数据库管理平台以前，数据库实例一多（包括生产和测试环境），许多表要执行DDL会变得异常繁杂。</p>
+<p>说个自己的经历，需要改现网的一个索引来看优化的效果，因为存在风险，不会一次全改，先只改1个库，然后逐步放开。前后验证效果可能花上一两周的时间，除非实现完整的记录了当时的ddl语句和对应的库，否则根本难以记得。这就完全依赖于个人的习惯及能力。</p>
+<p>又比如现网出了个问题，开发追查到一个时间点，想确认那个时候有没有对库表进行过更改操作，如果没有记录表结构变更的历史，也就难以提供需要的信息。</p>
+<p>记录差异，很早就思考过能不能用git来做。终于花了一天时间来实现，并验证、修改达到预期的效果，还算满意。</p>
+<p>github项目地址在文后。</p>
+<h2 id="2-concept">2. Concept<a hidden class="anchor" aria-hidden="true" href="#2-concept">#</a></h2>
+<p>思路很简单，就是利用 <code>mydumper</code> 导出表时会把各表（结构）单独导成一个文件的特性，每天低峰期导出所有对象元数据：表、视图、存储过程、事件、触发器。需要过滤掉 <code>AUTO_INCREMENT</code> 值。</p>
+<p>结构内容存放在一个git仓库下，通过shell脚本提交到 gitlab。所有DDL更改由原来依赖于DBA的主动记录，变成被动采集。</p>
+<p>测试环境和生产环境表结构总会有些差异，为了兼顾同时收集两个环境的数据，设置了 <code>environment</code> 选项，根据当前所在运行的机器，自动判断采集哪些实例信息。</p>
+<h2 id="3-usage">3. Usage<a hidden class="anchor" aria-hidden="true" href="#3-usage">#</a></h2>
+<p>首先你需要能够存放表结构信息的git仓库，如gitlab，而且建议设置为私有。</p>
+<!-- raw HTML omitted -->
+<ol>
+<li>
+<p>安装 git 和 mydumper
+mydumper 0.9.1 版本需要编译安装，可以参考这里 <a href="https://gist.github.com/nicksantamaria/66726bca586d152a3a01#file-mydumper-install-ubuntu14-04-sh">file-mydumper-install-ubuntu14-04-sh</a>。当然 yum 或 apt-get 安装其他版本也是一样的。
+脚本会尝试自动获取 <code>mydumper</code> 命令的路径。
+注意配置git权限的时候，最好不允许其它用户手动提交修改仓库内容。</p>
+</li>
+<li>
+<p>配置db实例地址
+<code>settings.ini</code>示例：</p>
+</li>
+</ol>
+<pre tabindex="0"><code>[environment]
+production=puppetmaster
+test=puppettestmaster
+
+[production]
+production_auth=your_defaultuser:yourpassword
+
+db_name1=192.168.1.100:3306
+db_name2=192.168.1.101:3306
+db_name3=name3.dbhost.com:3306
+db_name4=192.168.1.100:3306:myuser:mypassword
+
+[test]
+test_auth=user1:password1
+
+db_name1=10.0.100.1:3306
+db_name2=10.0.100.1:3307
+db_name3=10.0.100.2:3306
+
+db_name4=10.0.100.3:3306:myuser1:mypassword1
+</code></pre><ul>
+<li>上面的配置采集 <code>production</code>和<code>test</code>两个环境的表结构，识别两个环境是根据 hostname 来决定的。这样做的好吃就是这个脚本在两个环境下运行不需要做任何修改。</li>
+<li><code>[production]</code>节的名字就是 <code>[environment]</code>节指定的名字 <em>production=xx</em></li>
+<li><code>dbname1=</code>就是配置各个db，地址+端口的形式。用户名和密码可以继续用 <code>:</code> 跟上</li>
+<li><code>production_auth=</code>表示 production 环境下，如 <code>dbname1</code>没有配置用户名时，默认采用这个用户名和密码。这样设计主要是简化配置。<br>
+该数据库用户需要 select,show view,event,trigger,procedure 权限。<br>
+<code>settings_parser.py</code> 用于解析上面的配置文件，输出<code>collect_tableMeta.sh</code>易处理的格式。</li>
+</ul>
+<ol start="3">
+<li>每天运行
+可使用 <code>python settings_parser.py</code> 测试解析配置是否正常。
+在配置文件里两个环境下（一般网络不互通）分别加上定时任务：</li>
+</ol>
+<pre tabindex="0"><code># Puppet Name: collect_DBschema
+5 5 * * * /opt/DBschema/collect_tableMeta.sh &gt;&gt; /tmp/collect_DBschema.log 2&gt;&amp;1
+</code></pre><ol start="4">
+<li>展示效果
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-schema-structure1.png" alt="mysql_schema_info"  />
+
+<code>A</code> 是新增，<code>M</code> 是修改，<code>D</code> 是删除，一目了然。点开可以前后对比。</li>
+</ol>
+<h2 id="4-more">4. More<a hidden class="anchor" aria-hidden="true" href="#4-more">#</a></h2>
+<p>思路和实现都不难，主要是意识，和如何快速找到解决当前需求的办法。一切都是为了效率 :)</p>
+<p>目前所能想到更多的：</p>
+<ol>
+<li>有内容push到git仓库后，使用 web hook 发出邮件。</li>
+<li>根据A,B两个表的结构，快速得到A修改成B的样子的DDL。</li>
+<li>event 权限问题。event权限没有所谓的读和修改之分，阿里云RDS就把它从 <em>只读</em> 账号里拿除了，导致收集不到事件定义。所以它的高权限账号管理模式还是很有作用的。</li>
+<li>密码明文。<br>
+最近公司邀请了一个安全公司给做培训，数据库安全里面，密码明文配置在文件里面是广泛存在的，难搞。</li>
+</ol>
+<p>GitHub地址：https://github.com/seanlook/DBschema_gather</p>
+<hr>
+<p>原文链接地址：http://xgknight.com/2016/11/28/mysql-schema-gather-structure/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/%E7%9B%91%E6%8E%A7/">监控</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

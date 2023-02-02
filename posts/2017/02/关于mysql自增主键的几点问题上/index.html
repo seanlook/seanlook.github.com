@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>关于MySQL自增主键的几点问题（上） | Sean Note</title>
+<meta name="keywords" content="mysql, schema设计">
+<meta name="description" content="前段时间遇到一个InnoDB表自增锁导致的问题，最近刚好有一个同行网友也问到自增锁的疑问，所以抽空系统的总结一下，这两个问题下篇会有阐述。
+1. 划分三种插入类型 这里区分一下几种插入数据行的类型，便于后面描述：（纯逻辑上的划分）
+&ldquo;Simple inserts&rdquo;
+简单插入，就是在处理sql语句的时候，能够提前预估到插入的行数，包括 INSERT / REPLACE 的单行、多行插入，但不含嵌套子查询以及 INSERT ... ON DUPLICATE KEY UPDATE。
+&ldquo;Bulk inserts&rdquo;
+本文暂且叫做 大块插入，不能提前预知语句要插入的行数，也就无法知道分配多少个自增值，包括 INSERT ... SELECT, REPLACE ... SELECT, 以及 LOAD DATA 导入语句。InnoDB会每处理一行记录就为 AUTO_INCREMENT 列分配一个值。
+&ldquo;Mixed-mode inserts&rdquo;
+混合插入，比如在 “简单插入” 多行记录的时候，有的新行有指定自增值，有的没有，所以获得最坏情况下需要插入的数量，然后一次性分配足够的auto_increment id。比如:
+# c1 是 t1 的 AUTO_INCREMENT 列 INSERT INTO t1 (c1,c2) VALUES (1,&#39;a&#39;), (NULL,&#39;b&#39;), (5,&#39;c&#39;), (NULL,&#39;d&#39;); 又比如 INSERT ... ON DUPLICATE KEY UPDATE，它在 update 阶段有可能分配新的自增id，也可能不会。
+2. 三种自增模式：innodb_autoinc_lock_mode 在以 5.6 版本，自增id累加模式分为：
+** 传统模式**">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2017/02/%E5%85%B3%E4%BA%8Emysql%E8%87%AA%E5%A2%9E%E4%B8%BB%E9%94%AE%E7%9A%84%E5%87%A0%E7%82%B9%E9%97%AE%E9%A2%98%E4%B8%8A/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="关于MySQL自增主键的几点问题（上）" />
+<meta property="og:description" content="前段时间遇到一个InnoDB表自增锁导致的问题，最近刚好有一个同行网友也问到自增锁的疑问，所以抽空系统的总结一下，这两个问题下篇会有阐述。
+1. 划分三种插入类型 这里区分一下几种插入数据行的类型，便于后面描述：（纯逻辑上的划分）
+&ldquo;Simple inserts&rdquo;
+简单插入，就是在处理sql语句的时候，能够提前预估到插入的行数，包括 INSERT / REPLACE 的单行、多行插入，但不含嵌套子查询以及 INSERT ... ON DUPLICATE KEY UPDATE。
+&ldquo;Bulk inserts&rdquo;
+本文暂且叫做 大块插入，不能提前预知语句要插入的行数，也就无法知道分配多少个自增值，包括 INSERT ... SELECT, REPLACE ... SELECT, 以及 LOAD DATA 导入语句。InnoDB会每处理一行记录就为 AUTO_INCREMENT 列分配一个值。
+&ldquo;Mixed-mode inserts&rdquo;
+混合插入，比如在 “简单插入” 多行记录的时候，有的新行有指定自增值，有的没有，所以获得最坏情况下需要插入的数量，然后一次性分配足够的auto_increment id。比如:
+# c1 是 t1 的 AUTO_INCREMENT 列 INSERT INTO t1 (c1,c2) VALUES (1,&#39;a&#39;), (NULL,&#39;b&#39;), (5,&#39;c&#39;), (NULL,&#39;d&#39;); 又比如 INSERT ... ON DUPLICATE KEY UPDATE，它在 update 阶段有可能分配新的自增id，也可能不会。
+2. 三种自增模式：innodb_autoinc_lock_mode 在以 5.6 版本，自增id累加模式分为：
+** 传统模式**" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2017/02/%E5%85%B3%E4%BA%8Emysql%E8%87%AA%E5%A2%9E%E4%B8%BB%E9%94%AE%E7%9A%84%E5%87%A0%E7%82%B9%E9%97%AE%E9%A2%98%E4%B8%8A/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2017-02-16T16:32:49+00:00" />
+<meta property="article:modified_time" content="2017-02-16T16:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="关于MySQL自增主键的几点问题（上）"/>
+<meta name="twitter:description" content="前段时间遇到一个InnoDB表自增锁导致的问题，最近刚好有一个同行网友也问到自增锁的疑问，所以抽空系统的总结一下，这两个问题下篇会有阐述。
+1. 划分三种插入类型 这里区分一下几种插入数据行的类型，便于后面描述：（纯逻辑上的划分）
+&ldquo;Simple inserts&rdquo;
+简单插入，就是在处理sql语句的时候，能够提前预估到插入的行数，包括 INSERT / REPLACE 的单行、多行插入，但不含嵌套子查询以及 INSERT ... ON DUPLICATE KEY UPDATE。
+&ldquo;Bulk inserts&rdquo;
+本文暂且叫做 大块插入，不能提前预知语句要插入的行数，也就无法知道分配多少个自增值，包括 INSERT ... SELECT, REPLACE ... SELECT, 以及 LOAD DATA 导入语句。InnoDB会每处理一行记录就为 AUTO_INCREMENT 列分配一个值。
+&ldquo;Mixed-mode inserts&rdquo;
+混合插入，比如在 “简单插入” 多行记录的时候，有的新行有指定自增值，有的没有，所以获得最坏情况下需要插入的数量，然后一次性分配足够的auto_increment id。比如:
+# c1 是 t1 的 AUTO_INCREMENT 列 INSERT INTO t1 (c1,c2) VALUES (1,&#39;a&#39;), (NULL,&#39;b&#39;), (5,&#39;c&#39;), (NULL,&#39;d&#39;); 又比如 INSERT ... ON DUPLICATE KEY UPDATE，它在 update 阶段有可能分配新的自增id，也可能不会。
+2. 三种自增模式：innodb_autoinc_lock_mode 在以 5.6 版本，自增id累加模式分为：
+** 传统模式**"/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "关于MySQL自增主键的几点问题（上）",
+      "item": "http://xgknight.com/posts/2017/02/%E5%85%B3%E4%BA%8Emysql%E8%87%AA%E5%A2%9E%E4%B8%BB%E9%94%AE%E7%9A%84%E5%87%A0%E7%82%B9%E9%97%AE%E9%A2%98%E4%B8%8A/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "关于MySQL自增主键的几点问题（上）",
+  "name": "关于MySQL自增主键的几点问题（上）",
+  "description": "前段时间遇到一个InnoDB表自增锁导致的问题，最近刚好有一个同行网友也问到自增锁的疑问，所以抽空系统的总结一下，这两个问题下篇会有阐述。\n1. 划分三种插入类型 这里区分一下几种插入数据行的类型，便于后面描述：（纯逻辑上的划分）\n\u0026ldquo;Simple inserts\u0026rdquo;\n简单插入，就是在处理sql语句的时候，能够提前预估到插入的行数，包括 INSERT / REPLACE 的单行、多行插入，但不含嵌套子查询以及 INSERT ... ON DUPLICATE KEY UPDATE。\n\u0026ldquo;Bulk inserts\u0026rdquo;\n本文暂且叫做 大块插入，不能提前预知语句要插入的行数，也就无法知道分配多少个自增值，包括 INSERT ... SELECT, REPLACE ... SELECT, 以及 LOAD DATA 导入语句。InnoDB会每处理一行记录就为 AUTO_INCREMENT 列分配一个值。\n\u0026ldquo;Mixed-mode inserts\u0026rdquo;\n混合插入，比如在 “简单插入” 多行记录的时候，有的新行有指定自增值，有的没有，所以获得最坏情况下需要插入的数量，然后一次性分配足够的auto_increment id。比如:\n# c1 是 t1 的 AUTO_INCREMENT 列 INSERT INTO t1 (c1,c2) VALUES (1,\u0026#39;a\u0026#39;), (NULL,\u0026#39;b\u0026#39;), (5,\u0026#39;c\u0026#39;), (NULL,\u0026#39;d\u0026#39;); 又比如 INSERT ... ON DUPLICATE KEY UPDATE，它在 update 阶段有可能分配新的自增id，也可能不会。\n2. 三种自增模式：innodb_autoinc_lock_mode 在以 5.6 版本，自增id累加模式分为：\n** 传统模式**",
+  "keywords": [
+    "mysql", "schema设计"
+  ],
+  "articleBody": "前段时间遇到一个InnoDB表自增锁导致的问题，最近刚好有一个同行网友也问到自增锁的疑问，所以抽空系统的总结一下，这两个问题下篇会有阐述。\n1. 划分三种插入类型 这里区分一下几种插入数据行的类型，便于后面描述：（纯逻辑上的划分）\n“Simple inserts”\n简单插入，就是在处理sql语句的时候，能够提前预估到插入的行数，包括 INSERT / REPLACE 的单行、多行插入，但不含嵌套子查询以及 INSERT ... ON DUPLICATE KEY UPDATE。\n“Bulk inserts”\n本文暂且叫做 大块插入，不能提前预知语句要插入的行数，也就无法知道分配多少个自增值，包括 INSERT ... SELECT, REPLACE ... SELECT, 以及 LOAD DATA 导入语句。InnoDB会每处理一行记录就为 AUTO_INCREMENT 列分配一个值。\n“Mixed-mode inserts”\n混合插入，比如在 “简单插入” 多行记录的时候，有的新行有指定自增值，有的没有，所以获得最坏情况下需要插入的数量，然后一次性分配足够的auto_increment id。比如:\n# c1 是 t1 的 AUTO_INCREMENT 列 INSERT INTO t1 (c1,c2) VALUES (1,'a'), (NULL,'b'), (5,'c'), (NULL,'d'); 又比如 INSERT ... ON DUPLICATE KEY UPDATE，它在 update 阶段有可能分配新的自增id，也可能不会。\n2. 三种自增模式：innodb_autoinc_lock_mode 在以 5.6 版本，自增id累加模式分为：\n** 传统模式**\ntraditional，innodb_autoinc_lock_mode = 0\n在具有 AUTO_INCREMENT 的表上，所有插入语句会获取一个特殊的表级锁 AUTO-INC ，这个表锁是在语句结束之后立即释放（无需等到事务结束），它可以保证在一个insert里面的多行记录连续递增，也能保证多个insert并发情况下自增值是连续的（不会有空洞）。\n** 连续模式 **\nconsecutive，innodb_autoinc_lock_mode = 1\nMySQL 5.1.22开始，InnoDB提供了一种轻量级互斥的自增实现机制，在内存中会有一个互斥量（mutex），每次分配自增长ID时，就通过估算插入的数量（前提是必须能够估算到插入的数量，否则还是使用传统模式），然后更新mutex，下一个线程过来时从新 mutex 开始继续计算，这样就能避免传统模式非要等待每个都插入之后才能获取下一个，把“锁”降级到 只在分配id的时候 锁定互斥量。\n在 innodb_autoinc_lock_mode = 1（默认） 模式下，“简单插入”采用上面的 mutex 方式，“大块插入”（insert/replace … select … 、load data…）依旧采用 AUTO-INC 表级锁方式。当然如果一个事务里已经持有表 AUTO-INC 锁，那么后续的简单插入也需要等待这个 AUTO-INC 锁释放。这能够保证任意insert并发情况下自增值是连续的。\n** 交叉模式 **\ninterleaved，innodb_autoinc_lock_mode = 2\n该模式下所有 INSERT SQL 都不会有表级 AUTO-INC 锁，多个 语句 可以同时执行，所以在高并发插入场景下性能会好一些。但是当 binlog 采用 SBR 格式时，对于从库重放日志或者主库实例恢复时，并不可靠。\n另者，它只能保证自增值在 insert语句级别 （单调）递增，所以多个insert可能会交叉着分配id，最终可能导致多个语句之间的id值不连续，这种情况出现在 混合插入： INSERT INTO t1 (c1,c2) VALUES (1,'a'), (NULL,'b'), (5,'c'), (NULL,'d'); mutex 会按行分配4个id，但实际只用到2个，因此出现空洞。 3. 自增空洞（auto-increment sequence gap） 关于 AUTO_INCREMENT 自增出现空洞的问题，有必要再说明一下。\n在 0, 1, 2 三种任何模式下，如果事务回滚，那么里面获得自增值的sql回滚，但产生的自增值会一起丢失，不可能重新分配给其它insert语句。这也会产生空洞。\n在大块插入情景下\ninnodb_autoinc_lock_mode为 0 或 1 时，因为 AUTO-INC 锁会持续到语句结束，同一时间只有一个 语句 在表上执行，所以自增值是连续的（其它事务需要等待），不会有空洞； innodb_autoinc_lock_mode为 2 时，两个 “大块插入” 之间可能会有空洞，因为每条语句事先无法预知精确的数量而导致分配过多的id，可能有空洞。 4. 混合插入对 AUTO_INCREMENT 的影响 混合插入在 innodb_autoinc_lock_mode 不同模式下会有对 表自增值有不同的表现。\nCREATE TABLE t1 ( c1 INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, c2 CHAR(1) ) ENGINE=INNODB; ALTER TABLE t1 AUTO_INCREMENT 101; mysql\u003e SHOW CREATE TABLE t1\\G *************************** 1. row *************************** Table: t1 Create Table: CREATE TABLE `t1` ( `c1` int(10) unsigned NOT NULL AUTO_INCREMENT, `c2` char(1) DEFAULT NULL, PRIMARY KEY (`c1`) ) ENGINE=InnoDB AUTO_INCREMENT=101 DEFAULT CHARSET=utf8 1. mode 0 mysql\u003e select @@innodb_autoinc_lock_mode; +----------------------------+ | @@innodb_autoinc_lock_mode | +----------------------------+ | 0 | +----------------------------+ mysql\u003e INSERT INTO t1 (c1,c2) VALUES (1,'a'), (NULL,'b'), (5,'c'), (NULL,'d'); mysql\u003e select * from t1; +-----+------+ | c1 | c2 | +-----+------+ | 1 | a | | 5 | c | | 101 | b | | 102 | d | +-----+------+ mysql\u003e show create table t1\\G ... ) ENGINE=InnoDB AUTO_INCREMENT=103 DEFAULT CHARSET=utf8 ... 可以看到下一个自增值是 103 ，因为即使这是 ** 一条 ** insert语句（多行记录），自增值还是每次分配一个，不会在语句开始前一次分配全。\n2. mode 1 mysql\u003e truncate table t1; ALTER TABLE t1 AUTO_INCREMENT 101; -- 复原 mysql\u003e select @@innodb_autoinc_lock_mode; +----------------------------+ | @@innodb_autoinc_lock_mode | +----------------------------+ | 1 | +----------------------------+ 1 row in set (0.00 sec) mysql\u003e INSERT INTO t1 (c1,c2) VALUES (1,'a'), (NULL,'b'), (5,'c'), (NULL,'d'); Query OK, 4 rows affected (0.00 sec) Records: 4 Duplicates: 0 Warnings: 0 mysql\u003e select * from t1; +-----+------+ | c1 | c2 | +-----+------+ | 1 | a | | 5 | c | | 101 | b | | 102 | d | +-----+------+ mysql\u003e show create table t1\\G ... ) ENGINE=InnoDB AUTO_INCREMENT=105 DEFAULT CHARSET=utf8 可以看到最终插入的值是一样的，但下一个自增值变成了 105，因为该模式下insert语句处理的时候，提前分配了 4 个自增值，但实际只有了两个。\n注：如果你的insert自增列全都有带值，那么处理的时候是不会分配自增值的，经过下面这个实验，可以知道 ** 分配自增值，是在遇到第一个没有带自增列的行时，一次性分配的 ** ：\n-- Tx1，先运行。 -- 插入第2行的时候 sleep 5s INSERT INTO t1 (c1,c2) VALUES (2,'e'),(sleep(5)+6,'g'),(NULL,'f'), (NULL,'h'); -- Tx2，后运行。 -- 第一行没有给自增列值，马上分配 4 个 INSERT INTO t1 (c1,c2) VALUES (NULL,'b'), (1,'a'), (sleep(5)+5,'c'), (NULL,'d'); -- 得到的结果是 +-----+------+ | c1 | c2 | +-----+------+ | 1 | a | | 2 | e | | 5 | c | | 6 | g | | 101 | b | | 102 | d | | 105 | f | | 106 | h | +-----+------+ 3. mode 2 mysql\u003e truncate table t1; ALTER TABLE t1 AUTO_INCREMENT 101; -- 复原 mysql\u003e select @@innodb_autoinc_lock_mode; +----------------------------+ | @@innodb_autoinc_lock_mode | +----------------------------+ | 2 | +----------------------------+ mysql\u003e INSERT INTO t1 (c1,c2) VALUES (1,'a'), (NULL,'b'), (5,'c'), (NULL,'d'); mysql\u003e select * from t1; +-----+------+ | c1 | c2 | +-----+------+ | 1 | a | | 5 | c | | 101 | b | | 102 | d | +-----+------+ mysql\u003e show create table t1\\G ... ) ENGINE=InnoDB AUTO_INCREMENT=105 DEFAULT CHARSET=utf8 结果看起来与 连续模式 一样，其实不然！该模式下，如果另外一个 大块插入 并发执行时，可能会出现以下现象：\n大块插入的的自增值有间断 其它并发执行的事务插入出现 duplicate-key error 第1点 (create t2 select * from t1) Tx1: insert into t1(c2) select c2 from t2； -- 先执行 Tx2: INSERT INTO t1 (c1,c2) VALUES (1,'a'), (NULL,'b'), (5,'c'), (NULL,'d'); -- 后 并发执行 在交叉模式下，Tx1事务插入的数据行会与 Tx1 交叉出现。 注：如果 Tx1 改成 insert into t1 select * from t2 ，那么 Tx2 执行极有可能会报 duplicate-key error，与下面第2点所说的重复键是不一样的 第2点 mysql\u003e truncate table t1; ALTER TABLE t1 AUTO_INCREMENT 5; -- 复原 mysql\u003e INSERT INTO t1 (c1,c2) VALUES (1,'a'), (NULL,'b'), (5,'c'), (NULL,'d'); ERROR 1062 (23000): Duplicate entry '5' for key 'PRIMARY' 总结 上面说了这么多，那么自增模式到底该怎么选择呢？其实很简单，目前数据库默认的 consecutive 即 innodb_autoinc_lock_mode=1 就是最好的模式，一般业务生产库不会有 insert into ... select ...或者 load data infile 这样的维护动作。（提示：即使晚上有数据迁移任务，也不要通过这样的形式进行）\ninnodb_autoinc_lock_mode=2 可以提高获取表自增id的并发能力（性能），但是除非出现上面演示的 duplicate-key 特殊用法情形，不会像网上所说的获取到相同key导致重复的问题。但是如果binlog在 RBR 格式下不建议使用，可能出现主从数据不一致。还有就是能够容忍gap的存在，以及多个语句insert的自增值交叉。\n参考： https://dev.mysql.com/doc/refman/5.6/en/innodb-auto-increment-handling.html\n下篇分析遇到过的 MySQL 自增主键相关的具体问题。\n本文链接地址：http://xgknight.com/2017/02/16/mysql-autoincrement/\n",
+  "wordCount" : "691",
+  "inLanguage": "en",
+  "datePublished": "2017-02-16T16:32:49Z",
+  "dateModified": "2017-02-16T16:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2017/02/%E5%85%B3%E4%BA%8Emysql%E8%87%AA%E5%A2%9E%E4%B8%BB%E9%94%AE%E7%9A%84%E5%87%A0%E7%82%B9%E9%97%AE%E9%A2%98%E4%B8%8A/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      关于MySQL自增主键的几点问题（上）
+    </h1>
+    <div class="post-meta"><span title='2017-02-16 16:32:49 +0000 UTC'>February 16, 2017</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>前段时间遇到一个InnoDB表自增锁导致的问题，最近刚好有一个同行网友也问到自增锁的疑问，所以抽空系统的总结一下，这两个问题下篇会有阐述。</p>
+<h2 id="1-划分三种插入类型">1. 划分三种插入类型<a hidden class="anchor" aria-hidden="true" href="#1-划分三种插入类型">#</a></h2>
+<p>这里区分一下几种插入数据行的类型，便于后面描述：（纯逻辑上的划分）</p>
+<ol>
+<li>
+<p>&ldquo;Simple inserts&rdquo;<br>
+简单插入，就是在处理sql语句的时候，能够提前预估到插入的行数，包括 <code>INSERT</code> / <code>REPLACE</code> 的单行、多行插入，但不含嵌套子查询以及 <code>INSERT ... ON DUPLICATE KEY UPDATE</code>。</p>
+</li>
+<li>
+<p>&ldquo;Bulk inserts&rdquo;<br>
+本文暂且叫做 大块插入，不能提前预知语句要插入的行数，也就无法知道分配多少个自增值，包括 <code>INSERT ... SELECT</code>, <code>REPLACE ... SELECT</code>, 以及 <code>LOAD DATA</code> 导入语句。InnoDB会每处理一行记录就为 AUTO_INCREMENT 列分配一个值。</p>
+</li>
+<li>
+<p>&ldquo;Mixed-mode inserts&rdquo;<br>
+混合插入，比如在 “简单插入” 多行记录的时候，有的新行有指定自增值，有的没有，所以获得最坏情况下需要插入的数量，然后一次性分配足够的auto_increment id。比如:</p>
+</li>
+</ol>
+<pre tabindex="0"><code># c1 是 t1 的 AUTO_INCREMENT 列
+INSERT INTO t1 (c1,c2) VALUES (1,&#39;a&#39;), (NULL,&#39;b&#39;), (5,&#39;c&#39;), (NULL,&#39;d&#39;);
+</code></pre><p>又比如 <code>INSERT ... ON DUPLICATE KEY UPDATE</code>，它在 update 阶段有可能分配新的自增id，也可能不会。</p>
+<h2 id="2-三种自增模式innodb_autoinc_lock_mode">2. 三种自增模式：<code>innodb_autoinc_lock_mode</code><a hidden class="anchor" aria-hidden="true" href="#2-三种自增模式innodb_autoinc_lock_mode">#</a></h2>
+<p>在以 5.6 版本，自增id累加模式分为：</p>
+<ul>
+<li>
+<p>** 传统模式**<br>
+traditional，<code>innodb_autoinc_lock_mode = 0</code><br>
+在具有 AUTO_INCREMENT 的表上，所有插入语句会获取一个特殊的表级锁 <em>AUTO-INC</em> ，这个表锁是在语句结束之后立即释放（无需等到事务结束），它可以保证在一个insert里面的多行记录连续递增，也能保证多个insert并发情况下自增值是连续的（不会有空洞）。</p>
+</li>
+<li>
+<p>** 连续模式 **<br>
+consecutive，<code>innodb_autoinc_lock_mode = 1</code><br>
+MySQL 5.1.22开始，InnoDB提供了一种轻量级互斥的自增实现机制，在内存中会有一个互斥量（mutex），每次分配自增长ID时，就通过估算插入的数量（前提是必须能够估算到插入的数量，否则还是使用传统模式），然后更新mutex，下一个线程过来时从新 mutex 开始继续计算，这样就能避免传统模式非要等待每个都插入之后才能获取下一个，把“锁”降级到 只在分配id的时候 锁定互斥量。<br>
+在 <code>innodb_autoinc_lock_mode = 1</code>（默认） 模式下，“简单插入”采用上面的 mutex 方式，“大块插入”（insert/replace &hellip; select &hellip; 、load data&hellip;）依旧采用 AUTO-INC 表级锁方式。当然如果一个事务里已经持有表 AUTO-INC 锁，那么后续的简单插入也需要等待这个 AUTO-INC 锁释放。这能够保证任意insert并发情况下自增值是连续的。</p>
+</li>
+</ul>
+<!-- raw HTML omitted -->
+<ul>
+<li>** 交叉模式 **<br>
+interleaved，<code>innodb_autoinc_lock_mode = 2</code><br>
+该模式下所有 INSERT SQL 都不会有表级 AUTO-INC 锁，多个 <strong>语句</strong> 可以同时执行，所以在高并发插入场景下性能会好一些。但是当 binlog 采用 SBR 格式时，对于从库重放日志或者主库实例恢复时，并不可靠。<br>
+另者，它只能保证自增值在 insert语句级别 （单调）递增，所以多个insert可能会交叉着分配id，最终可能导致多个语句之间的id值不连续，这种情况出现在 混合插入：
+<pre tabindex="0"><code>INSERT INTO t1 (c1,c2) VALUES (1,&#39;a&#39;), (NULL,&#39;b&#39;), (5,&#39;c&#39;), (NULL,&#39;d&#39;);
+</code></pre>mutex 会按行分配4个id，但实际只用到2个，因此出现空洞。</li>
+</ul>
+<h2 id="3-自增空洞auto-increment-sequence-gap">3. 自增空洞（auto-increment sequence gap）<a hidden class="anchor" aria-hidden="true" href="#3-自增空洞auto-increment-sequence-gap">#</a></h2>
+<p>关于 AUTO_INCREMENT 自增出现空洞的问题，有必要再说明一下。</p>
+<ol>
+<li>
+<p>在 0, 1, 2 三种任何模式下，如果事务回滚，那么里面获得自增值的sql回滚，但产生的自增值会一起丢失，不可能重新分配给其它insert语句。这也会产生空洞。</p>
+</li>
+<li>
+<p>在大块插入情景下</p>
+</li>
+</ol>
+<ul>
+<li><code>innodb_autoinc_lock_mode</code>为 0 或 1 时，因为 AUTO-INC 锁会持续到语句结束，同一时间只有一个 语句 在表上执行，所以自增值是连续的（其它事务需要等待），不会有空洞；</li>
+<li><code>innodb_autoinc_lock_mode</code>为 2 时，两个 “大块插入” 之间可能会有空洞，因为每条语句事先无法预知精确的数量而导致分配过多的id，可能有空洞。</li>
+</ul>
+<h2 id="4-混合插入对-auto_increment-的影响">4. 混合插入对 AUTO_INCREMENT 的影响<a hidden class="anchor" aria-hidden="true" href="#4-混合插入对-auto_increment-的影响">#</a></h2>
+<p>混合插入在 innodb_autoinc_lock_mode 不同模式下会有对 表自增值有不同的表现。</p>
+<pre tabindex="0"><code>CREATE TABLE t1 (
+  c1 INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  c2 CHAR(1)
+  ) ENGINE=INNODB;
+
+ALTER TABLE t1 AUTO_INCREMENT 101;
+
+
+mysql&gt; SHOW CREATE TABLE t1\G
+*************************** 1. row ***************************
+       Table: t1
+Create Table: CREATE TABLE `t1` (
+  `c1` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `c2` char(1) DEFAULT NULL,
+  PRIMARY KEY (`c1`)
+) ENGINE=InnoDB AUTO_INCREMENT=101 DEFAULT CHARSET=utf8
+</code></pre><h3 id="1-mode-0">1. mode 0<a hidden class="anchor" aria-hidden="true" href="#1-mode-0">#</a></h3>
+<pre tabindex="0"><code>mysql&gt; select @@innodb_autoinc_lock_mode;
++----------------------------+
+| @@innodb_autoinc_lock_mode |
++----------------------------+
+|                          0 |
++----------------------------+
+
+mysql&gt; INSERT INTO t1 (c1,c2) VALUES (1,&#39;a&#39;), (NULL,&#39;b&#39;), (5,&#39;c&#39;), (NULL,&#39;d&#39;);
+mysql&gt; select * from t1;
++-----+------+
+| c1  | c2   |
++-----+------+
+|   1 | a    |
+|   5 | c    |
+| 101 | b    |
+| 102 | d    |
++-----+------+
+
+mysql&gt; show create table t1\G
+...
+) ENGINE=InnoDB AUTO_INCREMENT=103 DEFAULT CHARSET=utf8
+...
+</code></pre><p>可以看到下一个自增值是 103 ，因为即使这是 ** 一条 ** insert语句（多行记录），自增值还是每次分配一个，不会在语句开始前一次分配全。</p>
+<h3 id="2-mode-1">2. mode 1<a hidden class="anchor" aria-hidden="true" href="#2-mode-1">#</a></h3>
+<pre tabindex="0"><code>mysql&gt; truncate table t1; ALTER TABLE t1 AUTO_INCREMENT 101;  -- 复原
+mysql&gt; select @@innodb_autoinc_lock_mode;
++----------------------------+
+| @@innodb_autoinc_lock_mode |
++----------------------------+
+|                          1 |
++----------------------------+
+1 row in set (0.00 sec)
+
+mysql&gt; INSERT INTO t1 (c1,c2) VALUES (1,&#39;a&#39;), (NULL,&#39;b&#39;), (5,&#39;c&#39;), (NULL,&#39;d&#39;);
+Query OK, 4 rows affected (0.00 sec)
+Records: 4  Duplicates: 0  Warnings: 0
+
+mysql&gt; select * from t1;
++-----+------+
+| c1  | c2   |
++-----+------+
+|   1 | a    |
+|   5 | c    |
+| 101 | b    |
+| 102 | d    |
++-----+------+
+
+mysql&gt; show create table t1\G
+...
+) ENGINE=InnoDB AUTO_INCREMENT=105 DEFAULT CHARSET=utf8
+</code></pre><p>可以看到最终插入的值是一样的，但下一个自增值变成了 105，因为该模式下insert语句处理的时候，提前分配了 4 个自增值，但实际只有了两个。</p>
+<p>注：如果你的insert自增列全都有带值，那么处理的时候是不会分配自增值的，经过下面这个实验，可以知道 ** 分配自增值，是在遇到第一个没有带自增列的行时，一次性分配的 ** ：</p>
+<pre tabindex="0"><code>-- Tx1，先运行。 -- 插入第2行的时候 sleep 5s
+INSERT INTO t1 (c1,c2) VALUES (2,&#39;e&#39;),(sleep(5)+6,&#39;g&#39;),(NULL,&#39;f&#39;), (NULL,&#39;h&#39;);
+
+-- Tx2，后运行。 -- 第一行没有给自增列值，马上分配 4 个
+INSERT INTO t1 (c1,c2) VALUES  (NULL,&#39;b&#39;), (1,&#39;a&#39;), (sleep(5)+5,&#39;c&#39;), (NULL,&#39;d&#39;);
+
+-- 得到的结果是
++-----+------+
+| c1  | c2   |
++-----+------+
+|   1 | a    |
+|   2 | e    |
+|   5 | c    |
+|   6 | g    |
+| 101 | b    |
+| 102 | d    |
+| 105 | f    |
+| 106 | h    |
++-----+------+
+</code></pre><h3 id="3-mode-2">3. mode 2<a hidden class="anchor" aria-hidden="true" href="#3-mode-2">#</a></h3>
+<pre tabindex="0"><code>mysql&gt; truncate table t1; ALTER TABLE t1 AUTO_INCREMENT 101;  -- 复原
+mysql&gt; select @@innodb_autoinc_lock_mode;
++----------------------------+
+| @@innodb_autoinc_lock_mode |
++----------------------------+
+|                          2 |
++----------------------------+
+
+mysql&gt; INSERT INTO t1 (c1,c2) VALUES (1,&#39;a&#39;), (NULL,&#39;b&#39;), (5,&#39;c&#39;), (NULL,&#39;d&#39;);
+mysql&gt; select * from t1;
++-----+------+
+| c1  | c2   |
++-----+------+
+|   1 | a    |
+|   5 | c    |
+| 101 | b    |
+| 102 | d    |
++-----+------+
+
+mysql&gt; show create table t1\G
+...
+) ENGINE=InnoDB AUTO_INCREMENT=105 DEFAULT CHARSET=utf8
+</code></pre><p>结果看起来与 连续模式 一样，其实不然！该模式下，如果另外一个 大块插入 并发执行时，可能会出现以下现象：</p>
+<ol>
+<li>大块插入的的自增值有间断</li>
+<li>其它并发执行的事务插入出现 duplicate-key error</li>
+</ol>
+<pre tabindex="0"><code>第1点 (create t2 select * from t1)
+Tx1: insert into t1(c2) select c2 from t2；  -- 先执行
+Tx2: INSERT INTO t1 (c1,c2) VALUES (1,&#39;a&#39;), (NULL,&#39;b&#39;), (5,&#39;c&#39;), (NULL,&#39;d&#39;);  -- 后 并发执行
+
+在交叉模式下，Tx1事务插入的数据行会与 Tx1 交叉出现。
+注：如果 Tx1 改成 insert into t1 select * from t2 ，那么 Tx2 执行极有可能会报 duplicate-key error，与下面第2点所说的重复键是不一样的
+
+第2点
+mysql&gt; truncate table t1; ALTER TABLE t1 AUTO_INCREMENT 5;  -- 复原
+mysql&gt; INSERT INTO t1 (c1,c2) VALUES (1,&#39;a&#39;), (NULL,&#39;b&#39;), (5,&#39;c&#39;), (NULL,&#39;d&#39;);
+ERROR 1062 (23000): Duplicate entry &#39;5&#39; for key &#39;PRIMARY&#39;
+</code></pre><h2 id="总结">总结<a hidden class="anchor" aria-hidden="true" href="#总结">#</a></h2>
+<p>上面说了这么多，那么自增模式到底该怎么选择呢？其实很简单，目前数据库默认的 consecutive 即 <code>innodb_autoinc_lock_mode=1</code> 就是最好的模式，一般业务生产库不会有 <code>insert into ... select ...</code>或者 load data infile 这样的维护动作。（提示：即使晚上有数据迁移任务，也不要通过这样的形式进行）</p>
+<p><code>innodb_autoinc_lock_mode=2</code> 可以提高获取表自增id的并发能力（性能），但是除非出现上面演示的 duplicate-key 特殊用法情形，不会像网上所说的获取到相同key导致重复的问题。但是如果binlog在 RBR 格式下不建议使用，可能出现主从数据不一致。还有就是能够容忍gap的存在，以及多个语句insert的自增值交叉。</p>
+<p>参考： <a href="https://dev.mysql.com/doc/refman/5.6/en/innodb-auto-increment-handling.html">https://dev.mysql.com/doc/refman/5.6/en/innodb-auto-increment-handling.html</a></p>
+<p>下篇分析遇到过的 MySQL 自增主键相关的具体问题。</p>
+<hr>
+<p>本文链接地址：http://xgknight.com/2017/02/16/mysql-autoincrement/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/schema%E8%AE%BE%E8%AE%A1/">schema设计</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Percona-toolkit on Sean Note</title>
+    <link>http://xgknight.com/tags/percona-toolkit/</link>
+    <description>Recent content in Percona-toolkit on Sean Note</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Fri, 27 May 2016 16:32:49 +0000</lastBuildDate><atom:link href="http://xgknight.com/tags/percona-toolkit/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>pt-online-schema-change使用说明、限制与比较</title>
+      <link>http://xgknight.com/posts/2016/05/pt-online-schema-change%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E%E9%99%90%E5%88%B6%E4%B8%8E%E6%AF%94%E8%BE%83/</link>
+      <pubDate>Fri, 27 May 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/05/pt-online-schema-change%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E%E9%99%90%E5%88%B6%E4%B8%8E%E6%AF%94%E8%BE%83/</guid>
+      <description>如果正在看这篇文章，相信你已经知道自己的需求了。
+在 mysql 5.5 版本以前，修改表结构如添加索引、修改列，需要锁表，期间不能写入，对于大表这简直是灾难。从5.5特别是5.6里，情况有了好转，支持Online DDL，相关介绍见 这篇文章，而我在实际alter table过程中还是会引起 data meta lock 问题。pt-online-schema-change是Percona-toolkit一员，通过改进原生ddl的方式，达到不锁表在线修改表结构。
+1. pt-osc工作过程 创建一个和要执行 alter 操作的表一样的新的空表结构(是alter之前的结构) 在新表执行alter table 语句（速度应该很快） 在原表中创建触发器3个触发器分别对应insert,update,delete操作 以一定块大小从原表拷贝数据到临时表，拷贝过程中通过原表上的触发器在原表进行的写操作都会更新到新建的临时表 Rename 原表到old表中，在把临时表Rename为原表 如果有参考该表的外键，根据alter-foreign-keys-method参数的值，检测外键相关的表，做相应设置的处理 默认最后将旧原表删除 2. 常用选项说明 只介绍部分常用的选项
+--host=xxx --user=xxx --password=xxx 连接实例信息，缩写-h xxx -u xxx -p xxx，密码可以使用参数--ask-pass 手动输入。
+--alter 结构变更语句，不需要 ALTER TABLE关键字。与原始ddl一样可以指定多个更改，用逗号分隔。
+绝大部分情况下表上需要有主键或唯一索引，因为工具在运行当中为了保证新表也是最新的，需要旧表上创建 DELETE和UPDATE 触发器，同步到新表的时候有主键会更快。个别情况是，当alter操作就是在c1列上建立主键时，DELETE触发器将基于c1列。
+子句不支持 rename 去给表重命名。
+alter命令原表就不支持给索引重命名，需要先drop再add，在pt-osc也一样。(mysql 5.7 支持 RENAME INDEX old_index_name TO new_index_name) 但给字段重命名，千万不要drop-add，整列数据会丢失，使用change col1 col1_new type constraint（保持类型和约束一致，否则相当于修改 column type，不能online）
+子句如果是add column并且定义了not null，那么必须指定default值，否则会失败。
+如果要删除外键（名 fk_foo），使用工具的时候外键名要加下划线，比如--alter &amp;quot;DROP FOREIGN KEY _fk_foo&amp;quot;</description>
+    </item>
+    
+    <item>
+      <title>使用pt-osc修改主键时注意</title>
+      <link>http://xgknight.com/posts/2016/05/%E4%BD%BF%E7%94%A8pt-osc%E4%BF%AE%E6%94%B9%E4%B8%BB%E9%94%AE%E6%97%B6%E6%B3%A8%E6%84%8F/</link>
+      <pubDate>Fri, 27 May 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/05/%E4%BD%BF%E7%94%A8pt-osc%E4%BF%AE%E6%94%B9%E4%B8%BB%E9%94%AE%E6%97%B6%E6%B3%A8%E6%84%8F/</guid>
+      <description>使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：
+原表上有个复合主键，现在要添加一个自增id作为主键，如何进行 会涉及到以下修改动作：
+删除复合主键定义 添加新的自增主键 原复合主键字段，修改成唯一索引 如果你够聪明，应该会把这三个操作放在同一个 alter table 命令执行。percona手册里有两个地方对修改主键进行了特殊注解：
+&amp;ndash;alter A notable exception is when a PRIMARY KEY or UNIQUE INDEX is being created from existing columns as part of the ALTER clause; in that case it will use these column(s) for the DELETE trigger.
+&amp;ndash;[no]check-alter
+DROP PRIMARY KEY If &amp;ndash;alter contain DROP PRIMARY KEY (case- and space-insensitive), a warning is printed and the tool exits unless &amp;ndash;dry-run is specified.</description>
+    </item>
+    
+    <item>
+      <title>mysql 5.6 原生Online DDL解析</title>
+      <link>http://xgknight.com/posts/2016/05/mysql-5.6-%E5%8E%9F%E7%94%9Fonline-ddl%E8%A7%A3%E6%9E%90/</link>
+      <pubDate>Tue, 24 May 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/05/mysql-5.6-%E5%8E%9F%E7%94%9Fonline-ddl%E8%A7%A3%E6%9E%90/</guid>
+      <description>做MySQL的都知道，数据库操作里面，DDL操作（比如CREATE,DROP,ALTER等）代价是非常高的，特别是在单表上千万的情况下，加个索引或改个列类型，就有可能堵塞整个表的读写。
+然后 mysql 5.6 开始，大家期待的Online DDL出现了，可以实现修改表结构的同时，依然允许DML操作(select,insert,update,delete)。在这个特性出现以前，用的比较多的工具是pt-online-schema-change，比较请参考pt-online-schema-change使用说明、限制与比较或 ONLINE DDL VS PT-ONLINE-SCHEMA-CHANGE 。
+1. Online DDL 在 MySQL 5.1 （带InnoDB Plugin）和5.5中，有个新特性叫 Fast Index Creation（下称 FIC），就是在添加或者删除二级索引的时候，可以不用复制原表。对于之前的版本对于索引的添加删除这类DDL操作，MySQL数据库的操作过程为如下：
+首先新建Temp table，表结构是 ALTAR TABLE 新定义的结构 然后把原表中数据导入到这个Temp table 删除原表 最后把临时表rename为原来的表名 为了保持数据的一致性，中间复制数据（Copy Table）全程锁表只读，如果有写请求进来将无法提供服务，连接数爆张。
+引入FIC之后，创建二级索引时会对原表加上一个S锁，创建过程不需要重建表（no-rebuild）；删除InnoDB二级索引只需要更新内部视图，并标记这个索引的空间可用，去掉数据库元数据上该索引的定义即可。这个过程也只允许读操作，不能写入，但大大加快了修改索引的速度（不含主键索引，InnoDB IOT的特性决定了修改主键依然需要 Copy Table ）。
+FIC只对索引的创建删除有效，MySQL 5.6 Online DDL把这种特性扩展到了添加列、删除列、修改列类型、列重命名、设置默认值等等，实际效果要看所使用的选项和操作类别来定。
+1.1 Online DDL选项 MySQL 在线DDL分为 INPLACE 和 COPY 两种方式，通过在ALTER语句的ALGORITHM参数指定。
+ALGORITHM=INPLACE，可以避免重建表带来的IO和CPU消耗，保证ddl期间依然有良好的性能和并发。 ALGORITHM=COPY，需要拷贝原始表，所以不允许并发DML写操作，可读。这种copy方式的效率还是不如 inplace ，因为前者需要记录undo和redo log，而且因为临时占用buffer pool引起短时间内性能受影响。 上面只是 Online DDL 内部的实现方式，此外还有 LOCK 选项控制是否锁表，根据不同的DDL操作类型有不同的表现：默认mysql尽可能不去锁表，但是像修改主键这样的昂贵操作不得不选择锁表。
+LOCK=NONE，即DDL期间允许并发读写涉及的表，比如为了保证 ALTER TABLE 时不影响用户注册或支付，可以明确指定，好处是如果不幸该 alter语句不支持对该表的继续写入，则会提示失败，而不会直接发到库上执行。ALGORITHM=COPY默认LOCK级别 LOCK=SHARED，即DDL期间表上的写操作会被阻塞，但不影响读取。 LOCK=DEFAULT，让mysql自己去判断lock的模式，原则是mysql尽可能不去锁表 LOCK=EXCLUSIVE，即DDL期间该表不可用，堵塞任何读写请求。如果你想alter操作在最短的时间内完成，或者表短时间内不可用能接受，可以手动指定。 但是有一点需要说明，无论任何模式下，online ddl开始之前都需要一个短时间排它锁(exclusive)来准备环境，所以alter命令发出后，会首先等待该表上的其它操作完成，在alter命令之后的请求会出现等待waiting meta data lock。同样在ddl结束之前，也要等待alter期间所有的事务完成，也会堵塞一小段时间。所以尽量在ALTER TABLE之前确保没有大事务在执行，否则一样出现连环锁表。</description>
+    </item>
+    
+  </channel>
+</rss>

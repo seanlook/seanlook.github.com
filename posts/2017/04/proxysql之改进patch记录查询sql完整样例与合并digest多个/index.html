@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>ProxySQL之改进patch：记录查询sql完整样例与合并digest多个? | Sean Note</title>
+<meta name="keywords" content="mysql, 中间件, proxysql">
+<meta name="description" content="近期一直在思考sql上线审核该怎么做，刚好接触到 ProxySQL 这个中间件，内置了一个计算sql指纹的功能，但是没有记录原始的sql语句。当前正有个紧急的拆库项目也希望知道库上所有的查询。于是把ProxySQL的代码下了回来研究了几天，改了把，加入了两个功能：
+在 stats_mysql_query_digest 表上增加 query_text 字段，当第一次出现这个digest_text时，把原始sql记录下来。 修改计算指纹的模块，对 IN或者 VALUES 后面的多个 ? 合并。这个是目前 c_tokenizer.c 文件里没有做的，用到底1点上可以避免重复记录。 效果： 多个 ? 被折叠成 ?,，有些意外情况时 ??，因为后面一些多余空格的缘故，没有像 pt-fingerprint 那样完全模糊化，像这里digest就保留了大小写、去除重复空格、保留 ` 分隔符。但仅有的几种意外情况是可以接受的。
+后面的 query_text 列也有些未知情况，就是末尾会加上一些奇怪的字符，还在排除，但大体不影响需求。
+代码是基于最新 v1.3.6 稳定版修改的，查看变更 https://github.com/sysown/proxysql/compare/v1.3.6...seanlook:v1.3.7-querysample_digest
+多个 ? 合并只涉及到 c_tokenizer.c 文件，分别在flag=4（处理 &#39;abc&#39;,&#39;def&#39; 的情况）和flag=5（处理 1,2, 3 的情况）加入判断：
+// wrap two more ? to one ?, if (*(p_r_t-2) == &#39;?&#39; &amp;&amp; (*(p_r_t-1) ==&#39; &#39; || *(p_r_t-1) == &#39;,&#39; || *(p_r_t-1) == &#39;?&#39;)){ *(p_r-1) = &#39;,&#39;; } else *p_r&#43;&#43; = &#39;?">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E6%94%B9%E8%BF%9Bpatch%E8%AE%B0%E5%BD%95%E6%9F%A5%E8%AF%A2sql%E5%AE%8C%E6%95%B4%E6%A0%B7%E4%BE%8B%E4%B8%8E%E5%90%88%E5%B9%B6digest%E5%A4%9A%E4%B8%AA/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="ProxySQL之改进patch：记录查询sql完整样例与合并digest多个?" />
+<meta property="og:description" content="近期一直在思考sql上线审核该怎么做，刚好接触到 ProxySQL 这个中间件，内置了一个计算sql指纹的功能，但是没有记录原始的sql语句。当前正有个紧急的拆库项目也希望知道库上所有的查询。于是把ProxySQL的代码下了回来研究了几天，改了把，加入了两个功能：
+在 stats_mysql_query_digest 表上增加 query_text 字段，当第一次出现这个digest_text时，把原始sql记录下来。 修改计算指纹的模块，对 IN或者 VALUES 后面的多个 ? 合并。这个是目前 c_tokenizer.c 文件里没有做的，用到底1点上可以避免重复记录。 效果： 多个 ? 被折叠成 ?,，有些意外情况时 ??，因为后面一些多余空格的缘故，没有像 pt-fingerprint 那样完全模糊化，像这里digest就保留了大小写、去除重复空格、保留 ` 分隔符。但仅有的几种意外情况是可以接受的。
+后面的 query_text 列也有些未知情况，就是末尾会加上一些奇怪的字符，还在排除，但大体不影响需求。
+代码是基于最新 v1.3.6 稳定版修改的，查看变更 https://github.com/sysown/proxysql/compare/v1.3.6...seanlook:v1.3.7-querysample_digest
+多个 ? 合并只涉及到 c_tokenizer.c 文件，分别在flag=4（处理 &#39;abc&#39;,&#39;def&#39; 的情况）和flag=5（处理 1,2, 3 的情况）加入判断：
+// wrap two more ? to one ?, if (*(p_r_t-2) == &#39;?&#39; &amp;&amp; (*(p_r_t-1) ==&#39; &#39; || *(p_r_t-1) == &#39;,&#39; || *(p_r_t-1) == &#39;?&#39;)){ *(p_r-1) = &#39;,&#39;; } else *p_r&#43;&#43; = &#39;?" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E6%94%B9%E8%BF%9Bpatch%E8%AE%B0%E5%BD%95%E6%9F%A5%E8%AF%A2sql%E5%AE%8C%E6%95%B4%E6%A0%B7%E4%BE%8B%E4%B8%8E%E5%90%88%E5%B9%B6digest%E5%A4%9A%E4%B8%AA/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2017-04-27T15:32:49+00:00" />
+<meta property="article:modified_time" content="2017-04-27T15:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="ProxySQL之改进patch：记录查询sql完整样例与合并digest多个?"/>
+<meta name="twitter:description" content="近期一直在思考sql上线审核该怎么做，刚好接触到 ProxySQL 这个中间件，内置了一个计算sql指纹的功能，但是没有记录原始的sql语句。当前正有个紧急的拆库项目也希望知道库上所有的查询。于是把ProxySQL的代码下了回来研究了几天，改了把，加入了两个功能：
+在 stats_mysql_query_digest 表上增加 query_text 字段，当第一次出现这个digest_text时，把原始sql记录下来。 修改计算指纹的模块，对 IN或者 VALUES 后面的多个 ? 合并。这个是目前 c_tokenizer.c 文件里没有做的，用到底1点上可以避免重复记录。 效果： 多个 ? 被折叠成 ?,，有些意外情况时 ??，因为后面一些多余空格的缘故，没有像 pt-fingerprint 那样完全模糊化，像这里digest就保留了大小写、去除重复空格、保留 ` 分隔符。但仅有的几种意外情况是可以接受的。
+后面的 query_text 列也有些未知情况，就是末尾会加上一些奇怪的字符，还在排除，但大体不影响需求。
+代码是基于最新 v1.3.6 稳定版修改的，查看变更 https://github.com/sysown/proxysql/compare/v1.3.6...seanlook:v1.3.7-querysample_digest
+多个 ? 合并只涉及到 c_tokenizer.c 文件，分别在flag=4（处理 &#39;abc&#39;,&#39;def&#39; 的情况）和flag=5（处理 1,2, 3 的情况）加入判断：
+// wrap two more ? to one ?, if (*(p_r_t-2) == &#39;?&#39; &amp;&amp; (*(p_r_t-1) ==&#39; &#39; || *(p_r_t-1) == &#39;,&#39; || *(p_r_t-1) == &#39;?&#39;)){ *(p_r-1) = &#39;,&#39;; } else *p_r&#43;&#43; = &#39;?"/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "ProxySQL之改进patch：记录查询sql完整样例与合并digest多个?",
+      "item": "http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E6%94%B9%E8%BF%9Bpatch%E8%AE%B0%E5%BD%95%E6%9F%A5%E8%AF%A2sql%E5%AE%8C%E6%95%B4%E6%A0%B7%E4%BE%8B%E4%B8%8E%E5%90%88%E5%B9%B6digest%E5%A4%9A%E4%B8%AA/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "ProxySQL之改进patch：记录查询sql完整样例与合并digest多个?",
+  "name": "ProxySQL之改进patch：记录查询sql完整样例与合并digest多个?",
+  "description": "近期一直在思考sql上线审核该怎么做，刚好接触到 ProxySQL 这个中间件，内置了一个计算sql指纹的功能，但是没有记录原始的sql语句。当前正有个紧急的拆库项目也希望知道库上所有的查询。于是把ProxySQL的代码下了回来研究了几天，改了把，加入了两个功能：\n在 stats_mysql_query_digest 表上增加 query_text 字段，当第一次出现这个digest_text时，把原始sql记录下来。 修改计算指纹的模块，对 IN或者 VALUES 后面的多个 ? 合并。这个是目前 c_tokenizer.c 文件里没有做的，用到底1点上可以避免重复记录。 效果： 多个 ? 被折叠成 ?,，有些意外情况时 ??，因为后面一些多余空格的缘故，没有像 pt-fingerprint 那样完全模糊化，像这里digest就保留了大小写、去除重复空格、保留 ` 分隔符。但仅有的几种意外情况是可以接受的。\n后面的 query_text 列也有些未知情况，就是末尾会加上一些奇怪的字符，还在排除，但大体不影响需求。\n代码是基于最新 v1.3.6 稳定版修改的，查看变更 https://github.com/sysown/proxysql/compare/v1.3.6...seanlook:v1.3.7-querysample_digest\n多个 ? 合并只涉及到 c_tokenizer.c 文件，分别在flag=4（处理 'abc','def' 的情况）和flag=5（处理 1,2, 3 的情况）加入判断：\n// wrap two more ? to one ?, if (*(p_r_t-2) == \u0026#39;?\u0026#39; \u0026amp;\u0026amp; (*(p_r_t-1) ==\u0026#39; \u0026#39; || *(p_r_t-1) == \u0026#39;,\u0026#39; || *(p_r_t-1) == \u0026#39;?\u0026#39;)){ *(p_r-1) = \u0026#39;,\u0026#39;; } else *p_r++ = \u0026#39;?",
+  "keywords": [
+    "mysql", "中间件", "proxysql"
+  ],
+  "articleBody": "近期一直在思考sql上线审核该怎么做，刚好接触到 ProxySQL 这个中间件，内置了一个计算sql指纹的功能，但是没有记录原始的sql语句。当前正有个紧急的拆库项目也希望知道库上所有的查询。于是把ProxySQL的代码下了回来研究了几天，改了把，加入了两个功能：\n在 stats_mysql_query_digest 表上增加 query_text 字段，当第一次出现这个digest_text时，把原始sql记录下来。 修改计算指纹的模块，对 IN或者 VALUES 后面的多个 ? 合并。这个是目前 c_tokenizer.c 文件里没有做的，用到底1点上可以避免重复记录。 效果： 多个 ? 被折叠成 ?,，有些意外情况时 ??，因为后面一些多余空格的缘故，没有像 pt-fingerprint 那样完全模糊化，像这里digest就保留了大小写、去除重复空格、保留 ` 分隔符。但仅有的几种意外情况是可以接受的。\n后面的 query_text 列也有些未知情况，就是末尾会加上一些奇怪的字符，还在排除，但大体不影响需求。\n代码是基于最新 v1.3.6 稳定版修改的，查看变更 https://github.com/sysown/proxysql/compare/v1.3.6...seanlook:v1.3.7-querysample_digest\n多个 ? 合并只涉及到 c_tokenizer.c 文件，分别在flag=4（处理 'abc','def' 的情况）和flag=5（处理 1,2, 3 的情况）加入判断：\n// wrap two more ? to one ?, if (*(p_r_t-2) == '?' \u0026\u0026 (*(p_r_t-1) ==' ' || *(p_r_t-1) == ',' || *(p_r_t-1) == '?')){ *(p_r-1) = ','; } else *p_r++ = '?'; 然后在 line:450 左右 COPY CHAR 的时候进行一次过滤：\n// COPY CHAR // ================================================= // wrap two more ? to ?, if ((*s == ' ' || *s == ',') \u0026\u0026 (*(p_r_t-1) == '?' || *(p_r_t-1) == ',' || *(p_r_t-1) == ' ')) { if (*(p_r_t-1) == ' ' \u0026\u0026 *(p_r_t-2) == '?') *(p_r-1) = ','; // p_r may be changed in line:435:is_digit_string } else { 这部分代码调试花了不少功夫，一是理清逻辑，而是意外情况处理。变量的用途注释不清晰，几年没写C，不得不动用 gdb 来跟踪调试，怀念大学时用IDE的日子。\n加 query_text 字段，在用 gdb 理清c++函数间调用关系的之后，改起来还是比较容易：\nMySQL_Session.cpp:Query_Info::init 里面会将连接会话的sql信息临时存起来 MySQL_Session.cpp:Query_Info::query_parser_init 调用 Qurey_Processor.cpp:Query_Processor::query_parser_init，里面会调用上面 c_tokenizer.c 来处理digest_text并计算得到digest 继而是 Query_Processor 类骨规则路由函数 process_mysql_query，但这与我们的改动无关 路由完成后，调用 query_parser_update_counters 函数来更新统计信息，改动从这里开始。从 sess 里拿到原始的sql，把地址传递给 update_query_digest() Query_Processor::update_query_digest 方法会判断当前digest是否已存在 digest_umap.find(qp-\u003edigest_total) 如果不是第一次出现，则更新 last_seen 时间 如果是第一次出现，则 new QP_query_digest_stats 对象，就在这个地方把sql传过去。（Query_Processor.cpp:1026,1028） 在 QP_query_digest_stats 加入 query_text 字段并在析构函数里初始化，同时记得free掉 这个地方一度出现 qt 的值在赋给 query_text 的时候，被莫名的吃掉，猜想应该是内存分配的时候被擦掉了，请了公司C++大神涛哥一起调试看了下，是传过来长度截取不对。 现在是没有这个问题，但是会随机性出现本文开头所说，sql末尾出现意外字符。还需要进一步排查。 修改操作sqlite的命令 Query_Processor.cpp：SQLite3_result * Query_Processor::get_query_digests() ProxySQL_Admin.cpp：修改 stats_mysql_query_digest 表定义，以及插入sql的模板。 这个地方参数漏了一个导致proxysql crash，编译的时候建议把 Makefile中的 -O2 改成 -O0，这样gdb调试的时候不会优化输出，容易跟踪。 这些改动对于c++程序员来说，小菜一碟，但对于我一个DBA来说，总算啃下来了。主要是考虑功能急用，提交 issue 等作者renecannao发版也是太慢。 现在可以愉快的收集所有sql了，接下来就是新产生的sql进行自动化审核。\n以上两点特性对于升级来讲是无障碍的，因为 stats_mysql_query_stats 在内存里，重启之前字段就加上了，无需改动proxysql.db里面的内容。代码在我fork仓库的 v1.3.7-querysample_digest 分支，我也已提交 pull request 给作者合并。等消息中……\n原文连接地址：http://xgknight.com/2017/04/27/mysql-proxysql-patch-querytext-sample/\n",
+  "wordCount" : "210",
+  "inLanguage": "en",
+  "datePublished": "2017-04-27T15:32:49Z",
+  "dateModified": "2017-04-27T15:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E6%94%B9%E8%BF%9Bpatch%E8%AE%B0%E5%BD%95%E6%9F%A5%E8%AF%A2sql%E5%AE%8C%E6%95%B4%E6%A0%B7%E4%BE%8B%E4%B8%8E%E5%90%88%E5%B9%B6digest%E5%A4%9A%E4%B8%AA/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      ProxySQL之改进patch：记录查询sql完整样例与合并digest多个?
+    </h1>
+    <div class="post-meta"><span title='2017-04-27 15:32:49 +0000 UTC'>April 27, 2017</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>近期一直在思考sql上线审核该怎么做，刚好接触到 ProxySQL 这个中间件，内置了一个计算sql指纹的功能，但是没有记录原始的sql语句。当前正有个紧急的拆库项目也希望知道库上所有的查询。于是把ProxySQL的代码下了回来研究了几天，改了把，加入了两个功能：</p>
+<ol>
+<li>在 <code>stats_mysql_query_digest</code> 表上增加 <code>query_text</code> 字段，当第一次出现这个digest_text时，把原始sql记录下来。</li>
+<li>修改计算指纹的模块，对 IN或者 VALUES 后面的多个 <code>?</code> 合并。这个是目前 <code>c_tokenizer.c</code> 文件里没有做的，用到底1点上可以避免重复记录。</li>
+</ol>
+<p>效果：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/proxysql-querytext-sample-digest.png" alt="proxysql-querytext-sample-digest"  />
+</p>
+<p>多个 <code>?</code> 被折叠成 <code>?,</code>，有些意外情况时 <code>??</code>，因为后面一些多余空格的缘故，没有像 <em>pt-fingerprint</em> 那样完全模糊化，像这里digest就保留了大小写、去除重复空格、保留 ` 分隔符。但仅有的几种意外情况是可以接受的。</p>
+<p>后面的 query_text 列也有些未知情况，就是末尾会加上一些奇怪的字符，还在排除，但大体不影响需求。</p>
+<p>代码是基于最新 v1.3.6 稳定版修改的，查看变更 <a href="https://github.com/sysown/proxysql/compare/v1.3.6...seanlook:v1.3.7-querysample_digest">https://github.com/sysown/proxysql/compare/v1.3.6...seanlook:v1.3.7-querysample_digest</a></p>
+<p>多个 <code>?</code> 合并只涉及到 <em>c_tokenizer.c</em> 文件，分别在flag=4（处理 <code>'abc','def'</code> 的情况）和flag=5（处理 <code>1,2, 3</code> 的情况）加入判断：</p>
+<pre tabindex="0"><code>// wrap two more ? to one ?,
+if (*(p_r_t-2) == &#39;?&#39; &amp;&amp; (*(p_r_t-1) ==&#39; &#39; || *(p_r_t-1) == &#39;,&#39; || *(p_r_t-1) == &#39;?&#39;)){
+    *(p_r-1) = &#39;,&#39;;
+}
+else
+    *p_r++ = &#39;?&#39;;
+</code></pre><p>然后在 line:450 左右 COPY CHAR 的时候进行一次过滤：</p>
+<pre tabindex="0"><code>// COPY CHAR
+// =================================================
+// wrap two more ? to ?,
+if ((*s == &#39; &#39; || *s == &#39;,&#39;) &amp;&amp; (*(p_r_t-1) == &#39;?&#39; || *(p_r_t-1) == &#39;,&#39; || *(p_r_t-1) == &#39; &#39;)) {
+    if (*(p_r_t-1) == &#39; &#39; &amp;&amp; *(p_r_t-2) == &#39;?&#39;)
+        *(p_r-1) = &#39;,&#39;;  // p_r may be changed in line:435:is_digit_string
+}
+else {
+</code></pre><p>这部分代码调试花了不少功夫，一是理清逻辑，而是意外情况处理。变量的用途注释不清晰，几年没写C，不得不动用 gdb 来跟踪调试，怀念大学时用IDE的日子。</p>
+<!-- raw HTML omitted -->
+<p>加 query_text 字段，在用 gdb 理清c++函数间调用关系的之后，改起来还是比较容易：</p>
+<ol>
+<li><em>MySQL_Session.cpp:Query_Info::init</em> 里面会将连接会话的sql信息临时存起来</li>
+<li><em>MySQL_Session.cpp:Query_Info::query_parser_init</em> 调用 <em>Qurey_Processor.cpp:Query_Processor::query_parser_init</em>，里面会调用上面 <em>c_tokenizer.c</em> 来处理digest_text并计算得到digest</li>
+<li>继而是 Query_Processor 类骨规则路由函数 <em>process_mysql_query</em>，但这与我们的改动无关</li>
+<li>路由完成后，调用 <em>query_parser_update_counters</em> 函数来更新统计信息，改动从这里开始。从 sess 里拿到原始的sql，把地址传递给 <em>update_query_digest()</em></li>
+<li><em>Query_Processor::update_query_digest</em> 方法会判断当前digest是否已存在 <em>digest_umap.find(qp-&gt;digest_total)</em></li>
+</ol>
+<ul>
+<li>如果不是第一次出现，则更新 <code>last_seen</code> 时间</li>
+<li>如果是第一次出现，则 <em>new QP_query_digest_stats</em> 对象，就在这个地方把sql传过去。（Query_Processor.cpp:1026,1028）</li>
+</ul>
+<ol start="6">
+<li>在 <code>QP_query_digest_stats</code> 加入 <code>query_text</code> 字段并在析构函数里初始化，同时记得free掉
+这个地方一度出现 qt 的值在赋给 query_text 的时候，被莫名的吃掉，猜想应该是内存分配的时候被擦掉了，请了公司C++大神涛哥一起调试看了下，是传过来长度截取不对。
+现在是没有这个问题，但是会随机性出现本文开头所说，sql末尾出现意外字符。还需要进一步排查。</li>
+<li>修改操作sqlite的命令</li>
+</ol>
+<ul>
+<li><em>Query_Processor.cpp</em>：<em>SQLite3_result * Query_Processor::get_query_digests()</em></li>
+<li><em>ProxySQL_Admin.cpp</em>：修改 <code>stats_mysql_query_digest</code> 表定义，以及插入sql的模板。
+这个地方参数漏了一个导致proxysql crash，编译的时候建议把 Makefile中的 <code>-O2</code> 改成 <code>-O0</code>，这样gdb调试的时候不会优化输出，容易跟踪。</li>
+</ul>
+<p>这些改动对于c++程序员来说，小菜一碟，但对于我一个DBA来说，总算啃下来了。主要是考虑功能急用，提交 issue 等作者renecannao发版也是太慢。
+现在可以愉快的收集所有sql了，接下来就是新产生的sql进行自动化审核。</p>
+<p>以上两点特性对于升级来讲是无障碍的，因为 <code>stats_mysql_query_stats</code> 在内存里，重启之前字段就加上了，无需改动proxysql.db里面的内容。代码在我fork仓库的 <a href="https://github.com/seanlook/proxysql/tree/v1.3.7-querysample_digest"><strong>v1.3.7-querysample_digest</strong></a> 分支，我也已提交 <a href="https://github.com/sysown/proxysql/pull/1010">pull request</a> 给作者合并。等消息中……</p>
+<hr>
+<p>原文连接地址：http://xgknight.com/2017/04/27/mysql-proxysql-patch-querytext-sample/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/%E4%B8%AD%E9%97%B4%E4%BB%B6/">中间件</a></li>
+      <li><a href="http://xgknight.com/tags/proxysql/">proxysql</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>maxwell on Sean Note</title>
+    <link>http://xgknight.com/tags/maxwell/</link>
+    <description>Recent content in maxwell on Sean Note</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sun, 14 Jan 2018 15:32:49 +0000</lastBuildDate><atom:link href="http://xgknight.com/tags/maxwell/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>基于MySQL binlog增量数据同步方案(maxwell&#43;rabbimt&#43;pydbsync)</title>
+      <link>http://xgknight.com/posts/2018/01/%E5%9F%BA%E4%BA%8Emysql-binlog%E5%A2%9E%E9%87%8F%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5%E6%96%B9%E6%A1%88maxwell-rabbimt-pydbsync/</link>
+      <pubDate>Sun, 14 Jan 2018 15:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2018/01/%E5%9F%BA%E4%BA%8Emysql-binlog%E5%A2%9E%E9%87%8F%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5%E6%96%B9%E6%A1%88maxwell-rabbimt-pydbsync/</guid>
+      <description>应用场景：同 http://xgknight.com/2017/09/05/mysql-binlog-subscribe-simple-for-dba/ ，但更灵活：
+实时同步部分表到另外一个数据库实例 比如在数据库迁库时，将当天表的数据同步到新库，模拟阿里云dms数据传输的功能，相当于在测试环境演练，减少失误。 另外还可以从新库反向同步增量数据到老库，解决测试环境多项目测试引起数据库冲突的问题。
+正式切库时的回滚措施 比如数据库迁移项目，切换期间数据写向新库，但如果切换失败需要回滚到老库，就需要把这段时间新增的数据同步回老库（启动消费程序），这就不需要程序段再考虑复杂的回滚设计。
+数据库闪回 关于数据库误操作的闪回方案，见 文章MySQL根据离线binlog快速闪回 。binlog2sql的 -B 选项可以将sql反向组装，生产回滚sql。如果需要完善的闪回功能，要进一步开发，提高易用性。
+binlog搜索功能 目前组内一版的binlog搜索功能，是离线任务处理的方式，好处是不会占用太大空间，缺点是处理时间较长。通过实时binlog解析过滤的方式，入ES可以快速搜索。需要进一步开发完善。 结合graylog可以实现阿里云RDS类似的数据追踪功能。见 http://xgknight.com/2018/01/25/maxwell-graylog/
+rabbitmq介绍：http://xgknight.com/2018/01/06/rabbitmq-introduce/
+maxwell介绍：http://xgknight.com/2018/01/13/maxwell-binlog/
+数据已经生成，要完成 MySQL binlog 增量数据同步，还差一个消费者程序，将rabbitmq里面的消息取出来，在目标库重放：
+** https://github.com/seanlook/pydbsync ** 目前这个增量程序重放动作是：
+binlog里面 insert 和 update 行，都变成 replace into binlog里面 delele ，变成 delete ignore xxx limit 1 alter/create，原封不动 所以如果表上没有主键或者唯一索引，是非常难搞定的，原本的update变成 replace into 多插入一条数据。当然如果把 update 事件改成 update tables set f1=v1,f2=v2 where f1=v1,f2=vv2 limit 1 也没毛病。
+使用python3，安装rabbitmq 的python客户端即可：pip install pika
+config.py
+增量程序的配置文件
+db_info: 指定要写入的目标db rabbitmq_conn_info: 增量数据的来源，rabbitmq连接信息 rabbitmq_queue_bind: 指定怎么划分队列</description>
+    </item>
+    
+  </channel>
+</rss>

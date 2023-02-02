@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>schema设计 on Sean Note</title>
+    <link>http://xgknight.com/tags/schema%E8%AE%BE%E8%AE%A1/</link>
+    <description>Recent content in schema设计 on Sean Note</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Fri, 17 Feb 2017 16:32:49 +0000</lastBuildDate><atom:link href="http://xgknight.com/tags/schema%E8%AE%BE%E8%AE%A1/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>关于MySQL自增主键的几点问题（下）</title>
+      <link>http://xgknight.com/posts/2017/02/%E5%85%B3%E4%BA%8Emysql%E8%87%AA%E5%A2%9E%E4%B8%BB%E9%94%AE%E7%9A%84%E5%87%A0%E7%82%B9%E9%97%AE%E9%A2%98%E4%B8%8B/</link>
+      <pubDate>Fri, 17 Feb 2017 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/02/%E5%85%B3%E4%BA%8Emysql%E8%87%AA%E5%A2%9E%E4%B8%BB%E9%94%AE%E7%9A%84%E5%87%A0%E7%82%B9%E9%97%AE%E9%A2%98%E4%B8%8B/</guid>
+      <description>AUTO-INC waiting 锁等待 这是生产环境出现的现象，某日下午5点业务高峰期，我们的 慢查询快照抓取程序 报出大量线程阻塞，但是1分钟以后就好了。于是分析了当时的 processlist 和 innodb status 现场记录，发现有大量的 AUTO-INC waiting：
+![auto-inc-lock-wait][1]
+当时想这是得多大的并发量，才会导致 AUTO_INCREMENT 列的自增id分配出现性能问题，不太愿意相信这个事实（后面就再也没出现过）。了解一番之后（见 关于MySQLz自增主键问题（上篇）），发现这个表级别的 AUTO-INC lock 就不应该在业务中存在，因为 innodb_autoinc_lock_mode为1，普通业务都是 simple inserts，获取自增id是靠内存里维护的一个互斥量（mutex counter）。
+问题拿到知数堂优化班上课群里讨论过，也只是猜测是不是慢查询多了导致负载高，或者当时磁盘遇到什么物理故障阿里云那边自动恢复了。再后来怀疑是不是因为插入时带了 auto_increment 列的值（我们有个redis incr实现的自增id服务，虽然这一列有 AAUTO_INCREMENT 定义，但实际已经从发号器取id了），会导致锁的性质会变？
+为了弄清这个疑问，特意去看了下mysql源码，发现如果插入的自增值比表当前AUTOINC值要大，是直接update mutex counter：
+看源码的时候也打消了另一个疑虑：show engine innodb status 看到的 AUTO-INC 有没有可能不区分 表级自增锁和互斥量计数器 两种自增方案，只是告诉你自增id获取忙不过来？ 实际不是的，代码里面有明确的定义是 autoinc_lock还是autoinc_mutex：
+// dict0dict.cc : #ifndef UNIV_HOTBACKUP /********************************************************************//** Acquire the autoinc lock. */ UNIV_INTERN void dict_table_autoinc_lock( /*====================*/ dict_table_t*	table)	/*!&amp;lt; in/out: table */ { mutex_enter(&amp;amp;table-&amp;gt;autoinc_mutex); } /********************************************************************//** Unconditionally set the autoinc counter.</description>
+    </item>
+    
+    <item>
+      <title>关于MySQL自增主键的几点问题（上）</title>
+      <link>http://xgknight.com/posts/2017/02/%E5%85%B3%E4%BA%8Emysql%E8%87%AA%E5%A2%9E%E4%B8%BB%E9%94%AE%E7%9A%84%E5%87%A0%E7%82%B9%E9%97%AE%E9%A2%98%E4%B8%8A/</link>
+      <pubDate>Thu, 16 Feb 2017 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2017/02/%E5%85%B3%E4%BA%8Emysql%E8%87%AA%E5%A2%9E%E4%B8%BB%E9%94%AE%E7%9A%84%E5%87%A0%E7%82%B9%E9%97%AE%E9%A2%98%E4%B8%8A/</guid>
+      <description>前段时间遇到一个InnoDB表自增锁导致的问题，最近刚好有一个同行网友也问到自增锁的疑问，所以抽空系统的总结一下，这两个问题下篇会有阐述。
+1. 划分三种插入类型 这里区分一下几种插入数据行的类型，便于后面描述：（纯逻辑上的划分）
+&amp;ldquo;Simple inserts&amp;rdquo;
+简单插入，就是在处理sql语句的时候，能够提前预估到插入的行数，包括 INSERT / REPLACE 的单行、多行插入，但不含嵌套子查询以及 INSERT ... ON DUPLICATE KEY UPDATE。
+&amp;ldquo;Bulk inserts&amp;rdquo;
+本文暂且叫做 大块插入，不能提前预知语句要插入的行数，也就无法知道分配多少个自增值，包括 INSERT ... SELECT, REPLACE ... SELECT, 以及 LOAD DATA 导入语句。InnoDB会每处理一行记录就为 AUTO_INCREMENT 列分配一个值。
+&amp;ldquo;Mixed-mode inserts&amp;rdquo;
+混合插入，比如在 “简单插入” 多行记录的时候，有的新行有指定自增值，有的没有，所以获得最坏情况下需要插入的数量，然后一次性分配足够的auto_increment id。比如:
+# c1 是 t1 的 AUTO_INCREMENT 列 INSERT INTO t1 (c1,c2) VALUES (1,&amp;#39;a&amp;#39;), (NULL,&amp;#39;b&amp;#39;), (5,&amp;#39;c&amp;#39;), (NULL,&amp;#39;d&amp;#39;); 又比如 INSERT ... ON DUPLICATE KEY UPDATE，它在 update 阶段有可能分配新的自增id，也可能不会。
+2. 三种自增模式：innodb_autoinc_lock_mode 在以 5.6 版本，自增id累加模式分为：
+** 传统模式**</description>
+    </item>
+    
+    <item>
+      <title>InnoDB行格式对text/blob大变长字段的影响</title>
+      <link>http://xgknight.com/posts/2016/05/innodb%E8%A1%8C%E6%A0%BC%E5%BC%8F%E5%AF%B9text/blob%E5%A4%A7%E5%8F%98%E9%95%BF%E5%AD%97%E6%AE%B5%E7%9A%84%E5%BD%B1%E5%93%8D/</link>
+      <pubDate>Wed, 18 May 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/05/innodb%E8%A1%8C%E6%A0%BC%E5%BC%8F%E5%AF%B9text/blob%E5%A4%A7%E5%8F%98%E9%95%BF%E5%AD%97%E6%AE%B5%E7%9A%84%E5%BD%B1%E5%93%8D/</guid>
+      <description>最近在排查现网Text与Blob类型，发现有不少，在《高性能MySQL(第3版)》看到对这两种变长数据类型的处理会涉及到在磁盘上创建临时表，性能开销比较大。于是把影响blob型数据存储方式了解了一下：row_format。
+1. InnoDB的Antelop与Barracuda文件格式 Innodb存储引擎保存记录，是以行的形式存放的（与之对应的是像Google BigTable这种列数据库）。在InnoDB 1.0.x版本之前，InnoDB 存储引擎提供了 Compact 和 Redundant 两种格式来存放行记录数据，这也是目前使用最多的一种格式。Redundant 格式是为兼容之前版本而保留的。
+MySQL 5.1 中的 innodb_plugin 引入了新的文件格式：Barracuda（将以前的行格式 compact 和 redundant 合称为Antelope），该文件格式拥有新的两种行格式：compressed和dynamic。
+在 MySQL 5.6 版本中，默认还是 Compact 行格式，也是目前使用最多的一种 ROW FORMAT。用户可以通过命令 SHOW TABLE STATUS LIKE&#39;table_name&#39; 来查看当前表使用的行格式，其中 row_format 列表示当前所使用的行记录结构类型。
+mysql&amp;gt; show variables like &amp;#34;innodb_file_format&amp;#34;; +--------------------+-----------+ | Variable_name | Value | +--------------------+-----------+ | innodb_file_format | Barracuda | +--------------------+-----------+ 1 row in set mysql&amp;gt; show table status like &amp;#34;tablename%&amp;#34;\G *************************** 1. row *************************** Name: t_rf_compact Engine: InnoDB Version: 10 Row_format: Compact Rows: 4 Avg_row_length: 36864 Data_length: 147456 Max_data_length: 0 Index_length: 0 Data_free: 0 Auto_increment: 7 Create_time: 2016-05-14 20:52:58 Update_time: NULL Check_time: NULL Collation: utf8_general_ci Checksum: NULL Create_options: Comment: 1 row in set (0.</description>
+    </item>
+    
+    <item>
+      <title>小心MySQL的隐式类型转换陷阱</title>
+      <link>http://xgknight.com/posts/2016/05/%E5%B0%8F%E5%BF%83mysql%E7%9A%84%E9%9A%90%E5%BC%8F%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E9%99%B7%E9%98%B1/</link>
+      <pubDate>Thu, 05 May 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/05/%E5%B0%8F%E5%BF%83mysql%E7%9A%84%E9%9A%90%E5%BC%8F%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E9%99%B7%E9%98%B1/</guid>
+      <description>1. 隐式类型转换实例 今天生产库上突然出现MySQL线程数告警，IOPS很高，实例会话里面出现许多类似下面的sql：(修改了相关字段和值)
+SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233) 用 explain 看了下扫描行数和索引选择情况：
+mysql&amp;gt;explain SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233); +------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+ | id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra | +------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+ | 1 | SIMPLE | t_tb1 | ref | uid_type_frid,idx_corpid_qq1id | uid_type_frid | 8 | const | 1386 | Using index condition; Using where | +------+---------------+---------+--------+--------------------------------+---------------+------------+--------+--------+------------------------------------+ 共返回 1 行记录,花费 11.</description>
+    </item>
+    
+    <item>
+      <title>MySQL数字类型int与tinyint、float与decimal如何选择</title>
+      <link>http://xgknight.com/posts/2016/04/mysql%E6%95%B0%E5%AD%97%E7%B1%BB%E5%9E%8Bint%E4%B8%8Etinyintfloat%E4%B8%8Edecimal%E5%A6%82%E4%BD%95%E9%80%89%E6%8B%A9/</link>
+      <pubDate>Fri, 29 Apr 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/04/mysql%E6%95%B0%E5%AD%97%E7%B1%BB%E5%9E%8Bint%E4%B8%8Etinyintfloat%E4%B8%8Edecimal%E5%A6%82%E4%BD%95%E9%80%89%E6%8B%A9/</guid>
+      <description>最近在准备给开发做一个mysql数据库开发规范方面培训，一步一步来，结合在生产环境发现的数据库方面的问题，从几个常用的数据类型说起。
+int、tinyint与bigint 它们都是（精确）整型数据类型，但是占用字节数和表达的范围不同。首先没有这个表就说不过去了：
+Type Storage Minimum Value Maximum Value (Bytes) (Signed/Unsigned) (Signed/Unsigned) TINYINT 1 -128 127 0 255 SMALLINT 2 -32768 32767 0 65535 MEDIUMINT 3 -8388608 8388607 0 16777215 INT 4 -2147483648 2147483647 0 4294967295 BIGINT 8 -9223372036854775808 9223372036854775807 0 18446744073709551615 只需要知道对应类型占多少字节就能推算出范围了，比如int占 4 bytes,即4*8=32bits，大约10位数字，也能理解为什么int默认显示位数是11。
+遇到比较多的是tinyint和bigint，tinyint一般用于存放status,type这种数值小的数据，不够用时可能会用smallint。bigint一般用于自增主键。
+为了避免数据库被过度设计，布尔、枚举类型也采用tinyint。
+还有一点也是经常被提到的关于 int(M) 中M的理解，int型数据无论是int(4)还是int(11)，都已经占用了 4 bytes 存储空间，M表示的只是显示宽度(display width, max value 255)，并不是定义int的长度。
+例如：
+mysql&amp;gt; CREATE TABLE `tc_integer` ( `f_id` bigint(20) PRIMARY KEY AUTO_INCREMENT, `f_type` tinyint, `f_flag` tinyint(1), `f_num` smallint(5) unsigned ZEROFILL ) ENGINE=InnoDB DEFAULT CHARSET=utf8; mysql&amp;gt; desc tc_integer; +----------------+-------------------------------+------+-----+---------+----------------+ | Field | Type | Null | Key | Default | Extra | +----------------+-------------------------------+------+-----+---------+----------------+ | f_id | bigint(20) | NO | PRI | NULL | auto_increment | | f_type | tinyint(4) | YES | | NULL | | | f_flag | tinyint(1) | YES | | NULL | | | f_num | smallint(5) unsigned zerofill | YES | | NULL | | +----------------+-------------------------------+------+-----+---------+----------------+ 4 rows in set (0.</description>
+    </item>
+    
+    <item>
+      <title>MySQL字符数据类型char与varchar的区别</title>
+      <link>http://xgknight.com/posts/2016/04/mysql%E5%AD%97%E7%AC%A6%E6%95%B0%E6%8D%AE%E7%B1%BB%E5%9E%8Bchar%E4%B8%8Evarchar%E7%9A%84%E5%8C%BA%E5%88%AB/</link>
+      <pubDate>Thu, 28 Apr 2016 16:32:49 +0000</pubDate>
+      
+      <guid>http://xgknight.com/posts/2016/04/mysql%E5%AD%97%E7%AC%A6%E6%95%B0%E6%8D%AE%E7%B1%BB%E5%9E%8Bchar%E4%B8%8Evarchar%E7%9A%84%E5%8C%BA%E5%88%AB/</guid>
+      <description>数据类型差不多是接触mysql一开始就了解的内容，最近遇到几个现象如varchar自动转mediumtext，blob存储性能的问题，不得不回头明确一下关于MySQL常用数据类型的选择。
+mysql手册这里 已经讲的很清楚了。它们都是定义字符串型字段时常用的类型，但它们存储和检索的方式有不同，最大长度和尾部的空格是否保留也有差别。
+char类型是使用固定长度空间进行存储，范围0-255。比如CHAR(30)能放30个字符，存放abcd时，尾部会以空格补齐，实际占用空间 30 * 3bytes (utf8)。检索它的时候尾部空格会被去除。
+char善于存储经常改变的值，或者长度相对固定的值，比如type、ip地址或md5之类的数据，不容易产生碎片。关于它的效率可以参考这里。
+varchar类型保存可变长度字符串，范围0-65535（但受到单行最大64kb的限制）。比如用 varchar(30) 去存放abcd，实际使用5个字节，因为还需要使用额外1个字节来标识字串长度（0-255使用1个字节，超过255需要2个字节）。
+varchar善于存储值的长短不一的列，也是用的最多的一种类型，节省磁盘空间。update时varchar列时，如果新数据比原数据大，数据库需要重新开辟空间，这一点会有性能略有损耗，但innodb引擎下查询效率比char高一点。这也是innodb官方推荐的类型。
+如果存储时真实长度超过了char或者varchar定义的最大长度呢？
+在SQL严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示错误，即插入失败 在SQL非严格模式下，无论char还是varchar，如果尾部要被截断的是非空格，会提示warning，但可以成功 如果尾部要被截断的是空格，无论SQL所处模式，varchar都可以插入成功但提示warning；char也可以插入成功，并且无任何提示 这里特意提到SQL的严格模式，是因为在工作中也遇到过一些坑，参考MySQL的sql_mode严格模式注意点。
+贴上官方的一个表格：
+Value CHAR(4) Storage Required VARCHAR(4) Storage Required &#39;&#39; &amp;rsquo; &#39; 4 bytes &#39;&#39; 1 byte &amp;lsquo;ab&amp;rsquo; &amp;lsquo;ab &#39; 4 bytes &amp;lsquo;ab&amp;rsquo; 3 bytes &amp;lsquo;abcd&amp;rsquo; &amp;lsquo;abcd&amp;rsquo; 4 bytes &amp;lsquo;abcd&amp;rsquo; 5 bytes &amp;lsquo;abcdefgh&amp;rsquo; &amp;lsquo;abcd&amp;rsquo; 4 bytes &amp;lsquo;abcd&amp;rsquo; 5 bytes 另外，mysql字段值比较时默认是不区分大小写的，这是由于他们的校对规则（一般是 utf8_general_ci）决定的，按字符比较，所以查询时 值尾部 的空格也是被忽略的，除非建表时对列指定 BINARY （校对字符集变成utf8_bin）或者select * from vc where binary v=&#39;ab &#39;;，就会按字节比较，即比较时区分大小写和尾部空格。
+需要注意的是，使用varchar不能因为长度可变就随意分大空间，比如90个字节能放够的列定义成varchar(200)，因为开辟内存时是以200字节进行的，遇到需要filesort或tmp table作业可能会带来不利影响。</description>
+    </item>
+    
+  </channel>
+</rss>
