@@ -137,186 +137,195 @@
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>在ubuntu上部署Kubernetes管理docker集群示例
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: 在Linux上使用logwatch分析监控日志文件 date: 2014-08-23 01:21:25 updated: 2014-08-23 10:46:23 tags: [logwatch, linux,日志] categories: [Linux] 1. 介绍 在维护Linux服务器时，经常需要查看系统中各种服务的日志，以检查服务器的运行状态。 如登陆历史、邮件、软件安装等日志。系统管理员一个个去检查会十分不方便；且大多时候，这会是一种被动的检查，即只有在发现系统运行异常时才会想到去查看日志以获取异常的信息。那么如何主动、集中的分析这些日志，并产生报告，定时发送给管理员就会显得十分重要。
-logwatch 是一款用 Perl 语言编写的开源日志解析分析器。它能对原始的日志文件进行解析并转换成结构化格式的文档，也能根据您的使用情况和需求来定制报告。logwatch 的主要目的是生成更易于使用的日志摘要，并不是用来对日志进行实时的处理和监控的。正因为如此，logwatch 通常被设定好时间和频率的自动定时任务来调度运行或者是有需要日志处理的时候从命令行里手动运行。一旦日志报告生成，logwatch 可以通过电子邮件把这报告发送给您，您可以把它保存成文件或者直接显示在屏幕上。
-Logwatch 报告的详细程度和报告覆盖范围是完全可定制化的。Logwatch 的日志处理引擎也是可扩展的，从某种意义上来说，如果您想在一个新的应用程序中使用 logwatch 功能的话，只需要为这个应用程序的日志文件编写一个日志处理脚本（使用 Perl 语言），然后挂接到 logwatch 上就行。
-logwatch 有一点不好的就是，在它生成的报告中没有详细的时间戳信息，而原来的日志文件中是存在的。您只能知道被记录下来的一段时间之内的特定事件，如果想要知道精确的时间点的信息，就不得不去查看原日志文件了。
-2. 安装与配置说明 2.1 安装 无论在Debian系还是Redhat系上，安装logwatch都非常简单：
-# apt-get install logwatch //Debian、Ubuntu.etc # yum install logwatch -y //Redhat、Centos.etc 以下内容基于 CentOS 6.x，其余系统相差不大。
-2.2 配置 2.2.1 配置文件说明 安装后的目录文件说明： /usr/share/logwatch default.conf/ # 配置目录 logwatch.conf # 主配置文件，收件人，级别等 logfiles/ # 定义待分析服务的日志文件组路径，相对于/var/log(*.conf) services/ # 自定义需分析日志的Service目录(*....</p>
+    <p>本文通过实际操作来演示Kubernetes的使用，因为环境有限，集群部署在本地3个ubuntu上，主要包括如下内容：
+部署环境介绍，以及Kubernetes集群逻辑架构 安装部署Open vSwitch跨机器容器通信工具 安装部署Etcd和Kubernetes的各大组件 演示Kubernetes管理容器和服务 关于 Kubernetes 系统架构及组件介绍见这里。
+1. 部署环境及架构 vSphere: 5.1 操作系统: ubuntu 14.04 x86_64 Open vSwith版本: 2.0.2 Kubernetes: v0.7.2 Etcd版本: 2.0.0-rc.1 Docker版本: 1.4.1 服务器信息： Role Hostname IP Address APIServer kubernetes 172.29.88.206 Minion minion1 172.29.88.207 Minion minion2 172.29.88.208 在详细介绍部署Kubernetes集群前，先给大家展示下集群的逻辑架构。从下图可知，整个系统分为两部分，第一部分是Kubernetes APIServer，是整个系统的核心，承担集群中所有容器的管理工作；第二部分是minion，运行Container Daemon，是所有容器栖息之地，同时在minion上运行Open vSwitch程序，通过GRE Tunnel负责minions之间Pod的网络通信工作。 2. 安装Open vSwitch及配置GRE 为了解决跨minion之间Pod的通信问题，我们在每个minion上安装Open vSwtich，并使用GRE或者VxLAN使得跨机器之间P11od能相互通信，本文使用GRE，而VxLAN通常用在需要隔离的大规模网络中。对于Open vSwitch的介绍请参考另一篇文章Open vSwitch。
+sudo apt-get install openvswitch-switch bridge-utils 安装完Open vSwitch和桥接工具后，接下来便建立minion0和minion1之间的隧道。首先在minion1和minion2上分别建立OVS Bridge：
+# ovs-vsctl add-br obr0 接下来建立gre，并将新建的gre0添加到obr0，在minion1上执行如下命令：
+# ovs-vsctl add-port obr0 gre0 -- set Interface gre0 type=gre options:remote_ip=172....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2015-02-07 13:21:25 +0000 UTC'>February 7, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 在ubuntu上部署Kubernetes管理docker集群示例" href="http://xgknight.com/posts/2015/02/%E5%9C%A8ubuntu%E4%B8%8A%E9%83%A8%E7%BD%B2kubernetes%E7%AE%A1%E7%90%86docker%E9%9B%86%E7%BE%A4%E7%A4%BA%E4%BE%8B/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>开源容器集群管理系统Kubernetes架构及组件介绍
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: linux进程后台运行的几种方式 date: 2014-02-20 11:21:25 updated: 2014-02-20 18:46:23 tags: [linux, shell, 后台进程,screen] categories: Linux Ctrl&#43;z/bg/nohup/setsid/&amp; 在Linux中，如果要让进程在后台运行，一般情况下，我们在命令后面加上&amp;即可，实际上，这样是将命令放入到一个作业队列中了：
-# ./rsync.sh &amp; # jobs 对于已经在前台执行的命令，也可以重新放到后台执行，首先按ctrl&#43;z暂停已经运行的进程，然后使用bg命令将停止的作业放到后台运行：bg %1，放回前台运行：%1。
-但是如上方到后台执行的进程，其父进程还是当前终端shell的进程，而一旦父进程退出，则会发送hangup信号给所有子进程，子进程收到hangup以后也会退出。如果我们要在退出shell的时候继续运行进程，则需要使用nohup忽略hangup信号，或者setsid将将父进程设为init进程(进程号为1)：
-# nohup ./rsync.sh &amp; # setsid ./rsync.sh &amp; 或 # (./rsync.sh &amp;) ////在一个subshell中执行 # ps -ef|grep rsync nohup 的用途就是让提交的命令忽略 hangup 信号，标准输出和标准错误缺省会被重定向到 nohup.out 文件中。。一般我们可在结尾加上&#34;&amp;“来将命令同时放入后台运行，也可用” &gt; log.out 2&gt;&amp;1&#34;来更改缺省的重定向文件名。
-上面的试验演示了使用nohup/setsid加上&amp;使进程在后台运行，同时不受当前shell退出的影响。那么对于已经在后台运行的进程，该怎么办呢？可以使用disown命令：
-# jobs # disown -h %1 # ps -ef|grep rsync 效果与setid相同，但是disown后无法通过jobs命令查看了。
-screen 还有一种更加强大的方式是使用screen，首先创建一个断开模式的虚拟终端，然后用-r选项重新连接这个虚拟终端，在其中执行的任何命令，都能达到nohup的效果，这在有多个命令需要在后台连续执行的时候比较方便。
-GNU Screen是一款由GNU计划开发的用于命令行终端切换的自由软件。用户可以通过该软件同时连接多个本地或远程的命令行会话，并在其间自由切换，可以看作是窗口管理器的命令行界面版本。它提供了统一的管理多个会话的界面和相应的功能。
-# yum install screen -y 常用screen参数：...</p>
+    <p>本文来源于Infoq的一篇文章（见参考部分），并在难懂的地方自己理解的基础上做了修改。实际在ubuntu上部署 kubernetes 操作另见 文章 。
+Together we will ensure that Kubernetes is a strong and open container management framework for any application and in any environment, whether in a private, public or hybrid cloud. –Urs Hölzle, Google
+Kubernetes 作为Docker生态圈中重要一员，是Google多年大规模容器管理技术的开源版本，是产线实践经验的最佳表现。如Urs Hölzle所说，无论是公有云还是私有云甚至混合云，Kubernetes将作为一个为任何应用，任何环境的容器管理框架无处不在。正因为如此，目前受到各大巨头及初创公司的青睐，如Microsoft、VMWare、Red Hat、CoreOS、Mesos等，纷纷加入给Kubernetes贡献代码。随着Kubernetes社区及各大厂商的不断改进、发展，Kuberentes将成为容器管理领域的领导者。
+接下来我们一起探索Kubernetes是什么、能做什么以及怎么做。
+1. 什么是Kubernetes Kubernetes是Google开源的容器集群管理系统，使用Golang开发，其提供应用部署、维护、扩展机制等功能，利用Kubernetes能方便地管理跨机器运行容器化的应用，其主要功能如下：
+使用Docker对应用程序包装(package)、实例化(instantiate)、运行(run)。 以集群的方式运行、管理跨机器的容器。 解决Docker跨机器容器之间的通讯问题。 Kubernetes的自我修复机制使得容器集群总是运行在用户期望的状态。 当前Kubernetes支持GCE、vShpere、CoreOS、OpenShift、Azure等平台，除此之外，也可以直接运行在物理机上。
+这个官方给出的完整的架构图：（可在新标签页打开查看大图）
+2. Kubernetes的主要概念 2.1 Pods 在Kubernetes系统中，调度的最小颗粒不是单纯的容器，而是抽象成一个Pod，Pod是一个可以被创建、销毁、调度、管理的最小的部署单元。把相关的一个或多个容器（Container）构成一个Pod，通常Pod里的容器运行相同的应用。Pod包含的容器运行在同一个Minion(Host)上，看作一个统一管理单元，共享相同的volumes和network namespace/IP和Port空间。
+2.2 Services Services也是Kubernetes的基本操作单元，是真实应用服务的抽象，每一个服务后面都有很多对应的容器来支持，通过Proxy的port和服务selector决定服务请求传递给后端提供服务的容器，对外表现为一个单一访问地址，外部不需要了解后端如何运行，这给扩展或维护后端带来很大的好处。
+这一点github上的官网文档 services.md 讲的特别清楚。
+2.3 Replication Controllers Replication Controller，理解成更复杂形式的pods，它确保任何时候Kubernetes集群中有指定数量的pod副本(replicas)在运行，如果少于指定数量的pod副本(replicas)，Replication Controller会启动新的Container，反之会杀死多余的以保证数量不变。Replication Controller使用预先定义的pod模板创建pods，一旦创建成功，pod 模板和创建的pods没有任何关联，可以修改 pod 模板而不会对已创建pods有任何影响，也可以直接更新通过Replication Controller创建的pods。对于利用 pod 模板创建的pods，Replication Controller根据 label selector 来关联，通过修改pods的label可以删除对应的pods。Replication Controller主要有如下用法：...</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2015-02-03 13:21:25 +0000 UTC'>February 3, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 开源容器集群管理系统Kubernetes架构及组件介绍" href="http://xgknight.com/posts/2015/02/%E5%BC%80%E6%BA%90%E5%AE%B9%E5%99%A8%E9%9B%86%E7%BE%A4%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9Fkubernetes%E6%9E%B6%E6%9E%84%E5%8F%8A%E7%BB%84%E4%BB%B6%E4%BB%8B%E7%BB%8D/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>Linux下rar及zip压缩包中批量替换某文件脚本
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: CentOS 6 服务器安全配置指南（通用） date: 2014-09-07 01:21:25 updated: 2014-09-07-12 00:46:23 tags: [安全,ssh] categories: Linux Linux是一个开放式系统，可以在网络上找到许多现成的程序和工具，这既方便了用户，也方便了黑客，因为他们也能很容易地找到程序和工具来潜入Linux系统，或者盗取Linux系统上的重要信息。不过，只要我们仔细地设定Linux的各种系统功能，并且加上必要的安全措施，就能让黑客们无机可乘。一般来说，对Linux系统的安全设定包括取消不必要的服务、限制远程存取、隐藏重要资料、修补安全漏洞、采用安全工具以及经常性的安全检查等。
-本文是可参考的实际操作，不涉及如IP欺骗这样的原理，而且安全问题也不算几行命令就能预防的，这里只是linux系统上基本的安全加固方法，后续有新的内容再添加进来。
-注：所有文件在修改之前都要进行备份如 cp /etc/passwd{,.dist}
-1. 禁用不使用的用户 注意：不建议直接删除，当你需要某个用户时，自己重新添加会很麻烦。也可以usermod -L或passwd -l user锁定。
-cp /etc/passwd{,.bak} 修改之前先备份 vi /etc/passwd 编辑用户，在前面加上#注释掉此行
-注释的用户名：
-# cat /etc/passwd|grep ^# #adm:x:3:4:adm:/var/adm:/sbin/nologin #lp:x:4:7:lp:/var/spool/lpd:/sbin/nologin #shutdown:x:6:0:shutdown:/sbin:/sbin/shutdown #halt:x:7:0:halt:/sbin:/sbin/halt #uucp:x:10:14:uucp:/var/spool/uucp:/sbin/nologin #operator:x:11:0:operator:/root:/sbin/nologin #games:x:12:100:games:/usr/games:/sbin/nologin #gopher:x:13:30:gopher:/var/gopher:/sbin/nologin #ftp:x:14:50:FTP User:/var/ftp:/sbin/nologin #nfsnobody:x:65534:65534:Anonymous NFS User:/var/lib/nfs:/sbin/nologin #postfix:x:89:89::/var/spool/postfix:/sbin/nologin 注释的组：
-# cat /etc/group|grep ^# #adm:x:4:adm,daemon #lp:x:7:daemon #uucp:x:14: #games:x:20: #gopher:x:30: #video:x:39: #dip:x:40: #ftp:x:50: #audio:x:63: #floppy:x:19: #postfix:x:89: 2. 关闭不使用的服务 # chkconfig --list |grep &#39;3:on&#39; 邮件服务，使用公司邮件服务器：...</p>
+    <p>本需求是自己负责的一个生产系统上，有大量以zip和rar结尾的压缩文件散落在文件系统的各个文件夹，先在需要把压缩包里包含某一个特定文件（如tftpd32.exe或Tftpd32.exe，版本较旧），全都替换成比较新的tftpd32.exe版本。压缩文件总数约5000个，需要替换的数量约1500个。
+因为是生产环境，不敢轻易乱动，所以脚本考虑的因素就非常多，不允许中间执行过程出现异常，所以找到文件后实际执行替换操作之前做好备份，并且将操作过程记录日志。
+以下几点需要考虑：
+分别处理zip和rar文件，为减低脚本的复杂程度，分作两个shell脚本。 rar在Linux下默认是没有安装解压缩工具，下载rarlinux-x64-5.2.0.tar.gz zip包中文件含有中文文件名，unzip测试解压缩或列出内容时出现文件名乱码，原因是zip在压缩时不记录当时的编码格式。这个问题非常棘手，乱码打进压缩包是绝对不允许的，网上有几种解压办法有几种办法都不能很好的应对我的场景：并不需要实际解压zip文件，而只需使用 l ——列出文件列表、获取目录及文件名，d ——从压缩包中直接删除某个文件，a ——向压缩包添加一个文件。实际解压到文件系统上是不是乱码我们并不关心。 最后的解决办法是使用p7zip工具，配合LANG变量解决。 向压缩包里添加新文件时，要保持里面的目录结构，则必须在文件系统上存在同样的 相对目录/文件 。所以每次都要在脚本执行目录下创建临时目录tmp_dir，还要及时删除。但如果文件在压缩包的根目录下，这个临时目录就是当前脚本执行目录。 有可能会存在一个压缩包中多个文件夹中包含不止一个tftpd32.exe文件。 每个文件都有一个CRC值，处理文件名大小写不同但实质是同一个文件时有效。 以下脚本使用说明：
+变量说明 filelist 变量设定你所需要检查的压缩文件列表（绝对路径），可以通过find /your/dir/ -name *.rar | sort | uniq &gt; testfile。与脚本在相同目录下，并且为unix格式 existlist 变量是从filelist文件中得到的包含特定文件的列表，脚本执行完后可以查看 errorlist 变量是从filelist文件列表中得到的不包含特定文件的列表，当然也有可能这个压缩文件本身不完整 filebak 变量指定要替换的那个压缩文件备份的目录 oldfile 指定要替换的那个文件名 newfile 指定新文件的文件名，注意这个文件一定要在脚本当前目录下 binrar,bin7z 指定解压缩命令目录，因为7z和rar都不是CentOS自带的 fl 是filelist文件列表里的每一条记录 exist 压缩文件fl的内容列表里包含tftpd32.exe的记录，可能有多行 dirfiles 处理exist的结果，形如压缩包里的目录结构 your/dir/tftpd32.exe，可能有多行 df 是dirfiles中的单行记录，它的前面目录部分便是tmp_dir 是否有必要root用户执行看个人情况，执行后部分文件的属主可能会变，可用chown user1.user1 -R /your/dir/恢复 有部分zip文件无法使用7z，但文件本身正常，从日志可以看到error信息 tftpd32.exe区分大小写，如果要查找替换Tftpd32.exe请修改后在执行（确保grep没有-i选项） 可以处理的情况 压缩文件中无tftpd32.exe 要替换的tftpd32.exe文件在压缩文件根目录下 要替换的tftpd32.exe在嵌套子目录中 压缩文件中存在多个tftpd32.exe 压缩文件本身存在问题 该脚本有一定的危险性（虽然已备份），在正式环境中运行之前一定要多做测试。并且运行一次之后，谨慎运行第二次，因为可能会导致备份被覆盖（可换备份目录） 假如出现异常，要从备份文件恢复所有修改的文件，可以根据$existlist和filebak下的目录列表拼凑cp语句 建议执行方法./rar_new.sh | tee your.log，事后可从your.log中查看日志 处理rar的脚本rar_new.sh:
+#!/bin/bash filelist=&#34;testfile&#34; # filelist=&#34;crm_rar....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2015-01-29 18:21:25 +0000 UTC'>January 29, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to Linux下rar及zip压缩包中批量替换某文件脚本" href="http://xgknight.com/posts/2015/01/linux%E4%B8%8Brar%E5%8F%8Azip%E5%8E%8B%E7%BC%A9%E5%8C%85%E4%B8%AD%E6%89%B9%E9%87%8F%E6%9B%BF%E6%8D%A2%E6%9F%90%E6%96%87%E4%BB%B6%E8%84%9A%E6%9C%AC/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>LDIF修改ldap记录或配置示例
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: lsyncd实时同步搭建指南——取代rsync&#43;inotify date: 2015-05-06 01:21:25 updated: 2015-05-07 12:46:23 tags: [rsync,inotify,lsyncd，文件同步] categories: Linux 1. 几大实时同步工具比较 1.1 inotify &#43; rsync 最近一直在寻求生产服务服务器上的同步替代方案，原先使用的是inotify &#43; rsync，但随着文件数量的增大到100W&#43;，目录下的文件列表就达20M，在网络状况不佳或者限速的情况下，变更的文件可能10来个才几M，却因此要发送的文件列表就达20M，严重减低的带宽的使用效率以及同步效率；更为要紧的是，加入inotifywait在5s内监控到10个小文件发生变化，便会触发10个rsync同步操作，结果就是真正需要传输的才2-3M的文件，比对的文件列表就达200M。使用这两个组合的好处在于，它们都是最基本的软件，可以通过不同选项做到很精确的控制，比如排除同步的目录，同步多个模块或同步到多个主机。
-搭建过程参考 Linux下同步工具inotify&#43;rsync使用详解 。
-1.2 sersync 后来听同事说 sersync 这么个工具可以提高同步的性能，也解决了同步大文件时出现异常的问题，所以就尝试了一下。sersync是国内的一个开发者开源出来的，使用c&#43;&#43;编写，采用多线程的方式进行同步，失败后还有重传机制，对临时文件过滤，自带crontab定时同步功能。网上看到有人说性能还不错，说一下我的观点：
-国产开源，文档不是很全，在2011年之后就没更新了（googlecode都要快关闭了，其实可以转交其他人维护），网上关于它的使用和讨论都止于10年了 采用xml配置文件的方式，可读性比较好，但是有些原生的有些功能没有实现就没法使用了 无法实现多目录同步，只能通过多个配置文件启动多个进程 文件排除功能太弱。这个要看需求，不是每个人都需要排除子目录。而对于我的环境中，这个功能很重要，而且排除的规则较多 虽然提供插件的功能，但很鸡肋，因为软件本身没有持续更新，也没有看到贡献有其它插件出现（可能是我知识面不够，还用不到里面的refreshCDN plugin）。 虽然不懂c&#43;&#43;，但大致看了下源码 FileSynchronize，拼接rsync命令大概在273行左右，最后一个函数就是排除选项，简单一点可以将--exclude=改成--eclude-from来灵活控制。有机会再改吧。
-另外，在作者的文章 Sersync服务器同步程序 项目简介与设计框架 评论中，说能解决上面 rsync &#43; inotify中所描述的问题。阅读了下源码，这个应该是没有解决，因为在拼接rsync命令时，后面的目的地址始终是针对module的，只要执行rsync命令，就会对整个目录进行遍历，发送要比对的文件列表，然后再发送变化的文件。sersync只是减少了监听的事件，减少了rsync的次数——这已经是很大的改进，但每次rsync没办法改变。（如有其它看法可与我讨论）
-其实我们也不能要求每一个软件功能都十分健全，关键是看能否满足我们当下的特定的需求。所谓好的架构不是设计出来的，而是进化来的。目前使用sersync2没什么问题，而且看了它的设计思路应该是比较科学的，特别是过滤队列的设计。双向同步看起来也是可以实现。
-1.3 lsyncd 废话说这么多，本文就是介绍它了。有些博客说lsyncd是谷歌开源的，实际不是了，只是托管在了googlecode上而已，幸运的是已经迁移到github了：https://github.com/axkibe/lsyncd 。
-Lysncd 实际上是lua语言封装了 inotify 和 rsync 工具，采用了 Linux 内核（2.6.13 及以后）里的 inotify 触发机制，然后通过rsync去差异同步，达到实时的效果。我认为它最令人称道的特性是，完美解决了 inotify &#43; rsync海量文件同步带来的文件频繁发送文件列表的问题 —— 通过时间延迟或累计触发事件次数实现。另外，它的配置方式很简单，lua本身就是一种配置语言，可读性非常强。lsyncd也有多种工作模式可以选择，本地目录cp，本地目录rsync，远程目录rsyncssh。
-实现简单高效的本地目录同步备份（网络存储挂载也当作本地目录），一个命令搞定。
-2. 使用 lsyncd 本地目录实时备份 这一节实现的功能是，本地目录source实时同步到另一个目录target，而在source下有大量的文件，并且有部分目录和临时文件不需要同步。...</p>
+    <p>可以说LDIF文件是OpenLDAP操作数据或修改配置的一切来源，下面是实际通过客户端工具操作的具体示例。（openldap安装及配置过程见这里）。
+1. 添加组织或条目 创建一个Marketing部门，添加一个dn记录：
+# cat add_entry.ldif dn: ou=Marketing, dc=example,dc=com changetype: add objectclass: top objectclass: organizationalUnit ou: Marketing dn: cn=Pete Minsky,ou=Marketing,dc=example,dc=com changetype: add objectclass: person objectclass: organizationalPerson objectclass: inetOrgPerson cn: Pete Minsky sn: Pete ou: Marketing description: sb, sx description: sx uid: pminsky # ldapmodify -xWD &#39;cn=admin,dc=example,dc=com&#39; -f add_entry.ldif 或去掉changetype后 # ldapmodify -a -xWD &#39;cn=admin,dc=example,dc=com&#39; -f add_entry.ldif # ldapadd -xWD &#39;cn=admin,dc=example,dc=com&#39; -f add.ldif 2. 修改组织或条目 添加mail属性，修改sn的值，删除一个description属性：
+# cat modify_entry.ldif dn: cn=Pete Minsky,ou=Marketing,dc=example,dc=com changetype: modify add: mail mail: pminsky@example....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2015-01-22 01:21:25 +0000 UTC'>January 22, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to LDIF修改ldap记录或配置示例" href="http://xgknight.com/posts/2015/01/ldif%E4%BF%AE%E6%94%B9ldap%E8%AE%B0%E5%BD%95%E6%88%96%E9%85%8D%E7%BD%AE%E7%A4%BA%E4%BE%8B/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>OpenLDAP(2.4.3x)服务器搭建及配置说明
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: markdown语法备忘笔记 date: 2014-10-25 01:21:25 tags: [markdown, hexo博客] categories:
-其它 updated: 2014-10-27 10:46:23 ##1. 什么是markdown##
-##2. 我选择的markdown编辑器## 首先选择适合自己的markdown编辑器需要考虑几个方面： 平台：Mac OS X, Windows, Online, 插件形式 预览：实时预览、html预览 语法：选定某一款后，适应自己的习惯，不必太复杂 其它：如主题，快捷键，同步等
-###首先来说一下以下几款为什么我没选用：（纯属个人喜好）###
-Sublime Text的插件markdown preview，编辑和预览是分离的，在浏览器里预览。 CuteMarkEd，独立编辑器，支持多平台，不知道为什么我的编辑和预览窗口字体都那么丑。 MarkdownPad，独立编辑器，windows下口碑比较好的，但我把曾经写好的md文章放进去，格式不太对，应该是语法上略有差别，其它都还好。它多标签页的形式可以加分。 社区活跃，新功能反馈及时，例如 toc replace vim或emacs的markdown插件，windows平台下我还是正常一点吧。 ###习惯采用的编辑器### Haroopad，不得不说韩国人开发的软件体验上超赞，与segmentfault的文章写作一样，左右实时预览，多种主题可选。如果能实现多标签页就更好了。各平台上都可以使用，还有vim编辑模式。 马克飞象，google浏览器插件，专为印象笔记开发的浏览器markdown扩展，用起来特别舒服，自动保存在本地缓存，没有导出html格式或浏览器在线预览的功能，但比MaDe好用多了。（现在有离线客户端版） 在线markdown编辑器（首先你得有网络） [github]：不用多说 MaHua：与Mac OS X上相传甚广的Mou风格类似 cmd markdown：大牛开发的 ##3. 常用markdown语法## 标题/粗斜体 文章内容较多时，可以用标题分段：
-# 一级标题 # ## 大标题 ## ### 小标题 ### sf只有三级标题
-粗体/斜体 *斜体文本*　或　_斜体文本_　显示成　斜体文本 **粗体文本**　或　__粗体文本__　显示成　粗体文本 ***粗斜体文本***　或　___粗斜体文本___　显示成　粗斜体文本...</p>
+    <p>本文采用的是从源码编译安装，适合Ubuntu和CentOS平台，通过apt-get或yum方式安装参考补充部分。openldap原理介绍参考这里。
+环境： Ubuntu: 14.04.1 (trusty), x86_64 OpenLDAP: 2.4.31 Berkery DB: 5.1.29
+1 安装 1.1 准备编译环境和依赖包 # apt-get install build-essential # apt-get install libssl-dev 下载openldap-2.4.31.tgz和db-5.1.29.NC.tar.gz并解压：
+# cd /usr/local/src src# wget ftp://ftp.openldap.org/pub/OpenLDAP/openldap-release/openldap-2.4.31.tgz # wget http://download.oracle.com/berkeley-db/db-5.1.29.NC.tar.gz # tar -zxf openldap-2.4.31.tgz # tar -zxf db-5.1.29.NC.tar.gz # cd db-5.1.29.NC/build_unix/ # ../dist/configure --prefix=/usr/local/berkeleydb-5.1 # make &amp;&amp; make install 建议人工指定--prefix，默认会安装到/usr/local/BerkeleyDB.5.1。上面的make过程会比较长，另外如果gcc版本在4.7及以上，可能会出现如下warning，可以忽略：
+../src/dbinc/atomic.h:179:19: warning: conflicting types for built-in function ‘__atomic_compare_exchange’ [enabled by default] 1.2 安装openldap 设置一些环境变量，修改/etc/profile或/etc/bash.bashrc：
+export BERKELEYDB_HOME=&#34;/usr/local/berkeleydb-5.1&#34; export CPPFLAGS=&#34;-I$BERKELEYDB_HOME/include&#34; export LDFLAGS=&#34;-L$BERKELEYDB_HOME/lib&#34; export LD_LIBRARY_PATH=&#34;$BERKELEYDB_HOME/lib&#34; export LDAP_HOME=&#34;/usr/local/openldap-2....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2015-01-21 01:21:25 +0000 UTC'>January 21, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to OpenLDAP(2.4.3x)服务器搭建及配置说明" href="http://xgknight.com/posts/2015/01/openldap2.4.3x%E6%9C%8D%E5%8A%A1%E5%99%A8%E6%90%AD%E5%BB%BA%E5%8F%8A%E9%85%8D%E7%BD%AE%E8%AF%B4%E6%98%8E/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>基于OpenSSL自建CA和颁发SSL证书
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: 管理多tomcat服务shell脚本（CentOS） date: 2014-10-29 18:21:25 updated: 2014-10-29 11:46:23 tags: [tomcat, script, shell] categories: Tomcat 该脚本改自csdn上的一个shell，忘记出处了，只记得它能够简单的通过service tomcat [stop|start|restart]来方便的管理Linux服务器上的tomcat，这可以满足大部分人的需求，然而并不适合我所管理的CentOS上的tomcat应用：通过端口区分的3台tomcat集群。如果每一次管理tomcat或查看日志，都cd /apps/test/tomcat0/log/然后切换到另外一个cd ../../或cd /apps/test/tomcat1/log/，麻烦至极。因此“懒人”创造了这个脚本tomcat：
-#!/bin/bash # author: Sean Chow (seanlook7@gmail.com) # # # chkconfig: 345 80 15 # description: Multiple tomcats service management script. # Source function library. . /etc/rc.d/init.d/functions # 第几个tomcat tcNo=$1 tcName=tomcat$1 basedir=/apps/test/$tcName tclog=${basedir}/logs/catalina.$(date &#43;%Y-%m-%d).out RETVAL=0 start(){ checkrun if [ $RETVAL -eq 0 ]; then echo &#34;-- Starting tomcat...&#34; $basedir/bin/startup.sh touch /var/lock/subsys/${tcNo} checklog status else echo &#34;-- tomcat already running&#34; fi } # 停止某一台tomcat，如果是重启则带re参数，表示不查看日志，等待启动时再提示查看 stop(){ checkrun if [ $RETVAL -eq 1 ]; then echo &#34;-- Shutting down tomcat....</p>
+    <p>关于SSL/TLS介绍见文章 SSL/TLS原理详解。 关于证书授权中心CA以及数字证书等概念，请移步 OpenSSL 与 SSL 数字证书概念贴 。
+openssl是一个开源程序的套件、这个套件有三个部分组成：一是libcryto，这是一个具有通用功能的加密库，里面实现了众多的加密库；二是libssl，这个是实现ssl机制的，它是用于实现TLS/SSL的功能；三是openssl，是个多功能命令行工具，它可以实现加密解密，甚至还可以当CA来用，可以让你创建证书、吊销证书。
+默认情况ubuntu和CentOS上都已安装好openssl。CentOS 6.x 上有关ssl证书的目录结构：
+/etc/pki/CA/ newcerts 存放CA签署（颁发）过的数字证书（证书备份目录） private 用于存放CA的私钥 crl 吊销的证书 /etc/pki/tls/ cert.pem 软链接到certs/ca-bundle.crt certs/ 该服务器上的证书存放目录，可以房子自己的证书和内置证书 ca-bundle.crt 内置信任的证书 private 证书密钥存放目录 openssl.cnf openssl的CA主配置文件 1. 颁发证书 1.1 修改CA的一些配置文件 CA要给别人颁发证书，首先自己得有一个作为根证书，我们得在一切工作之前修改好CA的配置文件、序列号、索引等等。
+vi /etc/pki/tls/openssl.cnf：
+... [ CA_default ] dir = /etc/pki/CA # Where everything is kept certs = $dir/certs # Where the issued certs are kept crl_dir = $dir/crl # Where the issued crl are kept database = $dir/index....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2015-01-18 01:21:25 +0000 UTC'>January 18, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 基于OpenSSL自建CA和颁发SSL证书" href="http://xgknight.com/posts/2015/01/%E5%9F%BA%E4%BA%8Eopenssl%E8%87%AA%E5%BB%BAca%E5%92%8C%E9%A2%81%E5%8F%91ssl%E8%AF%81%E4%B9%A6/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>LDAP服务器的概念和原理简单介绍
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: ProxySQL高可用方案 date: 2017-07-15 21:32:49 tags: [mysql, 中间件, proxysql] categories:
-MySQL updated: 2017-07-18 21:32:49 MySQL的高可用方案现在如 MHA, Galera, InnoDB Cluster，一旦在上游使用中间件之后，中间件本身可能成为单点。所以本文要介绍的是对于ProxySQL自身高可用的方案对比。 首先ProxySQL自身是通过Angel进程的形式运行，即proxysql如果有崩溃，主进程会自动拉起来。但如果是无响应或者网络故障，则需要另外的机制去做到服务的高可用。本文总结了四种方法。
-ProxySQL有关介绍，请参考： http://xgknight.com/2017/04/10/mysql-proxysql-install-config/
-1. 与应用一起部署 所有部署应用的地方，都会部署proxysql节点，当这个proxysql挂掉之后，只影响本机的应用。而且不需要多经过一层网络。 但带来的问题是，如果应用节点很多，proxy的数量也会增加：
-会导致proxysql的配置不容易管理 proxysql对后端db健康检查的请求成倍增加 限制每个用户或后端db的 max_connections 特性用不了 2. 集中式部署，多ip引用 后端一个db集群，对应中间两个以上的 proxysql 节点，前端应用配置多个ip地址，随机挑选一个使用，完全无状态。仅需要多经过一次网络代理。 这种方式的好处是，不需要再对数据库这种基础服务，多引入一个软件来实现高可用（如下节的keepalive或consul），由应用端获取数据库连接的代码逻辑处理。
-但是因为proxysql访问地址是写在配置文件里面的，如果一个节点挂掉，随机挑选还是会落地这个失败的节点。所以优化方案是，ip列表里面默认取某一个，失败之后再选取下一个重试。
-示例代码：
-proxysql_addr_list = [&#39;192.168.1.175&#39;, &#39;192.168.1.176&#39;, &#39;192.168.1.177&#39;] proxysql_addr_list_len = 3 hostname = &#39;this_hostname_for_hash_loadbalance&#39; def get_dbconnection(): list_index = hash(hostname) % proxysql_addr_list_len dbconn = None try: dbconn = DBConnect(dbhost=proxysql_addr_list[ list_index ], dbport=3306) # timeout 1000ms except: if (list_index &#43; 1) == proxysql_addr_list_len: list_index = -1 # like Circular Array dbconn = DBConnec(dbhost=proxysql_addr_list[ list_index &#43; 1 ], dbport=3306) # if failed again, through exception return dbconn 上述并不完美，比如可以改用环形数组轮巡，允许重试其它更多的ip。...</p>
+    <p>1. 目录服务 目录是一个为查询、浏览和搜索而优化的专业分布式数据库，它呈树状结构组织数据，就好象Linux/Unix系统中的文件目录一样。目录数据库和关系数据库不同，它有优异的读性能，但写性能差，并且没有事务处理、回滚等复杂功能，不适于存储修改频繁的数据。所以目录天生是用来查询的，就好象它的名字一样。
+目录服务是由目录数据库和一套访问协议组成的系统。类似以下的信息适合储存在目录中：
+企业员工信息，如姓名、电话、邮箱等； 公用证书和安全密钥； 公司的物理设备信息，如服务器，它的IP地址、存放位置、厂商、购买时间等； LDAP是轻量目录访问协议(Lightweight Directory Access Protocol)的缩写，LDAP是从X.500目录访问协议的基础上发展过来的，目前的版本是v3.0。与LDAP一样提供类似的目录服务软件还有ApacheDS、Active Directory、Red Hat Directory Service 。
+2. LDAP特点 LDAP的结构用树来表示，而不是用表格。正因为这样，就不能用SQL语句了 LDAP可以很快地得到查询结果，不过在写方面，就慢得多 LDAP提供了静态数据的快速查询方式 Client/server模型，Server 用于存储数据，Client提供操作目录信息树的工具 这些工具可以将数据库的内容以文本格式（LDAP 数据交换格式，LDIF）呈现在您的面前 LDAP是一种开放Internet标准，LDAP协议是跨平台的Interent协议 3. LDAP组织数据的方式 4. 基本概念 在浏览LDAP相关文档时经常会遇见一些概念，下面是常见概念的简单解释。
+4.1 Entry 条目，也叫记录项，是LDAP中最基本的颗粒，就像字典中的词条，或者是数据库中的记录。通常对LDAP的添加、删除、更改、检索都是以条目为基本对象的。
+dn：每一个条目都有一个唯一的标识名（distinguished Name ，DN），如上图中一个 dn：“cn=baby,ou=marketing,ou=people,dc=mydomain,dc=org” 。通过DN的层次型语法结构，可以方便地表示出条目在LDAP树中的位置，通常用于检索。
+rdn：一般指dn逗号最左边的部分，如cn=baby。它与RootDN不同，RootDN通常与RootPW同时出现，特指管理LDAP中信息的最高权限用户。
+Base DN：LDAP目录树的最顶部就是根，也就是所谓的“Base DN&#34;，如&#34;dc=mydomain,dc=org&#34;。
+4.2 Attribute 每个条目都可以有很多属性（Attribute），比如常见的人都有姓名、地址、电话等属性。每个属性都有名称及对应的值，属性值可以有单个、多个，比如你有多个邮箱。
+属性不是随便定义的，需要符合一定的规则，而这个规则可以通过schema制定。比如，如果一个entry没有包含在 inetorgperson 这个 schema 中的objectClass: inetOrgPerson，那么就不能为它指定employeeNumber属性，因为employeeNumber是在inetOrgPerson中定义的。
+LDAP为人员组织机构中常见的对象都设计了属性(比如commonName，surname)。下面有一些常用的别名：
+属性 别名 语法 描述 值(举例) commonName cn Directory String 姓名 sean surname sn Directory String 姓 Chow organizationalUnitName ou Directory String 单位（部门）名称 IT_SECTION organization o Directory String 组织（公司）名称 example telephoneNumber Telephone Number 电话号码 110 objectClass 内置属性 organizationalPerson 4....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2015-01-15 01:21:25 +0000 UTC'>January 15, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to LDAP服务器的概念和原理简单介绍" href="http://xgknight.com/posts/2015/01/ldap%E6%9C%8D%E5%8A%A1%E5%99%A8%E7%9A%84%E6%A6%82%E5%BF%B5%E5%92%8C%E5%8E%9F%E7%90%86%E7%AE%80%E5%8D%95%E4%BB%8B%E7%BB%8D/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>OpenSSL 与 SSL 数字证书概念贴
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: ProxySQL监控方案 date: 2017-07-16 21:32:49 tags: [mysql, 中间件, proxysql] categories:
-MySQL updated: 2017-07-18 21:32:49 ProxySQL能监控的信息不多，而且大部分是统计信息，不是性能数据。
-mysql&gt; show tables from stats; &#43;--------------------------------&#43; | tables | &#43;--------------------------------&#43; | global_variables | | stats_mysql_commands_counters | | stats_mysql_connection_pool | | stats_mysql_global | | stats_mysql_processlist | | stats_mysql_query_digest | | stats_mysql_query_digest_reset | | stats_mysql_query_rules | &#43;--------------------------------&#43; 主要关心的指标都在表 stats_mysql_global 里面，源代码 diamond 目录下有个 proxysqlstat.py 脚本，是通过SHOW MYSQL STATUS命令，由diamond收集进程将指标上报到Graphite。有以下几个Metrics：
-并发数 Active_Transactions Questions 连接相关 Client_Connections_connected Server_Connections_connected Server_Connections_aborted 内存相关 Query_Cache_Entries Query_Cache_Memory_bytes SQLite3_memory_bytes ConnPool_memory_bytes 流量相关 mysql_backend_buffers_bytes mysql_frontend_buffers_bytes mysql_session_internal_bytes 其它 MySQL_Monitor_Workers MySQL_Thread_Workers 但是这些远远不够，还有以下更值得关心的指标： 表 stats_mysql_connection_pool:...</p>
+    <p>SSL/TLS 介绍见文章 SSL/TLS原理详解。 如果你想快速自建CA然后签发数字证书，请移步 基于OpenSSL自建CA和颁发SSL证书 。
+首先简单区分一下HTTPS、SSL、OpenSSL三者的关系：
+SSL是在客户端和服务器之间建立一条SSL安全通道的安全协议，而OpenSSL是TLS/SSL协议的开源实现，提供开发库和命令行程序。常说的HTTPS是HTTP的加密版，底层使用的加密协议是SSL。
+1. PKI、CA与证书 PKI 就是 Public Key Infrastructure 的缩写，翻译过来就是公开密钥基础设施。它是利用公开密钥技术所构建的，解决网络安全问题的，普遍适用的一种基础设施;是一种遵循既定标准的密钥管理平台,它能够为所有网络应用提供加密和数字签名等密码服务及所必需的密钥和证书管理体系。
+PKI既不是一个协议，也不是一个软件，它是一个标准，在这个标准之下发展出的为了实现安全基础服务目的的技术统称为PKI。可以说CA(认证中心)是PKI的核心，而数字证书是PKI的最基本元素，还有如apache等服务器、浏览器等客户端、银行等应用，都是pki的组件。这篇文章可以帮助理解：PKI/CA 技术的介绍 。
+1.1 CA 为保证用户之间在网上传递信息的安全性、真实性、可靠性、完整性和不可抵赖性
+CA 机构，又称为证书认证中心 (Certificate Authority) 中心，是一个负责发放和管理数字证书的第三方权威机构，它负责管理PKI结构下的所有用户(包括各种应用程序)的证书，把用户的公钥和用户的其他信息捆绑在一起，在网上验证用户的身份。CA机构的数字签名使得攻击者不能伪造和篡改证书。
+认证中心主要有以下5个功能：
+证书的颁发：接收、验证用户(包括下级认证中心和最终用户)的数字证书的申请。可以受理或拒绝 证书的更新：认证中心可以定期更新所有用户的证书，或者根据用户的请求来更新用户的证书 证书的查询：查询当前用户证书申请处理过程；查询用户证书的颁发信息，这类查询由目录服务器ldap来完成 证书的作废：由于用户私钥泄密等原因，需要向认证中心提出证书作废的请求；证书已经过了有效期，认证中心自动将该证书作废。认证中心通过维护证书作废列表 (Certificate Revocation List,CRL) 来完成上述功能。 证书的归档：证书具有一定的有效期，证书过了有效期之后就将作废，但是我们不能将作废的证书简单地丢弃，因为有时我们可能需要验证以前的某个交易过程中产生的数字签名，这时我们就需要查询作废的证书。 1.2 Certificate 1.2.1 X.509标准 “SSL证书&#34;这个词是一个相对较大的概念，整个PKI体系中有很多SSL证书格式标准。PKI的标准规定了PKI的设计、实施和运营，规定了PKI各种角色的&#34;游戏规则”，提供数据语法和语义的共同约定。x.509是PKI中最重要的标准，它定义了公钥证书的基本结构，可以说PKI是在X.509标准基础上发展起来的：
+SSL公钥证书 证书废除列表CRL(Certificate revocation lists 证书黑名单) 参考 http://en.wikipedia.org/wiki/X.509 。
+另外一个常用的标准是PKCS#12，通常采用pfx,p12作为文件扩展名，openssl和java的keytool工具都可以用作生产此类格式的证书。
+1.2.2 ssl公钥证书格式 1. 证书版本号(Version) 版本号指明X.509证书的格式版本，现在的值可以为: 1) 0: v1 2) 1: v2 3) 2: v3 也为将来的版本进行了预定义 2. 证书序列号(Serial Number) 序列号指定由CA分配给证书的唯一的&#34;数字型标识符&#34;。当证书被取消时，实际上是将此证书的序列号放入由CA签发的CRL中， 这也是序列号唯一的原因。 3....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2015-01-15 01:21:25 +0000 UTC'>January 15, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to OpenSSL 与 SSL 数字证书概念贴" href="http://xgknight.com/posts/2015/01/openssl-%E4%B8%8E-ssl-%E6%95%B0%E5%AD%97%E8%AF%81%E4%B9%A6%E6%A6%82%E5%BF%B5%E8%B4%B4/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>SSL/TLS原理详解
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: 使用 Xtrabackup 在线对MySQL做主从复制 date: 2015-12-14 10:21:25 updated: 2015-12-14 00:46:23 tags: [mysql, 主从复制, 备份] categories:
-MySQL 1. 说明 1.1 xtrabackup mysqldump对于导出10G以下的数据库或几个表，还是适用的，而且更快捷。一旦数据量达到100-500G，无论是对原库的压力还是导出的性能，mysqldump就力不从心了。Percona-Xtrabackup备份工具，是实现MySQL在线热备工作的不二选择，可进行全量、增量、单表备份和还原。（但当数据量更大时，可能需要考虑分库分表，或使用 LVM 快照来加快备份速度了）
-2.2版本 xtrabackup 能对InnoDB和XtraDB存储引擎的数据库非阻塞地备份，innobackupex通过perl封装了一层xtrabackup，对MyISAM的备份通过加表读锁的方式实现。2.3版本 xtrabackup 命令直接支持MyISAM引擎。
-XtraBackup优势 ：
-无需停止数据库进行InnoDB热备 增量备份MySQL 流压缩到传输到其它服务器 能比较容易地创建主从同步 备份MySQL时不会增大服务器负载 1.2 replication 为什么要做主从复制？ 我想这是要在实施以前要想清楚的问题。是为了实现读写分离，减轻主库负载或数据分析？ 为了数据安全，做备份恢复？主从切换做高可用？ 大部分场景下，以上三个问号一主一从都能够解决，而且任何生产环境都建议你至少要有一个从库，假如你的读操作压力特别大，甚至要做一主多从，还可以不同的slave扮演不同的角色，例如使用不同的索引，或者不同的存储引擎，或使用一个小内存server做slave只用于备份。（当然slave太多也会对master的负载和网络带宽造成压力，此时可以考虑级联复制，即 A-&gt;B-&gt;C ）
-还有需要考虑的是，一主一从，一旦做了主从切换，不通过其它HA手段干预的话，业务访问的还是原IP，而且原主库很容易就作废了。于是 主-主 复制就产生了，凭借各自不同的 server-id ，可以避免 “A的变化同步到B，B应用变化又同步到A” 这样循环复制的问题。但建议是，主主复制，其中一个主库强制设置为只读，主从切换后架构依然是可用的。
-复制过程是slave主动向master拉取，而不是master去推的，所以理想情况下做搭建主从时不需要master做出任何改变甚至停服，slave失败也不影响主库。
-复制类型
-基于语句的复制：STATEMENT，在主服务器上执行的SQL语句，在从服务器上执行同样的语句，有可能会由于SQL执行上下文环境不同而是数据不一致，例如调用NOW()函数。MySQL在5.7.7以前默认采用基于语句的复制，在 5.7.7 及以后版本默认改用 row-based。 基于行的复制：ROW，把改变的内容复制过去，而不是把命令在从服务器上执行一遍。从mysql5.0开始支持，能够严格保证数据完全一致，但此时用mysqlbinlog去分析日志就没啥意义。因为任何一条update语句，都会把涉及到的行数据全部set值，所以binlog文件会比较大。 （遇到的一个坑是，迁移时，从库改正了字段默认值定义，但数据在主库更改后，即使产生的新数据默认值是正确的，但基于行的复制依然用不正确的值字段全部更新了） 混合类型的复制: MIXED，默认采用基于语句的复制，一旦发现基于语句的无法精确的复制时，就会采用基于行的复制。 mysql系统库mysql库里面表的日志记录格式需要说明：在通过如INSERT、UPDATE、DELETE、TRUNCATE等方式直接修改数据的语句，使用 binlog_format指定的方式记录，但使用GRANT、ALTER、CREATE、RENAME等改动的mysql库里数据的，会强制使用statement-based方式记录binlog。
-可以在线修改二进制日志类型，如SET SESSION binlog_format=MIXED;，需要SUPER权限。
-复制类型还可以分为 异步复制和半同步复制。 通常没说明指的都是异步，即主库执行完Commit后，在主库写入Binlog日志后即可成功返回客户端，无需等等Binlog日志传送给从库，一旦主库宕机，有可能会丢失日志。而半同步复制，是等待其中一个从库也接收到Binlog事务并成功写入Relay Log之后，才返回Commit操作成功给客户端；如此半同步就保证了事务成功提交后至少有两份日志记录，一份在主库Binlog上，另一份在从库的Relay Log上，从而进一步保证数据完整性；半同步复制很大程度取决于主从网络RTT（往返时延），以插件 semisync_master/semisync_slave 形式存在。 原理 (1) master将改变记录到二进制日志(binary log)中（这些记录叫做二进制日志事件，binary log events）； (2) slave将master的binary log events拷贝到它的中继日志(relay log)； (3) slave重做中继日志中的事件，将改变反映它自己的数据。 该过程的第一部分就是master记录二进制日志。在每个事务更新数据完成之前，master在二进制日志记录这些改变。MySQL将事务串行的写入二进制日志，即使事务中的语句都是交叉执行的。在事件写入二进制日志完成后，master通知存储引擎提交事务。 下一步将master的binary log拷贝到它自己的中继日志。首先，slave开始一个工作线程——I/O线程。I/O线程在master上打开一个普通的连接，请求从指定日志文件的指定位置之后的日志内容，然后开始binlog dump process。Binlog dump process从master的二进制日志中读取事件，如果已经跟上master，它会睡眠并等待master产生新的事件。I/O线程将这些事件写入中继日志。 SQL slave thread（SQL从线程）处理该过程的最后一步。SQL线程从中继日志读取事件，并重放其中的事件而更新slave的数据，使其与master中的数据一致。只要该线程与I/O线程保持一致，中继日志通常会位于OS的缓存中，所以中继日志的开销很小。 此外，在master中也有一个工作线程：和其它MySQL的连接一样，slave在master中打开一个连接也会使得master开始一个线程。复制过程有一个很重要的限制——复制在slave上是串行化的，也就是说master上的并行更新操作不能在slave上并行操作。...</p>
+    <p>本文大部分整理自网络，相关文章请见文后参考。
+关于证书授权中心CA以及数字证书等概念，请移步 OpenSSL 与 SSL 数字证书概念贴 ，如果你想快速自建CA然后签发数字证书，请移步 基于OpenSSL自建CA和颁发SSL证书 。
+SSL/TLS作为一种互联网安全加密技术，原理较为复杂，枯燥而无味，我也是试图理解之后重新整理，尽量做到层次清晰。正文开始。
+1. SSL/TLS概览 1.1 整体结构 SSL是一个介于HTTP协议与TCP之间的一个可选层，其位置大致如下: SSL：（Secure Socket Layer，安全套接字层），为Netscape所研发，用以保障在Internet上数据传输之安全，利用数据加密(Encryption)技术，可确保数据在网络上之传输过程中不会被截取。当前版本为3.0。它已被广泛地用于Web浏览器与服务器之间的身份认证和加密数据传输。 SSL协议位于TCP/IP协议与各种应用层协议之间，为数据通讯提供安全支持。SSL协议可分为两层： SSL记录协议（SSL Record Protocol）：它建立在可靠的传输协议（如TCP）之上，为高层协议提供数据封装、压缩、加密等基本功能的支持。 SSL握手协议（SSL Handshake Protocol）：它建立在SSL记录协议之上，用于在实际的数据传输开始前，通讯双方进行身份认证、协商加密算法、交换加密密钥等。
+TLS：(Transport Layer Security，传输层安全协议)，用于两个应用程序之间提供保密性和数据完整性。 TLS 1.0是IETF（Internet Engineering Task Force，Internet工程任务组）制定的一种新的协议，它建立在SSL 3.0协议规范之上，是SSL 3.0的后续版本，可以理解为SSL 3.1，它是写入了 RFC 的。该协议由两层组成： TLS 记录协议（TLS Record）和 TLS 握手协议（TLS Handshake）。较低的层为 TLS 记录协议，位于某个可靠的传输协议（例如 TCP）上面。
+SSL/TLS协议提供的服务主要有：
+认证用户和服务器，确保数据发送到正确的客户机和服务器； 加密数据以防止数据中途被窃取； 维护数据的完整性，确保数据在传输过程中不被改变。 1.2 TLS与SSL的差异 版本号：TLS记录格式与SSL记录格式相同，但版本号的值不同，TLS的版本1.0使用的版本号为SSLv3.1。 报文鉴别码：SSLv3.0和TLS的MAC算法及MAC计算的范围不同。TLS使用了RFC-2104定义的HMAC算法。SSLv3.0使用了相似的算法，两者差别在于SSLv3.0中，填充字节与密钥之间采用的是连接运算，而HMAC算法采用的是异或运算。但是两者的安全程度是相同的。 伪随机函数：TLS使用了称为PRF的伪随机函数来将密钥扩展成数据块，是更安全的方式。 报警代码：TLS支持几乎所有的SSLv3.0报警代码，而且TLS还补充定义了很多报警代码，如解密失败（decryption_failed）、记录溢出（record_overflow）、未知CA（unknown_ca）、拒绝访问（access_denied）等。 密文族和客户证书：SSLv3.0和TLS存在少量差别，即TLS不支持Fortezza密钥交换、加密算法和客户证书。 certificate_verify和finished消息：SSLv3.0和TLS在用certificate_verify和finished消息计算MD5和SHA-1散列码时，计算的输入有少许差别，但安全性相当。 加密计算：TLS与SSLv3.0在计算主密值（master secret）时采用的方式不同。 填充：用户数据加密之前需要增加的填充字节。在SSL中，填充后的数据长度要达到密文块长度的最小整数倍。而在TLS中，填充后的数据长度可以是密文块长度的任意整数倍（但填充的最大长度为255字节），这种方式可以防止基于对报文长度进行分析的攻击。 TLS的主要增强内容
+TLS的主要目标是使SSL更安全，并使协议的规范更精确和完善。TLS 在SSL v3.0 的基础上，提供了以下增强内容：
+更安全的MAC算法 更严密的警报 “灰色区域”规范的更明确的定义 TLS对于安全性的改进...</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2015-01-07 01:21:25 +0000 UTC'>January 7, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to SSL/TLS原理详解" href="http://xgknight.com/posts/2015/01/ssl/tls%E5%8E%9F%E7%90%86%E8%AF%A6%E8%A7%A3/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>只怕时间走的太过匆忙，忘记了躲在角落中的我
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: MySQL增量备份与恢复实例 date: 2014-12-05 09:21:25 updated: 2014-05 17:00:46:23 tags: [mysql, database, binlog, backup] categories: MySQL 小量的数据库可以每天进行完整备份，因为这也用不了多少时间，但当数据库很大时，就不太可能每天进行一次完整备份了，这时候就可以使用增量备份。增量备份的原理就是使用了mysql的binlog日志。 本次操作的MySQL版本为5.5.40 for Linux (x86_64)。
-增量备份要确保打开了二进制日志，参考mysql的日志系统：
-mysql&gt; show variables like &#39;%log_bin%&#39;; 首先对pak数据库做一个完整备份：
-$ mysqldump -h localhost -upak -ppwd -P3306 --master-data=2 --single-transaction --opt pak &gt; pak_bak_full.sql 这时候就会得到一个全备文件pak_bak_full.sql。mysqldump操作会导致滚动一次log，假设新的binlog文件是mysql-bin.000002。
-1. 模拟插入数据和误操作 a. 在pak库的某个表插入一些数据，然后执行flush logs命令。这时将会产生一个新的二进制日志文件mysql-bin.000003，mysql-bin.000002则保存了全备过后的所有更改，既增加记录的操作也保存在了mysql-bin.00002中。
-b. 再在pak库中的t_user表中增加两条记录，然后误删除t_user表。t_user中增加记录的操作和删除表的操作都记录在mysql-bin.000003中。
-2. 开始恢复 恢复过程不要记录日志：
-mysql &gt; set global sql_log_bin=0; 3. 首先导入全备数据 $ mysql -h localhost -upak -ppwd &lt; pak_bak_full.sql 或 mysql&gt; source /path/backup/pak_bak_full.sql 我们也可以看到全备时的binlog位置：...</p>
+    <p>青春是一道明媚的伤痕，疼的酣畅淋漓，走的跌跌撞撞，她不顾一切遍体鳞伤，但仍庆幸，生命中仍有人为她执着与疯狂。
+很久没有静下来总结过自己了，拥有大把的自由时间反而没有停下来写写东西。还记得上一次这种类似的总结是在毕业那会儿，qq空间里被各种日志刷屏，于是自己也写过一篇，只是没发，现在也找不到去哪里了。这里就唠一唠过去的2014吧。
+完全想不起来2014上半年做过什么事情，就像7月1号换房子之后时间河流断开了一样。一年总的说来，没什么太大变化，很失败。定过的计划，下过的决心，好像没有几件做成的。就拿体重来说，天天喊着要多吃饭，要增肥，可偏偏不爱吃长相不好的肉。这里可能就有拉仇恨的嫌疑了，毕竟嚷嚷要减肥的比要增肥的多的去了。爹妈没生好只能后天自己努力了，于是买了个电子秤，天天在家“吃饱了cheng”——唉声叹气远比眉开眼笑次数多，为了身体也是蛮拼的了。
+相比以前来说，比较欣慰的是运动的频率多了，从夏热天一直到10月份，基本每周都会和小明去游泳。经常感到郁闷的是在游泳池里游泳怎么小明还要带上一瓶脉动，我就从来没感到过口渴……不说了，池里的水没少喝，到现在蛙泳还不敢游到中点，真是废。天变凉后，正巧室友要出国，把全新的羽毛球拍放我这，于是不出意外每周都会跟峰哥他们去打球，逐渐的爱上在球场上酣畅淋漓的感觉，从一开始只是玩玩，到有意识的练技术，再到看电视里的比赛，不知不觉快成为一种习惯了，这个习惯与能不能邂逅到运动型的妹子无关 -_-#，是不是，经常去隔壁王叔叔家打洞的小明。。
+曾经我是一个比较宅的人，很少出去离校旅行但也不玩游戏，就莫名其妙的忙碌。我讨厌宅，更害怕一个人，所以六七月份找房子的时候从没考虑过单间，人是需要同伴才不会孤独，哪怕是走在路上看到个漂亮姑娘可以来吐槽的“腐友”。但同时我也经常会很安静，比如在下班车上跑到人少座位，一个人占着两个座，靠外的放包，靠窗的看外面，从疲惫的眼睛上取下眼镜，不必看得太清，单曲循环或随机播放着手机里的歌曲，成了装逼犯。下半年也随同事、朋友去阳江、阳朔玩过，爬了两次梧桐山，部门活动也没缺席过，算是改变闷*的历程吧。还计划过找时间去厦门转转，去哈尔滨看雪（不要问我雪是谁），由于种种原因都被搁浅了。
+除了频率并不算高的体育锻炼和户外运动，酒桌、KTV也没少去，刚来公司那会儿的几个同事现在也成了最好的朋友，年轻的同龄人在一起也没什么束缚，谁谁过生日撮一顿，好久没聚了就到谁家吃火锅。KTV倒不是我乐意去的地方，玩玩游戏、骰子还可以，唱歌也就只能吧唧跟着吼两句，不能认真。从前就没练过，五音不全，也回不到过去傲娇耍个性，也许我有其它过人之处我自己都没发现呢！如果非到打击我说，“上帝给我关上了一扇门，又顺手帮我关了一扇窗”，那就是逼我破门向前了。
+其它方面，可能因为本身一年来并没有什么成就，没攒下多少money，还过着这样安逸的生活，所有偶尔会“痛心疾首”一番，在手机上做个笔记计划点什么，劲头一过又看电视、玩手机去了，还时常忘记给爸妈打电话，即使说在电话里说来说去就那些内容。记得有一次脚踝无缘无故疼起来，最严重的时候都站不住了，成功了领到了来深圳第一份病历，这事在朋友圈散开后让我哥告诉了爸妈，随后几天每天都打电话来问好些没，果然是亲生的…这里还要谢谢周围还有网上留言关心过我的人，岁月淘沙能留下的是何其珍贵。中秋之前特意去广州看过爸妈，前几个月也从香港带了些药去，只是岁月不饶人，而我还太年轻，哥哥生意刚有起色而嫂子马上生小孩，怎么越想压力越大呢，难道这就是属羊的命不好？偶还是相信事在人为吧！
+其实有时候觉得我还是挺幸运的，周围很多人都是学习的对象。人不是要成为谁，有的人会侃，有的人会耍，还有的人思考问题敏捷、思维方式不同，可能说起来有点虚无但真真切切是我从不同的人身上感受到的。虽然不必互相过分对比，但我认为正能量的东西还是很愿意去多多接触。根深，暑假来我这逗留过一段时间，它是少数让我觉得读研还是有用的几人，想到什么便说什么，敢于闯荡（有爱大声说啊）；德义，也是跟我睡过同一张床铺的，有明确的规划和目标，有见解（高富帅带我飞）；小明，活泼可爱任性又偶尔带点深沉（求别喷），经常能想他人之未想，会做饭。等等这些优秀的朋友、同学、同事，让我偶尔觉得无所适从，告诉自己未来还有很多事情要做……
+工作方面，虽然占据了大部分时间，但并没有那么多可说的，能说的都是槽点。不是吐槽一下网络管理课那群没脑子的，就是工作没啥事闲着淡腾，用同样的话反复回答为什么加班——没事才加班。其实真不是非要加班，因为确实是不加班回家也没事做，看电视玩手机到晚上依然要1点睡觉，正如前面说的就目前这个阶段来说，何必过得太安逸呢。都说在TP的员工成熟起来会很慢，所以闲着闲着就需要自己去思考出路。IT运维的工作（DBA?），在这样有限的环境里，只能靠自己去学习，所以有80%时间我是借着工作内容关联或技术调研的名义在学着其它东西，零碎时间逛逛社区和问答网站。也买了些数据分析与金融方面的书，只是一直没有看过，这也将成为2015年计划的一部分了，权当小说看了。
+规划性的东西这里就不说了，自己有个底就行，太过形式或太过庄重都不好。只说一个字，不要闹“2015年新年计划就是搞定2014年那些原定于2013年完成的安排，不为别的，只为兑现2012年时 要完成2011年计划的诺言。”的笑话就OK。
+回头看，整篇写起来还真是天马行空，想到哪写到哪，连标题都想不到好一点的，没什么逻辑、文采可言，只是做个记录，剩下的交给心情……</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-12-31 00:21:25 +0000 UTC'>December 31, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 只怕时间走的太过匆忙，忘记了躲在角落中的我" href="http://xgknight.com/posts/2014/12/%E5%8F%AA%E6%80%95%E6%97%B6%E9%97%B4%E8%B5%B0%E7%9A%84%E5%A4%AA%E8%BF%87%E5%8C%86%E5%BF%99%E5%BF%98%E8%AE%B0%E4%BA%86%E8%BA%B2%E5%9C%A8%E8%A7%92%E8%90%BD%E4%B8%AD%E7%9A%84%E6%88%91/"></a>
 </article>
 <footer class="page-footer">
   <nav class="pagination">

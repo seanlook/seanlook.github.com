@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>开源容器集群管理系统Kubernetes架构及组件介绍 | Sean Note</title>
+<meta name="keywords" content="docker, linux, kubernetes">
+<meta name="description" content="本文来源于Infoq的一篇文章（见参考部分），并在难懂的地方自己理解的基础上做了修改。实际在ubuntu上部署 kubernetes 操作另见 文章 。
+Together we will ensure that Kubernetes is a strong and open container management framework for any application and in any environment, whether in a private, public or hybrid cloud. &ndash;Urs Hölzle, Google
+Kubernetes 作为Docker生态圈中重要一员，是Google多年大规模容器管理技术的开源版本，是产线实践经验的最佳表现。如Urs Hölzle所说，无论是公有云还是私有云甚至混合云，Kubernetes将作为一个为任何应用，任何环境的容器管理框架无处不在。正因为如此，目前受到各大巨头及初创公司的青睐，如Microsoft、VMWare、Red Hat、CoreOS、Mesos等，纷纷加入给Kubernetes贡献代码。随着Kubernetes社区及各大厂商的不断改进、发展，Kuberentes将成为容器管理领域的领导者。
+接下来我们一起探索Kubernetes是什么、能做什么以及怎么做。
+1. 什么是Kubernetes Kubernetes是Google开源的容器集群管理系统，使用Golang开发，其提供应用部署、维护、扩展机制等功能，利用Kubernetes能方便地管理跨机器运行容器化的应用，其主要功能如下：
+使用Docker对应用程序包装(package)、实例化(instantiate)、运行(run)。 以集群的方式运行、管理跨机器的容器。 解决Docker跨机器容器之间的通讯问题。 Kubernetes的自我修复机制使得容器集群总是运行在用户期望的状态。 当前Kubernetes支持GCE、vShpere、CoreOS、OpenShift、Azure等平台，除此之外，也可以直接运行在物理机上。
+这个官方给出的完整的架构图：（可在新标签页打开查看大图）
+2. Kubernetes的主要概念 2.1 Pods 在Kubernetes系统中，调度的最小颗粒不是单纯的容器，而是抽象成一个Pod，Pod是一个可以被创建、销毁、调度、管理的最小的部署单元。把相关的一个或多个容器（Container）构成一个Pod，通常Pod里的容器运行相同的应用。Pod包含的容器运行在同一个Minion(Host)上，看作一个统一管理单元，共享相同的volumes和network namespace/IP和Port空间。
+2.2 Services Services也是Kubernetes的基本操作单元，是真实应用服务的抽象，每一个服务后面都有很多对应的容器来支持，通过Proxy的port和服务selector决定服务请求传递给后端提供服务的容器，对外表现为一个单一访问地址，外部不需要了解后端如何运行，这给扩展或维护后端带来很大的好处。
+这一点github上的官网文档 services.md 讲的特别清楚。
+2.3 Replication Controllers Replication Controller，理解成更复杂形式的pods，它确保任何时候Kubernetes集群中有指定数量的pod副本(replicas)在运行，如果少于指定数量的pod副本(replicas)，Replication Controller会启动新的Container，反之会杀死多余的以保证数量不变。Replication Controller使用预先定义的pod模板创建pods，一旦创建成功，pod 模板和创建的pods没有任何关联，可以修改 pod 模板而不会对已创建pods有任何影响，也可以直接更新通过Replication Controller创建的pods。对于利用 pod 模板创建的pods，Replication Controller根据 label selector 来关联，通过修改pods的label可以删除对应的pods。Replication Controller主要有如下用法：">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2015/02/%E5%BC%80%E6%BA%90%E5%AE%B9%E5%99%A8%E9%9B%86%E7%BE%A4%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9Fkubernetes%E6%9E%B6%E6%9E%84%E5%8F%8A%E7%BB%84%E4%BB%B6%E4%BB%8B%E7%BB%8D/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="开源容器集群管理系统Kubernetes架构及组件介绍" />
+<meta property="og:description" content="本文来源于Infoq的一篇文章（见参考部分），并在难懂的地方自己理解的基础上做了修改。实际在ubuntu上部署 kubernetes 操作另见 文章 。
+Together we will ensure that Kubernetes is a strong and open container management framework for any application and in any environment, whether in a private, public or hybrid cloud. &ndash;Urs Hölzle, Google
+Kubernetes 作为Docker生态圈中重要一员，是Google多年大规模容器管理技术的开源版本，是产线实践经验的最佳表现。如Urs Hölzle所说，无论是公有云还是私有云甚至混合云，Kubernetes将作为一个为任何应用，任何环境的容器管理框架无处不在。正因为如此，目前受到各大巨头及初创公司的青睐，如Microsoft、VMWare、Red Hat、CoreOS、Mesos等，纷纷加入给Kubernetes贡献代码。随着Kubernetes社区及各大厂商的不断改进、发展，Kuberentes将成为容器管理领域的领导者。
+接下来我们一起探索Kubernetes是什么、能做什么以及怎么做。
+1. 什么是Kubernetes Kubernetes是Google开源的容器集群管理系统，使用Golang开发，其提供应用部署、维护、扩展机制等功能，利用Kubernetes能方便地管理跨机器运行容器化的应用，其主要功能如下：
+使用Docker对应用程序包装(package)、实例化(instantiate)、运行(run)。 以集群的方式运行、管理跨机器的容器。 解决Docker跨机器容器之间的通讯问题。 Kubernetes的自我修复机制使得容器集群总是运行在用户期望的状态。 当前Kubernetes支持GCE、vShpere、CoreOS、OpenShift、Azure等平台，除此之外，也可以直接运行在物理机上。
+这个官方给出的完整的架构图：（可在新标签页打开查看大图）
+2. Kubernetes的主要概念 2.1 Pods 在Kubernetes系统中，调度的最小颗粒不是单纯的容器，而是抽象成一个Pod，Pod是一个可以被创建、销毁、调度、管理的最小的部署单元。把相关的一个或多个容器（Container）构成一个Pod，通常Pod里的容器运行相同的应用。Pod包含的容器运行在同一个Minion(Host)上，看作一个统一管理单元，共享相同的volumes和network namespace/IP和Port空间。
+2.2 Services Services也是Kubernetes的基本操作单元，是真实应用服务的抽象，每一个服务后面都有很多对应的容器来支持，通过Proxy的port和服务selector决定服务请求传递给后端提供服务的容器，对外表现为一个单一访问地址，外部不需要了解后端如何运行，这给扩展或维护后端带来很大的好处。
+这一点github上的官网文档 services.md 讲的特别清楚。
+2.3 Replication Controllers Replication Controller，理解成更复杂形式的pods，它确保任何时候Kubernetes集群中有指定数量的pod副本(replicas)在运行，如果少于指定数量的pod副本(replicas)，Replication Controller会启动新的Container，反之会杀死多余的以保证数量不变。Replication Controller使用预先定义的pod模板创建pods，一旦创建成功，pod 模板和创建的pods没有任何关联，可以修改 pod 模板而不会对已创建pods有任何影响，也可以直接更新通过Replication Controller创建的pods。对于利用 pod 模板创建的pods，Replication Controller根据 label selector 来关联，通过修改pods的label可以删除对应的pods。Replication Controller主要有如下用法：" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2015/02/%E5%BC%80%E6%BA%90%E5%AE%B9%E5%99%A8%E9%9B%86%E7%BE%A4%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9Fkubernetes%E6%9E%B6%E6%9E%84%E5%8F%8A%E7%BB%84%E4%BB%B6%E4%BB%8B%E7%BB%8D/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2015-02-03T13:21:25+00:00" />
+<meta property="article:modified_time" content="2015-02-03T13:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="开源容器集群管理系统Kubernetes架构及组件介绍"/>
+<meta name="twitter:description" content="本文来源于Infoq的一篇文章（见参考部分），并在难懂的地方自己理解的基础上做了修改。实际在ubuntu上部署 kubernetes 操作另见 文章 。
+Together we will ensure that Kubernetes is a strong and open container management framework for any application and in any environment, whether in a private, public or hybrid cloud. &ndash;Urs Hölzle, Google
+Kubernetes 作为Docker生态圈中重要一员，是Google多年大规模容器管理技术的开源版本，是产线实践经验的最佳表现。如Urs Hölzle所说，无论是公有云还是私有云甚至混合云，Kubernetes将作为一个为任何应用，任何环境的容器管理框架无处不在。正因为如此，目前受到各大巨头及初创公司的青睐，如Microsoft、VMWare、Red Hat、CoreOS、Mesos等，纷纷加入给Kubernetes贡献代码。随着Kubernetes社区及各大厂商的不断改进、发展，Kuberentes将成为容器管理领域的领导者。
+接下来我们一起探索Kubernetes是什么、能做什么以及怎么做。
+1. 什么是Kubernetes Kubernetes是Google开源的容器集群管理系统，使用Golang开发，其提供应用部署、维护、扩展机制等功能，利用Kubernetes能方便地管理跨机器运行容器化的应用，其主要功能如下：
+使用Docker对应用程序包装(package)、实例化(instantiate)、运行(run)。 以集群的方式运行、管理跨机器的容器。 解决Docker跨机器容器之间的通讯问题。 Kubernetes的自我修复机制使得容器集群总是运行在用户期望的状态。 当前Kubernetes支持GCE、vShpere、CoreOS、OpenShift、Azure等平台，除此之外，也可以直接运行在物理机上。
+这个官方给出的完整的架构图：（可在新标签页打开查看大图）
+2. Kubernetes的主要概念 2.1 Pods 在Kubernetes系统中，调度的最小颗粒不是单纯的容器，而是抽象成一个Pod，Pod是一个可以被创建、销毁、调度、管理的最小的部署单元。把相关的一个或多个容器（Container）构成一个Pod，通常Pod里的容器运行相同的应用。Pod包含的容器运行在同一个Minion(Host)上，看作一个统一管理单元，共享相同的volumes和network namespace/IP和Port空间。
+2.2 Services Services也是Kubernetes的基本操作单元，是真实应用服务的抽象，每一个服务后面都有很多对应的容器来支持，通过Proxy的port和服务selector决定服务请求传递给后端提供服务的容器，对外表现为一个单一访问地址，外部不需要了解后端如何运行，这给扩展或维护后端带来很大的好处。
+这一点github上的官网文档 services.md 讲的特别清楚。
+2.3 Replication Controllers Replication Controller，理解成更复杂形式的pods，它确保任何时候Kubernetes集群中有指定数量的pod副本(replicas)在运行，如果少于指定数量的pod副本(replicas)，Replication Controller会启动新的Container，反之会杀死多余的以保证数量不变。Replication Controller使用预先定义的pod模板创建pods，一旦创建成功，pod 模板和创建的pods没有任何关联，可以修改 pod 模板而不会对已创建pods有任何影响，也可以直接更新通过Replication Controller创建的pods。对于利用 pod 模板创建的pods，Replication Controller根据 label selector 来关联，通过修改pods的label可以删除对应的pods。Replication Controller主要有如下用法："/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "开源容器集群管理系统Kubernetes架构及组件介绍",
+      "item": "http://xgknight.com/posts/2015/02/%E5%BC%80%E6%BA%90%E5%AE%B9%E5%99%A8%E9%9B%86%E7%BE%A4%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9Fkubernetes%E6%9E%B6%E6%9E%84%E5%8F%8A%E7%BB%84%E4%BB%B6%E4%BB%8B%E7%BB%8D/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "开源容器集群管理系统Kubernetes架构及组件介绍",
+  "name": "开源容器集群管理系统Kubernetes架构及组件介绍",
+  "description": "本文来源于Infoq的一篇文章（见参考部分），并在难懂的地方自己理解的基础上做了修改。实际在ubuntu上部署 kubernetes 操作另见 文章 。\nTogether we will ensure that Kubernetes is a strong and open container management framework for any application and in any environment, whether in a private, public or hybrid cloud. \u0026ndash;Urs Hölzle, Google\nKubernetes 作为Docker生态圈中重要一员，是Google多年大规模容器管理技术的开源版本，是产线实践经验的最佳表现。如Urs Hölzle所说，无论是公有云还是私有云甚至混合云，Kubernetes将作为一个为任何应用，任何环境的容器管理框架无处不在。正因为如此，目前受到各大巨头及初创公司的青睐，如Microsoft、VMWare、Red Hat、CoreOS、Mesos等，纷纷加入给Kubernetes贡献代码。随着Kubernetes社区及各大厂商的不断改进、发展，Kuberentes将成为容器管理领域的领导者。\n接下来我们一起探索Kubernetes是什么、能做什么以及怎么做。\n1. 什么是Kubernetes Kubernetes是Google开源的容器集群管理系统，使用Golang开发，其提供应用部署、维护、扩展机制等功能，利用Kubernetes能方便地管理跨机器运行容器化的应用，其主要功能如下：\n使用Docker对应用程序包装(package)、实例化(instantiate)、运行(run)。 以集群的方式运行、管理跨机器的容器。 解决Docker跨机器容器之间的通讯问题。 Kubernetes的自我修复机制使得容器集群总是运行在用户期望的状态。 当前Kubernetes支持GCE、vShpere、CoreOS、OpenShift、Azure等平台，除此之外，也可以直接运行在物理机上。\n这个官方给出的完整的架构图：（可在新标签页打开查看大图）\n2. Kubernetes的主要概念 2.1 Pods 在Kubernetes系统中，调度的最小颗粒不是单纯的容器，而是抽象成一个Pod，Pod是一个可以被创建、销毁、调度、管理的最小的部署单元。把相关的一个或多个容器（Container）构成一个Pod，通常Pod里的容器运行相同的应用。Pod包含的容器运行在同一个Minion(Host)上，看作一个统一管理单元，共享相同的volumes和network namespace/IP和Port空间。\n2.2 Services Services也是Kubernetes的基本操作单元，是真实应用服务的抽象，每一个服务后面都有很多对应的容器来支持，通过Proxy的port和服务selector决定服务请求传递给后端提供服务的容器，对外表现为一个单一访问地址，外部不需要了解后端如何运行，这给扩展或维护后端带来很大的好处。\n这一点github上的官网文档 services.md 讲的特别清楚。\n2.3 Replication Controllers Replication Controller，理解成更复杂形式的pods，它确保任何时候Kubernetes集群中有指定数量的pod副本(replicas)在运行，如果少于指定数量的pod副本(replicas)，Replication Controller会启动新的Container，反之会杀死多余的以保证数量不变。Replication Controller使用预先定义的pod模板创建pods，一旦创建成功，pod 模板和创建的pods没有任何关联，可以修改 pod 模板而不会对已创建pods有任何影响，也可以直接更新通过Replication Controller创建的pods。对于利用 pod 模板创建的pods，Replication Controller根据 label selector 来关联，通过修改pods的label可以删除对应的pods。Replication Controller主要有如下用法：",
+  "keywords": [
+    "docker", "linux", "kubernetes"
+  ],
+  "articleBody": "本文来源于Infoq的一篇文章（见参考部分），并在难懂的地方自己理解的基础上做了修改。实际在ubuntu上部署 kubernetes 操作另见 文章 。\nTogether we will ensure that Kubernetes is a strong and open container management framework for any application and in any environment, whether in a private, public or hybrid cloud. –Urs Hölzle, Google\nKubernetes 作为Docker生态圈中重要一员，是Google多年大规模容器管理技术的开源版本，是产线实践经验的最佳表现。如Urs Hölzle所说，无论是公有云还是私有云甚至混合云，Kubernetes将作为一个为任何应用，任何环境的容器管理框架无处不在。正因为如此，目前受到各大巨头及初创公司的青睐，如Microsoft、VMWare、Red Hat、CoreOS、Mesos等，纷纷加入给Kubernetes贡献代码。随着Kubernetes社区及各大厂商的不断改进、发展，Kuberentes将成为容器管理领域的领导者。\n接下来我们一起探索Kubernetes是什么、能做什么以及怎么做。\n1. 什么是Kubernetes Kubernetes是Google开源的容器集群管理系统，使用Golang开发，其提供应用部署、维护、扩展机制等功能，利用Kubernetes能方便地管理跨机器运行容器化的应用，其主要功能如下：\n使用Docker对应用程序包装(package)、实例化(instantiate)、运行(run)。 以集群的方式运行、管理跨机器的容器。 解决Docker跨机器容器之间的通讯问题。 Kubernetes的自我修复机制使得容器集群总是运行在用户期望的状态。 当前Kubernetes支持GCE、vShpere、CoreOS、OpenShift、Azure等平台，除此之外，也可以直接运行在物理机上。\n这个官方给出的完整的架构图：（可在新标签页打开查看大图）\n2. Kubernetes的主要概念 2.1 Pods 在Kubernetes系统中，调度的最小颗粒不是单纯的容器，而是抽象成一个Pod，Pod是一个可以被创建、销毁、调度、管理的最小的部署单元。把相关的一个或多个容器（Container）构成一个Pod，通常Pod里的容器运行相同的应用。Pod包含的容器运行在同一个Minion(Host)上，看作一个统一管理单元，共享相同的volumes和network namespace/IP和Port空间。\n2.2 Services Services也是Kubernetes的基本操作单元，是真实应用服务的抽象，每一个服务后面都有很多对应的容器来支持，通过Proxy的port和服务selector决定服务请求传递给后端提供服务的容器，对外表现为一个单一访问地址，外部不需要了解后端如何运行，这给扩展或维护后端带来很大的好处。\n这一点github上的官网文档 services.md 讲的特别清楚。\n2.3 Replication Controllers Replication Controller，理解成更复杂形式的pods，它确保任何时候Kubernetes集群中有指定数量的pod副本(replicas)在运行，如果少于指定数量的pod副本(replicas)，Replication Controller会启动新的Container，反之会杀死多余的以保证数量不变。Replication Controller使用预先定义的pod模板创建pods，一旦创建成功，pod 模板和创建的pods没有任何关联，可以修改 pod 模板而不会对已创建pods有任何影响，也可以直接更新通过Replication Controller创建的pods。对于利用 pod 模板创建的pods，Replication Controller根据 label selector 来关联，通过修改pods的label可以删除对应的pods。Replication Controller主要有如下用法：\nRescheduling 如上所述，Replication Controller会确保Kubernetes集群中指定的pod副本(replicas)在运行， 即使在节点出错时。\nScaling 通过修改Replication Controller的副本(replicas)数量来水平扩展或者缩小运行的pods。\nRolling updates Replication Controller的设计原则使得可以一个一个地替换pods来滚动更新（rolling updates）服务。\nMultiple release tracks 如果需要在系统中运行multiple release的服务，Replication Controller使用labels来区分multiple release tracks。\n以上三个概念便是用户可操作的REST对象。Kubernetes以RESTfull API形式开放的接口来处理。\n2.4 Labels service和replicationController只是建立在pod之上的抽象，最终是要作用于pod的，那么它们如何跟pod联系起来呢？这就引入了label的概念：label其实很好理解，就是为pod加上可用于搜索或关联的一组key/value标签，而service和replicationController正是通过label来与pod关联的。为了将访问Service的请求转发给后端提供服务的多个容器，正是通过标识容器的labels来选择正确的容器；Replication Controller也使用labels来管理通过 pod 模板创建的一组容器，这样Replication Controller可以更加容易，方便地管理多个容器。\n如下图所示，有三个pod都有label为\"app=backend\"，创建service和replicationController时可以指定同样的label:“app=backend”，再通过label selector机制，就将它们与这三个pod关联起来了。例如，当有其他frontend pod访问该service时，自动会转发到其中的一个backend pod。 3. Kubernetes构件 Kubenetes整体框架如下图，主要包括kubecfg、Master API Server、Kubelet、Minion(Host)以及Proxy。 3.1 Master Master定义了Kubernetes 集群Master/API Server的主要声明，包括Pod Registry、Controller Registry、Service Registry、Endpoint Registry、Minion Registry、Binding Registry、RESTStorage以及Client, 是client(Kubecfg)调用Kubernetes API，管理Kubernetes主要构件Pods、Services、Minions、容器的入口。Master由API Server、Scheduler以及Registry等组成。从下图可知Master的工作流主要分以下步骤：\nKubecfg将特定的请求，比如创建Pod，发送给Kubernetes Client。 Kubernetes Client将请求发送给API server。 API Server根据请求的类型，比如创建Pod时storage类型是pods，然后依此选择何种REST Storage API对请求作出处理。 REST Storage API对的请求作相应的处理。 将处理的结果存入高可用键值存储系统Etcd中。 在API Server响应Kubecfg的请求后，Scheduler会根据Kubernetes Client获取集群中运行Pod及Minion信息。 依据从Kubernetes Client获取的信息，Scheduler将未分发的Pod分发到可用的Minion节点上。 下面是Master的主要构件的详细介绍。\n3.1.1 Minion Registry Minion Registry负责跟踪Kubernetes 集群中有多少Minion(Host)。Kubernetes封装Minion Registry成实现Kubernetes API Server的RESTful API接口REST，通过这些API，我们可以对Minion Registry做Create、Get、List、Delete操作，由于Minon只能被创建或删除，所以不支持Update操作，并把Minion的相关配置信息存储到etcd。除此之外，Scheduler算法根据Minion的资源容量来确定是否将新建Pod分发到该Minion节点。\n可以通过curl http://{master-apiserver-ip}:4001/v2/keys/registry/minions/来验证etcd中存储的内容。\n3.1.2 Pod Registry Pod Registry负责跟踪Kubernetes集群中有多少Pod在运行，以及这些Pod跟Minion是如何的映射关系。将Pod Registry和Cloud Provider信息及其他相关信息封装成实现Kubernetes API Server的RESTful API接口REST。通过这些API，我们可以对Pod进行Create、Get、List、Update、Delete操作，并将Pod的信息存储到etcd中，而且可以通过Watch接口监视Pod的变化情况，比如一个Pod被新建、删除或者更新。\n3.1.3 Service Registry Service Registry负责跟踪Kubernetes集群中运行的所有服务。根据提供的Cloud Provider及Minion Registry信息把Service Registry封装成实现Kubernetes API Server需要的RESTful API接口REST。利用这些接口，我们可以对Service进行Create、Get、List、Update、Delete操作，以及监视Service变化情况的watch操作，并把Service信息存储到etcd。\n3.1.4 Controller Registry Controller Registry负责跟踪Kubernetes集群中所有的Replication Controller，Replication Controller维护着指定数量的pod 副本(replicas)拷贝，如果其中的一个容器死掉，Replication Controller会自动启动一个新的容器，如果死掉的容器恢复，其会杀死多出的容器以保证指定的拷贝不变。通过封装Controller Registry为实现Kubernetes API Server的RESTful API接口REST， 利用这些接口，我们可以对Replication Controller进行Create、Get、List、Update、Delete操作，以及监视Replication Controller变化情况的watch操作，并把Replication Controller信息存储到etcd。\n3.1.5 Endpoints Registry Endpoints Registry负责收集Service的endpoint，比如Name：“mysql”，Endpoints: [“10.10.1.1:1909”，“10.10.2.2:8834”]，同Pod Registry，Controller Registry也实现了Kubernetes API Server的RESTful API接口，可以做Create、Get、List、Update、Delete以及watch操作。\n3.1.6 Binding Registry Binding包括一个需要绑定Pod的ID和Pod被绑定的Host，Scheduler写Binding Registry后，需绑定的Pod被绑定到一个host。Binding Registry也实现了Kubernetes API Server的RESTful API接口，但Binding Registry是一个write-only对象，所有只有Create操作可以使用， 否则会引起错误。\n3.1.7 Scheduler Scheduler收集和分析当前Kubernetes集群中所有Minion节点的资源(内存、CPU)负载情况，然后依此分发新建的Pod到Kubernetes集群中可用的节点。由于一旦Minion节点的资源被分配给Pod，那这些资源就不能再分配给其他Pod， 除非这些Pod被删除或者退出， 因此，Kubernetes需要分析集群中所有Minion的资源使用情况，保证分发的工作负载不会超出当前该Minion节点的可用资源范围。具体来说，Scheduler做以下工作：\n实时监测Kubernetes集群中未分发的Pod。 实时监测Kubernetes集群中所有运行的Pod，Scheduler需要根据这些Pod的资源状况安全地将未分发的Pod分发到指定的Minion节点上。 Scheduler也监测Minion节点信息，由于会频繁查找Minion节点，Scheduler会缓存一份最新的信息在本地。 最后，Scheduler在分发Pod到指定的Minion节点后，会把Pod相关的信息Binding写回API Server。 3.2 Kubelet 根据上图可知Kubelet是Kubernetes集群中每个Minion和Master API Server的连接点，Kubelet运行在每个Minion上，是Master API Server和Minion之间的桥梁，接收Master API Server分配给它的commands和work，与持久性键值存储etcd、file、server和http进行交互，读取配置信息。Kubelet的主要工作是管理Pod和容器的生命周期，其包括Docker Client、Root Directory、Pod Workers、Etcd Client、Cadvisor Client以及Health Checker组件，具体工作如下：\n通过Worker给Pod异步运行特定的Action 设置容器的环境变量 给容器绑定Volume 给容器绑定Port 根据指定的Pod运行一个单一容器 杀死容器 给指定的Pod创建network 容器 删除Pod的所有容器 同步Pod的状态 从cAdvisor获取container info、 pod info、 root info、 machine info 检测Pod的容器健康状态信息 在容器中运行命令。 3.3 Proxy Proxy是为了解决外部网络能够访问跨机器集群中容器提供的应用服务而设计的，运行在每个Minion上。Proxy提供TCP/UDP sockets的proxy，每创建一种Service，Proxy主要从etcd获取Services和Endpoints的配置信息（也可以从file获取），然后根据配置信息在Minion上启动一个Proxy的进程并监听相应的服务端口，当外部请求发生时，Proxy会根据Load Balancer将请求分发到后端正确的容器处理。\n所以Proxy不但解决了同一主宿机相同服务端口冲突的问题，还提供了Service转发服务端口对外提供服务的能力，Proxy后端使用了随机、轮循负载均衡算法。关于更多 kube-proxy 的内容 KUBERNETES代码走读之MINION NODE 组件 KUBE-PROXY 。\n4. etcd etcd在上面架构图上提到过几次，但它并不是kubernetes的一部分，它是 CoreOS 团队发起的一个管理配置信息和服务发现（service discovery）项目，目标是构建一个高可用的分布式键值（key-value）数据库。与kubernetes和docker一样还是在快速迭代开发中的产品，没有ZooKeeper那样成熟。有机会再另外通过文章介绍。\n参考\nKubernetes系统架构简介\nAn Introduction to Kubernetes\nKubernetes-DESIGN （Kubernetes 设计概要）\n怎样构建一个容器集群\n",
+  "wordCount" : "299",
+  "inLanguage": "en",
+  "datePublished": "2015-02-03T13:21:25Z",
+  "dateModified": "2015-02-03T13:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2015/02/%E5%BC%80%E6%BA%90%E5%AE%B9%E5%99%A8%E9%9B%86%E7%BE%A4%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9Fkubernetes%E6%9E%B6%E6%9E%84%E5%8F%8A%E7%BB%84%E4%BB%B6%E4%BB%8B%E7%BB%8D/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      开源容器集群管理系统Kubernetes架构及组件介绍
+    </h1>
+    <div class="post-meta"><span title='2015-02-03 13:21:25 +0000 UTC'>February 3, 2015</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>本文来源于Infoq的一篇文章（见参考部分），并在难懂的地方自己理解的基础上做了修改。实际在ubuntu上部署 kubernetes 操作另见 <a href="http://xgknight.com/2015/02/07/docker-kubernetes-deploy2/">文章</a> 。</p>
+<blockquote>
+<p>Together we will ensure that Kubernetes is a strong and open container management framework for any application and in any environment, whether in a private, public or hybrid cloud.  &ndash;Urs Hölzle, Google</p>
+</blockquote>
+<p><a href="https://github.com/GoogleCloudPlatform/kubernetes">Kubernetes</a> 作为Docker生态圈中重要一员，是Google多年大规模容器管理技术的开源版本，是产线实践经验的最佳表现。如Urs Hölzle所说，无论是公有云还是私有云甚至混合云，Kubernetes将作为一个为任何应用，任何环境的容器管理框架无处不在。正因为如此，目前受到各大巨头及初创公司的青睐，如Microsoft、VMWare、Red Hat、CoreOS、Mesos等，纷纷加入给Kubernetes贡献代码。随着Kubernetes社区及各大厂商的不断改进、发展，Kuberentes将成为容器管理领域的领导者。</p>
+<p>接下来我们一起探索Kubernetes是什么、能做什么以及怎么做。</p>
+<h1 id="1-什么是kubernetes">1. 什么是Kubernetes<a hidden class="anchor" aria-hidden="true" href="#1-什么是kubernetes">#</a></h1>
+<p>Kubernetes是Google开源的容器集群管理系统，使用Golang开发，其提供应用部署、维护、扩展机制等功能，利用Kubernetes能方便地管理跨机器运行容器化的应用，其主要功能如下：</p>
+<ol>
+<li>使用Docker对应用程序包装(package)、实例化(instantiate)、运行(run)。</li>
+<li>以集群的方式运行、管理跨机器的容器。</li>
+<li>解决Docker跨机器容器之间的通讯问题。</li>
+<li>Kubernetes的自我修复机制使得容器集群总是运行在用户期望的状态。</li>
+</ol>
+<p>当前Kubernetes支持GCE、vShpere、CoreOS、OpenShift、Azure等平台，除此之外，也可以直接运行在物理机上。</p>
+<p>这个官方给出的完整的架构图：（可在新标签页打开查看大图）</p>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/kubernetes-architecture.png" alt="kubernetes-architecture"  />
+</p>
+<h1 id="2-kubernetes的主要概念">2. Kubernetes的主要概念<a hidden class="anchor" aria-hidden="true" href="#2-kubernetes的主要概念">#</a></h1>
+<h2 id="21-pods">2.1 Pods<a hidden class="anchor" aria-hidden="true" href="#21-pods">#</a></h2>
+<p>在Kubernetes系统中，调度的最小颗粒不是单纯的容器，而是抽象成一个Pod，Pod是一个可以被创建、销毁、调度、管理的最小的部署单元。把相关的一个或多个容器（Container）构成一个Pod，通常Pod里的容器运行相同的应用。Pod包含的容器运行在同一个Minion(Host)上，看作一个统一管理单元，共享相同的volumes和network namespace/IP和Port空间。</p>
+<!-- raw HTML omitted -->
+<h2 id="22-services">2.2 Services<a hidden class="anchor" aria-hidden="true" href="#22-services">#</a></h2>
+<p>Services也是Kubernetes的基本操作单元，是真实应用服务的抽象，每一个服务后面都有很多对应的容器来支持，通过Proxy的port和服务selector决定服务请求传递给后端提供服务的容器，对外表现为一个单一访问地址，外部不需要了解后端如何运行，这给扩展或维护后端带来很大的好处。</p>
+<p>这一点github上的官网文档 <a href="https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md">services.md</a> 讲的特别清楚。</p>
+<h2 id="23-replication-controllers">2.3 Replication Controllers<a hidden class="anchor" aria-hidden="true" href="#23-replication-controllers">#</a></h2>
+<p>Replication Controller，理解成更复杂形式的pods，它确保任何时候Kubernetes集群中有指定数量的pod副本(replicas)在运行，如果少于指定数量的pod副本(replicas)，Replication Controller会启动新的Container，反之会杀死多余的以保证数量不变。Replication Controller使用预先定义的pod模板创建pods，一旦创建成功，pod 模板和创建的pods没有任何关联，可以修改 pod 模板而不会对已创建pods有任何影响，也可以直接更新通过Replication Controller创建的pods。对于利用 pod 模板创建的pods，Replication Controller根据 label selector 来关联，通过修改pods的label可以删除对应的pods。Replication Controller主要有如下用法：</p>
+<p><strong>Rescheduling</strong>
+如上所述，Replication Controller会确保Kubernetes集群中指定的pod副本(replicas)在运行， 即使在节点出错时。</p>
+<p><strong>Scaling</strong>
+通过修改Replication Controller的副本(replicas)数量来水平扩展或者缩小运行的pods。</p>
+<p><strong>Rolling updates</strong>
+Replication Controller的设计原则使得可以一个一个地替换pods来滚动更新（rolling updates）服务。</p>
+<p><strong>Multiple release tracks</strong>
+如果需要在系统中运行multiple release的服务，Replication Controller使用labels来区分multiple release tracks。</p>
+<p>以上三个概念便是用户可操作的REST对象。Kubernetes以RESTfull API形式开放的接口来处理。</p>
+<h2 id="24-labels">2.4 Labels<a hidden class="anchor" aria-hidden="true" href="#24-labels">#</a></h2>
+<p>service和replicationController只是建立在pod之上的抽象，最终是要作用于pod的，那么它们如何跟pod联系起来呢？这就引入了label的概念：label其实很好理解，就是为pod加上可用于搜索或关联的一组key/value标签，而service和replicationController正是通过label来与pod关联的。为了将访问Service的请求转发给后端提供服务的多个容器，正是通过标识容器的labels来选择正确的容器；Replication Controller也使用labels来管理通过 pod 模板创建的一组容器，这样Replication Controller可以更加容易，方便地管理多个容器。</p>
+<p>如下图所示，有三个pod都有label为&quot;app=backend&quot;，创建service和replicationController时可以指定同样的label:&ldquo;app=backend&rdquo;，再通过label selector机制，就将它们与这三个pod关联起来了。例如，当有其他frontend pod访问该service时，自动会转发到其中的一个backend pod。
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/kubernetes-label.jpg" alt="kubernetes-label"  />
+</p>
+<h1 id="3-kubernetes构件">3. Kubernetes构件<a hidden class="anchor" aria-hidden="true" href="#3-kubernetes构件">#</a></h1>
+<p>Kubenetes整体框架如下图，主要包括kubecfg、Master API Server、Kubelet、Minion(Host)以及Proxy。
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/kubernetes-simple.png" alt="kubernetes-simple"  />
+</p>
+<h2 id="31-master">3.1 Master<a hidden class="anchor" aria-hidden="true" href="#31-master">#</a></h2>
+<p>Master定义了Kubernetes 集群Master/API Server的主要声明，包括Pod Registry、Controller Registry、Service Registry、Endpoint Registry、Minion Registry、Binding Registry、RESTStorage以及Client, 是client(Kubecfg)调用Kubernetes API，管理Kubernetes主要构件Pods、Services、Minions、容器的入口。Master由API Server、Scheduler以及Registry等组成。从下图可知Master的工作流主要分以下步骤：</p>
+<ol>
+<li>Kubecfg将特定的请求，比如创建Pod，发送给Kubernetes Client。</li>
+<li>Kubernetes Client将请求发送给API server。</li>
+<li>API Server根据请求的类型，比如创建Pod时storage类型是pods，然后依此选择何种REST Storage API对请求作出处理。</li>
+<li>REST Storage API对的请求作相应的处理。</li>
+<li>将处理的结果存入高可用键值存储系统Etcd中。</li>
+<li>在API Server响应Kubecfg的请求后，Scheduler会根据Kubernetes Client获取集群中运行Pod及Minion信息。</li>
+<li>依据从Kubernetes Client获取的信息，Scheduler将未分发的Pod分发到可用的Minion节点上。</li>
+</ol>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/kubernetes-restfull.png" alt="kubernetes-restfull"  />
+
+下面是Master的主要构件的详细介绍。</p>
+<h3 id="311-minion-registry">3.1.1 Minion Registry<a hidden class="anchor" aria-hidden="true" href="#311-minion-registry">#</a></h3>
+<p>Minion Registry负责跟踪Kubernetes 集群中有多少Minion(Host)。Kubernetes封装Minion Registry成实现Kubernetes API Server的RESTful API接口REST，通过这些API，我们可以对Minion Registry做Create、Get、List、Delete操作，由于Minon只能被创建或删除，所以不支持Update操作，并把Minion的相关配置信息存储到etcd。除此之外，Scheduler算法根据Minion的资源容量来确定是否将新建Pod分发到该Minion节点。</p>
+<p>可以通过<code>curl http://{master-apiserver-ip}:4001/v2/keys/registry/minions/</code>来验证etcd中存储的内容。</p>
+<h3 id="312-pod-registry">3.1.2 Pod Registry<a hidden class="anchor" aria-hidden="true" href="#312-pod-registry">#</a></h3>
+<p>Pod Registry负责跟踪Kubernetes集群中有多少Pod在运行，以及这些Pod跟Minion是如何的映射关系。将Pod Registry和Cloud Provider信息及其他相关信息封装成实现Kubernetes API Server的RESTful API接口REST。通过这些API，我们可以对Pod进行Create、Get、List、Update、Delete操作，并将Pod的信息存储到etcd中，而且可以通过Watch接口监视Pod的变化情况，比如一个Pod被新建、删除或者更新。</p>
+<h3 id="313-service-registry">3.1.3 Service Registry<a hidden class="anchor" aria-hidden="true" href="#313-service-registry">#</a></h3>
+<p>Service Registry负责跟踪Kubernetes集群中运行的所有服务。根据提供的Cloud Provider及Minion Registry信息把Service Registry封装成实现Kubernetes API Server需要的RESTful API接口REST。利用这些接口，我们可以对Service进行Create、Get、List、Update、Delete操作，以及监视Service变化情况的watch操作，并把Service信息存储到etcd。</p>
+<h3 id="314-controller-registry">3.1.4 Controller Registry<a hidden class="anchor" aria-hidden="true" href="#314-controller-registry">#</a></h3>
+<p>Controller Registry负责跟踪Kubernetes集群中所有的Replication Controller，Replication Controller维护着指定数量的pod 副本(replicas)拷贝，如果其中的一个容器死掉，Replication Controller会自动启动一个新的容器，如果死掉的容器恢复，其会杀死多出的容器以保证指定的拷贝不变。通过封装Controller Registry为实现Kubernetes API Server的RESTful API接口REST， 利用这些接口，我们可以对Replication Controller进行Create、Get、List、Update、Delete操作，以及监视Replication Controller变化情况的watch操作，并把Replication Controller信息存储到etcd。</p>
+<h3 id="315-endpoints-registry">3.1.5 Endpoints Registry<a hidden class="anchor" aria-hidden="true" href="#315-endpoints-registry">#</a></h3>
+<p>Endpoints Registry负责收集Service的endpoint，比如Name：&ldquo;mysql&rdquo;，Endpoints: [&ldquo;10.10.1.1:1909&rdquo;，&ldquo;10.10.2.2:8834&rdquo;]，同Pod Registry，Controller Registry也实现了Kubernetes API Server的RESTful API接口，可以做Create、Get、List、Update、Delete以及watch操作。</p>
+<h3 id="316-binding-registry">3.1.6 Binding Registry<a hidden class="anchor" aria-hidden="true" href="#316-binding-registry">#</a></h3>
+<p>Binding包括一个需要绑定Pod的ID和Pod被绑定的Host，Scheduler写Binding Registry后，需绑定的Pod被绑定到一个host。Binding Registry也实现了Kubernetes API Server的RESTful API接口，但Binding Registry是一个write-only对象，所有只有Create操作可以使用， 否则会引起错误。</p>
+<h3 id="317-scheduler">3.1.7 Scheduler<a hidden class="anchor" aria-hidden="true" href="#317-scheduler">#</a></h3>
+<p>Scheduler收集和分析当前Kubernetes集群中所有Minion节点的资源(内存、CPU)负载情况，然后依此分发新建的Pod到Kubernetes集群中可用的节点。由于一旦Minion节点的资源被分配给Pod，那这些资源就不能再分配给其他Pod， 除非这些Pod被删除或者退出， 因此，Kubernetes需要分析集群中所有Minion的资源使用情况，保证分发的工作负载不会超出当前该Minion节点的可用资源范围。具体来说，Scheduler做以下工作：</p>
+<ol>
+<li>实时监测Kubernetes集群中未分发的Pod。</li>
+<li>实时监测Kubernetes集群中所有运行的Pod，Scheduler需要根据这些Pod的资源状况安全地将未分发的Pod分发到指定的Minion节点上。</li>
+<li>Scheduler也监测Minion节点信息，由于会频繁查找Minion节点，Scheduler会缓存一份最新的信息在本地。</li>
+<li>最后，Scheduler在分发Pod到指定的Minion节点后，会把Pod相关的信息Binding写回API Server。</li>
+</ol>
+<h2 id="32-kubelet">3.2 Kubelet<a hidden class="anchor" aria-hidden="true" href="#32-kubelet">#</a></h2>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/kubernetes-kubelet.png" alt="kubernetes-kubelet"  />
+
+根据上图可知Kubelet是Kubernetes集群中每个Minion和Master API Server的连接点，Kubelet运行在每个Minion上，是Master API Server和Minion之间的桥梁，接收Master API Server分配给它的commands和work，与持久性键值存储etcd、file、server和http进行交互，读取配置信息。Kubelet的主要工作是管理Pod和容器的生命周期，其包括Docker Client、Root Directory、Pod Workers、Etcd Client、Cadvisor Client以及Health Checker组件，具体工作如下：</p>
+<ol>
+<li>通过Worker给Pod异步运行特定的Action</li>
+<li>设置容器的环境变量</li>
+<li>给容器绑定Volume</li>
+<li>给容器绑定Port</li>
+<li>根据指定的Pod运行一个单一容器</li>
+<li>杀死容器</li>
+<li>给指定的Pod创建network 容器</li>
+<li>删除Pod的所有容器</li>
+<li>同步Pod的状态</li>
+<li>从cAdvisor获取container info、 pod info、 root info、 machine info</li>
+<li>检测Pod的容器健康状态信息</li>
+<li>在容器中运行命令。</li>
+</ol>
+<h2 id="33-proxy">3.3 Proxy<a hidden class="anchor" aria-hidden="true" href="#33-proxy">#</a></h2>
+<p>Proxy是为了解决外部网络能够访问跨机器集群中容器提供的应用服务而设计的，运行在每个Minion上。Proxy提供TCP/UDP sockets的proxy，每创建一种Service，Proxy主要从etcd获取Services和Endpoints的配置信息（也可以从file获取），然后根据配置信息在Minion上启动一个Proxy的进程并监听相应的服务端口，当外部请求发生时，Proxy会根据Load Balancer将请求分发到后端正确的容器处理。</p>
+<p>所以Proxy不但解决了同一主宿机相同服务端口冲突的问题，还提供了Service转发服务端口对外提供服务的能力，Proxy后端使用了随机、轮循负载均衡算法。关于更多 kube-proxy 的内容 <a href="http://www.sel.zju.edu.cn/?p=484">KUBERNETES代码走读之MINION NODE 组件 KUBE-PROXY</a> 。</p>
+<h1 id="4-etcd">4. etcd<a hidden class="anchor" aria-hidden="true" href="#4-etcd">#</a></h1>
+<p><a href="https://github.com/coreos/etcd">etcd</a>在上面架构图上提到过几次，但它并不是kubernetes的一部分，它是 CoreOS 团队发起的一个管理配置信息和服务发现（service discovery）项目，目标是构建一个高可用的分布式键值（key-value）数据库。与kubernetes和docker一样还是在快速迭代开发中的产品，没有ZooKeeper那样成熟。有机会再另外通过文章介绍。</p>
+<p><strong>参考</strong></p>
+<ul>
+<li>
+<p><a href="http://www.infoq.com/cn/articles/Kubernetes-system-architecture-introduction">Kubernetes系统架构简介</a></p>
+</li>
+<li>
+<p><a href="https://www.digitalocean.com/community/tutorials/an-introduction-to-kubernetes">An Introduction to Kubernetes</a></p>
+</li>
+<li>
+<p><a href="https://github.com/GoogleCloudPlatform/kubernetes/blob/master/DESIGN.md">Kubernetes-DESIGN</a> （<a href="http://my.oschina.net/kakablue/blog/278038">Kubernetes 设计概要</a>）</p>
+</li>
+<li>
+<p><a href="http://dockerone.com/article/173">怎样构建一个容器集群</a></p>
+</li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/docker/">docker</a></li>
+      <li><a href="http://xgknight.com/tags/linux/">linux</a></li>
+      <li><a href="http://xgknight.com/tags/kubernetes/">kubernetes</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

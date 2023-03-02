@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>docker如何创建一个运行后台进程的容器并同时提供shell终端 | Sean Note</title>
+<meta name="keywords" content="docker, shell, linux">
+<meta name="description" content="只看标题还不是很明显，本文实现docker的这样一种比较常用的功能：通过docker run启动一个容器后，容器中已经运行了一个后台进程（这里以监听80端口的nginx为例），同时进入一个shell终端可供操作，而不受限于只能在前台运行nginx与运行shell终端之间的一种。这个例子实现了，那么其他类似的运行多任务docker就可以以此类推。另外本文还提供了一种在docker容器内部安装软件（vim）的方法，对于定制自己需要的镜像大有帮助。 你可能需要先阅读docker专题(2)：docker常用管理命令（上）、docker专题(2)：docker常用管理命令（下）来理解更多。
+1. 已经pull了官方的nginx 1.7.6的镜像（也可以从私服获取）## # docker images|grep nginx nginx 1.7.6 561ed4952ef0 10 days ago 100 MB 2. 根据官方指示启动这个容器 先做好自己要显示的页面 # echo &#34;&lt;h2 &gt;This is nginx official container running &lt;/h2&gt; &lt;br /&gt; static files:/tmp/doccker/index.html&#34; &gt; /tmp/docker/index.html 使用官方image启动一个容器，名字nginx_dist，把host的目录（包含刚才的html）映射到容器中nginx server的root，绑定80端口：
+# docker run --name nginx_dist -v /tmp/docker:/usr/share/nginx/html:ro \ &gt; -p 80:80 -d nginx:1.7.6 1b10b08d7905517a26c72ce8b17b719aaea5e5eac0889263db8b017427e3c8f7 # docker ps CONTAINER ID IMAGE COMMAND CREATED STATUS PORTS NAMES 1b10b08d7905 nginx:1 nginx -g &#39;daemon off 51 seconds ago Up 48 seconds 443/tcp, 0.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2014/11/docker%E5%A6%82%E4%BD%95%E5%88%9B%E5%BB%BA%E4%B8%80%E4%B8%AA%E8%BF%90%E8%A1%8C%E5%90%8E%E5%8F%B0%E8%BF%9B%E7%A8%8B%E7%9A%84%E5%AE%B9%E5%99%A8%E5%B9%B6%E5%90%8C%E6%97%B6%E6%8F%90%E4%BE%9Bshell%E7%BB%88%E7%AB%AF/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="docker如何创建一个运行后台进程的容器并同时提供shell终端" />
+<meta property="og:description" content="只看标题还不是很明显，本文实现docker的这样一种比较常用的功能：通过docker run启动一个容器后，容器中已经运行了一个后台进程（这里以监听80端口的nginx为例），同时进入一个shell终端可供操作，而不受限于只能在前台运行nginx与运行shell终端之间的一种。这个例子实现了，那么其他类似的运行多任务docker就可以以此类推。另外本文还提供了一种在docker容器内部安装软件（vim）的方法，对于定制自己需要的镜像大有帮助。 你可能需要先阅读docker专题(2)：docker常用管理命令（上）、docker专题(2)：docker常用管理命令（下）来理解更多。
+1. 已经pull了官方的nginx 1.7.6的镜像（也可以从私服获取）## # docker images|grep nginx nginx 1.7.6 561ed4952ef0 10 days ago 100 MB 2. 根据官方指示启动这个容器 先做好自己要显示的页面 # echo &#34;&lt;h2 &gt;This is nginx official container running &lt;/h2&gt; &lt;br /&gt; static files:/tmp/doccker/index.html&#34; &gt; /tmp/docker/index.html 使用官方image启动一个容器，名字nginx_dist，把host的目录（包含刚才的html）映射到容器中nginx server的root，绑定80端口：
+# docker run --name nginx_dist -v /tmp/docker:/usr/share/nginx/html:ro \ &gt; -p 80:80 -d nginx:1.7.6 1b10b08d7905517a26c72ce8b17b719aaea5e5eac0889263db8b017427e3c8f7 # docker ps CONTAINER ID IMAGE COMMAND CREATED STATUS PORTS NAMES 1b10b08d7905 nginx:1 nginx -g &#39;daemon off 51 seconds ago Up 48 seconds 443/tcp, 0." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2014/11/docker%E5%A6%82%E4%BD%95%E5%88%9B%E5%BB%BA%E4%B8%80%E4%B8%AA%E8%BF%90%E8%A1%8C%E5%90%8E%E5%8F%B0%E8%BF%9B%E7%A8%8B%E7%9A%84%E5%AE%B9%E5%99%A8%E5%B9%B6%E5%90%8C%E6%97%B6%E6%8F%90%E4%BE%9Bshell%E7%BB%88%E7%AB%AF/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2014-11-03T20:21:25+00:00" />
+<meta property="article:modified_time" content="2014-11-03T20:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="docker如何创建一个运行后台进程的容器并同时提供shell终端"/>
+<meta name="twitter:description" content="只看标题还不是很明显，本文实现docker的这样一种比较常用的功能：通过docker run启动一个容器后，容器中已经运行了一个后台进程（这里以监听80端口的nginx为例），同时进入一个shell终端可供操作，而不受限于只能在前台运行nginx与运行shell终端之间的一种。这个例子实现了，那么其他类似的运行多任务docker就可以以此类推。另外本文还提供了一种在docker容器内部安装软件（vim）的方法，对于定制自己需要的镜像大有帮助。 你可能需要先阅读docker专题(2)：docker常用管理命令（上）、docker专题(2)：docker常用管理命令（下）来理解更多。
+1. 已经pull了官方的nginx 1.7.6的镜像（也可以从私服获取）## # docker images|grep nginx nginx 1.7.6 561ed4952ef0 10 days ago 100 MB 2. 根据官方指示启动这个容器 先做好自己要显示的页面 # echo &#34;&lt;h2 &gt;This is nginx official container running &lt;/h2&gt; &lt;br /&gt; static files:/tmp/doccker/index.html&#34; &gt; /tmp/docker/index.html 使用官方image启动一个容器，名字nginx_dist，把host的目录（包含刚才的html）映射到容器中nginx server的root，绑定80端口：
+# docker run --name nginx_dist -v /tmp/docker:/usr/share/nginx/html:ro \ &gt; -p 80:80 -d nginx:1.7.6 1b10b08d7905517a26c72ce8b17b719aaea5e5eac0889263db8b017427e3c8f7 # docker ps CONTAINER ID IMAGE COMMAND CREATED STATUS PORTS NAMES 1b10b08d7905 nginx:1 nginx -g &#39;daemon off 51 seconds ago Up 48 seconds 443/tcp, 0."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "docker如何创建一个运行后台进程的容器并同时提供shell终端",
+      "item": "http://xgknight.com/posts/2014/11/docker%E5%A6%82%E4%BD%95%E5%88%9B%E5%BB%BA%E4%B8%80%E4%B8%AA%E8%BF%90%E8%A1%8C%E5%90%8E%E5%8F%B0%E8%BF%9B%E7%A8%8B%E7%9A%84%E5%AE%B9%E5%99%A8%E5%B9%B6%E5%90%8C%E6%97%B6%E6%8F%90%E4%BE%9Bshell%E7%BB%88%E7%AB%AF/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "docker如何创建一个运行后台进程的容器并同时提供shell终端",
+  "name": "docker如何创建一个运行后台进程的容器并同时提供shell终端",
+  "description": "只看标题还不是很明显，本文实现docker的这样一种比较常用的功能：通过docker run启动一个容器后，容器中已经运行了一个后台进程（这里以监听80端口的nginx为例），同时进入一个shell终端可供操作，而不受限于只能在前台运行nginx与运行shell终端之间的一种。这个例子实现了，那么其他类似的运行多任务docker就可以以此类推。另外本文还提供了一种在docker容器内部安装软件（vim）的方法，对于定制自己需要的镜像大有帮助。 你可能需要先阅读docker专题(2)：docker常用管理命令（上）、docker专题(2)：docker常用管理命令（下）来理解更多。\n1. 已经pull了官方的nginx 1.7.6的镜像（也可以从私服获取）## # docker images|grep nginx nginx 1.7.6 561ed4952ef0 10 days ago 100 MB 2. 根据官方指示启动这个容器 先做好自己要显示的页面 # echo \u0026#34;\u0026lt;h2 \u0026gt;This is nginx official container running \u0026lt;/h2\u0026gt; \u0026lt;br /\u0026gt; static files:/tmp/doccker/index.html\u0026#34; \u0026gt; /tmp/docker/index.html 使用官方image启动一个容器，名字nginx_dist，把host的目录（包含刚才的html）映射到容器中nginx server的root，绑定80端口：\n# docker run --name nginx_dist -v /tmp/docker:/usr/share/nginx/html:ro \\ \u0026gt; -p 80:80 -d nginx:1.7.6 1b10b08d7905517a26c72ce8b17b719aaea5e5eac0889263db8b017427e3c8f7 # docker ps CONTAINER ID IMAGE COMMAND CREATED STATUS PORTS NAMES 1b10b08d7905 nginx:1 nginx -g \u0026#39;daemon off 51 seconds ago Up 48 seconds 443/tcp, 0.",
+  "keywords": [
+    "docker", "shell", "linux"
+  ],
+  "articleBody": "只看标题还不是很明显，本文实现docker的这样一种比较常用的功能：通过docker run启动一个容器后，容器中已经运行了一个后台进程（这里以监听80端口的nginx为例），同时进入一个shell终端可供操作，而不受限于只能在前台运行nginx与运行shell终端之间的一种。这个例子实现了，那么其他类似的运行多任务docker就可以以此类推。另外本文还提供了一种在docker容器内部安装软件（vim）的方法，对于定制自己需要的镜像大有帮助。 你可能需要先阅读docker专题(2)：docker常用管理命令（上）、docker专题(2)：docker常用管理命令（下）来理解更多。\n1. 已经pull了官方的nginx 1.7.6的镜像（也可以从私服获取）## # docker images|grep nginx nginx 1.7.6 561ed4952ef0 10 days ago 100 MB 2. 根据官方指示启动这个容器 先做好自己要显示的页面 # echo \"This is nginx official container running static files:/tmp/doccker/index.html\" \u003e /tmp/docker/index.html 使用官方image启动一个容器，名字nginx_dist，把host的目录（包含刚才的html）映射到容器中nginx server的root，绑定80端口：\n# docker run --name nginx_dist -v /tmp/docker:/usr/share/nginx/html:ro \\ \u003e -p 80:80 -d nginx:1.7.6 1b10b08d7905517a26c72ce8b17b719aaea5e5eac0889263db8b017427e3c8f7 # docker ps CONTAINER ID IMAGE COMMAND CREATED STATUS PORTS NAMES 1b10b08d7905 nginx:1 nginx -g 'daemon off 51 seconds ago Up 48 seconds 443/tcp, 0.0.0.0:80-\u003e80/tcp nginx_dist 此时通过浏览器访问主机http://host_ip:port/就可以看到结果了： 3. 查看这个容器的信息 熟悉一下docker的命令。\n查看容器中运行着哪些进程 # docker top nginx_dist UID PID PPID C STIME TTY TIME CMD root 24378 18471 0 15:25 ? 00:00:00 nginx: master process nginx -g daemon off; 101 24433 24378 0 15:25 ? 00:00:00 nginx: worker process 查看容器IP和主机等信息 # docker inspect nginx_dist |grep 172.17 \"Gateway\": \"172.17.42.1\", \"IPAddress\": \"172.17.42.6\", 连接到容器上，--sig-proxy可以保证 Ctrl+D、Ctrl+C 不会退出 # docker attach --sig-proxy=false nginx_dist xxx.xx.xx.xx - - [03/Nov/2014:07:39:52 +0000] \"GET / HTTP/1.1\" 304 0 \"-\" \"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.104 Safari/537.36\" \"-\" Ctrl+C 4. 容器改造—在容器内部安装vim 这里有个未解决的问题，能否有办法在上面已经启动的container的基础上执行命令？官方没有这样的支持。 目前只能重新启动一个容器(停止上面的nginx_dist容器)\n可以比较一下与2中命令的变化 # docker run --name nginx_bash_vim -v /tmp/docker:/usr/share/nginx/html:ro \\ \u003e -p 80:80 -i -t nginx:1.7.6 \u003e /bin/bash root@3911d1104c3f:/# 但此时nginx服务是停止的，并没有在后台运行，访问http://host_ip:port/无效。为了后面编辑配置文件方便，我们先把vim安装好。 容器内部的网络与容器外部是相同的，并与host具有相同的DNS，所以可以使用公网软件（cat /etc/apt/sources.list）镜像源来安装。\n如果需要代理：export http_proxy=http://proxy_server:port # apt-get clean # apt-get update # apt-get install vim Reading package lists... Done ... After this operation, 25.2 MB of additional disk space will be used. Do you want to continue [Y/n]? y ... Setting up vim (2:7.3.547-7) ... ... 5. 让nginx在后台运行，前台提供shell终端 实现这一步的方法有许多种，比如\n5.1 手动运行/usr/sbin/nginx -c /etc/nginx/nginx.conf 也就是用第4步的方法先启动到/bin/bash，再手动运行/usr/sbin/nginx -c /etc/nginx/nginx.conf或service nginx start，很容易想到，但太麻烦。\n5.2 通过Dockerfile来build 将装好vim的容器提交成新的image，然后通过Dockerfile来自定义要启动哪些服务。关于Dockerfile后面我也会写文章来单独介绍其语法。\n在主机下运行 # docker commit -m \"nginx 14.10 with bash,vim\" nginx_bash_vim seanlook/nginx:bash_vim a06ab41a6565f0dbd5d35d44cb441d1a166beaae3bc49bffcb09d334a1e77a5c 使用Dockerfile来建立一个新的镜像，加入启动到容器是运行的命令 # vi Dockerfile FROM seanlook/nginx:bash_vim ENTRYPOINT /usr/sbin/nginx -c /etc/nginx/nginx.conf \u0026\u0026 /bin/bash build新image，tag为bash_vim_Df # docker build -t seanlook/nginx:bash_vim_Df . Sending build context to Docker daemon 73.45 MB Sending build context to Docker daemon Step 0 : FROM seanlook/nginx:bash_vim ---\u003e aa8516fa0bb7 Step 1 : EXPOSE 80 ---\u003e Using cache ---\u003e fece07e2b515 Step 2 : ENTRYPOINT /usr/sbin/nginx -c /etc/nginx/nginx.conf \u0026\u0026 /bin/bash ---\u003e Running in e08963fd5afb ---\u003e d9bbd13f5066 Removing intermediate container e08963fd5afb Successfully built d9bbd13f5066 --\u003e 新image id # docker images |grep 'bash_vim' seanlook/nginx bash_vim_Df d9bbd13f5066 About an hour ago 125.9 MB seanlook/nginx bash_vim aa8516fa0bb7 About an hour ago 125.9 MB 运行由Dockerfile创建的image # docker run --name nginx_bash_vim_Df -v /tmp/docker:/usr/share/nginx/html:ro \\ \u003e -i -t -p 8080:80 \\ \u003e d9bbd13f5066 --\u003e 或seanlook/nginx:bash_vim_Df 最后一条docker run之后就会自动进入bash终端，同时发现nginx服务也启动了，可以通过vim来编辑配置文件。\n5.3 修改容器的/etc/bash.bashrc 这是投机取巧但不失为最简单的一种办法，见Run a service automatically in a docker container。\n启动刚安装完vim的那个容器（不必用run） # docker start nginx_bash_vim 连接到终端上 # docker attach nginx_bash_vim root@3911d1104c3f:/# vi /etc/bash.bashrc # added by mis_zx for auto-service nginx --\u003e 在最后加入 /usr/sbin/nginx -c /etc/nginx/nginx.conf 保存后直接Ctrl+D退出，在start就可以访问了，如果要进入终端就attach，如果需要可以commit成一个镜像。\n5.4 听说有一种通过supervisor来管理docker容器的多个任务，有时间会研究一下 从上面的操作中可以看出，start是可以保留run启动时的参数如-v、-p，而commit之后如果没在Dockerfile中指定，下次启动依然需要带上目录、端口的映射参数。 另外提一点， docker run -i -t seanlook/nginx:bash_vim启动便会同时进入一个shell界面（但没有启动nginx），因为它的“前身”容器是在shell交互界面下run来的，但也没有保留-v、-p指定的映射关系。\n",
+  "wordCount" : "422",
+  "inLanguage": "en",
+  "datePublished": "2014-11-03T20:21:25Z",
+  "dateModified": "2014-11-03T20:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2014/11/docker%E5%A6%82%E4%BD%95%E5%88%9B%E5%BB%BA%E4%B8%80%E4%B8%AA%E8%BF%90%E8%A1%8C%E5%90%8E%E5%8F%B0%E8%BF%9B%E7%A8%8B%E7%9A%84%E5%AE%B9%E5%99%A8%E5%B9%B6%E5%90%8C%E6%97%B6%E6%8F%90%E4%BE%9Bshell%E7%BB%88%E7%AB%AF/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      docker如何创建一个运行后台进程的容器并同时提供shell终端
+    </h1>
+    <div class="post-meta"><span title='2014-11-03 20:21:25 +0000 UTC'>November 3, 2014</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>只看标题还不是很明显，本文实现docker的这样一种比较常用的功能：通过<code>docker run</code>启动一个容器后，容器中已经运行了一个后台进程（这里以监听80端口的nginx为例），同时进入一个shell终端可供操作，而不受限于只能在前台运行nginx与运行shell终端之间的一种。这个例子实现了，那么其他类似的运行多任务docker就可以以此类推。另外本文还提供了一种在docker容器内部安装软件（<code>vim</code>）的方法，对于定制自己需要的镜像大有帮助。
+你可能需要先阅读<a href="hhttp://xgknight.com/2014/10/31/docker-command-best-use-1/">docker专题(2)：docker常用管理命令（上）</a>、<a href="http://xgknight.com/2014/11/05/docker-command-best-use-2/">docker专题(2)：docker常用管理命令（下）</a>来理解更多。</p>
+<h2 id="1-已经pull了官方的nginx-176httpsregistryhubdockercom_nginx的镜像也可以从私服获取">1. 已经pull了官方的<a href="https://registry.hub.docker.com/_/nginx/">nginx 1.7.6</a>的镜像（也可以从私服获取）##<a hidden class="anchor" aria-hidden="true" href="#1-已经pull了官方的nginx-176httpsregistryhubdockercom_nginx的镜像也可以从私服获取">#</a></h2>
+<pre tabindex="0"><code># docker images|grep nginx
+nginx              1.7.6          561ed4952ef0     10 days ago         100 MB
+</code></pre><h2 id="2-根据官方指示启动这个容器">2. 根据官方指示启动这个容器<a hidden class="anchor" aria-hidden="true" href="#2-根据官方指示启动这个容器">#</a></h2>
+<pre tabindex="0"><code>先做好自己要显示的页面
+# echo &#34;&lt;h2 &gt;This is nginx official container running &lt;/h2&gt; &lt;br /&gt; static files:/tmp/doccker/index.html&#34; &gt; /tmp/docker/index.html
+</code></pre><p>使用官方image启动一个容器，名字nginx_dist，把host的目录（包含刚才的html）映射到容器中nginx server的root，绑定80端口：</p>
+<!-- raw HTML omitted -->
+<pre tabindex="0"><code># docker run --name nginx_dist -v /tmp/docker:/usr/share/nginx/html:ro \
+&gt; -p 80:80 -d nginx:1.7.6
+1b10b08d7905517a26c72ce8b17b719aaea5e5eac0889263db8b017427e3c8f7
+# docker ps
+CONTAINER ID  IMAGE    COMMAND               CREATED          STATUS         PORTS                        NAMES
+1b10b08d7905  nginx:1  nginx -g &#39;daemon off  51 seconds ago   Up 48 seconds  443/tcp, 0.0.0.0:80-&gt;80/tcp  nginx_dist
+</code></pre><p>此时通过浏览器访问主机<code>http://host_ip:port/</code>就可以看到结果了：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/docker_registry_nginx_dist.png" alt="docker_nginx_dist"  />
+</p>
+<h2 id="3-查看这个容器的信息">3. 查看这个容器的信息<a hidden class="anchor" aria-hidden="true" href="#3-查看这个容器的信息">#</a></h2>
+<p>熟悉一下docker的命令。</p>
+<pre tabindex="0"><code>查看容器中运行着哪些进程
+# docker top nginx_dist
+UID     PID      PPID     C     STIME     TTY    TIME         CMD
+root    24378    18471    0     15:25     ?      00:00:00     nginx: master process nginx -g daemon off;
+101     24433    24378    0     15:25     ?      00:00:00     nginx: worker process
+
+查看容器IP和主机等信息
+# docker inspect nginx_dist |grep 172.17
+        &#34;Gateway&#34;: &#34;172.17.42.1&#34;,
+        &#34;IPAddress&#34;: &#34;172.17.42.6&#34;,
+
+连接到容器上，--sig-proxy可以保证 Ctrl+D、Ctrl+C 不会退出
+# docker attach --sig-proxy=false nginx_dist 
+xxx.xx.xx.xx - - [03/Nov/2014:07:39:52 +0000] &#34;GET / HTTP/1.1&#34; 304 0 &#34;-&#34; &#34;Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.104 Safari/537.36&#34; &#34;-&#34;
+Ctrl+C
+</code></pre><h2 id="4-容器改造在容器内部安装vim">4. 容器改造—在容器内部安装vim<a hidden class="anchor" aria-hidden="true" href="#4-容器改造在容器内部安装vim">#</a></h2>
+<p>这里有个未解决的问题，能否有办法在上面已经启动的container的基础上执行命令？官方没有这样的支持。
+目前只能重新启动一个容器(停止上面的<code>nginx_dist</code>容器)</p>
+<pre tabindex="0"><code>可以比较一下与2中命令的变化
+# docker run --name nginx_bash_vim -v /tmp/docker:/usr/share/nginx/html:ro \
+&gt; -p 80:80 -i -t nginx:1.7.6 
+&gt; /bin/bash
+root@3911d1104c3f:/# 
+</code></pre><p>但此时nginx服务是停止的，并没有在后台运行，访问<code>http://host_ip:port/</code>无效。为了后面编辑配置文件方便，我们先把<code>vim</code>安装好。
+容器内部的网络与容器外部是相同的，并与host具有相同的DNS，所以可以使用公网软件（<code>cat /etc/apt/sources.list</code>）镜像源来安装。</p>
+<pre tabindex="0"><code>如果需要代理：export http_proxy=http://proxy_server:port
+# apt-get clean
+# apt-get update
+# apt-get install vim
+Reading package lists... Done
+...
+After this operation, 25.2 MB of additional disk space will be used.
+Do you want to continue [Y/n]? y
+...
+Setting up vim (2:7.3.547-7) ...
+...
+</code></pre><h2 id="5-让nginx在后台运行前台提供shell终端">5. 让nginx在后台运行，前台提供shell终端<a hidden class="anchor" aria-hidden="true" href="#5-让nginx在后台运行前台提供shell终端">#</a></h2>
+<p>实现这一步的方法有许多种，比如</p>
+<h3 id="51-手动运行usrsbinnginx--c-etcnginxnginxconf">5.1 手动运行<code>/usr/sbin/nginx -c /etc/nginx/nginx.conf</code><a hidden class="anchor" aria-hidden="true" href="#51-手动运行usrsbinnginx--c-etcnginxnginxconf">#</a></h3>
+<p>也就是用第4步的方法先启动到<code>/bin/bash</code>，再手动运行<code>/usr/sbin/nginx -c /etc/nginx/nginx.conf</code>或<code>service nginx start</code>，很容易想到，但太麻烦。</p>
+<h3 id="52-通过dockerfile来build">5.2 通过<code>Dockerfile</code>来<code>build</code><a hidden class="anchor" aria-hidden="true" href="#52-通过dockerfile来build">#</a></h3>
+<p>将装好vim的容器提交成新的image，然后通过<code>Dockerfile</code>来自定义要启动哪些服务。关于<code>Dockerfile</code>后面我也会写文章来单独介绍其语法。</p>
+<pre tabindex="0"><code>在主机下运行
+# docker commit -m &#34;nginx 14.10 with bash,vim&#34; nginx_bash_vim seanlook/nginx:bash_vim
+a06ab41a6565f0dbd5d35d44cb441d1a166beaae3bc49bffcb09d334a1e77a5c
+
+使用Dockerfile来建立一个新的镜像，加入启动到容器是运行的命令
+# vi Dockerfile
+FROM seanlook/nginx:bash_vim
+ENTRYPOINT /usr/sbin/nginx -c /etc/nginx/nginx.conf &amp;&amp; /bin/bash
+
+build新image，tag为bash_vim_Df
+# docker build -t seanlook/nginx:bash_vim_Df .
+Sending build context to Docker daemon 73.45 MB
+Sending build context to Docker daemon 
+Step 0 : FROM seanlook/nginx:bash_vim
+ ---&gt; aa8516fa0bb7
+Step 1 : EXPOSE 80
+ ---&gt; Using cache
+ ---&gt; fece07e2b515
+Step 2 : ENTRYPOINT /usr/sbin/nginx -c /etc/nginx/nginx.conf &amp;&amp; /bin/bash
+ ---&gt; Running in e08963fd5afb
+ ---&gt; d9bbd13f5066
+Removing intermediate container e08963fd5afb
+Successfully built d9bbd13f5066    --&gt; 新image id
+
+# docker images |grep &#39;bash_vim&#39;
+seanlook/nginx      bash_vim_Df       d9bbd13f5066       About an hour ago   125.9 MB
+seanlook/nginx      bash_vim          aa8516fa0bb7       About an hour ago   125.9 MB
+
+运行由Dockerfile创建的image
+# docker run --name nginx_bash_vim_Df -v /tmp/docker:/usr/share/nginx/html:ro \
+&gt; -i -t -p 8080:80 \
+&gt; d9bbd13f5066   --&gt; 或seanlook/nginx:bash_vim_Df
+</code></pre><p>最后一条<code>docker run</code>之后就会自动进入<code>bash</code>终端，同时发现<code>nginx</code>服务也启动了，可以通过<code>vim</code>来编辑配置文件。</p>
+<h3 id="53-修改容器的etcbashbashrc">5.3 修改容器的/etc/bash.bashrc<a hidden class="anchor" aria-hidden="true" href="#53-修改容器的etcbashbashrc">#</a></h3>
+<p>这是投机取巧但不失为最简单的一种办法，见<a href="http://stackoverflow.com/questions/17252356/run-a-service-automatically-in-a-docker-container/19872810#19872810">Run a service automatically in a docker container</a>。</p>
+<pre tabindex="0"><code>启动刚安装完vim的那个容器（不必用run）
+# docker start nginx_bash_vim
+
+连接到终端上
+# docker attach nginx_bash_vim
+root@3911d1104c3f:/# vi /etc/bash.bashrc 
+# added by mis_zx for auto-service nginx  --&gt; 在最后加入
+/usr/sbin/nginx -c /etc/nginx/nginx.conf
+</code></pre><p>保存后直接Ctrl+D退出，在<code>start</code>就可以访问了，如果要进入终端就<code>attach</code>，如果需要可以<code>commit</code>成一个镜像。</p>
+<h3 id="54-听说有一种通过supervisor来管理docker容器的多个任务有时间会研究一下">5.4 听说有一种通过<code>supervisor</code>来管理docker容器的多个任务，有时间会研究一下<a hidden class="anchor" aria-hidden="true" href="#54-听说有一种通过supervisor来管理docker容器的多个任务有时间会研究一下">#</a></h3>
+<p>从上面的操作中可以看出，<code>start</code>是可以保留<code>run</code>启动时的参数如<code>-v</code>、<code>-p</code>，而<code>commit</code>之后如果没在<code>Dockerfile</code>中指定，下次启动依然需要带上目录、端口的映射参数。
+另外提一点， <code>docker run -i -t seanlook/nginx:bash_vim</code>启动便会同时进入一个shell界面（但没有启动nginx），因为它的“前身”容器是在shell交互界面下<code>run</code>来的，但也没有保留<code>-v</code>、<code>-p</code>指定的映射关系。</p>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/docker/">docker</a></li>
+      <li><a href="http://xgknight.com/tags/shell/">shell</a></li>
+      <li><a href="http://xgknight.com/tags/linux/">linux</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

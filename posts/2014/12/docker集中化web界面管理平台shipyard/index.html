@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>Docker集中化web界面管理平台shipyard | Sean Note</title>
+<meta name="keywords" content="docker, linux, shipyard">
+<meta name="description" content="Shipyard（github）是建立在docker集群管理工具Citadel之上的可以管理容器、主机等资源的web图形化工具。包括core和extension两个版本，core即shipyard主要是把多个 Docker host上的 containers 统一管理（支持跨越多个host），extension即shipyard-extensions添加了应用路由和负载均衡、集中化日志、部署等。
+1. 几个概念 engine 一个shipyard管理的docker集群可以包含一个或多个engine（引擎），一个engine就是监听tcp端口的docker daemon。shipyard管理docker daemon、images、containers完全基于Docker API，不需要做其他的修改。另外，shipyard可以对每个engine做资源限制，包括CPU和内存；因为TCP监听相比Unix socket方式会有一定的安全隐患，所以shipyard还支持通过SSL证书与docker后台进程安全通信。
+rethinkdb RethinkDB是一个shipyard项目的一个docker镜像，用来存放账号（account）、引擎（engine）、服务密钥（service key）、扩展元数据（extension metadata）等信息，但不会存储任何有关容器或镜像的内容。一般会启动一个shipyard/rethinkdb容器shipyard-rethinkdb-data来使用它的/data作为数据卷供另外rethinkdb一个挂载，专门用于数据存储。
+2. 搭建过程 修改tcp监听 Shipyard 要管理和控制 Docker host 的话需要先修改 Docker host 上的默认配置使其监听tcp端口(可以继续保持Unix socket）。有以下2种方式
+sudo docker -H tcp://0.0.0.0:4243 -H unix:///var/run/docker.sock -d 启动docker daemon。如果为了避免每次启动都写这么长的命令，可以直接在/etc/init/docker.conf中修改。 修改/etc/default/docker的DOCKER_OPTS DOCKER_OPTS=&quot;-H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock&quot;。这种方式在我docker version 1.4.1 in ubuntu 14.04上并没有生效。 重启服务 $ sudo docker -H tcp://0.0.0.0:4243 -H unix:///var/run/docker.sock -d 验证 $ netstat -ant |grep 4243 tcp6 0 0 :::4243 :::* LISTEN 启动rethinkdb shipyard（基于Python/Django）在v1版本时安装过程比较复杂，既可以通过在host上安装，也可以部署shipyard镜像（包括shipyard-agent、shipyard-deploy等组件）。v2版本简化了安装过程，启动两个镜像就完成：">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2014/12/docker%E9%9B%86%E4%B8%AD%E5%8C%96web%E7%95%8C%E9%9D%A2%E7%AE%A1%E7%90%86%E5%B9%B3%E5%8F%B0shipyard/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="Docker集中化web界面管理平台shipyard" />
+<meta property="og:description" content="Shipyard（github）是建立在docker集群管理工具Citadel之上的可以管理容器、主机等资源的web图形化工具。包括core和extension两个版本，core即shipyard主要是把多个 Docker host上的 containers 统一管理（支持跨越多个host），extension即shipyard-extensions添加了应用路由和负载均衡、集中化日志、部署等。
+1. 几个概念 engine 一个shipyard管理的docker集群可以包含一个或多个engine（引擎），一个engine就是监听tcp端口的docker daemon。shipyard管理docker daemon、images、containers完全基于Docker API，不需要做其他的修改。另外，shipyard可以对每个engine做资源限制，包括CPU和内存；因为TCP监听相比Unix socket方式会有一定的安全隐患，所以shipyard还支持通过SSL证书与docker后台进程安全通信。
+rethinkdb RethinkDB是一个shipyard项目的一个docker镜像，用来存放账号（account）、引擎（engine）、服务密钥（service key）、扩展元数据（extension metadata）等信息，但不会存储任何有关容器或镜像的内容。一般会启动一个shipyard/rethinkdb容器shipyard-rethinkdb-data来使用它的/data作为数据卷供另外rethinkdb一个挂载，专门用于数据存储。
+2. 搭建过程 修改tcp监听 Shipyard 要管理和控制 Docker host 的话需要先修改 Docker host 上的默认配置使其监听tcp端口(可以继续保持Unix socket）。有以下2种方式
+sudo docker -H tcp://0.0.0.0:4243 -H unix:///var/run/docker.sock -d 启动docker daemon。如果为了避免每次启动都写这么长的命令，可以直接在/etc/init/docker.conf中修改。 修改/etc/default/docker的DOCKER_OPTS DOCKER_OPTS=&quot;-H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock&quot;。这种方式在我docker version 1.4.1 in ubuntu 14.04上并没有生效。 重启服务 $ sudo docker -H tcp://0.0.0.0:4243 -H unix:///var/run/docker.sock -d 验证 $ netstat -ant |grep 4243 tcp6 0 0 :::4243 :::* LISTEN 启动rethinkdb shipyard（基于Python/Django）在v1版本时安装过程比较复杂，既可以通过在host上安装，也可以部署shipyard镜像（包括shipyard-agent、shipyard-deploy等组件）。v2版本简化了安装过程，启动两个镜像就完成：" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2014/12/docker%E9%9B%86%E4%B8%AD%E5%8C%96web%E7%95%8C%E9%9D%A2%E7%AE%A1%E7%90%86%E5%B9%B3%E5%8F%B0shipyard/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2014-12-29T13:21:25+00:00" />
+<meta property="article:modified_time" content="2014-12-29T13:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Docker集中化web界面管理平台shipyard"/>
+<meta name="twitter:description" content="Shipyard（github）是建立在docker集群管理工具Citadel之上的可以管理容器、主机等资源的web图形化工具。包括core和extension两个版本，core即shipyard主要是把多个 Docker host上的 containers 统一管理（支持跨越多个host），extension即shipyard-extensions添加了应用路由和负载均衡、集中化日志、部署等。
+1. 几个概念 engine 一个shipyard管理的docker集群可以包含一个或多个engine（引擎），一个engine就是监听tcp端口的docker daemon。shipyard管理docker daemon、images、containers完全基于Docker API，不需要做其他的修改。另外，shipyard可以对每个engine做资源限制，包括CPU和内存；因为TCP监听相比Unix socket方式会有一定的安全隐患，所以shipyard还支持通过SSL证书与docker后台进程安全通信。
+rethinkdb RethinkDB是一个shipyard项目的一个docker镜像，用来存放账号（account）、引擎（engine）、服务密钥（service key）、扩展元数据（extension metadata）等信息，但不会存储任何有关容器或镜像的内容。一般会启动一个shipyard/rethinkdb容器shipyard-rethinkdb-data来使用它的/data作为数据卷供另外rethinkdb一个挂载，专门用于数据存储。
+2. 搭建过程 修改tcp监听 Shipyard 要管理和控制 Docker host 的话需要先修改 Docker host 上的默认配置使其监听tcp端口(可以继续保持Unix socket）。有以下2种方式
+sudo docker -H tcp://0.0.0.0:4243 -H unix:///var/run/docker.sock -d 启动docker daemon。如果为了避免每次启动都写这么长的命令，可以直接在/etc/init/docker.conf中修改。 修改/etc/default/docker的DOCKER_OPTS DOCKER_OPTS=&quot;-H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock&quot;。这种方式在我docker version 1.4.1 in ubuntu 14.04上并没有生效。 重启服务 $ sudo docker -H tcp://0.0.0.0:4243 -H unix:///var/run/docker.sock -d 验证 $ netstat -ant |grep 4243 tcp6 0 0 :::4243 :::* LISTEN 启动rethinkdb shipyard（基于Python/Django）在v1版本时安装过程比较复杂，既可以通过在host上安装，也可以部署shipyard镜像（包括shipyard-agent、shipyard-deploy等组件）。v2版本简化了安装过程，启动两个镜像就完成："/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "Docker集中化web界面管理平台shipyard",
+      "item": "http://xgknight.com/posts/2014/12/docker%E9%9B%86%E4%B8%AD%E5%8C%96web%E7%95%8C%E9%9D%A2%E7%AE%A1%E7%90%86%E5%B9%B3%E5%8F%B0shipyard/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Docker集中化web界面管理平台shipyard",
+  "name": "Docker集中化web界面管理平台shipyard",
+  "description": "Shipyard（github）是建立在docker集群管理工具Citadel之上的可以管理容器、主机等资源的web图形化工具。包括core和extension两个版本，core即shipyard主要是把多个 Docker host上的 containers 统一管理（支持跨越多个host），extension即shipyard-extensions添加了应用路由和负载均衡、集中化日志、部署等。\n1. 几个概念 engine 一个shipyard管理的docker集群可以包含一个或多个engine（引擎），一个engine就是监听tcp端口的docker daemon。shipyard管理docker daemon、images、containers完全基于Docker API，不需要做其他的修改。另外，shipyard可以对每个engine做资源限制，包括CPU和内存；因为TCP监听相比Unix socket方式会有一定的安全隐患，所以shipyard还支持通过SSL证书与docker后台进程安全通信。\nrethinkdb RethinkDB是一个shipyard项目的一个docker镜像，用来存放账号（account）、引擎（engine）、服务密钥（service key）、扩展元数据（extension metadata）等信息，但不会存储任何有关容器或镜像的内容。一般会启动一个shipyard/rethinkdb容器shipyard-rethinkdb-data来使用它的/data作为数据卷供另外rethinkdb一个挂载，专门用于数据存储。\n2. 搭建过程 修改tcp监听 Shipyard 要管理和控制 Docker host 的话需要先修改 Docker host 上的默认配置使其监听tcp端口(可以继续保持Unix socket）。有以下2种方式\nsudo docker -H tcp://0.0.0.0:4243 -H unix:///var/run/docker.sock -d 启动docker daemon。如果为了避免每次启动都写这么长的命令，可以直接在/etc/init/docker.conf中修改。 修改/etc/default/docker的DOCKER_OPTS DOCKER_OPTS=\u0026quot;-H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock\u0026quot;。这种方式在我docker version 1.4.1 in ubuntu 14.04上并没有生效。 重启服务 $ sudo docker -H tcp://0.0.0.0:4243 -H unix:///var/run/docker.sock -d 验证 $ netstat -ant |grep 4243 tcp6 0 0 :::4243 :::* LISTEN 启动rethinkdb shipyard（基于Python/Django）在v1版本时安装过程比较复杂，既可以通过在host上安装，也可以部署shipyard镜像（包括shipyard-agent、shipyard-deploy等组件）。v2版本简化了安装过程，启动两个镜像就完成：",
+  "keywords": [
+    "docker", "linux", "shipyard"
+  ],
+  "articleBody": "Shipyard（github）是建立在docker集群管理工具Citadel之上的可以管理容器、主机等资源的web图形化工具。包括core和extension两个版本，core即shipyard主要是把多个 Docker host上的 containers 统一管理（支持跨越多个host），extension即shipyard-extensions添加了应用路由和负载均衡、集中化日志、部署等。\n1. 几个概念 engine 一个shipyard管理的docker集群可以包含一个或多个engine（引擎），一个engine就是监听tcp端口的docker daemon。shipyard管理docker daemon、images、containers完全基于Docker API，不需要做其他的修改。另外，shipyard可以对每个engine做资源限制，包括CPU和内存；因为TCP监听相比Unix socket方式会有一定的安全隐患，所以shipyard还支持通过SSL证书与docker后台进程安全通信。\nrethinkdb RethinkDB是一个shipyard项目的一个docker镜像，用来存放账号（account）、引擎（engine）、服务密钥（service key）、扩展元数据（extension metadata）等信息，但不会存储任何有关容器或镜像的内容。一般会启动一个shipyard/rethinkdb容器shipyard-rethinkdb-data来使用它的/data作为数据卷供另外rethinkdb一个挂载，专门用于数据存储。\n2. 搭建过程 修改tcp监听 Shipyard 要管理和控制 Docker host 的话需要先修改 Docker host 上的默认配置使其监听tcp端口(可以继续保持Unix socket）。有以下2种方式\nsudo docker -H tcp://0.0.0.0:4243 -H unix:///var/run/docker.sock -d 启动docker daemon。如果为了避免每次启动都写这么长的命令，可以直接在/etc/init/docker.conf中修改。 修改/etc/default/docker的DOCKER_OPTS DOCKER_OPTS=\"-H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock\"。这种方式在我docker version 1.4.1 in ubuntu 14.04上并没有生效。 重启服务 $ sudo docker -H tcp://0.0.0.0:4243 -H unix:///var/run/docker.sock -d 验证 $ netstat -ant |grep 4243 tcp6 0 0 :::4243 :::* LISTEN 启动rethinkdb shipyard（基于Python/Django）在v1版本时安装过程比较复杂，既可以通过在host上安装，也可以部署shipyard镜像（包括shipyard-agent、shipyard-deploy等组件）。v2版本简化了安装过程，启动两个镜像就完成：\n获取一个/data的数据卷 $sudo docker run -it -d --name shipyard-rethinkdb-data \\ --entrypoint /bin/bash shipyard/rethinkdb -l 使用数据卷/data启动RethinkDB docker run -it -P -d --name shipyard-rethinkdb \\ --volumes-from shipyard-rethinkdb-data shipyard/rethinkdb 部署shipyard镜像 启动shipyard控制器：\nsudo docker run -it -p 8080:8080 -d --name shipyard \\ --link shipyard-rethinkdb:rethinkdb shipyard/shipyard 至此已经可以通过浏览器访问http://host:8080来访问shipyard UI界面了。\n第一次run后，关闭再次启动时直接使用：\nsudo docker stop shipyard shipyard-rethinkdb shipyard-rethinkdb-data sudo docker start shipyard-rethinkdb-data shipyard-rethinkdb shipyard 图示 登录： 默认用户名/密码为 admin/shipyard\n主界面： Dashboard展示在添加engine时指定的CPU以及内存的使用情况。\n容器： shipyard管理的所有docker主机的所有容器，包括stop和running状态的。可以直接点击DEPLOY按钮来从镜像运行出其他容器，与docker run的选项几乎相同，可以限制CPU和内存的使用，详见shipyard的containers文档。\n容器操作： 可以stop、start、restart容器，通过LOGS可以看到容器日志输出，SCALE可以批量（规模化）部署该容器，这个操作与容器的Type属性息息相关。因为shipyard可以管理多个host的docker容器，所以启动一个容器的type可以是：service——可以在具有相同label的engine上运行；unique——一个host上只允许某个镜像的一个实例运行；host——在指定的host上运行容器，启动的时候通过--label host:语法指定docker host。\nengine管理： 一个engine就是一个docker daemon，docker daemon下启动着多个containers，可以对engine限制一个整体的CPU和内存限制，shipyard通过TCP端口连接daemon。需要注意的是docker client与server的版本问题：（因为shipyard目前还在快速的完善过程，不同版本的docker应该是向下兼容的）\ncurl -X GET http://172.29.88.223:4243/v1.15/containers/json client and server don't have same version (client : 1.15, server: 1.13) 3. shipyard-cli 目前图形化界面能做的操作其实很少，正在强大的是通过shipyard提供的命令行窗口（称作Shipyard CLI）进行管理，参考http://shipyard-project.com/docs/usage/cli/ 启动命令行交互模式：\nsudo docker run --rm -it shipyard/shipyard-cli 使用它甚至可以替代docker客户端。\nsean@seanubt:~$ sudo docker run -it shipyard/shipyard-cli shipyard cli\u003e shipyard help NAME: shipyard - manage a shipyard cluster USAGE: shipyard [global options] command [command options] [arguments...] VERSION: 2.0.8 COMMANDS: login\tlogin to a shipyard cluster change-password\tupdate your password accounts\tshow accounts add-account\tadd account delete-account\tdelete account containers\tlist containers inspect\tinspect container run\trun a container stop\tstop a container restart\trestart a container scale\tscale a container logs\tshow container logs destroy\tdestroy a container engines\tlist engines add-engine\tadd shipyard engine remove-engine\tremoves an engine inspect-engine\tinspect an engine service-keys\tlist service keys add-service-key\tadds a service key remove-service-key\tremoves a service key extensions\tshow extensions add-extension\tadd extension remove-extension\tremove an extension webhook-keys\tlist webhook keys add-webhook-key\tadds a webhook key remove-webhook-key\tremoves a webhook key info\tshow cluster info events\tshow cluster events help, h\tShows a list of commands or help for one command GLOBAL OPTIONS: --help, -h\tshow help --generate-bash-completion\t--version, -v\tprint the version 登录shipyard shipyard cli\u003e shipyard login URL: http://172.29.88.205:8080 Username: admin Password: 查看containers shipyard cli\u003e shipyard containers 启动一个容器 shipyard cli\u003e shipyard run --name nginx:1.7.6 --container-name web_test \\ --cpus 0.2 \\ --memory 64 \\ --type service \\ --hostname nginx-test \\ --domain example.com \\ --link redis:db \\ --port tcp/172.29.88.205:81:8081 \\ --port tcp/::8000 \\ --restart \"on-failure:5\" \\ --env FOO=bar \\ --label dev \\ 查看容器日志（只能接容器ID，暂不能使用容器名） shipyard cli\u003e shipyard logs ff2761d 关闭并移除容器 shipyard cli\u003e shipyard destroy 不一一列举。。。\n",
+  "wordCount" : "405",
+  "inLanguage": "en",
+  "datePublished": "2014-12-29T13:21:25Z",
+  "dateModified": "2014-12-29T13:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2014/12/docker%E9%9B%86%E4%B8%AD%E5%8C%96web%E7%95%8C%E9%9D%A2%E7%AE%A1%E7%90%86%E5%B9%B3%E5%8F%B0shipyard/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      Docker集中化web界面管理平台shipyard
+    </h1>
+    <div class="post-meta"><span title='2014-12-29 13:21:25 +0000 UTC'>December 29, 2014</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p><a href="http://shipyard-project.com/">Shipyard</a>（<a href="https://github.com/shipyard/shipyard">github</a>）是建立在docker集群管理工具<a href="https://github.com/citadel/citadel">Citadel</a>之上的可以管理容器、主机等资源的web图形化工具。包括<a href="https://github.com/shipyard/shipyard">core</a>和<a href="https://github.com/shipyard/shipyard-extensions">extension</a>两个版本，core即shipyard主要是把多个 Docker host上的 containers 统一管理（支持跨越多个host），extension即shipyard-extensions添加了应用路由和负载均衡、集中化日志、部署等。</p>
+<h2 id="1-几个概念">1. 几个概念<a hidden class="anchor" aria-hidden="true" href="#1-几个概念">#</a></h2>
+<h3 id="engine">engine<a hidden class="anchor" aria-hidden="true" href="#engine">#</a></h3>
+<p>一个shipyard管理的docker集群可以包含一个或多个<code>engine</code>（引擎），一个engine就是监听tcp端口的docker daemon。shipyard管理docker daemon、images、containers完全基于Docker API，不需要做其他的修改。另外，shipyard可以对每个engine做资源限制，包括CPU和内存；因为TCP监听相比Unix socket方式会有一定的安全隐患，所以shipyard还支持通过SSL证书与docker后台进程安全通信。</p>
+<h3 id="rethinkdb">rethinkdb<a hidden class="anchor" aria-hidden="true" href="#rethinkdb">#</a></h3>
+<p><code>RethinkDB</code>是一个shipyard项目的一个docker镜像，用来存放账号（account）、引擎（engine）、服务密钥（service key）、扩展元数据（extension metadata）等信息，但不会存储任何有关容器或镜像的内容。一般会启动一个<code>shipyard/rethinkdb</code>容器shipyard-rethinkdb-data来使用它的<code>/data</code>作为数据卷供另外rethinkdb一个挂载，专门用于数据存储。</p>
+<h2 id="2-搭建过程">2. 搭建过程<a hidden class="anchor" aria-hidden="true" href="#2-搭建过程">#</a></h2>
+<h3 id="修改tcp监听">修改tcp监听<a hidden class="anchor" aria-hidden="true" href="#修改tcp监听">#</a></h3>
+<p>Shipyard 要管理和控制 Docker host 的话需要先修改 Docker host 上的默认配置使其监听tcp端口(可以继续保持Unix socket）。有以下2种方式</p>
+<ol>
+<li><code>sudo docker -H tcp://0.0.0.0:4243 -H unix:///var/run/docker.sock -d</code> 启动docker daemon。如果为了避免每次启动都写这么长的命令，可以直接在<code>/etc/init/docker.conf</code>中修改。</li>
+<li>修改<code>/etc/default/docker</code>的<code>DOCKER_OPTS</code>
+<code>DOCKER_OPTS=&quot;-H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock&quot;</code>。这种方式在我docker version 1.4.1 in ubuntu 14.04上并没有生效。</li>
+</ol>
+<!-- raw HTML omitted -->
+<pre tabindex="0"><code>重启服务
+$ sudo docker -H tcp://0.0.0.0:4243 -H unix:///var/run/docker.sock -d
+验证
+$ netstat -ant  |grep 4243
+tcp6       0      0 :::4243                 :::*                    LISTEN
+</code></pre><h3 id="启动rethinkdb">启动rethinkdb<a hidden class="anchor" aria-hidden="true" href="#启动rethinkdb">#</a></h3>
+<p>shipyard（基于Python/Django）在v1版本时安装过程比较复杂，既可以通过在host上安装，也可以部署shipyard镜像（包括<code>shipyard-agent</code>、<code>shipyard-deploy</code>等组件）。v2版本简化了安装过程，启动两个镜像就完成：</p>
+<pre tabindex="0"><code>获取一个/data的数据卷
+$sudo docker run -it -d --name shipyard-rethinkdb-data \
+  --entrypoint /bin/bash shipyard/rethinkdb -l
+
+使用数据卷/data启动RethinkDB
+docker run -it -P -d --name shipyard-rethinkdb \
+  --volumes-from shipyard-rethinkdb-data shipyard/rethinkdb
+</code></pre><h3 id="部署shipyard镜像">部署shipyard镜像<a hidden class="anchor" aria-hidden="true" href="#部署shipyard镜像">#</a></h3>
+<p>启动shipyard控制器：</p>
+<pre tabindex="0"><code>sudo docker run -it -p 8080:8080 -d --name shipyard \
+  --link shipyard-rethinkdb:rethinkdb shipyard/shipyard
+</code></pre><p>至此已经可以通过浏览器访问<code>http://host:8080</code>来访问shipyard UI界面了。</p>
+<p>第一次<code>run</code>后，关闭再次启动时直接使用：</p>
+<pre tabindex="0"><code>sudo docker stop shipyard shipyard-rethinkdb shipyard-rethinkdb-data
+sudo docker start shipyard-rethinkdb-data shipyard-rethinkdb shipyard
+</code></pre><h3 id="图示">图示<a hidden class="anchor" aria-hidden="true" href="#图示">#</a></h3>
+<p><strong>登录：</strong>
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-shipyard-login.png" alt="docker-shipyard-login"  />
+
+默认用户名/密码为 admin/shipyard</p>
+<p><strong>主界面：</strong>
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-shipyard.png" alt="docker-shipyard"  />
+
+Dashboard展示在添加engine时指定的CPU以及内存的使用情况。</p>
+<p><strong>容器：</strong>
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-shipyard-containers.png" alt="docker-shipyard-containers"  />
+
+shipyard管理的所有docker主机的所有容器，包括stop和running状态的。可以直接点击DEPLOY按钮来从镜像运行出其他容器，与<code>docker run</code>的选项几乎相同，可以限制CPU和内存的使用，详见<a href="http://shipyard-project.com/docs/containers/">shipyard的containers文档</a>。</p>
+<p><strong>容器操作：</strong>
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-shipyard-containers2.png" alt="docker-shipyard-containers2"  />
+
+可以<code>stop</code>、<code>start</code>、<code>restart</code>容器，通过<code>LOGS</code>可以看到容器日志输出，<code>SCALE</code>可以批量（规模化）部署该容器，这个操作与容器的Type属性息息相关。因为shipyard可以管理多个host的docker容器，所以启动一个容器的type可以是：service——可以在具有相同label的engine上运行；unique——一个host上只允许某个镜像的一个实例运行；host——在指定的host上运行容器，启动的时候通过<code>--label host:&lt;host-id&gt;</code>语法指定docker host。</p>
+<p><strong>engine管理：</strong>
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-shipyard-engine.png" alt="docker-shipyard-engine"  />
+
+一个engine就是一个docker daemon，docker daemon下启动着多个containers，可以对engine限制一个整体的CPU和内存限制，shipyard通过TCP端口连接daemon。需要注意的是docker client与server的版本问题：（因为shipyard目前还在快速的完善过程，不同版本的docker应该是向下兼容的）</p>
+<pre tabindex="0"><code>curl -X GET http://172.29.88.223:4243/v1.15/containers/json
+client and server don&#39;t have same version (client : 1.15, server: 1.13)
+</code></pre><h2 id="3-shipyard-cli">3. shipyard-cli<a hidden class="anchor" aria-hidden="true" href="#3-shipyard-cli">#</a></h2>
+<p>目前图形化界面能做的操作其实很少，正在强大的是通过shipyard提供的命令行窗口（称作<code>Shipyard CLI</code>）进行管理，参考http://shipyard-project.com/docs/usage/cli/
+启动命令行交互模式：</p>
+<pre><code>sudo docker run --rm -it shipyard/shipyard-cli
+</code></pre>
+<p>使用它甚至可以替代docker客户端。</p>
+<pre tabindex="0"><code>sean@seanubt:~$ sudo docker run -it shipyard/shipyard-cli
+shipyard cli&gt; shipyard help
+NAME:
+   shipyard - manage a shipyard cluster
+
+USAGE:
+   shipyard [global options] command [command options] [arguments...]
+
+VERSION:
+   2.0.8
+
+COMMANDS:
+   login		login to a shipyard cluster
+   change-password	update your password
+   accounts		show accounts
+   add-account		add account
+   delete-account	delete account
+   containers		list containers
+   inspect		inspect container
+   run			run a container
+   stop			stop a container
+   restart		restart a container
+   scale		scale a container
+   logs			show container logs
+   destroy		destroy a container
+   engines		list engines
+   add-engine		add shipyard engine
+   remove-engine	removes an engine
+   inspect-engine	inspect an engine
+   service-keys		list service keys
+   add-service-key	adds a service key
+   remove-service-key	removes a service key
+   extensions		show extensions
+   add-extension	add extension
+   remove-extension	remove an extension
+   webhook-keys		list webhook keys
+   add-webhook-key	adds a webhook key
+   remove-webhook-key	removes a webhook key
+   info			show cluster info
+   events		show cluster events
+   help, h		Shows a list of commands or help for one command
+   
+GLOBAL OPTIONS:
+   --help, -h			show help
+   --generate-bash-completion	
+   --version, -v		print the version
+
+登录shipyard
+shipyard cli&gt; shipyard login
+URL: http://172.29.88.205:8080
+Username: admin
+Password:
+
+查看containers
+shipyard cli&gt; shipyard containers
+
+启动一个容器
+shipyard cli&gt; shipyard run --name nginx:1.7.6 --container-name web_test \
+    --cpus 0.2 \
+    --memory 64 \
+    --type service \
+    --hostname nginx-test \
+    --domain example.com \
+    --link redis:db \
+    --port tcp/172.29.88.205:81:8081 \
+    --port tcp/::8000 \
+    --restart &#34;on-failure:5&#34; \
+    --env FOO=bar \
+    --label dev \
+
+查看容器日志（只能接容器ID，暂不能使用容器名）
+shipyard cli&gt; shipyard logs ff2761d
+
+关闭并移除容器
+shipyard cli&gt; shipyard destroy &lt;container_id&gt;
+</code></pre><p>不一一列举。。。</p>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/docker/">docker</a></li>
+      <li><a href="http://xgknight.com/tags/linux/">linux</a></li>
+      <li><a href="http://xgknight.com/tags/shipyard/">shipyard</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

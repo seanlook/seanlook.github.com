@@ -137,163 +137,191 @@
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>解答一个关于日志系统的思路
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: 搭建docker内网私服（docker-registry with nginx&amp;ssl on centos） date: 2014-11-13 20:21:25 updated: 2014-12-25 15:46:23 tags: [docker, centos, docker-registry, nginx, ssl] categories: [Virtualization, Docker] 主要思路： 1. Docker Registry 说明 关于如何创建和使用本地仓库，其实已经有很多文章介绍了。因为docker技术正处于发展和完善阶段，所以有些文章要么内容已经过时，要么给出了错误的配置，导致无法正常创建仓库。本文记录的是个人完整的搭建过程，docker version为1.1.2。
-官方提供了Docker Hub网站来作为一个公开的集中仓库。然而，本地访问Docker Hub速度往往很慢，并且很多时候我们需要一个本地的私有仓库只供网内使用。
-Docker仓库实际上提供两方面的功能，一个是镜像管理，一个是认证。前者主要由docker-registry项目来实现，通过http服务来上传下载；后者可以通过docker-index（闭源）项目或者利用现成认证方案（如nginx）实现http请求管理。
-docker-registry既然也是软件应用，自然最简单的方法就是使用官方提供的已经部署好的镜像registry。官方文档中也给出了建议，直接运行sudo docker run -p 5000:5000 registry命令。这样确实能启动一个registry服务器，但是所有上传的镜像其实都是由docker容器管理，放在了/var/lib/docker/….某个目录下。而且一旦删除容器，镜像也会被删除。因此，我们需要想办法告诉docker容器镜像应该存放在哪里。registry镜像中启动后镜像默认位置是/tmp/registry，因此直接映射这个位置即可，比如到本机的/opt/data/registry目录下。
-2. 在CentOS上搭建docker私服 2.1 安装docker-registry 方法有多种，直接运行下面的命令：
-# docker run -d -e SETTINGS_FLAVOR=dev -e STORAGE_PATH=/tmp/registry -v /opt/data/registry:/tmp/registry -p 5000:5000 registry 如果本地没有拉取过docker-registry，则首次运行会pull registry，运行时会映射路径和端口，以后就可以从/opt/data/registry下找到私有仓库都存在哪些镜像，通过主机的哪个端口可以访问。 你也可以把项目 https://github.com/docker/docker-registry.git 克隆到本地，然后使用Dockerfile来build镜像：
-# git clone https://github.com/docker/docker-registry.git # cd docker-registry &amp;&amp; mkdir -p /opt/data/registry # docker build -t &#34;local-sean&#34; ....</p>
+    <p>在一个群里看到一个面试题，试着去解答一下，毕竟正好花时间了解过日志这方面的内容。
+希望能达到的使用场景：
+在写业务逻辑时也能进行结构化的log, 并且log被转移到一个数据库， 一个UI前端以这个log数据库为支持， 可以可视化各种指标， 并且保留未来可以对指标进行alarm的可能性
+希望从两个方面考虑这个问题：
+技术通路实现。 在每一步会用些什么技术? 一些核心组件比如log采集和log数据库有哪些已有方案， 是否有优劣？ 从运维角度看， 这套系统可能在哪些方面有需要考量的地方。 比如log采集是否会影响业务进程？ log数据库的运维可能遇到哪些问题？ 可以看出问题提出者比较在意解决这些问题过程中的思维方式和学习能力，弱化实践经验的要求。
+首先根据要求确认一下要达到效果：
+log日志采集 log存储 log展示 alarm报警(附加) 1 确定日志流向/架构 因为一开始脑海里也不知道原型是怎样的，就是以前用过linux自带的rsyslog功能感觉很类似：在日志服务器上通过配置rsyslog存入mysql的插件，而其它的各个服务器上默认rsyslog都是开启的，修改conf的系统日志、mail、cron等不输出到本地，而是指向mysql数据库。前端通过loganalyzer从数据库获取数据，图形化显示（简陋到不想说了。。。），但是显示的柱形图/饼图没有什么意义，默认对系统messages处理比较方便，要记录nginx或业务逻辑的log还需做其它额外操作。
+但rsyslog并不是一无是处，它的整个架构特别是消息队列的设计，跟后面要讲的许多分布式日志系统是很像的。所以脑海里日记采集的原型出来了：
+业务逻辑的日志输出到文件file，服务上的日志采集客户端agent实时监控这个logfile，作为输入；日志中心服务器server接受来自agent的消息，存入后端数据库。另有一个UI从这个数据库取得数据显示，并提供搜索、统计图表。 然而有以下几个问题需要考虑，这也就是为什么出现各种开源解决方案： 日志产生数量过大，不能及时发送到server怎么办 可以使用队列或redis来缓冲 日志中心服务器server故障怎么办，肯定不能丢失日志，即可靠性 有的解决办法是对 log server 做集群，通过zookeeper来同步配置；有的是在agent上本地暂时存放，等恢复后重新传输，redis就可以承担这个角色 考虑到这个日志平台的可扩展性，新的日志来源input不一定是file，比如rsyslog 至少需要支持常用的input 是否支持过滤功能 filter可以在日志发送之前就把不匹配的日志内容排除掉 log结构化 收集的日志初始是一长字符串，为了后面使用方便，需要将日志结构化存储（后面会有说明） 存储采用关系型数据库对海量日志存储，性能肯定很大问题 log日志存储没有一致性的要求，甚至可以说一条日志根本就没意义，而是需要通过大量的日志，通过分析、比较趋势具备用处。于是日志的存储各显大招，主流有两种：hadoop分布式文件系统HDFS，elasticsearch（后面简称es）全文搜索引擎，它们都具备很强的可伸缩性和多节点高可用性 由于存储方式的不同，数据分析与展示也就有各自的阵营 HDFS一般采用MapReduce处理数据，es既可以通过其丰富的插件显示或搜索数据，也可以通过推荐使用的kibana来展示数据 总结下来大致流程图如下：
+2 log结构化 当然可能你一直存在这样一个疑问：log的结构化问题处理
+代码里logger的内容大概是timestamp,log_level,module,message… ，一下是nginx的access示例：
+172.16.30.88 - [08/Jun/2015:00:08:38 &#43;0800] &#34;POST /notice/statement_findStatementVByPage.htm?1433637553824 HTTP/1.1&#34; 200 114 &#34;http://service.tp-link.net/&#34; &#34;Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)&#34; 处理这条非结构话的字符串或消息，无非就是在它发送到日志中心之前格式化，像最简单的rsyslog处理方法是通过数据库表字段Mapping来存放，而es则是通过编写Grok规则来结构化，如将IP、日期、请求方式、响应状态码、响应时间等组合成json字符串。（然而Grok写起来是非常痛苦的，以至于官方github上专门维护了一份通用规则表）...</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2015-06-09 16:32:49 +0000 UTC'>June 9, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 解答一个关于日志系统的思路" href="http://xgknight.com/posts/2015/06/%E8%A7%A3%E7%AD%94%E4%B8%80%E4%B8%AA%E5%85%B3%E4%BA%8E%E6%97%A5%E5%BF%97%E7%B3%BB%E7%BB%9F%E7%9A%84%E6%80%9D%E8%B7%AF/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>nginx做负载均衡器以及proxy缓存配置
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: docker常用管理命令（上） date: 2014-10-31 20:21:25 updated: 2014-11-05 15:46:23 tags: [docker, command] categories: [Linux, Docker] 本文只记录docker命令在大部分情境下的使用，如果想了解每一个选项的细节，请参考官方文档，这里只作为自己以后的备忘记录下来。
-根据自己的理解，总的来说分为以下几种： 容器生命周期管理 — docker [run|start|stop|restart|kill|rm|pause|unpause] 容器操作运维 — docker [ps|inspect|top|attach|events|logs|wait|export|port] 容器rootfs命令 — docker [commit|cp|diff] 镜像仓库 — docker [login|pull|push|search] 本地镜像管理 — docker [images|rmi|tag|build|history|save|import] 其他命令 — docker [info|version]
-看一个变迁图 1. 列出机器上的镜像（images） # docker images REPOSITORY TAG IMAGE ID CREATED VIRTUAL SIZE ubuntu 14.10 2185fd50e2ca 13 days ago 236.9 MB … 其中我们可以根据REPOSITORY来判断这个镜像是来自哪个服务器，如果没有 / 则表示官方镜像，类似于username/repos_name表示Github的个人公共库，类似于regsistory.example.com:5000/repos_name则表示的是私服。 IMAGE ID列其实是缩写，要显示完整则带上--no-trunc选项
-2. 在docker index中搜索image（search） Usage: docker search TERM # docker search seanlo NAME DESCRIPTION STARS OFFICIAL AUTOMATED seanloook/centos6 sean&#39;s docker repos 0 搜索的范围是官方镜像和所有个人公共镜像。NAME列的 / 后面是仓库的名字。...</p>
+    <p>关于nginx的安装和基本配置请参考nginx，本文在原基础上完成以下几个功能：
+结合proxy和upstream模块实现nginx负载均衡 结合nginx_upstream_check_module模块实现后端服务器的健康检查 使用nginx-sticky-module扩展模块实现Cookie会话黏贴（session-sticky效果） 使用proxy模块实现静态文件缓存 使用ngx_cache_purge实现更强大的缓存清除功能 1. 安装及模块说明 上面提到的3个模块都属于第三方扩展模块，需要提前下好源码，然后编译时通过--add-moudle=src_path一起安装。
+注意：
+使用 nginx_upstream_check_module(简记为m1) 时要先为nginx打上相应版本的patch，我的nginx版本为 1.6.3，所以patch对应 m1 解压后目录下的check_1.5.12&#43;.patch，所以进入nginx源码目录，执行 patch -p1 …（见下方示例） nginx-sticky-module-ng(简记为m2) 模块可以单独使用，但是因为m1监控检查的方式是依赖于m2的，所以要使用m2，还要对m1打上patch，进入m2源码目录，执行 patch -p0… 编译示例：（CentOS 6.5 x86_64, nginx 1.6.3）
+# yum -y install gcc gcc-c&#43;&#43; make libtool zlib zlib-devel openssl openssl--devel pcre pcre-devel # cd nginx-1.6.3 # patch -p1 &lt; ../nginx_upstream_check_module-0.3.0/check_1.5.12&#43;.patch # cd ../nginx-sticky-module-ng-1.2.5 # patch -p0 &lt; ../nginx_upstream_check_module-0.3.0/nginx-sticky-module.patch # ./configure --prefix=/usr/local/nginx-1.6 --with-pcre --with-http_stub_status_module --with-http_ssl_module --with-http_gzip_static_module --with-http_realip_module --add-module=../nginx_upstream_check_module-0.3.0 --add-module=../nginx-sticky-module-ng-1.2.5 --add-module=../ngx_cache_purge-2.3 # make &amp;&amp; make install 如果你想在已安装好的nginx上添加第三方模块，依然需要重新编译，但为了不覆盖你原有的配置，请不要make install，而是直接拷贝可执行文件：...</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2015-06-02 01:21:25 +0000 UTC'>June 2, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to nginx做负载均衡器以及proxy缓存配置" href="http://xgknight.com/posts/2015/06/nginx%E5%81%9A%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1%E5%99%A8%E4%BB%A5%E5%8F%8Aproxy%E7%BC%93%E5%AD%98%E9%85%8D%E7%BD%AE/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>nginx配置ssl加密（单双向认证、部分https）
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: docker常用管理命令（下） date: 2014-11-05 16:21:25 updated: 2014-11-05 19:46:23 tags: [docker, command,linux] categories: [Virtualization, Docker] 本文承接docker专题(2)：docker常用管理命令（上）。
-1. 开启/停止/重启container（start/stop/restart） 容器可以通过run新建一个来运行，也可以重新start已经停止的container，但start不能够再指定容器启动时运行的指令，因为docker只能有一个前台进程。 容器stop（或Ctrl&#43;D）时，会在保存当前容器的状态之后退出，下次start时保有上次关闭时更改。而且每次进入attach进去的界面是一样的，与第一次run启动或commit提交的时刻相同。
-CONTAINER_ID=$(docker start &lt;containner_id&gt;) docker stop $CONTAINER_ID docker restart $CONTAINER_ID 关于这几个命令可以通过一个完整的实例使用：docker如何创建一个运行后台进程的容器并同时提供shell终端。
-2. 连接到正在运行中的container（attach） 要attach上去的容器必须正在运行，可以同时连接上同一个container来共享屏幕（与screen命令的attach类似）。 官方文档中说attach后可以通过CTRL-C来detach，但实际上经过我的测试，如果container当前在运行bash，CTRL-C自然是当前行的输入，没有退出；如果container当前正在前台运行进程，如输出nginx的access.log日志，CTRL-C不仅会导致退出容器，而且还stop了。这不是我们想要的，detach的意思按理应该是脱离容器终端，但容器依然运行。好在attach是可以带上 --sig-proxy=false来确保CTRL-D或CTRL-C不会关闭容器。
-# docker attach --sig-proxy=false $CONTAINER_ID 3. 查看image或container的底层信息（inspect） inspect的对象可以是image、运行中的container和停止的container。
-查看容器的内部IP # docker inspect --format=&#39;{\{.NetworkSettings.IPAddress}}&#39; $CONTAINER_ID 172.17.42.35 （注：由于代码块解析的问题，上面NetworkSettings前面的 \ 去掉） 4. 删除一个或多个container、image（rm、rmi） 你可能在使用过程中会build或commit许多镜像，无用的镜像需要删除。但删除这些镜像是有一些条件的：
-同一个IMAGE ID可能会有多个TAG（可能还在不同的仓库），首先你要根据这些 image names 来删除标签，当删除最后一个tag的时候就会自动删除镜像； 承上，如果要删除的多个IMAGE NAME在同一个REPOSITORY，可以通过docker rmi &lt;image_id&gt;来同时删除剩下的TAG；若在不同Repo则还是需要手动逐个删除TAG； 还存在由这个镜像启动的container时（即便已经停止），也无法删除镜像； TO-DO 如何查看镜像与容器的依存关系
-** 删除容器 ** docker rm &lt;container_id/contaner_name&gt;...</p>
+    <p>nginx下配置ssl本来是很简单的，无论是去认证中心买SSL安全证书还是自签署证书，但最近公司OA的一个需求，得以有个机会实际折腾一番。一开始采用的是全站加密，所有访问http:80的请求强制转换（rewrite）到https，后来自动化测试结果说响应速度太慢，https比http慢慢30倍，心想怎么可能，鬼知道他们怎么测的。所以就试了一下部分页面https（不能只针对某类动态请求才加密）和双向认证。下面分节介绍。
+默认nginx是没有安装ssl模块的，需要编译安装nginx时加入--with-http_ssl_module选项。
+关于SSL/TLS原理请参考 这里，如果你只是想测试或者自签发ssl证书，参考 这里 。
+提示：nignx到后端服务器由于一般是内网，所以不加密。
+1. 全站ssl 全站做ssl是最常见的一个使用场景，默认端口443，而且一般是单向认证。
+server { listen 443; server_name example.com; root /apps/www; index index.html index.htm; ssl on; ssl_certificate ../SSL/ittest.pem; ssl_certificate_key ../SSL/ittest.key; # ssl_protocols SSLv3 TLSv1 TLSv1.1 TLSv1.2; # ssl_ciphers ALL:!ADH:!EXPORT56:RC4&#43;RSA:&#43;HIGH:&#43;MEDIUM:&#43;LOW:&#43;SSLv2:&#43;EXP; # ssl_prefer_server_ciphers on; } 如果想把http的请求强制转到https的话：
+server { listen 80; server_name example.me; rewrite ^ https://$server_name$request_uri? permanent; ### 使用return的效率会更高 # return 301 https://$server_name$request_uri; } ssl_certificate证书其实是个公钥，它会被发送到连接服务器的每个客户端，ssl_certificate_key私钥是用来解密的，所以它的权限要得到保护但nginx的主进程能够读取。当然私钥和证书可以放在一个证书文件中，这种方式也只有公钥证书才发送到client。
+ssl_protocols指令用于启动特定的加密协议，nginx在1.1.13和1.0.12版本后默认是ssl_protocols SSLv3 TLSv1 TLSv1.1 TLSv1.2，TLSv1.1与TLSv1.2要确保OpenSSL &gt;= 1.0.1 ，SSLv3 现在还有很多地方在用但有不少被攻击的漏洞。
+ssl_ciphers选择加密套件，不同的浏览器所支持的套件（和顺序）可能会不同。这里指定的是OpenSSL库能够识别的写法，你可以通过 openssl -v cipher &#39;RC4:HIGH:!...</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2015-05-28 15:21:25 +0000 UTC'>May 28, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to nginx配置ssl加密（单双向认证、部分https）" href="http://xgknight.com/posts/2015/05/nginx%E9%85%8D%E7%BD%AEssl%E5%8A%A0%E5%AF%86%E5%8D%95%E5%8F%8C%E5%90%91%E8%AE%A4%E8%AF%81%E9%83%A8%E5%88%86https/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>Nginx&#43;Keepalived实现站点高可用
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: 【转&#43;改】Docker核心技术预览 date: 2014-12-18 13:21:25 updated: 2014-12-18 15:46:23 tags: [docker, linux, lxc, cgroup, aufs] categories: [Virtualization, Docker] 本文简单介绍docker使用到的部分核心技术，但不做深入探究，因为每一个技术都是一个独立的项目，有机会再分别详细介绍。 来源地址：http://www.infoq.com/cn/articles/docker-core-technology-preview
-Linux Namespace （实例隔离）## The purpose of each namespace is to wrap a particular global system resource in an abstraction that makes it appear to the processes within the namespace that they have their own isolated instance of the global resource.
-每个用户实例之间相互隔离，互不影响。一般的硬件虚拟化方法给出的方法是VM，而LXC给出的方法是container，更细一点讲就是kernel namespace。其中pid、net、ipc、mnt、uts、user等namespace将container的进程、网络、消息、文件系统、UTS(“UNIX Time-sharing System”)和用户空间隔离开。
-pid namespace 不同用户的进程就是通过pid namespace隔离开的，且不同 namespace 中可以有相同pid。所有的LXC进程在docker中的父进程为docker进程，每个lxc进程具有不同的namespace。同时由于允许嵌套，因此可以很方便的实现 Docker in Docker。...</p>
+    <p>公司内部 OA 系统要做线上高可用，避免单点故障，所以计划使用2台虚拟机通过 Keepalived 工具来实现 nginx 的高可用（High Avaiability），达到一台nginx入口服务器宕机，另一台备机自动接管服务的效果。（nginx做反向代理，实现后端应用服务器的负载均衡）快速搭建请直接跳至 第2节。
+1. Keepalived介绍 Keepalived是一个基于VRRP协议来实现的服务高可用方案，可以利用其来避免IP单点故障，类似的工具还有heartbeat、corosync、pacemaker。但是它一般不会单独出现，而是与其它负载均衡技术（如lvs、haproxy、nginx）一起工作来达到集群的高可用。
+1.1 VRRP协议 VRRP全称 Virtual Router Redundancy Protocol，即 虚拟路由冗余协议。可以认为它是实现路由器高可用的容错协议，即将N台提供相同功能的路由器组成一个路由器组(Router Group)，这个组里面有一个master和多个backup，但在外界看来就像一台一样，构成虚拟路由器，拥有一个虚拟IP（vip，也就是路由器所在局域网内其他机器的默认路由），占有这个IP的master实际负责ARP相应和转发IP数据包，组中的其它路由器作为备份的角色处于待命状态。master会发组播消息，当backup在超时时间内收不到vrrp包时就认为master宕掉了，这时就需要根据VRRP的优先级来选举一个backup当master，保证路由器的高可用。
+在VRRP协议实现里，虚拟路由器使用 00-00-5E-00-01-XX 作为虚拟MAC地址，XX就是唯一的 VRID （Virtual Router IDentifier），这个地址同一时间只有一个物理路由器占用。在虚拟路由器里面的物理路由器组里面通过多播IP地址 224.0.0.18 来定时发送通告消息。每个Router都有一个 1-255 之间的优先级别，级别最高的（highest priority）将成为主控（master）路由器。通过降低master的优先权可以让处于backup状态的路由器抢占（pro-empt）主路由器的状态，两个backup优先级相同的IP地址较大者为master，接管虚拟IP。
+与heartbeat/corosync等比较 直接摘抄自 http://www.linuxidc.com/Linux/2013-08/89227.htm ：
+Heartbeat、Corosync、Keepalived这三个集群组件我们到底选哪个好，首先我想说明的是，Heartbeat、Corosync是属于同一类型，Keepalived与Heartbeat、Corosync，根本不是同一类型的。Keepalived使用的vrrp协议方式，虚拟路由冗余协议 (Virtual Router Redundancy Protocol，简称VRRP)；Heartbeat或Corosync是基于主机或网络服务的高可用方式；简单的说就是，Keepalived的目的是模拟路由器的高可用，Heartbeat或Corosync的目的是实现Service的高可用。
+所以一般Keepalived是实现前端高可用，常用的前端高可用的组合有，就是我们常见的LVS&#43;Keepalived、Nginx&#43;Keepalived、HAproxy&#43;Keepalived。而Heartbeat或Corosync是实现服务的高可用，常见的组合有Heartbeat v3(Corosync)&#43;Pacemaker&#43;NFS&#43;Httpd 实现Web服务器的高可用、Heartbeat v3(Corosync)&#43;Pacemaker&#43;NFS&#43;MySQL 实现MySQL服务器的高可用。总结一下，Keepalived中实现轻量级的高可用，一般用于前端高可用，且不需要共享存储，一般常用于两个节点的高可用。而Heartbeat(或Corosync)一般用于服务的高可用，且需要共享存储，一般用于多节点的高可用。这个问题我们说明白了。
+又有博友会问了，那heartbaet与corosync我们又应该选择哪个好啊，我想说我们一般用corosync，因为corosync的运行机制更优于heartbeat，就连从heartbeat分离出来的pacemaker都说在以后的开发当中更倾向于corosync，所以现在corosync&#43;pacemaker是最佳组合。
+1.2 Keepalived &#43; nginx keepalived可以认为是VRRP协议在Linux上的实现，主要有三个模块，分别是core、check和vrrp。core模块为keepalived的核心，负责主进程的启动、维护以及全局配置文件的加载和解析。check负责健康检查，包括常见的各种检查方式。vrrp模块是来实现VRRP协议的。本文基于如下的拓扑图：
+&#43;-------------&#43; | uplink | &#43;-------------&#43; | &#43; MASTER keep|alived BACKUP 172.29.88.224 172.29.88.222 172.29.88.225 &#43;-------------&#43; &#43;-------------&#43; &#43;-------------&#43; | nginx01 |----| virtualIP |----| nginx02 | &#43;-------------&#43; &#43;-------------&#43; &#43;-------------&#43; | &#43;------------------&#43;------------------&#43; | | | &#43;-------------&#43; &#43;-------------&#43; &#43;-------------&#43; | web01 | | web02 | | web03 | &#43;-------------&#43; &#43;-------------&#43; &#43;-------------&#43; 2....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2015-05-18 01:21:25 +0000 UTC'>May 18, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to Nginx&#43;Keepalived实现站点高可用" href="http://xgknight.com/posts/2015/05/nginx-keepalived%E5%AE%9E%E7%8E%B0%E7%AB%99%E7%82%B9%E9%AB%98%E5%8F%AF%E7%94%A8/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>nginx配置location总结及rewrite规则写法
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: 在 CentOS 6.x上安装 docker.io成功 date: 2014-10-26 19:45:25 updated: 2014-10-27 10:46:23 tags: [docker, centos,linux] categories: [Virtualization, Docker] docker是什么就不多说了，见docker基础原理介绍。 docker容器最早受到RHEL完善的支持是从最近的CentOS 7.0开始的，官方说明是只能运行于64位架构平台，内核版本为2.6.32-431及以上（即&gt;=CentOS 6.5，运行docker时实际提示3.8.0及以上），升级内核请参考CentOS 6.x 内核升级（2.6.32 -&gt; 3.10.58）过程记录 需要注意的是CentOS 6.5与7.0的安装是有一点点不同的，CentOS-6上docker的安装包叫docker-io，并且来源于Fedora epel库，这个仓库维护了大量的没有包含在发行版中的软件，所以先要安装EPEL，而CentOS-7的docker直接包含在官方镜像源的Extras仓库（CentOS-Base.repo下的[extras]节enable=1启用）。前提是都需要联网，具体安装过程如下。 ###1. 禁用selinux###
-# getenforce enforcing # setenforce 0 permissive # vi /etc/selinux/config SELINUX=disabled ... ###2. 安装 Fedora EPEL### epel-release-6-8.noarch.rpm包在发行版的介质里面已经自带了，可以从rpm安装。
-# yum install epel-release-6-8.noarch.rpm //或 yum -y install http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm 如果出现GPG key retrieval failed: [Errno 14] Could not open/read file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-6问题，请在线安装epel，下载RPM-GPG-KEY-EPEL-6文件。 这一步执行之后，会在/etc/yum.repos.d/下生成epel.repo、epel-testing.repo两个文件，用于从Fedora官网下载rpm包。 ###3. 检查内核版本###
-# uname -r 2....</p>
+    <p>1. location正则写法 一个示例：
+location = / { # 精确匹配 / ，主机名后面不能带任何字符串 [ configuration A ] } location / { # 因为所有的地址都以 / 开头，所以这条规则将匹配到所有请求 # 但是正则和最长字符串会优先匹配 [ configuration B ] } location /documents/ { # 匹配任何以 /documents/ 开头的地址，匹配符合以后，还要继续往下搜索 # 只有后面的正则表达式没有匹配到时，这一条才会采用这一条 [ configuration C ] } location ~ /documents/Abc { # 匹配任何以 /documents/Abc 开头的地址，匹配符合以后，还要继续往下搜索 # 只有后面的正则表达式没有匹配到时，这一条才会采用这一条 [ configuration CC ] } location ^~ /images/ { # 匹配任何以 /images/ 开头的地址，匹配符合以后，停止往下搜索正则，采用这一条。 [ configuration D ] } location ~* \....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2015-05-17 15:21:25 +0000 UTC'>May 17, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to nginx配置location总结及rewrite规则写法" href="http://xgknight.com/posts/2015/05/nginx%E9%85%8D%E7%BD%AElocation%E6%80%BB%E7%BB%93%E5%8F%8Arewrite%E8%A7%84%E5%88%99%E5%86%99%E6%B3%95/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>nginx服务器安装及配置文件详解
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: Docker简介 date: 2014-12-18 11:21:25 updated: 2014-12-18 18:46:23 tags: [docker, linux] categories: [Virtualization, Docker] 1. docker是什么 Docker is an open-source engine that automates the deployment of any application as a lightweight, portable, self-sufficient container that will run virtually anywhere.
-Docker是 PaaS 提供商dotCloud开源的一个基于 LXC 的高级容器引擎， 源代码托管在 Github 上, 基于go语言并遵从Apache2.0协议开源。Docker近期非常火热，无论是从 GitHub 上的代码活跃度，还是Redhat宣布在RHEL7中正式支持Docker，都给业界一个信号，这是一项创新型的技术解决方案。就连 Google 公司的 Compute Engine 也支持 docker 在其之上运行，国内“BAT”先锋企业百度Baidu App Engine(BAE)平台也是以Docker作为其PaaS云基础。
-Docker产生的目的就是为了解决以下问题：
-环境管理复杂：从各种OS到各种中间件再到各种App，一款产品能够成功发布，作为开发者需要关心的东西太多，且难于管理，这个问题在软件行业中普遍存在并需要直接面对。Docker可以简化部署多种应用实例工作，比如Web应用、后台应用、数据库应用、大数据应用比如Hadoop集群、消息队列等等都可以打包成一个Image部署。 云计算时代的到来：AWS的成功，引导开发者将应用转移到云上, 解决了硬件管理的问题，然而软件配置和管理相关的问题依然存在 (AWS cloudformation是这个方向的业界标准, 样例模板可参考这里)。Docker的出现正好能帮助软件开发者开阔思路，尝试新的软件管理方法来解决这个问题。 虚拟化手段的变化：云时代采用标配硬件来降低成本，采用虚拟化手段来满足用户按需分配的资源需求以及保证可用性和隔离性。然而无论是KVM还是Xen，在 Docker 看来都在浪费资源，因为用户需要的是高效运行环境而非OS，GuestOS既浪费资源又难于管理，更加轻量级的LXC更加灵活和快速。 LXC的便携性：LXC在 Linux 2....</p>
+    <p>nginx在工作中已经有好几个环境在使用了，每次都是重新去网上扒博客，各种编译配置，今天自己也整理一份安装文档和nginx.conf配置选项的说明，留作以后参考。像负载均衡配置（包括健康检查）、缓存（包括清空缓存）配置实例，请参考 http://xgknight.com/2015/05/17/nginx-install-and-config ，ssl加密请参考 http://xgknight.com/2015/05/28/nginx-ssl/ 。
+1. 安装nginx 1.1 选择稳定版本 我们编译安装nginx来定制自己的模块，机器CentOS 6.2 x86_64。首先安装缺少的依赖包：
+# yum -y install gcc gcc-c&#43;&#43; make libtool zlib zlib-devel openssl openssl-devel pcre pcre-devel 这些软件包如果yum上没有的话可以下载源码来编译安装，只是要注意编译时默认安装的目录，确保下面在安装nginx时能够找到这些动态库文件（ldconfig）。
+从 http://nginx.org/en/download.html 下载稳定版nginx-1.6.3.tar.gz到/usr/local/src下解压。
+为了后续准备我们另外下载2个插件模块：nginx_upstream_check_module-0.3.0.tar.gz —— 检查后端服务器的状态，nginx-goodies-nginx-sticky-module-ng-bd312d586752.tar.gz（建议在/usr/local/src下解压后将目录重命名为nginx-sticky-module-ng-1.2.5） —— 后端做负载均衡解决session sticky问题（与upstream_check模块结合使用需要另外打补丁，请参考nginx负载均衡配置实战）。
+请注意插件与nginx的版本兼容问题，一般插件越新越好，nginx不用追新，稳定第一。nginx-1.4.7，nginx-sticky-module-1.1，nginx_upstream_check_module-0.2.0，这个搭配也没问题。sticky-1.1与nginx-1.6版本由于更新没跟上编译出错。（可以直接使用Tengine，默认就包括了这些模块）
+[root@cachets nginx-1.6.3]# pwd /usr/local/src/nginx-1.6.3 [root@cachets nginx-1.6.3]# ./configure --prefix=/usr/local/nginx-1.6 --with-pcre \ &gt; --with-http_stub_status_module --with-http_ssl_module \ &gt; --with-http_gzip_static_module --with-http_realip_module \ &gt; --add-module=../nginx_upstream_check_module-0.3.0 [root@cachets nginx-1.6.3]# make &amp;&amp; make install 1.2 常用编译选项说明 nginx大部分常用模块，编译时./configure --help以--without开头的都默认安装。
+--prefix=PATH ： 指定nginx的安装目录。默认 /usr/local/nginx --conf-path=PATH ： 设置nginx....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2015-05-17 01:21:25 +0000 UTC'>May 17, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to nginx服务器安装及配置文件详解" href="http://xgknight.com/posts/2015/05/nginx%E6%9C%8D%E5%8A%A1%E5%99%A8%E5%AE%89%E8%A3%85%E5%8F%8A%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6%E8%AF%A6%E8%A7%A3/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>仿豆丁网文件在线浏览解决方案搭建
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: 开源容器集群管理系统Kubernetes架构及组件介绍 date: 2015-02-03 13:21:25 updated: 2014-02-03 15:46:23 tags: [docker, linux, kubernetes] categories: [Virtualization, Docker] 本文来源于Infoq的一篇文章（见参考部分），并在难懂的地方自己理解的基础上做了修改。实际在ubuntu上部署 kubernetes 操作另见 文章 。
-Together we will ensure that Kubernetes is a strong and open container management framework for any application and in any environment, whether in a private, public or hybrid cloud. –Urs Hölzle, Google
-Kubernetes 作为Docker生态圈中重要一员，是Google多年大规模容器管理技术的开源版本，是产线实践经验的最佳表现。如Urs Hölzle所说，无论是公有云还是私有云甚至混合云，Kubernetes将作为一个为任何应用，任何环境的容器管理框架无处不在。正因为如此，目前受到各大巨头及初创公司的青睐，如Microsoft、VMWare、Red Hat、CoreOS、Mesos等，纷纷加入给Kubernetes贡献代码。随着Kubernetes社区及各大厂商的不断改进、发展，Kuberentes将成为容器管理领域的领导者。
-接下来我们一起探索Kubernetes是什么、能做什么以及怎么做。
-1. 什么是Kubernetes Kubernetes是Google开源的容器集群管理系统，使用Golang开发，其提供应用部署、维护、扩展机制等功能，利用Kubernetes能方便地管理跨机器运行容器化的应用，其主要功能如下：
-使用Docker对应用程序包装(package)、实例化(instantiate)、运行(run)。 以集群的方式运行、管理跨机器的容器。 解决Docker跨机器容器之间的通讯问题。 Kubernetes的自我修复机制使得容器集群总是运行在用户期望的状态。 当前Kubernetes支持GCE、vShpere、CoreOS、OpenShift、Azure等平台，除此之外，也可以直接运行在物理机上。
-这个官方给出的完整的架构图：（可在新标签页打开查看大图）
-2. Kubernetes的主要概念 2.1 Pods 在Kubernetes系统中，调度的最小颗粒不是单纯的容器，而是抽象成一个Pod，Pod是一个可以被创建、销毁、调度、管理的最小的部署单元。把相关的一个或多个容器（Container）构成一个Pod，通常Pod里的容器运行相同的应用。Pod包含的容器运行在同一个Minion(Host)上，看作一个统一管理单元，共享相同的volumes和network namespace/IP和Port空间。...</p>
+    <p>在公司OA和CRM系统遇到要实现在线查看word/jpg等文件的功能，按照开发小组的要求搭建了一套解决方案：OpenOffice &#43; JodConvertor &#43; SWFTool&#43; FlexPaper，其中OpenOffice &#43; JodConvertor用于将文档转化为PDF格式文档，SwfTool用于将PDF转化为SWF文档，FlexPaper用于展示。使用这个解决方案的最大好处就是跨平台且较为简单。
+1.1 安装openoffice openoffice需要jdk的支持，而且默认已经安装，如果没有，手动下载Apache_OpenOffice_4.0.1_Linux_x86-64_install-rpm_zh-CN.tar.gz到/usr/local/src（CentOS 6.4 x86_64）：
+# tar -zxf Apache_OpenOffice_4.0.1_Linux_x86-64_install-rpm_zh-CN.tar.gz # cd zh-CN/RPMS # rpm –ivh *.rpm 拷贝字体 安装完成后把windows（c:\windows\fonts）下的一些常用字体拷贝到 /opt/openoffice4/share/fonts/truetype 目录下，如Arial, Calibri, Courier New, Consolas等，如果你想正确的保留原doc的中文字体，还需要把 黑体、微软雅黑、宋体 常规、新宋体 常规、幼圆、隶书、楷体 等中文字体拷贝进去（重启进程后生效）。
+启动后台进程 切换至普通用户，如wxcrm启动转换进程：
+$ /opt/openoffice4/program/soffice -headless -accept=&#34;socket,host=127.0.0.1,port=8100;urp;&#34; -nofirststartwizard &amp; # ps –ef | grep soffice 1.2 解压jodconverter JODConverter是一个java的OpenDucument文件转换器，可以进行许多文件格式的转换工具，它利用OpenOffice来进行转换工作，它能完成以下转换：
+Microsoft Office格式转换为OpenDucument，以及OpenDucument转换为Microsoft Office OpenDucument转换为PDF，Word、Excel、PowerPoint转换为PDF，RTF转换为PDF等。 从 http://sourceforge.net/projects/jodconverter/files/JODConverter/2.2.2/ 下载jodconverter-2.2.2.zip解压到 /opt 目录下/opt/jodconverter-2.2.2/。手动转换测试，使用到的文件是安装包内的lib/jodconverter-cli-2.2.2.jar：
+java -jar /opt/jodconverter-2.2.2/lib/jodconverter-cli-2.2.2.jar /home/oa/docker.docx /home/oa/docker.pdf 至此doc等文件格式可以成功转换成pdf。
+2.1 swftool swftool可以将pdf/jpg等转换成swf格式。搜索下载swftools-0....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2015-05-13 01:21:25 +0000 UTC'>May 13, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 仿豆丁网文件在线浏览解决方案搭建" href="http://xgknight.com/posts/2015/05/%E4%BB%BF%E8%B1%86%E4%B8%81%E7%BD%91%E6%96%87%E4%BB%B6%E5%9C%A8%E7%BA%BF%E6%B5%8F%E8%A7%88%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88%E6%90%AD%E5%BB%BA/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>lsyncd实时同步搭建指南——取代rsync&#43;inotify
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: 在ubuntu上部署Kubernetes管理docker集群示例 date: 2015-02-07 13:21:25 updated: 2014-02-07 15:46:23 tags: [docker, linux, kubernetes] categories: [Virtualization, Docker] 本文通过实际操作来演示Kubernetes的使用，因为环境有限，集群部署在本地3个ubuntu上，主要包括如下内容：
-部署环境介绍，以及Kubernetes集群逻辑架构 安装部署Open vSwitch跨机器容器通信工具 安装部署Etcd和Kubernetes的各大组件 演示Kubernetes管理容器和服务 关于 Kubernetes 系统架构及组件介绍见这里。
-1. 部署环境及架构 vSphere: 5.1 操作系统: ubuntu 14.04 x86_64 Open vSwith版本: 2.0.2 Kubernetes: v0.7.2 Etcd版本: 2.0.0-rc.1 Docker版本: 1.4.1 服务器信息： Role Hostname IP Address APIServer kubernetes 172.29.88.206 Minion minion1 172.29.88.207 Minion minion2 172.29.88.208 在详细介绍部署Kubernetes集群前，先给大家展示下集群的逻辑架构。从下图可知，整个系统分为两部分，第一部分是Kubernetes APIServer，是整个系统的核心，承担集群中所有容器的管理工作；第二部分是minion，运行Container Daemon，是所有容器栖息之地，同时在minion上运行Open vSwitch程序，通过GRE Tunnel负责minions之间Pod的网络通信工作。 2. 安装Open vSwitch及配置GRE 为了解决跨minion之间Pod的通信问题，我们在每个minion上安装Open vSwtich，并使用GRE或者VxLAN使得跨机器之间P11od能相互通信，本文使用GRE，而VxLAN通常用在需要隔离的大规模网络中。对于Open vSwitch的介绍请参考另一篇文章Open vSwitch。
-sudo apt-get install openvswitch-switch bridge-utils 安装完Open vSwitch和桥接工具后，接下来便建立minion0和minion1之间的隧道。首先在minion1和minion2上分别建立OVS Bridge：...</p>
+    <p>1. 几大实时同步工具比较 1.1 inotify &#43; rsync 最近一直在寻求生产服务服务器上的同步替代方案，原先使用的是inotify &#43; rsync，但随着文件数量的增大到100W&#43;，目录下的文件列表就达20M，在网络状况不佳或者限速的情况下，变更的文件可能10来个才几M，却因此要发送的文件列表就达20M，严重减低的带宽的使用效率以及同步效率；更为要紧的是，加入inotifywait在5s内监控到10个小文件发生变化，便会触发10个rsync同步操作，结果就是真正需要传输的才2-3M的文件，比对的文件列表就达200M。使用这两个组合的好处在于，它们都是最基本的软件，可以通过不同选项做到很精确的控制，比如排除同步的目录，同步多个模块或同步到多个主机。
+搭建过程参考 Linux下同步工具inotify&#43;rsync使用详解 。
+1.2 sersync 后来听同事说 sersync 这么个工具可以提高同步的性能，也解决了同步大文件时出现异常的问题，所以就尝试了一下。sersync是国内的一个开发者开源出来的，使用c&#43;&#43;编写，采用多线程的方式进行同步，失败后还有重传机制，对临时文件过滤，自带crontab定时同步功能。网上看到有人说性能还不错，说一下我的观点：
+国产开源，文档不是很全，在2011年之后就没更新了（googlecode都要快关闭了，其实可以转交其他人维护），网上关于它的使用和讨论都止于10年了 采用xml配置文件的方式，可读性比较好，但是有些原生的有些功能没有实现就没法使用了 无法实现多目录同步，只能通过多个配置文件启动多个进程 文件排除功能太弱。这个要看需求，不是每个人都需要排除子目录。而对于我的环境中，这个功能很重要，而且排除的规则较多 虽然提供插件的功能，但很鸡肋，因为软件本身没有持续更新，也没有看到贡献有其它插件出现（可能是我知识面不够，还用不到里面的refreshCDN plugin）。 虽然不懂c&#43;&#43;，但大致看了下源码 FileSynchronize，拼接rsync命令大概在273行左右，最后一个函数就是排除选项，简单一点可以将--exclude=改成--eclude-from来灵活控制。有机会再改吧。
+另外，在作者的文章 Sersync服务器同步程序 项目简介与设计框架 评论中，说能解决上面 rsync &#43; inotify中所描述的问题。阅读了下源码，这个应该是没有解决，因为在拼接rsync命令时，后面的目的地址始终是针对module的，只要执行rsync命令，就会对整个目录进行遍历，发送要比对的文件列表，然后再发送变化的文件。sersync只是减少了监听的事件，减少了rsync的次数——这已经是很大的改进，但每次rsync没办法改变。（如有其它看法可与我讨论）
+其实我们也不能要求每一个软件功能都十分健全，关键是看能否满足我们当下的特定的需求。所谓好的架构不是设计出来的，而是进化来的。目前使用sersync2没什么问题，而且看了它的设计思路应该是比较科学的，特别是过滤队列的设计。双向同步看起来也是可以实现。
+1.3 lsyncd 废话说这么多，本文就是介绍它了。有些博客说lsyncd是谷歌开源的，实际不是了，只是托管在了googlecode上而已，幸运的是已经迁移到github了：https://github.com/axkibe/lsyncd 。
+Lysncd 实际上是lua语言封装了 inotify 和 rsync 工具，采用了 Linux 内核（2.6.13 及以后）里的 inotify 触发机制，然后通过rsync去差异同步，达到实时的效果。我认为它最令人称道的特性是，完美解决了 inotify &#43; rsync海量文件同步带来的文件频繁发送文件列表的问题 —— 通过时间延迟或累计触发事件次数实现。另外，它的配置方式很简单，lua本身就是一种配置语言，可读性非常强。lsyncd也有多种工作模式可以选择，本地目录cp，本地目录rsync，远程目录rsyncssh。
+实现简单高效的本地目录同步备份（网络存储挂载也当作本地目录），一个命令搞定。
+2. 使用 lsyncd 本地目录实时备份 这一节实现的功能是，本地目录source实时同步到另一个目录target，而在source下有大量的文件，并且有部分目录和临时文件不需要同步。
+2.1 安装lsyncd 安装lsyncd极为简单，已经收录在ubuntu的官方镜像源里，直接通过apt-get install lsyncd就可以。 在Redhat系（我的环境是CentOS 6.2 x86_64 ），可以手动去下载 lsyncd-2.1.5-6.fc21.x86_64.rpm，但首先你得安装两个依赖yum install lua lua-devel。也可以通过在线安装，需要epel-release扩展包：...</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2015-05-06 01:21:25 +0000 UTC'>May 6, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to lsyncd实时同步搭建指南——取代rsync&#43;inotify" href="http://xgknight.com/posts/2015/05/lsyncd%E5%AE%9E%E6%97%B6%E5%90%8C%E6%AD%A5%E6%90%AD%E5%BB%BA%E6%8C%87%E5%8D%97%E5%8F%96%E4%BB%A3rsync-inotify/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>五一回来了
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: docker如何创建一个运行后台进程的容器并同时提供shell终端 date: 2014-11-03 20:21:25 updated: 2014-11-07 15:46:23 tags: [docker, shell, linux] categories: [Virtualization, Docker] 只看标题还不是很明显，本文实现docker的这样一种比较常用的功能：通过docker run启动一个容器后，容器中已经运行了一个后台进程（这里以监听80端口的nginx为例），同时进入一个shell终端可供操作，而不受限于只能在前台运行nginx与运行shell终端之间的一种。这个例子实现了，那么其他类似的运行多任务docker就可以以此类推。另外本文还提供了一种在docker容器内部安装软件（vim）的方法，对于定制自己需要的镜像大有帮助。 你可能需要先阅读docker专题(2)：docker常用管理命令（上）、docker专题(2)：docker常用管理命令（下）来理解更多。
-1. 已经pull了官方的nginx 1.7.6的镜像（也可以从私服获取）## # docker images|grep nginx nginx 1.7.6 561ed4952ef0 10 days ago 100 MB 2. 根据官方指示启动这个容器 先做好自己要显示的页面 # echo &#34;&lt;h2 &gt;This is nginx official container running &lt;/h2&gt; &lt;br /&gt; static files:/tmp/doccker/index.html&#34; &gt; /tmp/docker/index.html 使用官方image启动一个容器，名字nginx_dist，把host的目录（包含刚才的html）映射到容器中nginx server的root，绑定80端口：
-# docker run --name nginx_dist -v /tmp/docker:/usr/share/nginx/html:ro \ &gt; -p 80:80 -d nginx:1.7.6 1b10b08d7905517a26c72ce8b17b719aaea5e5eac0889263db8b017427e3c8f7 # docker ps CONTAINER ID IMAGE COMMAND CREATED STATUS PORTS NAMES 1b10b08d7905 nginx:1 nginx -g &#39;daemon off 51 seconds ago Up 48 seconds 443/tcp, 0....</p>
+    <p>———————— 只是无聊，轻松的写点东西，在 LOFTER上是不需要写标题的
+失算了，下午四点到了汽车站，没能买到16:10的汽车，最早也要晚上六点到深圳侨社那班。这原本打算七点就可到深圳，淡定的去会展中心吃个饭啥的，说话算数太不好意思了。
+两个小时的等车时间真够无聊的，比在哥哥家里兼工作室要好些。这两天说过来玩，其实也是带任务来的——为哥哥的天猫手表店拍实物图片，借我的MAC一用做背景。我问他卡斯曼、卡西欧官方没给你宝贝图片吗，他说不是，是想拍出自己的特色放在介绍里。千篇一律大家都去旗舰店买了，谁来照顾我们的手表店。想想也是，现在都讲究情怀！看到房间里单反、灯光箱、360度转动盘（不晓得是个什么gui），我几百块的小叶紫檀貔貅手串都派上用场了。看到用心到连饭都没时间煮的份上，我要不要帮忙推广一下呢。
+本来打算是今天早点回深圳，可听他说下午还有几块手表要拍，大概要2个小时，我又怎么能无耻的坚持带走电脑呢。临走的时候，哥跟我在qq上说了一句“大老远让你从深圳跑中山来，也没弄点好吃的（也没带你去珠海玩——自己脑补的），太忙太赶了”。八月份再过来，那时候丽景名筑的房子也装修好了，开个入住仪式。昨天也去新房子看了一眼，线路已经全部埋好了，正在给洗手间做防水测试，厅中间还是一堆沙子，只有天花板刷好了乳石灰。六月份能够装修完成，八月份入住，想想那个时候过去，大飘窗、高低儿童床、乐视tv，比现在这个出租屋要好的多了去。可是，可是，这意味着一个很大的问题，哥哥收入用于装修屋子（简单八万的样子），家里在建的四层楼房怎么办？ 昨天跟家里视频，老爸正在算这一笔账，告诉我个数字，30-40万，毛坯房。现在在农村修个房子（四层可以俯瞰全村了）的成本，差不多可以在中小城市买一个90平的。老一辈人还是希望待在家里吧。鸭梨好大，只能这么形容了。
+终于上车了，迅速占领了一个排前靠窗的位置坐了下来，正准备戴上耳机听听音乐，一个50来岁的中年人来到旁边坐了下来，他太太坐斜对面靠近走廊。然后问我说几号座位，我坐了他位置，原本他跟他太太一起坐。于是我就说现在不都没按位置坐吗，正跟他讨论如果真有人计较这个时，让就让呗，有个年青人人过来指着大叔的位置说这是他位置。好吧既然有人认真了，我就收一收我这“乡下来”的不按座位乘车的土鳖气息，但大叔为什么要骗我他跟他太太是一起的邻座。算了，小事不提，滚到了最后一排48号，还好不是正中间走廊的位置，不然一个急刹车就该跟司机say hi了。
+不确定到深圳的时间，很抱歉。再写眼睛就花了。ps:刚才汽车颠的一下我敢说飞出了一米高。
+——零点更新
+等车2个小时不说，路上竟然堵车，虎门大桥原本20分钟的路程竟然走了一个多小时，到晚上将近十点才落车，下车的地方也真特么偏僻，来回半天都没见着竹子林地铁站，果断叫了个的士，到深大地铁站转地铁。法克，那司机竟给绕，原本走深南大道起步价的路程，省省的开到30块，差评投诉！连翻不顺！洗洗睡。</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2015-05-03 07:01:25 +0000 UTC'>May 3, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 五一回来了" href="http://xgknight.com/posts/2015/05/%E4%BA%94%E4%B8%80%E5%9B%9E%E6%9D%A5%E4%BA%86/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>五一去哪儿
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: Docker集中化web界面管理平台shipyard date: 2014-12-29 13:21:25 updated: 2014-12-29 15:46:23 tags: [docker, linux, shipyard] categories: [Virtualization, Docker] Shipyard（github）是建立在docker集群管理工具Citadel之上的可以管理容器、主机等资源的web图形化工具。包括core和extension两个版本，core即shipyard主要是把多个 Docker host上的 containers 统一管理（支持跨越多个host），extension即shipyard-extensions添加了应用路由和负载均衡、集中化日志、部署等。
-1. 几个概念 engine 一个shipyard管理的docker集群可以包含一个或多个engine（引擎），一个engine就是监听tcp端口的docker daemon。shipyard管理docker daemon、images、containers完全基于Docker API，不需要做其他的修改。另外，shipyard可以对每个engine做资源限制，包括CPU和内存；因为TCP监听相比Unix socket方式会有一定的安全隐患，所以shipyard还支持通过SSL证书与docker后台进程安全通信。
-rethinkdb RethinkDB是一个shipyard项目的一个docker镜像，用来存放账号（account）、引擎（engine）、服务密钥（service key）、扩展元数据（extension metadata）等信息，但不会存储任何有关容器或镜像的内容。一般会启动一个shipyard/rethinkdb容器shipyard-rethinkdb-data来使用它的/data作为数据卷供另外rethinkdb一个挂载，专门用于数据存储。
-2. 搭建过程 修改tcp监听 Shipyard 要管理和控制 Docker host 的话需要先修改 Docker host 上的默认配置使其监听tcp端口(可以继续保持Unix socket）。有以下2种方式
-sudo docker -H tcp://0.0.0.0:4243 -H unix:///var/run/docker.sock -d 启动docker daemon。如果为了避免每次启动都写这么长的命令，可以直接在/etc/init/docker.conf中修改。 修改/etc/default/docker的DOCKER_OPTS DOCKER_OPTS=&#34;-H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock&#34;。这种方式在我docker version 1.4.1 in ubuntu 14.04上并没有生效。 重启服务 $ sudo docker -H tcp://0.0.0.0:4243 -H unix:///var/run/docker....</p>
+    <p>五一去哪儿，我实在想不到更俗的标题了。去中山。说实在真不想去，我哥非要我带Mac回去让他拍照，给手表做陪衬。ps: 汽车就七个人，车厢也特么烂了，晃晃感觉要散了😳
+反正车上无聊，随便说说什么吧！昨晚，嗯，应该是失眠了。第二天睡到下午起来，窝在家里没事做（早知道就不那么快把《权利的游戏》看完了），五点的时候我竟然跑去公司加班了！
+加班也没做啥事，帮另一个同事调通了一个网络，然后在自己博客上更新了篇文章。赖到将近晚上八点半才走，本想在猫眼买张西乡天虹『左耳』的电影票，但没位置，想到一天没怎么吃饭（在公司吃了几包肉松饼和华夫饼干），在家门口沃尔玛楼下的爱尚堡点了份豪华午餐，坐了半个多小时起身才回去。晚上走在小区了，总有股淡淡的花香，却从来说不出名字，风吹的头发飘起，真的不是一般爽呢。但因为已经有十点多了，还是加快步伐推开了乌漆抹黑的家门，另外两个室友，一个回宜昌老家参加哥哥婚礼去了，一个去了阴盛阳衰的川大同学会。
+虽然今天还要赶车，但早睡这种事情很少发生在我身上。于是打开了电视，体育频道一个人没啥看的，央视一台播放什么劳动光荣的纪录片，五分钟换台了，想想还是去看宣传了很久的芒果台『真正男子汉』。额，杜海涛给我们的笑星形象永远不那么容易消失，这是节目，但也是在军队里，看着他总觉特意的去达到一种节目效果，他来部队参加训练是减肥。王宝强，真是个逗比，在教官检查违禁物品时宝宝那种呆萌老土的模样，笑抽了我，而且在后面打靶时的表现，蛮喜欢他的，他来部队是为了还原『士兵突击』里的许三多形象，想做一名真正的战士，这让我想到了不久前看过吴京的战狼，几次有一种每人都应该去参军的经历。我有个表弟（表哥？），就在去年过年时还跟我一起睡过，五年当兵回来，看他手持真枪的照片，威风凛凛。刘昊然，17岁，想在军队里完成他的成人礼，这名演员以后必火。袁弘，教官说他是一匹还没被驯服的野马，有血性，真男人。郭晓东，40岁的人，有过当兵的经历，可是带病参训，老婆不错😱。张丰毅，将近60岁的人，看过他不少电影，不是折腾，是表率。
+看完已经零点半了，什么，明天（5.2）去中山的东西还没收拾，可怕的拖延症。然后就是下了『澳门风云2』『天将雄狮』在手机上打发车上的时间，给充电宝充电、收拾衣服什么的。到了两点多，躺在床上却睡不着觉，空调开着第二天就闹肚子，不开又微热。眼睛眯着眯着，突然有个想法或想说什么，就打开笔记就记录了下来，好奇怪。其中有一个就是突然有个做APP的点子，想法不错，五一假后再查查资料。
+现在汽车正在路上飞驰，也坐满了人，旁边那个人的肉能不能不要碰我。就这样，再写下去手机电量怕是不足以支撑一部电影了。</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2015-05-01 11:01:25 +0000 UTC'>May 1, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 五一去哪儿" href="http://xgknight.com/posts/2015/05/%E4%BA%94%E4%B8%80%E5%8E%BB%E5%93%AA%E5%84%BF/"></a>
 </article>
 <footer class="page-footer">
   <nav class="pagination">

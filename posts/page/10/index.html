@@ -143,11 +143,100 @@
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>Docker集中化web界面管理平台shipyard
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: MySQL备份命令mysqldump参数说明与示例 date: 2014-12-05 20:21:25 updated: 2014-07 17:00:46:23 tags: [mysql, database, mysqldump, backup] categories: MySQL 1. 语法选项说明 -h, --host=name 主机名
+    <p>Shipyard（github）是建立在docker集群管理工具Citadel之上的可以管理容器、主机等资源的web图形化工具。包括core和extension两个版本，core即shipyard主要是把多个 Docker host上的 containers 统一管理（支持跨越多个host），extension即shipyard-extensions添加了应用路由和负载均衡、集中化日志、部署等。
+1. 几个概念 engine 一个shipyard管理的docker集群可以包含一个或多个engine（引擎），一个engine就是监听tcp端口的docker daemon。shipyard管理docker daemon、images、containers完全基于Docker API，不需要做其他的修改。另外，shipyard可以对每个engine做资源限制，包括CPU和内存；因为TCP监听相比Unix socket方式会有一定的安全隐患，所以shipyard还支持通过SSL证书与docker后台进程安全通信。
+rethinkdb RethinkDB是一个shipyard项目的一个docker镜像，用来存放账号（account）、引擎（engine）、服务密钥（service key）、扩展元数据（extension metadata）等信息，但不会存储任何有关容器或镜像的内容。一般会启动一个shipyard/rethinkdb容器shipyard-rethinkdb-data来使用它的/data作为数据卷供另外rethinkdb一个挂载，专门用于数据存储。
+2. 搭建过程 修改tcp监听 Shipyard 要管理和控制 Docker host 的话需要先修改 Docker host 上的默认配置使其监听tcp端口(可以继续保持Unix socket）。有以下2种方式
+sudo docker -H tcp://0.0.0.0:4243 -H unix:///var/run/docker.sock -d 启动docker daemon。如果为了避免每次启动都写这么长的命令，可以直接在/etc/init/docker.conf中修改。 修改/etc/default/docker的DOCKER_OPTS DOCKER_OPTS=&#34;-H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock&#34;。这种方式在我docker version 1.4.1 in ubuntu 14.04上并没有生效。 重启服务 $ sudo docker -H tcp://0.0.0.0:4243 -H unix:///var/run/docker.sock -d 验证 $ netstat -ant |grep 4243 tcp6 0 0 :::4243 :::* LISTEN 启动rethinkdb shipyard（基于Python/Django）在v1版本时安装过程比较复杂，既可以通过在host上安装，也可以部署shipyard镜像（包括shipyard-agent、shipyard-deploy等组件）。v2版本简化了安装过程，启动两个镜像就完成：...</p>
+  </div>
+  <footer class="entry-footer"><span title='2014-12-29 13:21:25 +0000 UTC'>December 29, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to Docker集中化web界面管理平台shipyard" href="http://xgknight.com/posts/2014/12/docker%E9%9B%86%E4%B8%AD%E5%8C%96web%E7%95%8C%E9%9D%A2%E7%AE%A1%E7%90%86%E5%B9%B3%E5%8F%B0shipyard/"></a>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
+    <h2>【转&#43;改】Docker核心技术预览
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>本文简单介绍docker使用到的部分核心技术，但不做深入探究，因为每一个技术都是一个独立的项目，有机会再分别详细介绍。 来源地址：http://www.infoq.com/cn/articles/docker-core-technology-preview
+Linux Namespace （实例隔离）## The purpose of each namespace is to wrap a particular global system resource in an abstraction that makes it appear to the processes within the namespace that they have their own isolated instance of the global resource.
+每个用户实例之间相互隔离，互不影响。一般的硬件虚拟化方法给出的方法是VM，而LXC给出的方法是container，更细一点讲就是kernel namespace。其中pid、net、ipc、mnt、uts、user等namespace将container的进程、网络、消息、文件系统、UTS(“UNIX Time-sharing System”)和用户空间隔离开。
+pid namespace 不同用户的进程就是通过pid namespace隔离开的，且不同 namespace 中可以有相同pid。所有的LXC进程在docker中的父进程为docker进程，每个lxc进程具有不同的namespace。同时由于允许嵌套，因此可以很方便的实现 Docker in Docker。
+** net namespace ** 有了 pid namespace, 每个namespace中的pid能够相互隔离，但是网络端口还是共享host的端口。网络隔离是通过net namespace实现的， 每个net namespace有独立的 network devices, IP addresses, IP routing tables, /proc/net 目录。这样每个container的网络就能隔离开来。LXC在此基础上有5种网络类型，docker默认采用veth的方式将container中的虚拟网卡同host上的一个docker bridge—docker0连接在一起。...</p>
+  </div>
+  <footer class="entry-footer"><span title='2014-12-18 13:21:25 +0000 UTC'>December 18, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 【转&#43;改】Docker核心技术预览" href="http://xgknight.com/posts/2014/12/%E8%BD%AC-%E6%94%B9docker%E6%A0%B8%E5%BF%83%E6%8A%80%E6%9C%AF%E9%A2%84%E8%A7%88/"></a>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
+    <h2>Docker简介
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>1. docker是什么 Docker is an open-source engine that automates the deployment of any application as a lightweight, portable, self-sufficient container that will run virtually anywhere.
+Docker是 PaaS 提供商dotCloud开源的一个基于 LXC 的高级容器引擎， 源代码托管在 Github 上, 基于go语言并遵从Apache2.0协议开源。Docker近期非常火热，无论是从 GitHub 上的代码活跃度，还是Redhat宣布在RHEL7中正式支持Docker，都给业界一个信号，这是一项创新型的技术解决方案。就连 Google 公司的 Compute Engine 也支持 docker 在其之上运行，国内“BAT”先锋企业百度Baidu App Engine(BAE)平台也是以Docker作为其PaaS云基础。
+Docker产生的目的就是为了解决以下问题：
+环境管理复杂：从各种OS到各种中间件再到各种App，一款产品能够成功发布，作为开发者需要关心的东西太多，且难于管理，这个问题在软件行业中普遍存在并需要直接面对。Docker可以简化部署多种应用实例工作，比如Web应用、后台应用、数据库应用、大数据应用比如Hadoop集群、消息队列等等都可以打包成一个Image部署。 云计算时代的到来：AWS的成功，引导开发者将应用转移到云上, 解决了硬件管理的问题，然而软件配置和管理相关的问题依然存在 (AWS cloudformation是这个方向的业界标准, 样例模板可参考这里)。Docker的出现正好能帮助软件开发者开阔思路，尝试新的软件管理方法来解决这个问题。 虚拟化手段的变化：云时代采用标配硬件来降低成本，采用虚拟化手段来满足用户按需分配的资源需求以及保证可用性和隔离性。然而无论是KVM还是Xen，在 Docker 看来都在浪费资源，因为用户需要的是高效运行环境而非OS，GuestOS既浪费资源又难于管理，更加轻量级的LXC更加灵活和快速。 LXC的便携性：LXC在 Linux 2.6 的 Kernel 里就已经存在了，但是其设计之初并非为云计算考虑的，缺少标准化的描述手段和容器的可便携性，决定其构建出的环境难于分发和标准化管理(相对于KVM之类image和snapshot的概念)。Docker就在这个问题上做出了实质性的创新方法。 Docker的主要特性如下：
+文件系统隔离：每个进程容器运行在完全独立的根文件系统里。 资源隔离：可以使用cgroup为每个进程容器分配不同的系统资源，例如CPU和内存。 网络隔离：每个进程容器运行在自己的网络命名空间里，拥有自己的虚拟接口和IP地址。 写时复制：采用写时复制方式创建根文件系统，这让部署变得极其快捷，并且节省内存和硬盘空间。 日志记录：Docker将会收集和记录每个进程容器的标准流（stdout/stderr/stdin），用于实时检索或批量检索。 变更管理：容器文件系统的变更可以提交到新的映像中，并可重复使用以创建更多的容器。无需使用模板或手动配置。 交互式Shell：Docker可以分配一个虚拟终端并关联到任何容器的标准输入上，例如运行一个一次性交互shell。 2. 比较 2....</p>
+  </div>
+  <footer class="entry-footer"><span title='2014-12-18 11:21:25 +0000 UTC'>December 18, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to Docker简介" href="http://xgknight.com/posts/2014/12/docker%E7%AE%80%E4%BB%8B/"></a>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
+    <h2>Linux下同步工具inotify&#43;rsync使用详解
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>1. rsync 1.1 什么是rsync rsync是一个远程数据同步工具，可通过LAN/WAN快速同步多台主机间的文件。它使用所谓的“Rsync演算法”来使本地和远程两个主机之间的文件达到同步，这个算法只传送两个文件的不同部分，而不是每次都整份传送，因此速度相当快。所以通常可以作为备份工具来使用。
+运行Rsync server的机器也叫backup server，一个Rsync server可同时备份多个client的数据；也可以多个Rsync server备份一个client的数据。Rsync可以搭配ssh甚至使用daemon模式。Rsync server会打开一个873的服务通道(port)，等待对方rsync连接。连接时，Rsync server会检查口令是否相符，若通过口令查核，则可以开始进行文件传输。第一次连通完成时，会把整份文件传输一次，下一次就只传送二个文件之间不同的部份。
+基本特点：
+可以镜像保存整个目录树和文件系统； 可以很容易做到保持原来文件的权限、时间、软硬链接等； 无须特殊权限即可安装； 优化的流程，文件传输效率高； 可以使用rcp、ssh等方式来传输文件，当然也可以通过直接的socket连接； 支持匿名传输。 命令语法： rsync的命令格式可以为以下六种： rsync [OPTION]… SRC DEST rsync [OPTION]… SRC [USER@]HOST:DEST rsync [OPTION]… [USER@]HOST:SRC DEST rsync [OPTION]… [USER@]HOST::SRC DEST rsync [OPTION]… SRC [USER@]HOST::DEST rsync [OPTION]… rsync://[USER@]HOST[:PORT]/SRC [DEST]
+对应于以上六种命令格式，我们可以总结rsync有2种不同的工作模式：
+shell模式：使用远程shell程序（如ssh或rsh）进行连接。当源路径或目的路径的主机名后面包含一个冒号分隔符时使用这种模式，rsync安装完成后就可以直接使用了，无所谓启动。（目前没有尝试过这个方法） daemon模式：使用TCP直接连接rsync daemon。当源路径或目的路径的主机名后面包含两个冒号，或使用rsync://URL时使用这种模式，无需远程shell，但必须在一台机器上启动rsync daemon，默认端口873，这里可以通过rsync --daemon使用独立进程的方式，或者通过xinetd超级进程来管理rsync后台进程。 当rsync作为daemon运行时，它需要一个用户身份。如果你希望启用chroot，则必须以root的身份来运行daemon，监听端口，或设定文件属主；如果不启用chroot，也可以不使用root用户来运行daemon，但该用户必须对相应的模块拥有读写数据、日志和lock file的权限。当rsync以daemon模式运行时，它还需要一个配置文件——rsyncd.conf。修改这个配置后不必重启rsync daemon，因为每一次的client连接都会去重新读取该文件。
+我们一般把DEST远程服务器端成为rsync Server，运行rsync命令的一端SRC称为Client。
+安装： rsync在CentOS6上默认已经安装，如果没有则可以使用yum install rsync -y，服务端和客户端是同一个安装包。
+# rsync -h 1.2 同步测试 关于rsync命令的诸多选项说明，见另外一篇文章rsync与inotifywait命令和配置选项说明。
+1.2.1 本机文件夹同步 # rsync -auvrtzopgP --progress /root/ /tmp/rsync_bak/ 会看到从/root/传输文件到/tmp/rsync_bak/的列表和速率，再运行一次会看到sending incremental file list下没有复制的内容，可以在/root/下touch某一个文件再运行看到只同步了修改过的文件。...</p>
+  </div>
+  <footer class="entry-footer"><span title='2014-12-12 01:21:25 +0000 UTC'>December 12, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to Linux下同步工具inotify&#43;rsync使用详解" href="http://xgknight.com/posts/2014/12/linux%E4%B8%8B%E5%90%8C%E6%AD%A5%E5%B7%A5%E5%85%B7inotify-rsync%E4%BD%BF%E7%94%A8%E8%AF%A6%E8%A7%A3/"></a>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
+    <h2>tar命令高级用法——备份数据
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>Linux上有功能强大的tar命令，tar最初是为了制作磁带备份（tape archive）而设计的，它的作用是把文件和目录备份到磁带中，然后从磁带中提取或恢复文件。现在我们可以使用tar来备份数据到任何存储介质上。它是文件级备份，不必考虑底层文件系统类别，并且支持增量备份。
+1. 部分常用选项 -z, --gzip：使用gzip工具（解）压缩，后缀一般为.gz -c, --create：tar打包，后缀一般为.tar -f, --file=：后面立刻接打包或压缩后得到的文件名 -x, --extract：解包命令，与-c对应 -p：保留备份数据的原本权限和属性 -g：后接增量备份的快照文件 -C：指定解压缩的目录 --exclude：排除不打包的目录或文件，支持正则匹配 其他
+-X, --exclude-from：在一个文件中列出要排除的目录或文件（在--exclude=较多时使用） -t, --list：列出备份档案中的文件列表，不与-c、-x同时出现 -j, --bzip2：使用bzip2工具（解）压缩，后缀一般为.bz2 -P：保留绝对路径，解压时同样会自动解压到绝对路径下 -v：（解）压缩过程显示文件处理过程，常用但不建议对大型文件使用 2. 增量备份（网站）数据 许多系统（应用或网站）每天都有静态文件产生，对于一些比较重要的静态文件如果有进行定期备份的需求，就可以通过tar打包压缩备份到指定的地方，特别是对一些总文件比较大比较多的情况，还可以利用-g选项来做增量备份。
+备份的目录最好使用相对路径，也就是进入到需要备份的根目录下
+具体示例方法如下。
+备份当前目录下的所有文件 # tar -g /tmp/snapshot_data.snap -zcpf /tmp/data01.tar.gz . 在需要恢复的目录下解压恢复 # tar -zxpf /tmp/data01.tar.gz -C . -g选项可以理解备份时给目录文件做一个快照，记录权限和属性等信息，第一次备份时/tmp/snapshot_data.snap不存在，会新建一个并做完全备份。当目录下的文件有修改后，再次执行第一条备份命令（记得修改后面的档案文件名），会自动根据-g指定的快照文件，增量备份修改过的文件，包括权限和属性，没有动过的文件不会重复备份。
+另外需要注意上面的恢复，是“保留恢复”，即存在相同文件名的文件会被覆盖，而原目录下已存在（但备份档案里没有）的，会依然保留。所以如果你想完全恢复到与备份文件一模一样，需要清空原目录。如果有增量备份档案，则还需要使用同样的方式分别解压这些档案，而且要注意顺序。
+下面演示一个比较综合的例子，要求：
+备份/tmp/data目录，但cache目录以及临时文件排除在外 由于目录比较大（&gt;4G），所以全备时分割备份的档案（如每个备份档案文件最大1G） 保留所有文件的权限和属性，如用户组和读写权限 # cd /tmp/data 做一次完全备份 # rm -f /tmp/snapshot_data.snap # tar -g /tmp/snapshot_data.snap -zcpf - --exclude=./cache ./ | split -b 1024M - /tmp/bak_data$(date -I)....</p>
+  </div>
+  <footer class="entry-footer"><span title='2014-12-08 01:21:25 +0000 UTC'>December 8, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to tar命令高级用法——备份数据" href="http://xgknight.com/posts/2014/12/tar%E5%91%BD%E4%BB%A4%E9%AB%98%E7%BA%A7%E7%94%A8%E6%B3%95%E5%A4%87%E4%BB%BD%E6%95%B0%E6%8D%AE/"></a>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
+    <h2>MySQL备份命令mysqldump参数说明与示例
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>1. 语法选项说明 -h, --host=name 主机名
 -P[ port_num], --port=port_num 用于连接MySQL服务器的的TCP/IP端口号
 --master-data 这个选项可以把binlog的位置和文件名添加到输出中，如果等于1，将会打印成一个CHANGE MASTER命令；如果等于2，会加上注释前缀。并且这个选项会自动打开--lock-all-tables，除非同时设置了--single-transaction（这种情况下，全局读锁只会在开始dump的时候加上一小段时间，不要忘了阅读--single-transaction的部分）。在任何情况下，所有日志中的操作都会发生在导出的准确时刻。这个选项会自动关闭--lock-tables。
 -x, --lock-all-tables 锁定所有库中所有的表。这是通过在整个dump的过程中持有全局读锁来实现的。会自动关闭--single-transaction和--lock-tables。
@@ -160,171 +249,91 @@
 不缓冲查询，直接导出至stdout。（默认打开，用--skip-quick来关闭）该选项用于转储大的表。
 --set-charset 将SET NAMES default_character_set加到输出中。该选项默认启用。要想禁用SET NAMES语句，使用--skip-set-charset。
 --add-drop-tables 在每个CREATE TABLE语句前添加DROP TABLE语句。默认开启。
---add-locks 在每个表导出之前增加LOCK TABLES并且之后UNLOCK TABLE。(为了使得更快地插入到MySQL)。默认开启。...</p>
+--add-locks 在每个表导出之前增加LOCK TABLES并且之后UNLOCK TABLE。(为了使得更快地插入到MySQL)。默认开启。
+--create-option 在CREATE TABLE语句中包括所有MySQL表选项。默认开启，使用--skip-create-options来关闭。
+-e, --extended-insert 使用全新多行INSERT语法，默认开启（给出更紧缩并且更快的插入语句）
+-d, --no-data 不写入表的任何行信息。如果你只想得到一个表的结构的导出，这是很有用的。
+--add-drop-database 在create数据库之前先DROP DATABASE，默认关闭，所以一般在导入时需要保证数据库已存在。...</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-12-05 20:21:25 +0000 UTC'>December 5, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to MySQL备份命令mysqldump参数说明与示例" href="http://xgknight.com/posts/2014/12/mysql%E5%A4%87%E4%BB%BD%E5%91%BD%E4%BB%A4mysqldump%E5%8F%82%E6%95%B0%E8%AF%B4%E6%98%8E%E4%B8%8E%E7%A4%BA%E4%BE%8B/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>MySQL增量备份与恢复实例
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: 生产环境使用 pt-table-checksum 检查MySQL数据一致性 date: 2015-12-29 10:21:25 updated: 2015-12-29 00:46:23 tags: [mysql, 主从复制, percona] categories:
-MySQL 公司数据中心从托管机房迁移到阿里云，需要对mysql迁移（Replication）后的数据一致性进行校验，但又不能对生产环境使用造成影响，pt-table-checksum 成为了绝佳也是唯一的检查工具。
-pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、从库的数据是否一致。其原理是在主库执行基于statement的sql语句来生成主库数据块的checksum，把相同的sql语句传递到从库执行，并在从库上计算相同数据块的checksum，最后，比较主从库上相同数据块的checksum值，由此判断主从数据是否一致。检测过程根据唯一索引将表按row切分为块（chunk），以为单位计算，可以避免锁表。检测时会自动判断复制延迟、 master的负载， 超过阀值后会自动将检测暂停，减小对线上服务的影响。
-pt-table-checksum 默认情况下可以应对绝大部分场景，官方说，即使上千个库、上万亿的行，它依然可以很好的工作，这源自于设计很简单，一次检查一个表，不需要太多的内存和多余的操作；必要时，pt-table-checksum 会根据服务器负载动态改变 chunk 大小，减少从库的延迟。
-为了减少对数据库的干预，pt-table-checksum还会自动侦测并连接到从库，当然如果失败，可以指定--recursion-method选项来告诉从库在哪里。它的易用性还体现在，复制若有延迟，在从库 checksum 会暂停直到赶上主库的计算时间点（也通过选项--设定一个可容忍的延迟最大值，超过这个值也认为不一致）。
-为了保证主数据库服务的安全，该工具实现了许多保护措施：
-自动设置 innodb_lock_wait_timeout 为1s，避免引起 默认当数据库有25个以上的并发查询时，pt-table-checksum会暂停。可以设置 --max-load 选项来设置这个阀值 当用 Ctrl&#43;C 停止任务后，工具会正常的完成当前 chunk 检测，下次使用 --resume 选项启动可以恢复继续下一个 chunk 工作过程 直接看 nettedfish 的说明：
-1. 连接到主库：pt工具连接到主库，然后自动发现主库的所有从库。默认采用show full processlist来查找从库，但是这只有在主从实例端口相同的情况下才有效。 3. 查找主库或者从库是否有复制过滤规则：这是为了安全而默认检查的选项。你可以关闭这个检查，但是这可能导致checksum的sql语句要么不会同步到从库，要么到了从库发现从库没有要被checksum的表，这都会导致从库同步卡库。 5. 开始获取表，一个个的计算。 6. 如果是表的第一个chunk，那么chunk-size一般为1000；如果不是表的第一个chunk，那么采用19步中分析出的结果。 7. 检查表结构，进行数据类型转换等，生成checksum的sql语句。 8. 根据表上的索引和数据的分布，选择最合适的split表的方法。 9. 开始checksum表。 10. 默认在chunk一个表之前，先删除上次这个表相关的计算结果。除非–resume。 14. 根据explain的结果，判断chunk的size是否超过了你定义的chunk-size的上限。如果超过了，为了不影响线上性能，这个chunk将被忽略。 15....</p>
+    <p>小量的数据库可以每天进行完整备份，因为这也用不了多少时间，但当数据库很大时，就不太可能每天进行一次完整备份了，这时候就可以使用增量备份。增量备份的原理就是使用了mysql的binlog日志。 本次操作的MySQL版本为5.5.40 for Linux (x86_64)。
+增量备份要确保打开了二进制日志，参考mysql的日志系统：
+mysql&gt; show variables like &#39;%log_bin%&#39;; 首先对pak数据库做一个完整备份：
+$ mysqldump -h localhost -upak -ppwd -P3306 --master-data=2 --single-transaction --opt pak &gt; pak_bak_full.sql 这时候就会得到一个全备文件pak_bak_full.sql。mysqldump操作会导致滚动一次log，假设新的binlog文件是mysql-bin.000002。
+1. 模拟插入数据和误操作 a. 在pak库的某个表插入一些数据，然后执行flush logs命令。这时将会产生一个新的二进制日志文件mysql-bin.000003，mysql-bin.000002则保存了全备过后的所有更改，既增加记录的操作也保存在了mysql-bin.00002中。
+b. 再在pak库中的t_user表中增加两条记录，然后误删除t_user表。t_user中增加记录的操作和删除表的操作都记录在mysql-bin.000003中。
+2. 开始恢复 恢复过程不要记录日志：
+mysql &gt; set global sql_log_bin=0; 3. 首先导入全备数据 $ mysql -h localhost -upak -ppwd &lt; pak_bak_full.sql 或 mysql&gt; source /path/backup/pak_bak_full.sql 我们也可以看到全备时的binlog位置：
+head -50 backup-file.sql |grep &#39;CHANGE MASTER&#39; -- CHANGE MASTER TO MASTER_LOG_FILE=&#39;mysql-bin.000001&#39;, MASTER_LOG_POS=4321; 查看当前所在二进制日志中的位置：
+mysql&gt; show master status; 根据上面两个position能大概确定需要完整恢复哪几个binlog文件。...</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-12-05 09:21:25 +0000 UTC'>December 5, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to MySQL增量备份与恢复实例" href="http://xgknight.com/posts/2014/12/mysql%E5%A2%9E%E9%87%8F%E5%A4%87%E4%BB%BD%E4%B8%8E%E6%81%A2%E5%A4%8D%E5%AE%9E%E4%BE%8B/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>Oracle单实例安装环境一键配置脚本（CentOS6 &#43; 11gR2 ）
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: nginx做负载均衡器以及proxy缓存配置 date: 2015-06-02 01:21:25 updated: 2015-06-02 00:46:23 tags: [nignx, 负载均衡, 缓存] categories: [Linux, Nginx] 关于nginx的安装和基本配置请参考nginx，本文在原基础上完成以下几个功能：
-结合proxy和upstream模块实现nginx负载均衡 结合nginx_upstream_check_module模块实现后端服务器的健康检查 使用nginx-sticky-module扩展模块实现Cookie会话黏贴（session-sticky效果） 使用proxy模块实现静态文件缓存 使用ngx_cache_purge实现更强大的缓存清除功能 1. 安装及模块说明 上面提到的3个模块都属于第三方扩展模块，需要提前下好源码，然后编译时通过--add-moudle=src_path一起安装。
-注意：
-使用 nginx_upstream_check_module(简记为m1) 时要先为nginx打上相应版本的patch，我的nginx版本为 1.6.3，所以patch对应 m1 解压后目录下的check_1.5.12&#43;.patch，所以进入nginx源码目录，执行 patch -p1 …（见下方示例） nginx-sticky-module-ng(简记为m2) 模块可以单独使用，但是因为m1监控检查的方式是依赖于m2的，所以要使用m2，还要对m1打上patch，进入m2源码目录，执行 patch -p0… 编译示例：（CentOS 6.5 x86_64, nginx 1.6.3）
-# yum -y install gcc gcc-c&#43;&#43; make libtool zlib zlib-devel openssl openssl--devel pcre pcre-devel # cd nginx-1.6.3 # patch -p1 &lt; ../nginx_upstream_check_module-0.3.0/check_1.5.12&#43;.patch # cd ../nginx-sticky-module-ng-1.2.5 # patch -p0 &lt; ....</p>
+    <p>这是自己曾经写的一个oracle 11gR2在CentOS6 x86_64服务器上，一键配置安装环境的脚本，能快速完成安装前环境的配置。
+具体完成以下工作：
+备份系统配置文件，以防出错 添加oracle用户和用户组 创建安装目录 关闭selinux 在.bash_profile中修改环境变量 修改sysctl.conf文件 修改limits.conf文件 修改PAM的login文件 安装必要的依赖包 使用注意事项：
+root的用户执行，chmod &#43;x oraclePreInstCheck.sh ./oraclePreInstCheck.sh运行后，请仔细阅读说明，再决定是否使用该脚本 该脚本默认参数适用于2核4G内存的环境，你可以根据需要修改kernelset()部分 执行完后，你检查一下你的安装目录及权限（默认/db/oracle） 该脚本会有提示输入的地方，请不要挑战它的健壮性，比如输入安装根目录时，不要带入空格 脚本只需执行一次，修改系统参数如sysctl.conf之前，都有备份成xxx.ora_bak 请确保可以通过yum方式安装软件包（使用挂载DVD镜像或联网） 建议结合tee将执行过程记录在日志文件中，./oraclePreInstCheck.sh | tee oraclePreInstCheck.log oraclePreInstCheck.sh：
+#!/bin/bash # author zhouxiao # date 2014-03-07 # description oracle 11g R2 for linux 6.0&#43; x86_64 安装辅助脚本 #定义常量 SYSCTL=/etc/sysctl.conf LIMITS=/etc/security/limits.conf PAM=/etc/pam.d/login PROFILE=/etc/profile BASH_PROFILE=/home/oracle/.bash_profile #循环变量 i=1 #定义显示颜色 #颜色定义 信息(33黄色) 警示(31红色) 过程(36浅蓝) usage() { echo &#34;Scripts: initialize the required env settings for Oracle 11gR2 installation on Linux 6....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-12-02 15:21:25 +0000 UTC'>December 2, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to Oracle单实例安装环境一键配置脚本（CentOS6 &#43; 11gR2 ）" href="http://xgknight.com/posts/2014/12/oracle%E5%8D%95%E5%AE%9E%E4%BE%8B%E5%AE%89%E8%A3%85%E7%8E%AF%E5%A2%83%E4%B8%80%E9%94%AE%E9%85%8D%E7%BD%AE%E8%84%9A%E6%9C%ACcentos6--11gr2/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>关于研究生的一点担忧
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: nginx服务器安装及配置文件详解 date: 2015-05-17 01:21:25 updated: 2015-05-28 00:46:23 tags: nignx categories: [Linux, Nginx] nginx在工作中已经有好几个环境在使用了，每次都是重新去网上扒博客，各种编译配置，今天自己也整理一份安装文档和nginx.conf配置选项的说明，留作以后参考。像负载均衡配置（包括健康检查）、缓存（包括清空缓存）配置实例，请参考 http://xgknight.com/2015/05/17/nginx-install-and-config ，ssl加密请参考 http://xgknight.com/2015/05/28/nginx-ssl/ 。
-1. 安装nginx 1.1 选择稳定版本 我们编译安装nginx来定制自己的模块，机器CentOS 6.2 x86_64。首先安装缺少的依赖包：
-# yum -y install gcc gcc-c&#43;&#43; make libtool zlib zlib-devel openssl openssl-devel pcre pcre-devel 这些软件包如果yum上没有的话可以下载源码来编译安装，只是要注意编译时默认安装的目录，确保下面在安装nginx时能够找到这些动态库文件（ldconfig）。
-从 http://nginx.org/en/download.html 下载稳定版nginx-1.6.3.tar.gz到/usr/local/src下解压。
-为了后续准备我们另外下载2个插件模块：nginx_upstream_check_module-0.3.0.tar.gz —— 检查后端服务器的状态，nginx-goodies-nginx-sticky-module-ng-bd312d586752.tar.gz（建议在/usr/local/src下解压后将目录重命名为nginx-sticky-module-ng-1.2.5） —— 后端做负载均衡解决session sticky问题（与upstream_check模块结合使用需要另外打补丁，请参考nginx负载均衡配置实战）。
-请注意插件与nginx的版本兼容问题，一般插件越新越好，nginx不用追新，稳定第一。nginx-1.4.7，nginx-sticky-module-1.1，nginx_upstream_check_module-0.2.0，这个搭配也没问题。sticky-1.1与nginx-1.6版本由于更新没跟上编译出错。（可以直接使用Tengine，默认就包括了这些模块）
-[root@cachets nginx-1.6.3]# pwd /usr/local/src/nginx-1.6.3 [root@cachets nginx-1.6.3]# ./configure --prefix=/usr/local/nginx-1.6 --with-pcre \ &gt; --with-http_stub_status_module --with-http_ssl_module \ &gt; --with-http_gzip_static_module --with-http_realip_module \ &gt; --add-module=../nginx_upstream_check_module-0.3.0 [root@cachets nginx-1....</p>
+    <p>最近有个在大学玩的比较好现在在读研的同学，来询问我一些如何给老师做精品课程在线测试系统的问题，从沟通中我忍不住从个人的角度来表达一下感想和担忧。
+首先从我接收到的信息来看，高校导师为了给自己擅长的课程评选上学校、市级或省级精品课程，急于完成一个展示成果的平台，只要能在最短的时间内提交所能看的见的成果，那就表明有效率和实力。所以这个在线测试系统只需要能够展示一个页面，页面上有单项、多选题，提交测试后直接显示对错和总分，无需记录测试者姓名等其他任何与试题无关的信息，也就是没有数据库。差不多就是一个静态页面了，对错的判断，包括答案都固定在代码里面了。我相信稍微了解IT软件开发的人都知道，这样的系统设计可以让人感到无语，当然还有很多不是计算机类专业的，可能看不懂这些，只关心最终实现的效果达到预期就行。偏偏导师和所交予任务的学生，都不懂设计和编程。所以当我说至少应该有个数据库时，“太麻烦，不懂，周期太长”。由于是出于帮忙的目的，也就没有说太多的话来打击他的积极性，说多了反而有点表现自己有多牛B的嫌疑，就硬着头皮做了个demo。
+由此可见大学老师为评上精品课程，那种急功近利的心理，只要对外宣传“我们有一个在线测评系统来检验学生学习效果，blablabla…”，然后评选小组比对评选规则里面有“在线测评”，加分！但请问像上面那样的系统意义何在？老师不知道有谁做过测试，不知道分数，只知道“当前浏览xxx次”，学生完全取决于是否主动。我想如果老师把这个测评当做一个硬性要求或作为所熟知却非常神秘的“平时成绩”的一部分，那只能是通过某种方式提交测试截图了。我心还想，在线测评系统一次性完成上线，是不是就再也不会修改了，加题减题，都要大动干戈的去修改后台代码，丝毫没有规划以后的扩展，当然也许我想多了，因为“这就是很简单的一个测试系统”，嗯，都说是测试而不是正式环境了，认真你就输了。
+这里做个小插曲。我们生活的环境，充斥着太多的指标、太多的名声。想起上周在我司门口早上卖炸酱面的摊贩被城管执法包围那件事。每天早上这位大叔家的炸酱面是附近最好吃的，每天都排着很长的队，如果不赶时间我和同事们都会优先选择这家。大家都生活不易，城管也是，起早贪黑，四处蹲点追赶流动摊贩，因为没有业绩没有完成指标，如何回去交差。又想起电视里报道过某地的交警每月要达到罚款20万的指标，这说多了其实就是社会问题了，我们这些小众市民除了旁观，祈祷不要发生在我们身上，还能做些什么呢。指标本应该是一个积极充满正能量的、督促机构上进的一个目标，但是如果是为了充数而不择手段去实现，急功近利，那就变质了。
+就在线测评问题来说，个人觉得比较合适的做法，应该是要具有一个长远的观念，为何学校不统一做一个在线测评系统，其他各个课程申请账号，获得出题的资格，自由的在后台添加题目，是否需要记录分数和姓名，老师还可以统计对比各班的情况，甚至在评上精品课程以后，作为进一步考核的数据来源，一次投入，无限产出。相比每门课程做重复低效的工作，一眼就可以看出利弊了。导师舍不得花钱请廉价的学生开发一个拿得出手的系统，只能让手下的研究生“自己看着办”。
+另外一方面是我对研究生所表现出来的担忧，是关于学习方法和学习能力。研究生最后毕业靠的是一纸论文，我相信会有高水平有独立见解的论文，但大部分论文“借鉴”的成分会不会太高呢？我们原创性的东西太少了，习惯捡现成的东西，包括我自己也是，写一份配置文档需要google许多文章，然后东抄西拆，拼接起来，但至少它都是实践有效了，对于我个人来说具有较大的参考价值。然而在大学里养成了这样的习惯，就会慢慢的丧失学习能力，遇见要解决一个全新的问题，第一反应不是自己去网上检索，而是找到会的直接问“这个怎么做？”。我该如何回答是好呢？
+提问也是有智慧的，问得太宽泛，需要与回答者反复沟通来确认具体的问题，才给出什么样的答案。依然是最初的例子，同学使用ASP.NET来做一个在线测试系统，但他完全不懂编程，于是就问了我“有哪些方法，要准备啥”（还好不是宽泛的问“要怎么做”），我告诉他一些流程性的东西，要基本会一些什么，但他说他是小白，编程基础几乎为零。还是为了快速拿出成果，于是我就违心的打开了2年没有点开竟然没有卸载的Visual Studio 2010，一边搜索，一边拖拉控件，许多基本知识都忘了，做了个及其简陋的demo，拙劣的后台代码自己都不忍直视。我一直不承认自己是个程序猿，实际上也不是，但依然偶尔会兼职一下。很难说我是不是把自己同学给害了，没害是这种可快速复制、完成任务的技能已经学会了，毕竟这一次之后他再也不必学习编程，害他是我把现成的东西给他了。其实任何一本书、任何一篇博客教程都可以自己琢磨快速搞定，而不是一出现问题“表格怎么做”、“图片怎么查”，我真就回了一句“ 搜索关键字 ‘html 表格’、‘asp.net 插入图片’ ”，当然一部分原因是当时忙，没有时间手把手教。
+遇到问题，自己查阅资料，自己去理解，练习独立的去面对、解决问题，琢磨不明白的再去问，这样也不会浪费对方太多时间。当然简单一句话的能搞定的问题，也没必要说让提问者去走冤枉路，大概就是这个“度”的问题区分了人与人之间的差距和性格吧，无所谓绝对的对错。
+写这么多，有点不自量力了，额，请看到的同学不要对号入座，没有任何针对性和攻击性。</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-11-30 18:21:25 +0000 UTC'>November 30, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 关于研究生的一点担忧" href="http://xgknight.com/posts/2014/11/%E5%85%B3%E4%BA%8E%E7%A0%94%E7%A9%B6%E7%94%9F%E7%9A%84%E4%B8%80%E7%82%B9%E6%8B%85%E5%BF%A7/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>Dockerfile指令详解
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: Nginx&#43;Keepalived实现站点高可用 date: 2015-05-18 01:21:25 updated: 2015-05-18 00:46:23 tags: [nignx, keepalived, 高可用] categories: [Linux, Nginx] 公司内部 OA 系统要做线上高可用，避免单点故障，所以计划使用2台虚拟机通过 Keepalived 工具来实现 nginx 的高可用（High Avaiability），达到一台nginx入口服务器宕机，另一台备机自动接管服务的效果。（nginx做反向代理，实现后端应用服务器的负载均衡）快速搭建请直接跳至 第2节。
-1. Keepalived介绍 Keepalived是一个基于VRRP协议来实现的服务高可用方案，可以利用其来避免IP单点故障，类似的工具还有heartbeat、corosync、pacemaker。但是它一般不会单独出现，而是与其它负载均衡技术（如lvs、haproxy、nginx）一起工作来达到集群的高可用。
-1.1 VRRP协议 VRRP全称 Virtual Router Redundancy Protocol，即 虚拟路由冗余协议。可以认为它是实现路由器高可用的容错协议，即将N台提供相同功能的路由器组成一个路由器组(Router Group)，这个组里面有一个master和多个backup，但在外界看来就像一台一样，构成虚拟路由器，拥有一个虚拟IP（vip，也就是路由器所在局域网内其他机器的默认路由），占有这个IP的master实际负责ARP相应和转发IP数据包，组中的其它路由器作为备份的角色处于待命状态。master会发组播消息，当backup在超时时间内收不到vrrp包时就认为master宕掉了，这时就需要根据VRRP的优先级来选举一个backup当master，保证路由器的高可用。
-在VRRP协议实现里，虚拟路由器使用 00-00-5E-00-01-XX 作为虚拟MAC地址，XX就是唯一的 VRID （Virtual Router IDentifier），这个地址同一时间只有一个物理路由器占用。在虚拟路由器里面的物理路由器组里面通过多播IP地址 224.0.0.18 来定时发送通告消息。每个Router都有一个 1-255 之间的优先级别，级别最高的（highest priority）将成为主控（master）路由器。通过降低master的优先权可以让处于backup状态的路由器抢占（pro-empt）主路由器的状态，两个backup优先级相同的IP地址较大者为master，接管虚拟IP。
-与heartbeat/corosync等比较 直接摘抄自 http://www.linuxidc.com/Linux/2013-08/89227.htm ：
-Heartbeat、Corosync、Keepalived这三个集群组件我们到底选哪个好，首先我想说明的是，Heartbeat、Corosync是属于同一类型，Keepalived与Heartbeat、Corosync，根本不是同一类型的。Keepalived使用的vrrp协议方式，虚拟路由冗余协议 (Virtual Router Redundancy Protocol，简称VRRP)；Heartbeat或Corosync是基于主机或网络服务的高可用方式；简单的说就是，Keepalived的目的是模拟路由器的高可用，Heartbeat或Corosync的目的是实现Service的高可用。
-所以一般Keepalived是实现前端高可用，常用的前端高可用的组合有，就是我们常见的LVS&#43;Keepalived、Nginx&#43;Keepalived、HAproxy&#43;Keepalived。而Heartbeat或Corosync是实现服务的高可用，常见的组合有Heartbeat v3(Corosync)&#43;Pacemaker&#43;NFS&#43;Httpd 实现Web服务器的高可用、Heartbeat v3(Corosync)&#43;Pacemaker&#43;NFS&#43;MySQL 实现MySQL服务器的高可用。总结一下，Keepalived中实现轻量级的高可用，一般用于前端高可用，且不需要共享存储，一般常用于两个节点的高可用。而Heartbeat(或Corosync)一般用于服务的高可用，且需要共享存储，一般用于多节点的高可用。这个问题我们说明白了。
-又有博友会问了，那heartbaet与corosync我们又应该选择哪个好啊，我想说我们一般用corosync，因为corosync的运行机制更优于heartbeat，就连从heartbeat分离出来的pacemaker都说在以后的开发当中更倾向于corosync，所以现在corosync&#43;pacemaker是最佳组合。
-1.2 Keepalived &#43; nginx keepalived可以认为是VRRP协议在Linux上的实现，主要有三个模块，分别是core、check和vrrp。core模块为keepalived的核心，负责主进程的启动、维护以及全局配置文件的加载和解析。check负责健康检查，包括常见的各种检查方式。vrrp模块是来实现VRRP协议的。本文基于如下的拓扑图：
-&#43;-------------&#43; | uplink | &#43;-------------&#43; | &#43; MASTER keep|alived BACKUP 172....</p>
+    <p>Docker可以从Dockerfile中一步一步的读取指令来自动的创建镜像，常使用Dockerfile来创建用户自定义的镜像。格式如下：
+# Comment INSTRUCTION arguments 虽然前面的指令大小写不敏感，但习惯性的还是建议大写。docker是严格按照顺序（#注释起来的忽略）运行指令的。 下面逐个来介绍几个必要的指令。
+FROM FROM &lt;image&gt; 或 FROM &lt;image&gt;:&lt;tag&gt; 在Dockerfile中第一条非注释INSTRUCTION一定是FROM，它决定了以哪一个镜像作为基准，&lt;image&gt;首选本地是否存在，如果不存在则会从公共仓库下载（当然也可以使用私有仓库的格式）。
+RUN RUN &lt;commnad&gt; 或 RUN [&#34;executable&#34;, &#34;param1&#34;, &#34;param2&#34;] RUN指令会在当前镜像的顶层执行任何命令，并commit成新的（中间）镜像，提交的镜像会在后面继续用到。 上面看到RUN后的格式有两种写法。
+shell格式，相当于执行/bin/sh -c &#34;&lt;command&gt;&#34;：
+RUN apt-get install vim -y exec格式，不会触发shell，所以$HOME这样的环境变量无法使用，但它可以在没有bash的镜像中执行，而且可以避免错误的解析命令字符串：
+RUN [&#34;apt-get&#34;, &#34;install&#34;, &#34;vim&#34;, &#34;-y&#34;] 或 RUN [&#34;/bin/bash&#34;, &#34;-c&#34;, &#34;apt-get install vim -y&#34;] 与shell风格相同 ENTRYPOINT ENTRYPOINT命令设置在容器启动时执行命令，如果有多个ENTRYPOINT指令，那只有最后一个生效。有以下两种命令格式：
+ENTRYPOINT [&#34;executable&#34;, &#34;param1&#34;, &#34;param2&#34;] 数组/exec格式，推荐 或 ENTRYPOINT command param1 param2 shell格式 比如：
+docker run -i -t --rm -p 80:80 nginx 使用exec格式，在docker run &lt;image&gt;的所有参数，都会追加到ENTRYPOINT之后，并且会覆盖CMD所指定的参数（如果有的话）。当然可以在run时使用--entrypoint来覆盖ENTRYPOINT指令。 使用shell格式，ENTRYPOINT相当于执行/bin/sh -c &lt;command....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
-</article>
-
-<article class="post-entry"> 
-  <header class="entry-header">
-    <h2>
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>title: nginx配置location总结及rewrite规则写法 date: 2015-05-17 15:21:25 updated: 2015-05-17 15:46:23 tags: [nignx, rewrite] categories: [Linux, Nginx] 1. location正则写法 一个示例：
-location = / { # 精确匹配 / ，主机名后面不能带任何字符串 [ configuration A ] } location / { # 因为所有的地址都以 / 开头，所以这条规则将匹配到所有请求 # 但是正则和最长字符串会优先匹配 [ configuration B ] } location /documents/ { # 匹配任何以 /documents/ 开头的地址，匹配符合以后，还要继续往下搜索 # 只有后面的正则表达式没有匹配到时，这一条才会采用这一条 [ configuration C ] } location ~ /documents/Abc { # 匹配任何以 /documents/Abc 开头的地址，匹配符合以后，还要继续往下搜索 # 只有后面的正则表达式没有匹配到时，这一条才会采用这一条 [ configuration CC ] } location ^~ /images/ { # 匹配任何以 /images/ 开头的地址，匹配符合以后，停止往下搜索正则，采用这一条。 [ configuration D ] } location ~* \....</p>
-  </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
-</article>
-
-<article class="post-entry"> 
-  <header class="entry-header">
-    <h2>
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>title: nginx配置ssl加密（单双向认证、部分https） date: 2015-05-28 15:21:25 updated: 2015-05-28 15:46:23 tags: [nignx, ssl] categories: [Linux, Nginx] nginx下配置ssl本来是很简单的，无论是去认证中心买SSL安全证书还是自签署证书，但最近公司OA的一个需求，得以有个机会实际折腾一番。一开始采用的是全站加密，所有访问http:80的请求强制转换（rewrite）到https，后来自动化测试结果说响应速度太慢，https比http慢慢30倍，心想怎么可能，鬼知道他们怎么测的。所以就试了一下部分页面https（不能只针对某类动态请求才加密）和双向认证。下面分节介绍。
-默认nginx是没有安装ssl模块的，需要编译安装nginx时加入--with-http_ssl_module选项。
-关于SSL/TLS原理请参考 这里，如果你只是想测试或者自签发ssl证书，参考 这里 。
-提示：nignx到后端服务器由于一般是内网，所以不加密。
-1. 全站ssl 全站做ssl是最常见的一个使用场景，默认端口443，而且一般是单向认证。
-server { listen 443; server_name example.com; root /apps/www; index index.html index.htm; ssl on; ssl_certificate ../SSL/ittest.pem; ssl_certificate_key ../SSL/ittest.key; # ssl_protocols SSLv3 TLSv1 TLSv1.1 TLSv1.2; # ssl_ciphers ALL:!ADH:!EXPORT56:RC4&#43;RSA:&#43;HIGH:&#43;MEDIUM:&#43;LOW:&#43;SSLv2:&#43;EXP; # ssl_prefer_server_ciphers on; } 如果想把http的请求强制转到https的话：
-server { listen 80; server_name example.me; rewrite ^ https://$server_name$request_uri? permanent; ### 使用return的效率会更高 # return 301 https://$server_name$request_uri; } ssl_certificate证书其实是个公钥，它会被发送到连接服务器的每个客户端，ssl_certificate_key私钥是用来解密的，所以它的权限要得到保护但nginx的主进程能够读取。当然私钥和证书可以放在一个证书文件中，这种方式也只有公钥证书才发送到client。...</p>
-  </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
-</article>
-
-<article class="post-entry"> 
-  <header class="entry-header">
-    <h2>
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>title: 记一次错误卸载软件包导致Linux系统崩溃的修复解决过程 date: 2014-11-03 01:21:25 updated: 2014-11-07 00:46:23 tags: [linux, 系统管理,troubleshooting] categories: Linux 首先问题产生的缘由很简单，是我一同事在安装oracle一套软件时，按照要求需要binutils软件包的32位版本，然而在Oracle Linux已经装有64位，按理说是可以安装i686的，我猜应该是32位的版本低于这个已有的64位所以导致冲突而安装失败，因此同事就用yum remove binutils，这个命令也奇葩，由于是root权限导致依赖于它的200多个软件包也被卸载，最终导致网络断开，系统崩溃，在vSphere虚拟机上重新启动发现再也起不来。下面看问题：
-1. Kernel panic - not syncing: Attempted to kill init! 这个错误时在重新启动Oracle Linux一开始就出现，查阅的相关资料得知Kernel panic问题一般是由驱动模块终端处理终端问题导致的（不懂。。。），一开始我以为是驱动程序依赖于binutils导致被卸载，因此第一反应是想办法把缺失的软件装回去。实际上，是由于安全访问控制模块selinux的问题，参考类似问题。于是检查vi /etc/selinux/config时发现SELINUX=disables，拼写错误，应为disabled。 当再次启动没再出现该错误时，我高兴的认为原来这么简单就帮同事解决了，事实这根本还没到200多个软件包缺失而导致系统崩溃那一步。
-2. 系统启动加载条完成后，一直hang住不动 这无疑要使用LiveCD修复系统了，参考Ultimate method to install package from linux rescue mode或Using Rescue Mode to Fix..Problems。因为知道出问题前做过什么操作，下面直接上解决问题的过程。
-2.1 将系统DVD安装镜像加载到光驱 再次重启就自动进入安装界面，我们当然选择rescue mode： 一路按照提示确定（可以不配置network，这里就不贴图了，很简单），最终会提供给用户一个shell终端，对应的是从DVD光驱加载进来的系统，执行chroot /mnt/sysimage才会进入到原损坏的Linux系统，还好yum和rpm命令还可以使用，悲剧的是我并不知道yum remove命令卸载了哪些软件包。
-2.2 安装缺失的软件包 这里得谢天谢地yum命令的安装卸载日志/var/log/yum.log，这个日志里清楚的记录了installed和erased的所有软件包，用rpm是不可能了，因为270多个包的依赖关系难以解决，只能通过yum方式，而由于rescue模式没有配置网络，因此只能使用本地镜像源。
-在rescue系统下挂载光驱到待修复系统中的/media目录 bash-4.1# mount /dev/cdrom /mnt/sysimage/media chroot进入待修复系统 bash-4.1# chroot /mnt/sysimage 手动编辑一个仓库源（真实待修复的系统） sh-4.1# cd /etc/yum.repos.d/ &amp;&amp; vi Oracle-Media....</p>
-  </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
-</article>
-
-<article class="post-entry"> 
-  <header class="entry-header">
-    <h2>
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>title: OpenLDAP(2.4.3x)服务器搭建及配置说明 date: 2015-01-21 01:21:25 updated: 2015-01-21 10:46:23 tags: [LDAP, slapd] categories: [Linux, OpenLDAP] 本文采用的是从源码编译安装，适合Ubuntu和CentOS平台，通过apt-get或yum方式安装参考补充部分。openldap原理介绍参考这里。
-环境： Ubuntu: 14.04.1 (trusty), x86_64 OpenLDAP: 2.4.31 Berkery DB: 5.1.29
-1 安装 1.1 准备编译环境和依赖包 # apt-get install build-essential # apt-get install libssl-dev 下载openldap-2.4.31.tgz和db-5.1.29.NC.tar.gz并解压：
-# cd /usr/local/src src# wget ftp://ftp.openldap.org/pub/OpenLDAP/openldap-release/openldap-2.4.31.tgz # wget http://download.oracle.com/berkeley-db/db-5.1.29.NC.tar.gz # tar -zxf openldap-2.4.31.tgz # tar -zxf db-5.1.29.NC.tar.gz # cd db-5.1.29.NC/build_unix/ # ../dist/configure --prefix=/usr/local/berkeleydb-5.1 # make &amp;&amp; make install 建议人工指定--prefix，默认会安装到/usr/local/BerkeleyDB.5.1。上面的make过程会比较长，另外如果gcc版本在4.7及以上，可能会出现如下warning，可以忽略：
-../src/dbinc/atomic.h:179:19: warning: conflicting types for built-in function ‘__atomic_compare_exchange’ [enabled by default] 1....</p>
-  </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
-</article>
-
-<article class="post-entry"> 
-  <header class="entry-header">
-    <h2>
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>title: LDAP服务器的概念和原理简单介绍 date: 2015-01-15 01:21:25 updated: 2015-01-15 10:46:23 tags: [LDAP, sasl, Kerberos] categories: [Linux, OpenLDAP] 1. 目录服务 目录是一个为查询、浏览和搜索而优化的专业分布式数据库，它呈树状结构组织数据，就好象Linux/Unix系统中的文件目录一样。目录数据库和关系数据库不同，它有优异的读性能，但写性能差，并且没有事务处理、回滚等复杂功能，不适于存储修改频繁的数据。所以目录天生是用来查询的，就好象它的名字一样。
-目录服务是由目录数据库和一套访问协议组成的系统。类似以下的信息适合储存在目录中：
-企业员工信息，如姓名、电话、邮箱等； 公用证书和安全密钥； 公司的物理设备信息，如服务器，它的IP地址、存放位置、厂商、购买时间等； LDAP是轻量目录访问协议(Lightweight Directory Access Protocol)的缩写，LDAP是从X.500目录访问协议的基础上发展过来的，目前的版本是v3.0。与LDAP一样提供类似的目录服务软件还有ApacheDS、Active Directory、Red Hat Directory Service 。
-2. LDAP特点 LDAP的结构用树来表示，而不是用表格。正因为这样，就不能用SQL语句了 LDAP可以很快地得到查询结果，不过在写方面，就慢得多 LDAP提供了静态数据的快速查询方式 Client/server模型，Server 用于存储数据，Client提供操作目录信息树的工具 这些工具可以将数据库的内容以文本格式（LDAP 数据交换格式，LDIF）呈现在您的面前 LDAP是一种开放Internet标准，LDAP协议是跨平台的Interent协议 3. LDAP组织数据的方式 4. 基本概念 在浏览LDAP相关文档时经常会遇见一些概念，下面是常见概念的简单解释。
-4.1 Entry 条目，也叫记录项，是LDAP中最基本的颗粒，就像字典中的词条，或者是数据库中的记录。通常对LDAP的添加、删除、更改、检索都是以条目为基本对象的。
-dn：每一个条目都有一个唯一的标识名（distinguished Name ，DN），如上图中一个 dn：“cn=baby,ou=marketing,ou=people,dc=mydomain,dc=org” 。通过DN的层次型语法结构，可以方便地表示出条目在LDAP树中的位置，通常用于检索。
-rdn：一般指dn逗号最左边的部分，如cn=baby。它与RootDN不同，RootDN通常与RootPW同时出现，特指管理LDAP中信息的最高权限用户。
-Base DN：LDAP目录树的最顶部就是根，也就是所谓的“Base DN&#34;，如&#34;dc=mydomain,dc=org&#34;。
-4.2 Attribute 每个条目都可以有很多属性（Attribute），比如常见的人都有姓名、地址、电话等属性。每个属性都有名称及对应的值，属性值可以有单个、多个，比如你有多个邮箱。
-属性不是随便定义的，需要符合一定的规则，而这个规则可以通过schema制定。比如，如果一个entry没有包含在 inetorgperson 这个 schema 中的objectClass: inetOrgPerson，那么就不能为它指定employeeNumber属性，因为employeeNumber是在inetOrgPerson中定义的。
-LDAP为人员组织机构中常见的对象都设计了属性(比如commonName，surname)。下面有一些常用的别名：
-属性 别名 语法 描述 值(举例) commonName cn Directory String 姓名 sean surname sn Directory String 姓 Chow organizationalUnitName ou Directory String 单位（部门）名称 IT_SECTION organization o Directory String 组织（公司）名称 example telephoneNumber Telephone Number 电话号码 110 objectClass 内置属性 organizationalPerson 4....</p>
-  </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-11-17 15:21:25 +0000 UTC'>November 17, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to Dockerfile指令详解" href="http://xgknight.com/posts/2014/11/dockerfile%E6%8C%87%E4%BB%A4%E8%AF%A6%E8%A7%A3/"></a>
 </article>
 <footer class="page-footer">
   <nav class="pagination">

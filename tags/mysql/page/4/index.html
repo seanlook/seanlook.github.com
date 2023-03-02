@@ -128,6 +128,40 @@
 
 <article class="post-entry tag-entry"> 
   <header class="entry-header">
+    <h2>让mysqldump变成并发导出导入的魔法
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>1. 简介 取名mypumpkin，是python封装的一个让mysqldump以多线程的方式导出库表，再以mysql命令多线程导入新库，用于成倍加快导出，特别是导入的速度。这一切只需要在 mysqldump 或 mysql 命令前面加上 mypumpkin.py 即可，所以称作魔法。
+项目地址：https://github.com/seanlook/mypumpkin
+该程序源于需要对现网单库几百G的数据进行转移到新库，并对中间进行一些特殊操作（如字符集转换），无法容忍mysqldump导入速度。有人可能会提到为什么不用 mydumper，其实也尝试过它但还是放弃了，原因有：
+不能设置字符集 mydumper强制使用 binary 方式来连接库以达到不关心备份恢复时的字符集问题，然而我的场景下需要特意以不同的字符集导出、再导入。写这个程序的时候正好在公众号看到网易有推送的一篇文章 (解密网易MySQL实例迁移高效完成背后的黑科技)，提到他们对mydumper的改进已支持字符集设置，可是在0.9.1版本的patch里还是没找到。 没有像 mysqldump 那样灵活控制过滤选项（导哪些表、忽略哪些表） 因为数据量之巨大，而且将近70%是不变更的历史表数据，这些表是可以提前导出转换的；又有少量单表大于50G的，最好是分库导出转换。mydumper 不具备 mysqldump 这样的灵活性 对忽略导出gtid信息、触发器等其它支持 阿里云rds 5.6 导出必须要设置 set-gtid-purged=OFF 另外有人还可能提到 mysqlpump —— 它才是我认为mysqldump应该具有的模样，语法兼容，基于表的并发导出。但是只有 mysql服务端 5.7.9 以上才支持，这就是现实和理想的距离。。。
+2. 实现方法 首先说明，mysqldump的导出速度并不慢，经测试能达到50M/s的速度，10G数据花费3分钟的样子，可以看到瓶颈在于网络和磁盘IO，再怎样的导出工具也快不了多少，但是导入却花了60分钟，磁盘和网络大概只用到了20%，瓶颈在目标库写入速度（而一般顺序写入达不到IOPS限制），所以mypumpkin就诞生了 —— 兼顾myloader的导入速度和mysqldump导出的灵活性。
+用python构造1个队列，将需要导出的所有表一次放到队列中，同时启动N个python线程，各自从这个Queue里取出表名，subprocess调用操作系统的mysqldump命令，导出数据到以 dbname.tablename.sql 命名的文件中。load in 与 dump out 类似，根据指定的库名或表名，从dump_dir目录找到所有sql文件，压进队列，N个线程同时调用mysql构造新的命令，模拟 &lt; 操作。
+参数解析从原来自己解析，到改用argparse模块，几乎做了一次重构。 对于没有指定--tables的情况，程序会主动去库里查询一下所有表名，然后过滤进队列。
+load in目标库，选项做到与dump out一样丰富，可以指定导入哪些db、哪些表、忽略哪些表。
+其中的重点是做到与原mysqldump兼容，因为需要对与表有关的选项（-B, -A, --tables, --ignore=），进行分析并组合成新的执行命令，考虑的异常情况非常多。
+3. 限制 重要：导出的数据不保证库级别的一致性 对历史不变表，是不影响的 具体到一个表能保证一致性，这是mysqldump本身采用哪些选项决定的 不同表导出动作在不同的mysqldump命令中，无法保证事务。 在我的案例场景下，是有开发同学辅助使用一套binlog解析程序，等完成后重放所有变更，来保证最终一致性。 另，许多情况下我们导数据，并不需要完整的或者一致的数据，只是用于离线分析或临时导出，重点是快速拿数据给到开发。 不寻常选项识别 程序已经尽力做到与mysqldump命令兼容，只需要加上 mypumpkin....</p>
+  </div>
+  <footer class="entry-footer"><span title='2016-11-17 16:32:49 +0000 UTC'>November 17, 2016</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 让mysqldump变成并发导出导入的魔法" href="http://xgknight.com/posts/2016/11/%E8%AE%A9mysqldump%E5%8F%98%E6%88%90%E5%B9%B6%E5%8F%91%E5%AF%BC%E5%87%BA%E5%AF%BC%E5%85%A5%E7%9A%84%E9%AD%94%E6%B3%95/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>mysql使用utf8mb4经验吐血总结
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>1. utf8 与 utf8mb4 异同 先看 官方手册 https://dev.mysql.com/doc/refman/5.6/en/charset-unicode-utf8mb4.html 的说明：
+The character set named utf8 uses a maximum of three bytes per character and contains only BMP characters. The utf8mb4 character set uses a maximum of four bytes per character supports supplementary characters: - For a BMP character, utf8 and utf8mb4 have identical storage characteristics: same code values, same encoding, same length. - For a supplementary character, utf8 cannot store the character at all, whereas utf8mb4 requires four bytes to store it....</p>
+  </div>
+  <footer class="entry-footer"><span title='2016-10-23 16:32:49 +0000 UTC'>October 23, 2016</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to mysql使用utf8mb4经验吐血总结" href="http://xgknight.com/posts/2016/10/mysql%E4%BD%BF%E7%94%A8utf8mb4%E7%BB%8F%E9%AA%8C%E5%90%90%E8%A1%80%E6%80%BB%E7%BB%93/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
     <h2>遇到腾讯云CDB连接字符集设置一个坑
     </h2>
   </header>
@@ -268,47 +302,6 @@ LOCK=NONE，即DDL期间允许并发读写涉及的表，比如为了保证 ALTE
   </div>
   <footer class="entry-footer"><span title='2016-05-24 16:32:49 +0000 UTC'>May 24, 2016</span>&nbsp;·&nbsp;admin</footer>
   <a class="entry-link" aria-label="post link to mysql 5.6 原生Online DDL解析" href="http://xgknight.com/posts/2016/05/mysql-5.6-%E5%8E%9F%E7%94%9Fonline-ddl%E8%A7%A3%E6%9E%90/"></a>
-</article>
-
-<article class="post-entry tag-entry"> 
-  <header class="entry-header">
-    <h2>InnoDB行格式对text/blob大变长字段的影响
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>最近在排查现网Text与Blob类型，发现有不少，在《高性能MySQL(第3版)》看到对这两种变长数据类型的处理会涉及到在磁盘上创建临时表，性能开销比较大。于是把影响blob型数据存储方式了解了一下：row_format。
-1. InnoDB的Antelop与Barracuda文件格式 Innodb存储引擎保存记录，是以行的形式存放的（与之对应的是像Google BigTable这种列数据库）。在InnoDB 1.0.x版本之前，InnoDB 存储引擎提供了 Compact 和 Redundant 两种格式来存放行记录数据，这也是目前使用最多的一种格式。Redundant 格式是为兼容之前版本而保留的。
-MySQL 5.1 中的 innodb_plugin 引入了新的文件格式：Barracuda（将以前的行格式 compact 和 redundant 合称为Antelope），该文件格式拥有新的两种行格式：compressed和dynamic。
-在 MySQL 5.6 版本中，默认还是 Compact 行格式，也是目前使用最多的一种 ROW FORMAT。用户可以通过命令 SHOW TABLE STATUS LIKE&#39;table_name&#39; 来查看当前表使用的行格式，其中 row_format 列表示当前所使用的行记录结构类型。
-mysql&gt; show variables like &#34;innodb_file_format&#34;; &#43;--------------------&#43;-----------&#43; | Variable_name | Value | &#43;--------------------&#43;-----------&#43; | innodb_file_format | Barracuda | &#43;--------------------&#43;-----------&#43; 1 row in set mysql&gt; show table status like &#34;tablename%&#34;\G *************************** 1. row *************************** Name: t_rf_compact Engine: InnoDB Version: 10 Row_format: Compact Rows: 4 Avg_row_length: 36864 Data_length: 147456 Max_data_length: 0 Index_length: 0 Data_free: 0 Auto_increment: 7 Create_time: 2016-05-14 20:52:58 Update_time: NULL Check_time: NULL Collation: utf8_general_ci Checksum: NULL Create_options: Comment: 1 row in set (0....</p>
-  </div>
-  <footer class="entry-footer"><span title='2016-05-18 16:32:49 +0000 UTC'>May 18, 2016</span>&nbsp;·&nbsp;admin</footer>
-  <a class="entry-link" aria-label="post link to InnoDB行格式对text/blob大变长字段的影响" href="http://xgknight.com/posts/2016/05/innodb%E8%A1%8C%E6%A0%BC%E5%BC%8F%E5%AF%B9text/blob%E5%A4%A7%E5%8F%98%E9%95%BF%E5%AD%97%E6%AE%B5%E7%9A%84%E5%BD%B1%E5%93%8D/"></a>
-</article>
-
-<article class="post-entry tag-entry"> 
-  <header class="entry-header">
-    <h2>InnoDB表主键设计方案
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>关于MySQL InnoDB表的主键设计，有必要从开发规范 http://xgknight.com/2016/05/11/mysql-dev-principle-ec/ 里拿出来，单独展开说一下。 InnoDB是一个聚集索引组织表，即行数据是按照聚集索引在物理磁盘上存储的，并且是块状结构，默认一个block是16kB。
-图片来《高性能MySQL》
-首先在设计表结构时，表一定要显式定义主键，自增主键，或者联合主键，或全局ID。 （所有与主键，包括其它索引，相关的字段，都要定义为NOT NULL，这是因为如果允许NULL，那么在索引的每条记录上，都要多用一个标记去记录这个列是否是NULL，占用多余的存储空间）
-1. 自增主键特性 对于高并发的插入速度较快，因为每次插入新记录，都是在之前记录的右边顺序插入，不需要频繁的分裂。 表上要建立多个二级索引时，索引记录都会带上主键，根据主键去定位行数据。自增主键一般是int或bigint型，多个二级索引上面占用的空间较小。
-2. 联合主键特性 每次新记录插入，都要寻找到合适的“缝隙”，插入，当插入位置空间不够时，需要做页分裂，这个需要维护成本。 二级索引带上的主键值，是联合主键的总长度，所以一个单列索引占用的空间里面，主键部分占了大部分，空间利用率不高，而且这种是 optimize table 解决不了的。 （提示：聚集索引叶子节点，就是行数据本身，所以，不需要另外的空间存储主键）
-但是联合主键有一个好处：逻辑上一批数据，在物理上很有可能相邻存储，有可能检索的数据，在一个block里面，减少了读取并缓存磁盘块的数量，一个是速度的提升，一个是减小内存的消耗。 比如 (f_c_id,f_m_id,f_type) 作为联合主键，f_c_id=22299有20w条记录，每条记录平均160bytes，一个页能存16kB，即100条记录（不考虑预留），那么f_c_id=22299需要2000个page，而且是相邻的page。
-举例，应用检索数据 f_c_id=22299, f_m_id IN(12345,23456) ，假设数据在块1和块10，缓存到内存。不多久检索f_c_id=22299, f_m_id=12399，刚好在块1。
-如果是自增id，那么就没有这个顺序， 而是根据插入数据时间来的，那么这两条记录可能在物理上很远的地方，要多读取磁盘。
-3. 全局ID 全局ID跟自增ID特性基本相同，但是它的值是从另外的服务获取的数字增长类型，不要UUID。
-只在有分库（一般有全局统计需求），或其它可能需要全局唯一性的情况下，才使用，否则没必要引入多余的服务依赖。
-另外，定义全局ID时，注意字段范围要满足要求，小心溢出；不要加上多余的 AUTO_INCREMENT 定义。
-使用全局id还有一个好处：在做数据迁移或拆库时，可以无缝切换，因为新旧数据id不用担心重复。
-4. 设计原则：自增主键 VS 联合主键 所有索引字段，特别主键，无论自增或联合主键，一定定义为 not null 表没有特殊情况下，都使用自增主键，尽量不用联合主键 特别是“可能作为联合主键”里面有的字段，会频繁update的情况，更不能做联合主键 在业务层具有唯一性的属性，如果不依赖于数据库的唯一索引来编码，也不用使用Unique Key。如果需要数据库维护唯一性，可使用Unique Key，比如将上面的联合主键定义为联合索引，再另外定义一个自增主键 如果表上有一个单列字段，已具有唯一性，可直接定义成主键，不必设置自增id 尽量用int或bigint型，如果不能，也要控制主键varchar列的长度在30以内。不要用带汉字或url类似的字段作为主键 根据上面的顺序走完，还是想用联合主键的，以下任意条件满足，可用： 表上的插入数据并发量不高 有明显的上文【联合主键】部分说到的，热点数据相邻存储的场景 出了联合主键外，其它索引的只有1-2个 与DBA协商后同意 参考： http://imysql.com/2015/10/29/mysql-faq-clustered-index.shtml
-原文连接地址：http://xgknight.com/2016/05/13/mysql-innodb-primary_key/</p>
-  </div>
-  <footer class="entry-footer"><span title='2016-05-13 15:32:49 +0000 UTC'>May 13, 2016</span>&nbsp;·&nbsp;admin</footer>
-  <a class="entry-link" aria-label="post link to InnoDB表主键设计方案" href="http://xgknight.com/posts/2016/05/innodb%E8%A1%A8%E4%B8%BB%E9%94%AE%E8%AE%BE%E8%AE%A1%E6%96%B9%E6%A1%88/"></a>
 </article>
 <footer class="page-footer">
   <nav class="pagination">

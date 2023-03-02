@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>nginx配置location总结及rewrite规则写法 | Sean Note</title>
+<meta name="keywords" content="nignx, rewrite">
+<meta name="description" content="1. location正则写法 一个示例：
+location = / { # 精确匹配 / ，主机名后面不能带任何字符串 [ configuration A ] } location / { # 因为所有的地址都以 / 开头，所以这条规则将匹配到所有请求 # 但是正则和最长字符串会优先匹配 [ configuration B ] } location /documents/ { # 匹配任何以 /documents/ 开头的地址，匹配符合以后，还要继续往下搜索 # 只有后面的正则表达式没有匹配到时，这一条才会采用这一条 [ configuration C ] } location ~ /documents/Abc { # 匹配任何以 /documents/Abc 开头的地址，匹配符合以后，还要继续往下搜索 # 只有后面的正则表达式没有匹配到时，这一条才会采用这一条 [ configuration CC ] } location ^~ /images/ { # 匹配任何以 /images/ 开头的地址，匹配符合以后，停止往下搜索正则，采用这一条。 [ configuration D ] } location ~* \.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2015/05/nginx%E9%85%8D%E7%BD%AElocation%E6%80%BB%E7%BB%93%E5%8F%8Arewrite%E8%A7%84%E5%88%99%E5%86%99%E6%B3%95/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="nginx配置location总结及rewrite规则写法" />
+<meta property="og:description" content="1. location正则写法 一个示例：
+location = / { # 精确匹配 / ，主机名后面不能带任何字符串 [ configuration A ] } location / { # 因为所有的地址都以 / 开头，所以这条规则将匹配到所有请求 # 但是正则和最长字符串会优先匹配 [ configuration B ] } location /documents/ { # 匹配任何以 /documents/ 开头的地址，匹配符合以后，还要继续往下搜索 # 只有后面的正则表达式没有匹配到时，这一条才会采用这一条 [ configuration C ] } location ~ /documents/Abc { # 匹配任何以 /documents/Abc 开头的地址，匹配符合以后，还要继续往下搜索 # 只有后面的正则表达式没有匹配到时，这一条才会采用这一条 [ configuration CC ] } location ^~ /images/ { # 匹配任何以 /images/ 开头的地址，匹配符合以后，停止往下搜索正则，采用这一条。 [ configuration D ] } location ~* \." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2015/05/nginx%E9%85%8D%E7%BD%AElocation%E6%80%BB%E7%BB%93%E5%8F%8Arewrite%E8%A7%84%E5%88%99%E5%86%99%E6%B3%95/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2015-05-17T15:21:25+00:00" />
+<meta property="article:modified_time" content="2015-05-17T15:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="nginx配置location总结及rewrite规则写法"/>
+<meta name="twitter:description" content="1. location正则写法 一个示例：
+location = / { # 精确匹配 / ，主机名后面不能带任何字符串 [ configuration A ] } location / { # 因为所有的地址都以 / 开头，所以这条规则将匹配到所有请求 # 但是正则和最长字符串会优先匹配 [ configuration B ] } location /documents/ { # 匹配任何以 /documents/ 开头的地址，匹配符合以后，还要继续往下搜索 # 只有后面的正则表达式没有匹配到时，这一条才会采用这一条 [ configuration C ] } location ~ /documents/Abc { # 匹配任何以 /documents/Abc 开头的地址，匹配符合以后，还要继续往下搜索 # 只有后面的正则表达式没有匹配到时，这一条才会采用这一条 [ configuration CC ] } location ^~ /images/ { # 匹配任何以 /images/ 开头的地址，匹配符合以后，停止往下搜索正则，采用这一条。 [ configuration D ] } location ~* \."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "nginx配置location总结及rewrite规则写法",
+      "item": "http://xgknight.com/posts/2015/05/nginx%E9%85%8D%E7%BD%AElocation%E6%80%BB%E7%BB%93%E5%8F%8Arewrite%E8%A7%84%E5%88%99%E5%86%99%E6%B3%95/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "nginx配置location总结及rewrite规则写法",
+  "name": "nginx配置location总结及rewrite规则写法",
+  "description": "1. location正则写法 一个示例：\nlocation = / { # 精确匹配 / ，主机名后面不能带任何字符串 [ configuration A ] } location / { # 因为所有的地址都以 / 开头，所以这条规则将匹配到所有请求 # 但是正则和最长字符串会优先匹配 [ configuration B ] } location /documents/ { # 匹配任何以 /documents/ 开头的地址，匹配符合以后，还要继续往下搜索 # 只有后面的正则表达式没有匹配到时，这一条才会采用这一条 [ configuration C ] } location ~ /documents/Abc { # 匹配任何以 /documents/Abc 开头的地址，匹配符合以后，还要继续往下搜索 # 只有后面的正则表达式没有匹配到时，这一条才会采用这一条 [ configuration CC ] } location ^~ /images/ { # 匹配任何以 /images/ 开头的地址，匹配符合以后，停止往下搜索正则，采用这一条。 [ configuration D ] } location ~* \\.",
+  "keywords": [
+    "nignx", "rewrite"
+  ],
+  "articleBody": "1. location正则写法 一个示例：\nlocation = / { # 精确匹配 / ，主机名后面不能带任何字符串 [ configuration A ] } location / { # 因为所有的地址都以 / 开头，所以这条规则将匹配到所有请求 # 但是正则和最长字符串会优先匹配 [ configuration B ] } location /documents/ { # 匹配任何以 /documents/ 开头的地址，匹配符合以后，还要继续往下搜索 # 只有后面的正则表达式没有匹配到时，这一条才会采用这一条 [ configuration C ] } location ~ /documents/Abc { # 匹配任何以 /documents/Abc 开头的地址，匹配符合以后，还要继续往下搜索 # 只有后面的正则表达式没有匹配到时，这一条才会采用这一条 [ configuration CC ] } location ^~ /images/ { # 匹配任何以 /images/ 开头的地址，匹配符合以后，停止往下搜索正则，采用这一条。 [ configuration D ] } location ~* \\.(gif|jpg|jpeg)$ { # 匹配所有以 gif,jpg或jpeg 结尾的请求 # 然而，所有请求 /images/ 下的图片会被 config D 处理，因为 ^~ 到达不了这一条正则 [ configuration E ] } location /images/ { # 字符匹配到 /images/，继续往下，会发现 ^~ 存在 [ configuration F ] } location /images/abc { # 最长字符匹配到 /images/abc，继续往下，会发现 ^~ 存在 # F与G的放置顺序是没有关系的 [ configuration G ] } location ~ /images/abc/ { # 只有去掉 config D 才有效：先最长匹配 config G 开头的地址，继续往下搜索，匹配到这一条正则，采用 [ configuration H ] } location ~* /js/.*/\\.js 已=开头表示精确匹配 如 A 中只匹配根目录结尾的请求，后面不能带任何字符串。 ^~ 开头表示uri以某个常规字符串开头，不是正则匹配 ~ 开头表示区分大小写的正则匹配; ~* 开头表示不区分大小写的正则匹配 / 通用匹配, 如果没有其它匹配,任何请求都会匹配到 顺序 no优先级： (location =) \u003e (location 完整路径) \u003e (location ^~ 路径) \u003e (location ~,~* 正则顺序) \u003e (location 部分起始路径) \u003e (/)\n上面的匹配结果 按照上面的location写法，以下的匹配示例成立：\n/ -\u003e config A\n精确完全匹配，即使/index.html也匹配不了 /downloads/download.html -\u003e config B\n匹配B以后，往下没有任何匹配，采用B /images/1.gif -\u003e configuration D\n匹配到F，往下匹配到D，停止往下 /images/abc/def -\u003e config D 最长匹配到G，往下匹配D，停止往下\n你可以看到 任何以/images/开头的都会匹配到D并停止，FG写在这里是没有任何意义的，H是永远轮不到的，这里只是为了说明匹配顺序 /documents/document.html -\u003e config C\n匹配到C，往下没有任何匹配，采用C /documents/1.jpg -\u003e configuration E\n匹配到C，往下正则匹配到E /documents/Abc.jpg -\u003e config CC 最长匹配到C，往下正则顺序匹配到CC，不会往下到E 实际使用建议 所以实际使用中，个人觉得至少有三个匹配规则定义，如下： #直接匹配网站根，通过域名访问网站首页比较频繁，使用这个会加速处理，官网如是说。 #这里是直接转发给后端应用服务器了，也可以是一个静态首页 # 第一个必选规则 location = / { proxy_pass http://tomcat:8080/index } # 第二个必选规则是处理静态文件请求，这是nginx作为http服务器的强项 # 有两种配置模式，目录匹配或后缀匹配,任选其一或搭配使用 location ^~ /static/ { root /webroot/static/; } location ~* \\.(gif|jpg|jpeg|png|css|js|ico)$ { root /webroot/res/; } #第三个规则就是通用规则，用来转发动态请求到后端应用服务器 #非静态文件请求就默认是动态请求，自己根据实际把握 #毕竟目前的一些框架的流行，带.php,.jsp后缀的情况很少了 location / { proxy_pass http://tomcat:8080/ } http://tengine.taobao.org/book/chapter_02.html http://nginx.org/en/docs/http/ngx_http_rewrite_module.html\n2. Rewrite规则 rewrite功能就是，使用nginx提供的全局变量或自己设置的变量，结合正则表达式和标志位实现url重写以及重定向。rewrite只能放在server{},location{},if{}中，并且只能对域名后边的除去传递的参数外的字符串起作用，例如 http://xgknight.com/a/we/index.php?id=1\u0026u=str 只对/a/we/index.php重写。语法rewrite regex replacement [flag];\n如果相对域名或参数字符串起作用，可以使用全局变量匹配，也可以使用proxy_pass反向代理。\n表明看rewrite和location功能有点像，都能实现跳转，主要区别在于rewrite是在同一域名内更改获取资源的路径，而location是对一类路径做控制访问或反向代理，可以proxy_pass到其他机器。很多情况下rewrite也会写在location里，它们的执行顺序是：\n执行server块的rewrite指令 执行location匹配 执行选定的location中的rewrite指令 如果其中某步URI被重写，则重新循环执行1-3，直到找到真实存在的文件；循环超过10次，则返回500 Internal Server Error错误。\n2.1 flag标志位 last : 相当于Apache的[L]标记，表示完成rewrite break : 停止执行当前虚拟主机的后续rewrite指令集 redirect : 返回302临时重定向，地址栏会显示跳转后的地址 permanent : 返回301永久重定向，地址栏会显示跳转后的地址 因为301和302不能简单的只返回状态码，还必须有重定向的URL，这就是return指令无法返回301,302的原因了。这里 last 和 break 区别有点难以理解：\nlast一般写在server和if中，而break一般使用在location中 last不终止重写后的url匹配，即新的url会再从server走一遍匹配流程，而break终止重写后的匹配 break和last都能组织继续执行后面的rewrite指令 2.2 if指令与全局变量 if判断指令 语法为if(condition){...}，对给定的条件condition进行判断。如果为真，大括号内的rewrite指令将被执行，if条件(conditon)可以是如下任何内容：\n当表达式只是一个变量时，如果值为空或任何以0开头的字符串都会当做false 直接比较变量和内容时，使用=或!= ~正则表达式匹配，~*不区分大小写的匹配，!~区分大小写的不匹配 -f和!-f用来判断是否存在文件 -d和!-d用来判断是否存在目录 -e和!-e用来判断是否存在文件或目录 -x和!-x用来判断文件是否可执行\n例如：\nif ($http_user_agent ~ MSIE) { rewrite ^(.*)$ /msie/$1 break; } //如果UA包含\"MSIE\"，rewrite请求到/msid/目录下 if ($http_cookie ~* \"id=([^;]+)(?:;|$)\") { set $id $1; } //如果cookie匹配正则，设置变量$id等于正则引用部分 if ($request_method = POST) { return 405; } //如果提交方法为POST，则返回状态405（Method not allowed）。return不能返回301,302 if ($slow) { limit_rate 10k; } //限速，$slow可以通过 set 指令设置 if (!-f $request_filename){ break; proxy_pass http://127.0.0.1; } //如果请求的文件名不存在，则反向代理到localhost 。这里的break也是停止rewrite检查 if ($args ~ post=140){ rewrite ^ http://example.com/ permanent; } //如果query string中包含\"post=140\"，永久重定向到example.com location ~* \\.(gif|jpg|png|swf|flv)$ { valid_referers none blocked www.jefflei.com www.leizhenfang.com; if ($invalid_referer) { return 404; } //防盗链 } 全局变量 下面是可以用作if判断的全局变量\n$args ： #这个变量等于请求行中的参数，同$query_string $content_length ： 请求头中的Content-length字段。 $content_type ： 请求头中的Content-Type字段。 $document_root ： 当前请求在root指令中指定的值。 $host ： 请求主机头字段，否则为服务器名称。 $http_user_agent ： 客户端agent信息 $http_cookie ： 客户端cookie信息 $limit_rate ： 这个变量可以限制连接速率。 $request_method ： 客户端请求的动作，通常为GET或POST。 $remote_addr ： 客户端的IP地址。 $remote_port ： 客户端的端口。 $remote_user ： 已经经过Auth Basic Module验证的用户名。 $request_filename ： 当前请求的文件路径，由root或alias指令与URI请求生成。 $scheme ： HTTP方法（如http，https）。 $server_protocol ： 请求使用的协议，通常是HTTP/1.0或HTTP/1.1。 $server_addr ： 服务器地址，在完成一次系统调用后可以确定这个值。 $server_name ： 服务器名称。 $server_port ： 请求到达服务器的端口号。 $request_uri ： 包含请求参数的原始URI，不包含主机名，如：”/foo/bar.php?arg=baz”。 $uri ： 不带请求参数的当前URI，$uri不包含主机名，如”/foo/bar.html”。 $document_uri ： 与$uri相同。 例：http://localhost:88/test1/test2/test.php $host：localhost $server_port：88 $request_uri：http://localhost:88/test1/test2/test.php $document_uri：/test1/test2/test.php $document_root：/var/www/html $request_filename：/var/www/html/test1/test2/test.php\n2.3 常用正则 . ： 匹配除换行符以外的任意字符 ? ： 重复0次或1次 + ： 重复1次或更多次 * ： 重复0次或更多次 \\d ：匹配数字 ^ ： 匹配字符串的开始 $ ： 匹配字符串的介绍 {n} ： 重复n次 {n,} ： 重复n次或更多次 [c] ： 匹配单个字符c [a-z] ： 匹配a-z小写字母的任意一个 小括号()之间匹配的内容，可以在后面通过$1来引用，$2表示的是前面第二个()里的内容。正则里面容易让人困惑的是\\转义特殊字符。\n2.4 rewrite实例 例1：\nhttp { # 定义image日志格式 log_format imagelog '[$time_local] ' $image_file ' ' $image_type ' ' $body_bytes_sent ' ' $status; # 开启重写日志 rewrite_log on; server { root /home/www; location / { # 重写规则信息 error_log logs/rewrite.log notice; # 注意这里要用‘’单引号引起来，避免{} rewrite '^/images/([a-z]{2})/([a-z0-9]{5})/(.*)\\.(png|jpg|gif)$' /data?file=$3.$4; # 注意不能在上面这条规则后面加上“last”参数，否则下面的set指令不会执行 set $image_file $3; set $image_type $4; } location /data { # 指定针对图片的日志格式，来分析图片类型和大小 access_log logs/images.log mian; root /data/images; # 应用前面定义的变量。判断首先文件在不在，不在再判断目录在不在，如果还不在就跳转到最后一个url里 try_files /$arg_file /image404.html; } location = /image404.html { # 图片不存在返回特定的信息 return 404 \"image not found\\n\"; } } 对形如/images/ef/uh7b3/test.png的请求，重写到/data?file=test.png，于是匹配到location /data，先看/data/images/test.png文件存不存在，如果存在则正常响应，如果不存在则重写tryfiles到新的image404 location，直接返回404状态码。\n例2：\nrewrite ^/images/(.*)_(\\d+)x(\\d+)\\.(png|jpg|gif)$ /resizer/$1.$4?width=$2\u0026height=$3? last; 对形如/images/bla_500x400.jpg的文件请求，重写到/resizer/bla.jpg?width=500\u0026height=400地址，并会继续尝试匹配location。\n例3： 见 ssl部分页面加密 。\n参考\nhttp://www.nginx.cn/216.html http://www.ttlsa.com/nginx/nginx-rewriting-rules-guide/ 老僧系列nginx之rewrite规则快速上手 http://fantefei.blog.51cto.com/2229719/919431 ",
+  "wordCount" : "592",
+  "inLanguage": "en",
+  "datePublished": "2015-05-17T15:21:25Z",
+  "dateModified": "2015-05-17T15:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2015/05/nginx%E9%85%8D%E7%BD%AElocation%E6%80%BB%E7%BB%93%E5%8F%8Arewrite%E8%A7%84%E5%88%99%E5%86%99%E6%B3%95/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      nginx配置location总结及rewrite规则写法
+    </h1>
+    <div class="post-meta"><span title='2015-05-17 15:21:25 +0000 UTC'>May 17, 2015</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><h1 id="1-location正则写法">1. location正则写法<a hidden class="anchor" aria-hidden="true" href="#1-location正则写法">#</a></h1>
+<p>一个示例：</p>
+<pre tabindex="0"><code>location  = / {
+  # 精确匹配 / ，主机名后面不能带任何字符串
+  [ configuration A ]
+}
+
+location  / {
+  # 因为所有的地址都以 / 开头，所以这条规则将匹配到所有请求
+  # 但是正则和最长字符串会优先匹配
+  [ configuration B ]
+}
+
+location /documents/ {
+  # 匹配任何以 /documents/ 开头的地址，匹配符合以后，还要继续往下搜索
+  # 只有后面的正则表达式没有匹配到时，这一条才会采用这一条
+  [ configuration C ]
+}
+
+location ~ /documents/Abc {
+  # 匹配任何以 /documents/Abc 开头的地址，匹配符合以后，还要继续往下搜索
+  # 只有后面的正则表达式没有匹配到时，这一条才会采用这一条
+  [ configuration CC ]
+}
+
+location ^~ /images/ {
+  # 匹配任何以 /images/ 开头的地址，匹配符合以后，停止往下搜索正则，采用这一条。
+  [ configuration D ]
+}
+
+location ~* \.(gif|jpg|jpeg)$ {
+  # 匹配所有以 gif,jpg或jpeg 结尾的请求
+  # 然而，所有请求 /images/ 下的图片会被 config D 处理，因为 ^~ 到达不了这一条正则
+  [ configuration E ]
+}
+
+location /images/ {
+  # 字符匹配到 /images/，继续往下，会发现 ^~ 存在
+  [ configuration F ]
+}
+
+location /images/abc {
+  # 最长字符匹配到 /images/abc，继续往下，会发现 ^~ 存在
+  # F与G的放置顺序是没有关系的
+  [ configuration G ]
+}
+
+location ~ /images/abc/ {
+  # 只有去掉 config D 才有效：先最长匹配 config G 开头的地址，继续往下搜索，匹配到这一条正则，采用
+    [ configuration H ]
+}
+
+location ~* /js/.*/\.js
+</code></pre><!-- raw HTML omitted -->
+<ul>
+<li>已<code>=</code>开头表示精确匹配
+如 A 中只匹配根目录结尾的请求，后面不能带任何字符串。</li>
+<li><code>^~</code> 开头表示uri以某个常规字符串开头，不是正则匹配</li>
+<li>~ 开头表示区分大小写的正则匹配;</li>
+<li>~* 开头表示不区分大小写的正则匹配</li>
+<li>/ 通用匹配, 如果没有其它匹配,任何请求都会匹配到</li>
+</ul>
+<p>顺序 no优先级：
+(location =) &gt; (location 完整路径) &gt; (location ^~ 路径) &gt; (location ~,~* 正则顺序) &gt; (location 部分起始路径) &gt; (/)</p>
+<p>上面的匹配结果
+按照上面的location写法，以下的匹配示例成立：</p>
+<ul>
+<li>/ -&gt; config A<br>
+精确完全匹配，即使/index.html也匹配不了</li>
+<li>/downloads/download.html -&gt; config B<br>
+匹配B以后，往下没有任何匹配，采用B</li>
+<li>/images/1.gif -&gt; configuration D<br>
+匹配到F，往下匹配到D，停止往下</li>
+<li>/images/abc/def -&gt; config D
+最长匹配到G，往下匹配D，停止往下<br>
+你可以看到 任何以/images/开头的都会匹配到D并停止，FG写在这里是没有任何意义的，H是永远轮不到的，这里只是为了说明匹配顺序</li>
+<li>/documents/document.html -&gt; config C<br>
+匹配到C，往下没有任何匹配，采用C</li>
+<li>/documents/1.jpg -&gt; configuration E<br>
+匹配到C，往下正则匹配到E</li>
+<li>/documents/Abc.jpg -&gt; config CC
+最长匹配到C，往下正则顺序匹配到CC，不会往下到E</li>
+</ul>
+<h2 id="实际使用建议">实际使用建议<a hidden class="anchor" aria-hidden="true" href="#实际使用建议">#</a></h2>
+<pre tabindex="0"><code>所以实际使用中，个人觉得至少有三个匹配规则定义，如下：
+#直接匹配网站根，通过域名访问网站首页比较频繁，使用这个会加速处理，官网如是说。
+#这里是直接转发给后端应用服务器了，也可以是一个静态首页
+# 第一个必选规则
+location = / {
+    proxy_pass http://tomcat:8080/index
+}
+# 第二个必选规则是处理静态文件请求，这是nginx作为http服务器的强项
+# 有两种配置模式，目录匹配或后缀匹配,任选其一或搭配使用
+location ^~ /static/ {
+    root /webroot/static/;
+}
+location ~* \.(gif|jpg|jpeg|png|css|js|ico)$ {
+    root /webroot/res/;
+}
+#第三个规则就是通用规则，用来转发动态请求到后端应用服务器
+#非静态文件请求就默认是动态请求，自己根据实际把握
+#毕竟目前的一些框架的流行，带.php,.jsp后缀的情况很少了
+location / {
+    proxy_pass http://tomcat:8080/
+}
+</code></pre><p><a href="http://tengine.taobao.org/book/chapter_02.html">http://tengine.taobao.org/book/chapter_02.html</a>
+<a href="http://nginx.org/en/docs/http/ngx_http_rewrite_module.html">http://nginx.org/en/docs/http/ngx_http_rewrite_module.html</a></p>
+<h1 id="2-rewrite规则">2. Rewrite规则<a hidden class="anchor" aria-hidden="true" href="#2-rewrite规则">#</a></h1>
+<p>rewrite功能就是，使用nginx提供的全局变量或自己设置的变量，结合正则表达式和标志位实现url重写以及重定向。rewrite只能放在server{},location{},if{}中，并且只能对域名后边的除去传递的参数外的字符串起作用，例如 <code>http://xgknight.com/a/we/index.php?id=1&amp;u=str</code> 只对/a/we/index.php重写。语法<code>rewrite regex replacement [flag];</code></p>
+<p>如果相对域名或参数字符串起作用，可以使用全局变量匹配，也可以使用proxy_pass反向代理。</p>
+<p>表明看rewrite和location功能有点像，都能实现跳转，主要区别在于rewrite是在同一域名内更改获取资源的路径，而location是对一类路径做控制访问或反向代理，可以proxy_pass到其他机器。很多情况下rewrite也会写在location里，它们的执行顺序是：</p>
+<ol>
+<li>执行server块的rewrite指令</li>
+<li>执行location匹配</li>
+<li>执行选定的location中的rewrite指令</li>
+</ol>
+<p>如果其中某步URI被重写，则重新循环执行1-3，直到找到真实存在的文件；循环超过10次，则返回500 Internal Server Error错误。</p>
+<h2 id="21-flag标志位">2.1 flag标志位<a hidden class="anchor" aria-hidden="true" href="#21-flag标志位">#</a></h2>
+<ul>
+<li><code>last</code> : 相当于Apache的[L]标记，表示完成rewrite</li>
+<li><code>break</code> : 停止执行当前虚拟主机的后续rewrite指令集</li>
+<li><code>redirect</code> : 返回302临时重定向，地址栏会显示跳转后的地址</li>
+<li><code>permanent</code> : 返回301永久重定向，地址栏会显示跳转后的地址</li>
+</ul>
+<p>因为301和302不能简单的只返回状态码，还必须有重定向的URL，这就是return指令无法返回301,302的原因了。这里 last 和 break 区别有点难以理解：</p>
+<ol>
+<li>last一般写在server和if中，而break一般使用在location中</li>
+<li>last不终止<em>重写后</em>的url匹配，即新的url会再从server走一遍匹配流程，而break终止重写后的匹配</li>
+<li>break和last都能组织继续执行后面的rewrite指令</li>
+</ol>
+<h2 id="22-if指令与全局变量">2.2 if指令与全局变量<a hidden class="anchor" aria-hidden="true" href="#22-if指令与全局变量">#</a></h2>
+<p><strong>if判断指令</strong>
+语法为<code>if(condition){...}</code>，对给定的条件condition进行判断。如果为真，大括号内的rewrite指令将被执行，if条件(conditon)可以是如下任何内容：</p>
+<ul>
+<li>当表达式只是一个变量时，如果值为空或任何以0开头的字符串都会当做false</li>
+<li>直接比较变量和内容时，使用<code>=</code>或<code>!=</code></li>
+<li><code>~</code>正则表达式匹配，<code>~*</code>不区分大小写的匹配，<code>!~</code>区分大小写的不匹配</li>
+</ul>
+<p><code>-f</code>和<code>!-f</code>用来判断是否存在文件
+<code>-d</code>和<code>!-d</code>用来判断是否存在目录
+<code>-e</code>和<code>!-e</code>用来判断是否存在文件或目录
+<code>-x</code>和<code>!-x</code>用来判断文件是否可执行</p>
+<p>例如：</p>
+<pre tabindex="0"><code>if ($http_user_agent ~ MSIE) {
+    rewrite ^(.*)$ /msie/$1 break;
+} //如果UA包含&#34;MSIE&#34;，rewrite请求到/msid/目录下
+
+if ($http_cookie ~* &#34;id=([^;]+)(?:;|$)&#34;) {
+    set $id $1;
+ } //如果cookie匹配正则，设置变量$id等于正则引用部分
+
+if ($request_method = POST) {
+    return 405;
+} //如果提交方法为POST，则返回状态405（Method not allowed）。return不能返回301,302
+
+if ($slow) {
+    limit_rate 10k;
+} //限速，$slow可以通过 set 指令设置
+
+if (!-f $request_filename){
+    break;
+    proxy_pass  http://127.0.0.1;
+} //如果请求的文件名不存在，则反向代理到localhost 。这里的break也是停止rewrite检查
+
+if ($args ~ post=140){
+    rewrite ^ http://example.com/ permanent;
+} //如果query string中包含&#34;post=140&#34;，永久重定向到example.com
+
+location ~* \.(gif|jpg|png|swf|flv)$ {
+    valid_referers none blocked www.jefflei.com www.leizhenfang.com;
+    if ($invalid_referer) {
+        return 404;
+    } //防盗链
+}
+</code></pre><p><strong>全局变量</strong>
+下面是可以用作if判断的全局变量</p>
+<ul>
+<li><code>$args</code> ： #这个变量等于请求行中的参数，同<code>$query_string</code></li>
+<li><code>$content_length</code> ： 请求头中的Content-length字段。</li>
+<li><code>$content_type</code> ： 请求头中的Content-Type字段。</li>
+<li><code>$document_root</code> ： 当前请求在root指令中指定的值。</li>
+<li><code>$host</code> ： 请求主机头字段，否则为服务器名称。</li>
+<li><code>$http_user_agent</code> ： 客户端agent信息</li>
+<li><code>$http_cookie</code> ： 客户端cookie信息</li>
+<li><code>$limit_rate</code> ： 这个变量可以限制连接速率。</li>
+<li><code>$request_method</code> ： 客户端请求的动作，通常为GET或POST。</li>
+<li><code>$remote_addr</code> ： 客户端的IP地址。</li>
+<li><code>$remote_port</code> ： 客户端的端口。</li>
+<li><code>$remote_user</code> ： 已经经过Auth Basic Module验证的用户名。</li>
+<li><code>$request_filename</code> ： 当前请求的文件路径，由root或alias指令与URI请求生成。</li>
+<li><code>$scheme</code> ： HTTP方法（如http，https）。</li>
+<li><code>$server_protocol</code> ： 请求使用的协议，通常是HTTP/1.0或HTTP/1.1。</li>
+<li><code>$server_addr</code> ： 服务器地址，在完成一次系统调用后可以确定这个值。</li>
+<li><code>$server_name</code> ： 服务器名称。</li>
+<li><code>$server_port</code> ： 请求到达服务器的端口号。</li>
+<li><code>$request_uri</code> ： 包含请求参数的原始URI，不包含主机名，如：”/foo/bar.php?arg=baz”。</li>
+<li><code>$uri</code> ： 不带请求参数的当前URI，$uri不包含主机名，如”/foo/bar.html”。</li>
+<li><code>$document_uri</code> ： 与$uri相同。</li>
+</ul>
+<p>例：<code>http://localhost:88/test1/test2/test.php</code>
+$host：localhost
+$server_port：88
+$request_uri：http://localhost:88/test1/test2/test.php
+$document_uri：/test1/test2/test.php
+$document_root：/var/www/html
+$request_filename：/var/www/html/test1/test2/test.php</p>
+<h2 id="23-常用正则">2.3 常用正则<a hidden class="anchor" aria-hidden="true" href="#23-常用正则">#</a></h2>
+<ul>
+<li><code>.</code> ： 匹配除换行符以外的任意字符</li>
+<li><code>?</code> ： 重复0次或1次</li>
+<li><code>+</code> ： 重复1次或更多次</li>
+<li><code>*</code> ： 重复0次或更多次</li>
+<li><code>\d</code> ：匹配数字</li>
+<li><code>^</code> ： 匹配字符串的开始</li>
+<li><code>$</code> ： 匹配字符串的介绍</li>
+<li><code>{n}</code> ： 重复n次</li>
+<li><code>{n,}</code> ： 重复n次或更多次</li>
+<li><code>[c]</code> ： 匹配单个字符c</li>
+<li><code>[a-z]</code> ： 匹配a-z小写字母的任意一个</li>
+</ul>
+<p>小括号<code>()</code>之间匹配的内容，可以在后面通过<code>$1</code>来引用，<code>$2</code>表示的是前面第二个<code>()</code>里的内容。正则里面容易让人困惑的是<code>\</code>转义特殊字符。</p>
+<h2 id="24-rewrite实例">2.4 rewrite实例<a hidden class="anchor" aria-hidden="true" href="#24-rewrite实例">#</a></h2>
+<p><em>例1</em>：</p>
+<pre tabindex="0"><code>http {
+    # 定义image日志格式
+    log_format imagelog &#39;[$time_local] &#39; $image_file &#39; &#39; $image_type &#39; &#39; $body_bytes_sent &#39; &#39; $status;
+    # 开启重写日志
+    rewrite_log on;
+
+    server {
+        root /home/www;
+
+        location / {
+                # 重写规则信息
+                error_log logs/rewrite.log notice;
+                # 注意这里要用‘’单引号引起来，避免{}
+                rewrite &#39;^/images/([a-z]{2})/([a-z0-9]{5})/(.*)\.(png|jpg|gif)$&#39; /data?file=$3.$4;
+                # 注意不能在上面这条规则后面加上“last”参数，否则下面的set指令不会执行
+                set $image_file $3;
+                set $image_type $4;
+        }
+
+        location /data {
+                # 指定针对图片的日志格式，来分析图片类型和大小
+                access_log logs/images.log mian;
+                root /data/images;
+                # 应用前面定义的变量。判断首先文件在不在，不在再判断目录在不在，如果还不在就跳转到最后一个url里
+                try_files /$arg_file /image404.html;
+        }
+        location = /image404.html {
+                # 图片不存在返回特定的信息
+                return 404 &#34;image not found\n&#34;;
+        }
+}
+</code></pre><p>对形如<code>/images/ef/uh7b3/test.png</code>的请求，重写到<code>/data?file=test.png</code>，于是匹配到<code>location /data</code>，先看<code>/data/images/test.png</code>文件存不存在，如果存在则正常响应，如果不存在则重写tryfiles到新的image404 location，直接返回404状态码。</p>
+<p><em>例2</em>：</p>
+<pre tabindex="0"><code>rewrite ^/images/(.*)_(\d+)x(\d+)\.(png|jpg|gif)$ /resizer/$1.$4?width=$2&amp;height=$3? last;
+</code></pre><p>对形如<code>/images/bla_500x400.jpg</code>的文件请求，重写到<code>/resizer/bla.jpg?width=500&amp;height=400</code>地址，并会继续尝试匹配location。</p>
+<p><em>例3</em>：
+见 <a href="http://xgknight.com/2015/05/28/nginx-ssl">ssl部分页面加密</a> 。</p>
+<p><strong>参考</strong></p>
+<ul>
+<li><a href="http://www.nginx.cn/216.html">http://www.nginx.cn/216.html</a></li>
+<li><a href="http://www.ttlsa.com/nginx/nginx-rewriting-rules-guide/">http://www.ttlsa.com/nginx/nginx-rewriting-rules-guide/</a></li>
+<li>老僧系列nginx之rewrite规则快速上手</li>
+<li><a href="http://fantefei.blog.51cto.com/2229719/919431">http://fantefei.blog.51cto.com/2229719/919431</a></li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/nignx/">nignx</a></li>
+      <li><a href="http://xgknight.com/tags/rewrite/">rewrite</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

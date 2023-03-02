@@ -128,6 +128,41 @@
 
 <article class="post-entry tag-entry"> 
   <header class="entry-header">
+    <h2>遇到腾讯云CDB连接字符集设置一个坑
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>最近一个与qq有关的服务迁到腾讯云上，相应的数据库也要从原阿里云RDS迁移到腾讯云CDB上，经过一番摸索，不带任何政治色彩的说，CDB跟RDS相比弱的不止一条街。比如看个错误日志还要提工单，数据库访问没有白名单，数据传输服务竞不支持源库的开启GTID，自带的后台管理是phpMyAdmin，要临时看查询日志也要提工单，当然这些都是可以容忍通过其它方法解决的，但是如果使用上带来了mysql数据库本身的影响，就用的不太爽了。
+最近2个月一直在弄与字符集相关的工作，却还是在cdb踩到一个大坑。情况是这样的，我们旧的RDS上的数据库表定义都是utf8，但由于历史原因，开发一直使用 latin1 去连接的。现在要把这样的一个db迁移到CDB，腾讯云的数据传输服务出了点问题，于是想了办法用阿里云的DTS反向迁。现象是：
+用Navicat客户端latin1连接，旧数据显示都ok 但程序端看到历史数据全是乱码，新数据正常 而且新数据通过navicat去看用 utf8 连接才正常 在mysql命令行下手动 set names latin1 读取旧数据ok，但新数据乱码 这明显是新写入的时候就是以 utf8 连接的，读取的时候新旧数据也以 utf8 连接。但应用端已明确设置使用 latin1 连接来读写。为了验证是否CDB的问题，在相同环境下自建了个mysql实例，一切都ok。
+腾讯云工程师先是怀疑迁移有问题，后来说可能是character_set_server设置的问题，我站在2个月来处理字符集的经验看了虽然不太可能，还是配合截了几个图，在工单、电话了里撕了几个来回：
+因为跟腾讯有合作关系，上头就直接联系到了腾讯云的人，这才找到问题根源：都是--skip-character-set-client-handshake惹的祸。
+--character-set-client-handshake Do not ignore character set information sent by the client. To ignore client information and use the default server character set, use --skip-character-set-client-handshake; this makes MySQL behave like MySQL 4.0 一看到这个选项就恍然大悟了，官方文档FAQ里有专门介绍：A.11.11（个人感觉最后一段贴的结果有问题），大意是说为了兼容 mysql 4.0 的习惯，mysqld启动时加上 --skip-character-set-client-handshake 来忽略客户端字符集的设置，强制使用服务端character-set-server的设置。
+但这个选项默认是没有开启的，当你在web控制台修改了实例字符集时，CDB自作自作主张修改了这个参数并重启 character_set_client_handshake = 0 。而这个参数在 show variables 看不到的，隐藏的比较深。正好我建实例的时候选择了utf8，然后修改为utf8mb4，但应用端要求latin1，便中枪了。
+主要是以前没听过这个参数，后来发现老叶也有篇文章讲到它 MySQL字符集的一个坑，其实是很小的东西，结果排查验证问题前后花了2天。。。...</p>
+  </div>
+  <footer class="entry-footer"><span title='2016-10-17 16:32:49 +0000 UTC'>October 17, 2016</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 遇到腾讯云CDB连接字符集设置一个坑" href="http://xgknight.com/posts/2016/10/%E9%81%87%E5%88%B0%E8%85%BE%E8%AE%AF%E4%BA%91cdb%E8%BF%9E%E6%8E%A5%E5%AD%97%E7%AC%A6%E9%9B%86%E8%AE%BE%E7%BD%AE%E4%B8%80%E4%B8%AA%E5%9D%91/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>经常会被问到 InnoDB隔离级别中 READ-COMMITED和REPEATABLE-READ 的区别，今天就整理了一下，不再从“脏读”、“幻读”这样的名词解释一样去回答了。
+1. 行锁 InnoDB行锁实际锁的是索引记录，为了防止死锁的产生以及维护所需要的隔离级别，在执行sql语句的全过程中，innodb必须对所需要修改的行每条索引记录上锁。如此一来，如果你执行的 UPDATE 没有很好的索引，那么会导致锁定许多行：
+update employees set store_id = 0 where store_id = 1; ---TRANSACTION 1EAB04, ACTIVE 7 sec 633 lock struct(s), &lt;strong&gt;heap size 96696&lt;/strong&gt;, 218786 row lock(s), undo log entries 1 MySQL thread id 4, OS thread handle 0x7f8dfc35d700, query id 47 localhost root show engine innodb status 上面的 employees 表 store_id 列没有索引。注意 UPDATE 已经执行完成（没有提交），但依然有 218786 个行锁没有释放，还有一个undo记录。这意味着只有一行被更改，但却持有了额外的锁。堆大小（heap size）代表了分配给锁使用的内存数量。
+在 REPEATABLE-READ 级别，事务持有的 每个锁 在整个事务期间一直被持有。
+在 READ-COMMITED 级别，事务里面特定语句结束之后，不匹配该sql语句扫描条件的锁，会被释放。...</p>
+  </div>
+  <footer class="entry-footer"><span title='2016-09-03 16:32:49 +0000 UTC'>September 3, 2016</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同" href="http://xgknight.com/posts/2016/09/read-commited-%E4%B8%8E-repeatable-read-%E4%BA%8B%E5%8A%A1%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E4%B9%8B%E9%97%B4%E7%9A%84%E5%BC%82%E5%90%8C/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
     <h2>浅析MySQL事务隔离级别与锁 分享
     </h2>
   </header>
@@ -275,39 +310,6 @@ mysql&gt; show variables like &#34;innodb_file_format&#34;; &#43;---------------
   </div>
   <footer class="entry-footer"><span title='2016-05-11 16:32:49 +0000 UTC'>May 11, 2016</span>&nbsp;·&nbsp;admin</footer>
   <a class="entry-link" aria-label="post link to MySQL数据库开发规范-EC" href="http://xgknight.com/posts/2016/05/mysql%E6%95%B0%E6%8D%AE%E5%BA%93%E5%BC%80%E5%8F%91%E8%A7%84%E8%8C%83-ec/"></a>
-</article>
-
-<article class="post-entry tag-entry"> 
-  <header class="entry-header">
-    <h2>小心MySQL的隐式类型转换陷阱
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>1. 隐式类型转换实例 今天生产库上突然出现MySQL线程数告警，IOPS很高，实例会话里面出现许多类似下面的sql：(修改了相关字段和值)
-SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233) 用 explain 看了下扫描行数和索引选择情况：
-mysql&gt;explain SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233); &#43;------&#43;---------------&#43;---------&#43;--------&#43;--------------------------------&#43;---------------&#43;------------&#43;--------&#43;--------&#43;------------------------------------&#43; | id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra | &#43;------&#43;---------------&#43;---------&#43;--------&#43;--------------------------------&#43;---------------&#43;------------&#43;--------&#43;--------&#43;------------------------------------&#43; | 1 | SIMPLE | t_tb1 | ref | uid_type_frid,idx_corpid_qq1id | uid_type_frid | 8 | const | 1386 | Using index condition; Using where | &#43;------&#43;---------------&#43;---------&#43;--------&#43;--------------------------------&#43;---------------&#43;------------&#43;--------&#43;--------&#43;------------------------------------&#43; 共返回 1 行记录,花费 11....</p>
-  </div>
-  <footer class="entry-footer"><span title='2016-05-05 16:32:49 +0000 UTC'>May 5, 2016</span>&nbsp;·&nbsp;admin</footer>
-  <a class="entry-link" aria-label="post link to 小心MySQL的隐式类型转换陷阱" href="http://xgknight.com/posts/2016/05/%E5%B0%8F%E5%BF%83mysql%E7%9A%84%E9%9A%90%E5%BC%8F%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E9%99%B7%E9%98%B1/"></a>
-</article>
-
-<article class="post-entry tag-entry"> 
-  <header class="entry-header">
-    <h2>MySQL数字类型int与tinyint、float与decimal如何选择
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>最近在准备给开发做一个mysql数据库开发规范方面培训，一步一步来，结合在生产环境发现的数据库方面的问题，从几个常用的数据类型说起。
-int、tinyint与bigint 它们都是（精确）整型数据类型，但是占用字节数和表达的范围不同。首先没有这个表就说不过去了：
-Type Storage Minimum Value Maximum Value (Bytes) (Signed/Unsigned) (Signed/Unsigned) TINYINT 1 -128 127 0 255 SMALLINT 2 -32768 32767 0 65535 MEDIUMINT 3 -8388608 8388607 0 16777215 INT 4 -2147483648 2147483647 0 4294967295 BIGINT 8 -9223372036854775808 9223372036854775807 0 18446744073709551615 只需要知道对应类型占多少字节就能推算出范围了，比如int占 4 bytes,即4*8=32bits，大约10位数字，也能理解为什么int默认显示位数是11。
-遇到比较多的是tinyint和bigint，tinyint一般用于存放status,type这种数值小的数据，不够用时可能会用smallint。bigint一般用于自增主键。
-为了避免数据库被过度设计，布尔、枚举类型也采用tinyint。
-还有一点也是经常被提到的关于 int(M) 中M的理解，int型数据无论是int(4)还是int(11)，都已经占用了 4 bytes 存储空间，M表示的只是显示宽度(display width, max value 255)，并不是定义int的长度。
-例如：
-mysql&gt; CREATE TABLE `tc_integer` ( `f_id` bigint(20) PRIMARY KEY AUTO_INCREMENT, `f_type` tinyint, `f_flag` tinyint(1), `f_num` smallint(5) unsigned ZEROFILL ) ENGINE=InnoDB DEFAULT CHARSET=utf8; mysql&gt; desc tc_integer; &#43;----------------&#43;-------------------------------&#43;------&#43;-----&#43;---------&#43;----------------&#43; | Field | Type | Null | Key | Default | Extra | &#43;----------------&#43;-------------------------------&#43;------&#43;-----&#43;---------&#43;----------------&#43; | f_id | bigint(20) | NO | PRI | NULL | auto_increment | | f_type | tinyint(4) | YES | | NULL | | | f_flag | tinyint(1) | YES | | NULL | | | f_num | smallint(5) unsigned zerofill | YES | | NULL | | &#43;----------------&#43;-------------------------------&#43;------&#43;-----&#43;---------&#43;----------------&#43; 4 rows in set (0....</p>
-  </div>
-  <footer class="entry-footer"><span title='2016-04-29 16:32:49 +0000 UTC'>April 29, 2016</span>&nbsp;·&nbsp;admin</footer>
-  <a class="entry-link" aria-label="post link to MySQL数字类型int与tinyint、float与decimal如何选择" href="http://xgknight.com/posts/2016/04/mysql%E6%95%B0%E5%AD%97%E7%B1%BB%E5%9E%8Bint%E4%B8%8Etinyintfloat%E4%B8%8Edecimal%E5%A6%82%E4%BD%95%E9%80%89%E6%8B%A9/"></a>
 </article>
 <footer class="page-footer">
   <nav class="pagination">

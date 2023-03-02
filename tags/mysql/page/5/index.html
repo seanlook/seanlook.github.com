@@ -128,6 +128,47 @@
 
 <article class="post-entry tag-entry"> 
   <header class="entry-header">
+    <h2>InnoDB行格式对text/blob大变长字段的影响
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>最近在排查现网Text与Blob类型，发现有不少，在《高性能MySQL(第3版)》看到对这两种变长数据类型的处理会涉及到在磁盘上创建临时表，性能开销比较大。于是把影响blob型数据存储方式了解了一下：row_format。
+1. InnoDB的Antelop与Barracuda文件格式 Innodb存储引擎保存记录，是以行的形式存放的（与之对应的是像Google BigTable这种列数据库）。在InnoDB 1.0.x版本之前，InnoDB 存储引擎提供了 Compact 和 Redundant 两种格式来存放行记录数据，这也是目前使用最多的一种格式。Redundant 格式是为兼容之前版本而保留的。
+MySQL 5.1 中的 innodb_plugin 引入了新的文件格式：Barracuda（将以前的行格式 compact 和 redundant 合称为Antelope），该文件格式拥有新的两种行格式：compressed和dynamic。
+在 MySQL 5.6 版本中，默认还是 Compact 行格式，也是目前使用最多的一种 ROW FORMAT。用户可以通过命令 SHOW TABLE STATUS LIKE&#39;table_name&#39; 来查看当前表使用的行格式，其中 row_format 列表示当前所使用的行记录结构类型。
+mysql&gt; show variables like &#34;innodb_file_format&#34;; &#43;--------------------&#43;-----------&#43; | Variable_name | Value | &#43;--------------------&#43;-----------&#43; | innodb_file_format | Barracuda | &#43;--------------------&#43;-----------&#43; 1 row in set mysql&gt; show table status like &#34;tablename%&#34;\G *************************** 1. row *************************** Name: t_rf_compact Engine: InnoDB Version: 10 Row_format: Compact Rows: 4 Avg_row_length: 36864 Data_length: 147456 Max_data_length: 0 Index_length: 0 Data_free: 0 Auto_increment: 7 Create_time: 2016-05-14 20:52:58 Update_time: NULL Check_time: NULL Collation: utf8_general_ci Checksum: NULL Create_options: Comment: 1 row in set (0....</p>
+  </div>
+  <footer class="entry-footer"><span title='2016-05-18 16:32:49 +0000 UTC'>May 18, 2016</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to InnoDB行格式对text/blob大变长字段的影响" href="http://xgknight.com/posts/2016/05/innodb%E8%A1%8C%E6%A0%BC%E5%BC%8F%E5%AF%B9text/blob%E5%A4%A7%E5%8F%98%E9%95%BF%E5%AD%97%E6%AE%B5%E7%9A%84%E5%BD%B1%E5%93%8D/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>InnoDB表主键设计方案
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>关于MySQL InnoDB表的主键设计，有必要从开发规范 http://xgknight.com/2016/05/11/mysql-dev-principle-ec/ 里拿出来，单独展开说一下。 InnoDB是一个聚集索引组织表，即行数据是按照聚集索引在物理磁盘上存储的，并且是块状结构，默认一个block是16kB。
+图片来《高性能MySQL》
+首先在设计表结构时，表一定要显式定义主键，自增主键，或者联合主键，或全局ID。 （所有与主键，包括其它索引，相关的字段，都要定义为NOT NULL，这是因为如果允许NULL，那么在索引的每条记录上，都要多用一个标记去记录这个列是否是NULL，占用多余的存储空间）
+1. 自增主键特性 对于高并发的插入速度较快，因为每次插入新记录，都是在之前记录的右边顺序插入，不需要频繁的分裂。 表上要建立多个二级索引时，索引记录都会带上主键，根据主键去定位行数据。自增主键一般是int或bigint型，多个二级索引上面占用的空间较小。
+2. 联合主键特性 每次新记录插入，都要寻找到合适的“缝隙”，插入，当插入位置空间不够时，需要做页分裂，这个需要维护成本。 二级索引带上的主键值，是联合主键的总长度，所以一个单列索引占用的空间里面，主键部分占了大部分，空间利用率不高，而且这种是 optimize table 解决不了的。 （提示：聚集索引叶子节点，就是行数据本身，所以，不需要另外的空间存储主键）
+但是联合主键有一个好处：逻辑上一批数据，在物理上很有可能相邻存储，有可能检索的数据，在一个block里面，减少了读取并缓存磁盘块的数量，一个是速度的提升，一个是减小内存的消耗。 比如 (f_c_id,f_m_id,f_type) 作为联合主键，f_c_id=22299有20w条记录，每条记录平均160bytes，一个页能存16kB，即100条记录（不考虑预留），那么f_c_id=22299需要2000个page，而且是相邻的page。
+举例，应用检索数据 f_c_id=22299, f_m_id IN(12345,23456) ，假设数据在块1和块10，缓存到内存。不多久检索f_c_id=22299, f_m_id=12399，刚好在块1。
+如果是自增id，那么就没有这个顺序， 而是根据插入数据时间来的，那么这两条记录可能在物理上很远的地方，要多读取磁盘。
+3. 全局ID 全局ID跟自增ID特性基本相同，但是它的值是从另外的服务获取的数字增长类型，不要UUID。
+只在有分库（一般有全局统计需求），或其它可能需要全局唯一性的情况下，才使用，否则没必要引入多余的服务依赖。
+另外，定义全局ID时，注意字段范围要满足要求，小心溢出；不要加上多余的 AUTO_INCREMENT 定义。
+使用全局id还有一个好处：在做数据迁移或拆库时，可以无缝切换，因为新旧数据id不用担心重复。
+4. 设计原则：自增主键 VS 联合主键 所有索引字段，特别主键，无论自增或联合主键，一定定义为 not null 表没有特殊情况下，都使用自增主键，尽量不用联合主键 特别是“可能作为联合主键”里面有的字段，会频繁update的情况，更不能做联合主键 在业务层具有唯一性的属性，如果不依赖于数据库的唯一索引来编码，也不用使用Unique Key。如果需要数据库维护唯一性，可使用Unique Key，比如将上面的联合主键定义为联合索引，再另外定义一个自增主键 如果表上有一个单列字段，已具有唯一性，可直接定义成主键，不必设置自增id 尽量用int或bigint型，如果不能，也要控制主键varchar列的长度在30以内。不要用带汉字或url类似的字段作为主键 根据上面的顺序走完，还是想用联合主键的，以下任意条件满足，可用： 表上的插入数据并发量不高 有明显的上文【联合主键】部分说到的，热点数据相邻存储的场景 出了联合主键外，其它索引的只有1-2个 与DBA协商后同意 参考： http://imysql.com/2015/10/29/mysql-faq-clustered-index.shtml
+原文连接地址：http://xgknight.com/2016/05/13/mysql-innodb-primary_key/</p>
+  </div>
+  <footer class="entry-footer"><span title='2016-05-13 15:32:49 +0000 UTC'>May 13, 2016</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to InnoDB表主键设计方案" href="http://xgknight.com/posts/2016/05/innodb%E8%A1%A8%E4%B8%BB%E9%94%AE%E8%AE%BE%E8%AE%A1%E6%96%B9%E6%A1%88/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
     <h2>MySQL数据库开发规范-EC
     </h2>
   </header>
@@ -248,10 +289,30 @@ cpu性能 磁盘io性能 调度程序性能 内存分配及传输速度 POSIX线
   <footer class="entry-footer"><span title='2016-03-28 16:32:49 +0000 UTC'>March 28, 2016</span>&nbsp;·&nbsp;admin</footer>
   <a class="entry-link" aria-label="post link to 使用sysbench对mysql压力测试" href="http://xgknight.com/posts/2016/03/%E4%BD%BF%E7%94%A8sysbench%E5%AF%B9mysql%E5%8E%8B%E5%8A%9B%E6%B5%8B%E8%AF%95/"></a>
 </article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>生产环境使用 pt-table-checksum 检查MySQL数据一致性
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>公司数据中心从托管机房迁移到阿里云，需要对mysql迁移（Replication）后的数据一致性进行校验，但又不能对生产环境使用造成影响，pt-table-checksum 成为了绝佳也是唯一的检查工具。
+pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、从库的数据是否一致。其原理是在主库执行基于statement的sql语句来生成主库数据块的checksum，把相同的sql语句传递到从库执行，并在从库上计算相同数据块的checksum，最后，比较主从库上相同数据块的checksum值，由此判断主从数据是否一致。检测过程根据唯一索引将表按row切分为块（chunk），以为单位计算，可以避免锁表。检测时会自动判断复制延迟、 master的负载， 超过阀值后会自动将检测暂停，减小对线上服务的影响。
+pt-table-checksum 默认情况下可以应对绝大部分场景，官方说，即使上千个库、上万亿的行，它依然可以很好的工作，这源自于设计很简单，一次检查一个表，不需要太多的内存和多余的操作；必要时，pt-table-checksum 会根据服务器负载动态改变 chunk 大小，减少从库的延迟。
+为了减少对数据库的干预，pt-table-checksum还会自动侦测并连接到从库，当然如果失败，可以指定--recursion-method选项来告诉从库在哪里。它的易用性还体现在，复制若有延迟，在从库 checksum 会暂停直到赶上主库的计算时间点（也通过选项--设定一个可容忍的延迟最大值，超过这个值也认为不一致）。
+为了保证主数据库服务的安全，该工具实现了许多保护措施：
+自动设置 innodb_lock_wait_timeout 为1s，避免引起 默认当数据库有25个以上的并发查询时，pt-table-checksum会暂停。可以设置 --max-load 选项来设置这个阀值 当用 Ctrl&#43;C 停止任务后，工具会正常的完成当前 chunk 检测，下次使用 --resume 选项启动可以恢复继续下一个 chunk 工作过程 直接看 nettedfish 的说明：
+1. 连接到主库：pt工具连接到主库，然后自动发现主库的所有从库。默认采用show full processlist来查找从库，但是这只有在主从实例端口相同的情况下才有效。 3. 查找主库或者从库是否有复制过滤规则：这是为了安全而默认检查的选项。你可以关闭这个检查，但是这可能导致checksum的sql语句要么不会同步到从库，要么到了从库发现从库没有要被checksum的表，这都会导致从库同步卡库。 5. 开始获取表，一个个的计算。 6. 如果是表的第一个chunk，那么chunk-size一般为1000；如果不是表的第一个chunk，那么采用19步中分析出的结果。 7. 检查表结构，进行数据类型转换等，生成checksum的sql语句。 8. 根据表上的索引和数据的分布，选择最合适的split表的方法。 9. 开始checksum表。 10. 默认在chunk一个表之前，先删除上次这个表相关的计算结果。除非–resume。 14. 根据explain的结果，判断chunk的size是否超过了你定义的chunk-size的上限。如果超过了，为了不影响线上性能，这个chunk将被忽略。 15. 把要checksum的行加上for update锁，并计算。 17-18. 把计算结果存储到master_crc master_count列中。 19. 调整下一个chunk的大小。 20. 等待从库追上主库。如果没有延迟备份的从库在运行，最好检查所有的从库，如果发现延迟最大的从库延迟超过max-lag秒，pt工具在这里将暂停。 21. 如果发现主库的max-load超过某个阈值，pt工具在这里将暂停。 22. 继续下一个chunk，直到这个table被chunk完毕。 23-24. 等待从库执行完checksum，便于生成汇总的统计结果。每个表汇总并统计一次。 25-26....</p>
+  </div>
+  <footer class="entry-footer"><span title='2015-12-29 10:21:25 +0000 UTC'>December 29, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 生产环境使用 pt-table-checksum 检查MySQL数据一致性" href="http://xgknight.com/posts/2015/12/%E7%94%9F%E4%BA%A7%E7%8E%AF%E5%A2%83%E4%BD%BF%E7%94%A8-pt-table-checksum-%E6%A3%80%E6%9F%A5mysql%E6%95%B0%E6%8D%AE%E4%B8%80%E8%87%B4%E6%80%A7/"></a>
+</article>
 <footer class="page-footer">
   <nav class="pagination">
     <a class="prev" href="http://xgknight.com/tags/mysql/page/4/">
       «&nbsp;Prev&nbsp;
+    </a>
+    <a class="next" href="http://xgknight.com/tags/mysql/page/6/">Next&nbsp;&nbsp;»
     </a>
   </nav>
 </footer>

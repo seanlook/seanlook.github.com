@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>图解pfSense软路由系统的使用（NAT功能） | Sean Note</title>
+<meta name="keywords" content="pfsense, vmware">
+<meta name="description" content="pfsense是一款开源的路由和防火墙产品，它基于freebsd系统定制和开发。pfsene拥有友好的web的配置界面，且具有伸缩性强又不失强大性能，在众多开源网络防火墙中属于佼佼者。
+2004年，pfsense作为m0n0wall项目（基于freebsd内核的嵌入式软防火墙）的分支项目启动，增加了许多m0n0wall没有的功能(pfSense的官方网站称它为the better m0n0wall).pfSense除了包含宽带路由器的基本功能外,还有以下的特点:
+基于稳定可靠的FreeBSD操作系统,能适应全天候运行的要求 具有用户认证功能,使用Web网页的认证方式,配合RADIUS可以实现记费功能 完善的防火墙、流量控制和数据包功能,保证了网络的安全,稳定和高速运行 支持多条WAN线路和负载均衡功能,可大幅度提高网络出口带宽,在带宽拥塞时自动分配负载 内置了IPsec 和PPTP VPN功能,实现不同分支机构的远程互联或远程用户安全地访问内部网 支持802.1Q VLAN标准,可以通过软件模拟的方式使得普通网卡能识别802.1Q的标记,同时为多个VLAN的用户提供服务 支持使用额外的软件包来扩展pfSense功能,为用户提供更多的功能(如FTP和透明代理). 详细的日志功能,方便用户对网络出现的事件分析,统计和处理 使用Web管理界面进行配置(支持SSL),支持远程管理和软件版本自动在线升级 本文简单介绍pfSense的安装及配置过程，完成一个基本的路由器该有的功能，如访问局外网、设置防火墙规则、配置端口映射。这里演示在ESXi虚拟服务器上，解决IP不足的问题。
+创建虚拟机 首先去 https://www.pfsense.org/download/ 下载稳定版本的pfSense，如pfSense-LiveCD-2.2.2-RELEASE-amd64.iso.gz（网上看到有人提到这个版本不稳定，我在使用中偶尔也发现突然很慢，建议2.1.5）。在vSphere上创建虚拟机的过程省略，取名01_pfSense，创建虚拟机操作系统时选择“其他 -&gt; FreeBSD 64位”，单CPU,512Mb内存，4G硬盘。将下载的系统解压成iso后挂载到CD/DVD，并“打开电源时连接”。 下图是网卡情况： 为pfSense分配两个网卡，分别是可以连接公司内网的172.29.88.1/24网段的vSphere_Admin端口组，和IP范围是172.30.31.1/24的内部局域网端口组VM Local。 记录下Mac地址 外网接口：00:0c:29:36:b6:c2 内网接口：00:0c:29:36:b6:cc
+安装pfsense 启动电源后出现欢迎界面，选择1.Boot pfSense [default]，或等待几秒钟自动选择，进入如下界面： 输入I，回车，然后是一个蓝屏，开始安装。
+也可以什么都不用管，系统会一直启动从CD启动得到一个完整的pfSense系统，因为没有安装所以在屏幕下方会有一个选项99） Install pfSense to a hard drive, etc.，输入99同样会进入下面的安装操作系统的过程。 一路保存默认：&lt; Accept these Settings &gt; → &lt; Quick/Easy InStall &gt; → erase all content &lt; OK &gt; → &lt; Standard Kernel &gt; → &lt; Reboot &gt;。
+重启后安装完成，断开CD介质。 详见见官网文档 https://doc.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2015/04/%E5%9B%BE%E8%A7%A3pfsense%E8%BD%AF%E8%B7%AF%E7%94%B1%E7%B3%BB%E7%BB%9F%E7%9A%84%E4%BD%BF%E7%94%A8nat%E5%8A%9F%E8%83%BD/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="图解pfSense软路由系统的使用（NAT功能）" />
+<meta property="og:description" content="pfsense是一款开源的路由和防火墙产品，它基于freebsd系统定制和开发。pfsene拥有友好的web的配置界面，且具有伸缩性强又不失强大性能，在众多开源网络防火墙中属于佼佼者。
+2004年，pfsense作为m0n0wall项目（基于freebsd内核的嵌入式软防火墙）的分支项目启动，增加了许多m0n0wall没有的功能(pfSense的官方网站称它为the better m0n0wall).pfSense除了包含宽带路由器的基本功能外,还有以下的特点:
+基于稳定可靠的FreeBSD操作系统,能适应全天候运行的要求 具有用户认证功能,使用Web网页的认证方式,配合RADIUS可以实现记费功能 完善的防火墙、流量控制和数据包功能,保证了网络的安全,稳定和高速运行 支持多条WAN线路和负载均衡功能,可大幅度提高网络出口带宽,在带宽拥塞时自动分配负载 内置了IPsec 和PPTP VPN功能,实现不同分支机构的远程互联或远程用户安全地访问内部网 支持802.1Q VLAN标准,可以通过软件模拟的方式使得普通网卡能识别802.1Q的标记,同时为多个VLAN的用户提供服务 支持使用额外的软件包来扩展pfSense功能,为用户提供更多的功能(如FTP和透明代理). 详细的日志功能,方便用户对网络出现的事件分析,统计和处理 使用Web管理界面进行配置(支持SSL),支持远程管理和软件版本自动在线升级 本文简单介绍pfSense的安装及配置过程，完成一个基本的路由器该有的功能，如访问局外网、设置防火墙规则、配置端口映射。这里演示在ESXi虚拟服务器上，解决IP不足的问题。
+创建虚拟机 首先去 https://www.pfsense.org/download/ 下载稳定版本的pfSense，如pfSense-LiveCD-2.2.2-RELEASE-amd64.iso.gz（网上看到有人提到这个版本不稳定，我在使用中偶尔也发现突然很慢，建议2.1.5）。在vSphere上创建虚拟机的过程省略，取名01_pfSense，创建虚拟机操作系统时选择“其他 -&gt; FreeBSD 64位”，单CPU,512Mb内存，4G硬盘。将下载的系统解压成iso后挂载到CD/DVD，并“打开电源时连接”。 下图是网卡情况： 为pfSense分配两个网卡，分别是可以连接公司内网的172.29.88.1/24网段的vSphere_Admin端口组，和IP范围是172.30.31.1/24的内部局域网端口组VM Local。 记录下Mac地址 外网接口：00:0c:29:36:b6:c2 内网接口：00:0c:29:36:b6:cc
+安装pfsense 启动电源后出现欢迎界面，选择1.Boot pfSense [default]，或等待几秒钟自动选择，进入如下界面： 输入I，回车，然后是一个蓝屏，开始安装。
+也可以什么都不用管，系统会一直启动从CD启动得到一个完整的pfSense系统，因为没有安装所以在屏幕下方会有一个选项99） Install pfSense to a hard drive, etc.，输入99同样会进入下面的安装操作系统的过程。 一路保存默认：&lt; Accept these Settings &gt; → &lt; Quick/Easy InStall &gt; → erase all content &lt; OK &gt; → &lt; Standard Kernel &gt; → &lt; Reboot &gt;。
+重启后安装完成，断开CD介质。 详见见官网文档 https://doc." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2015/04/%E5%9B%BE%E8%A7%A3pfsense%E8%BD%AF%E8%B7%AF%E7%94%B1%E7%B3%BB%E7%BB%9F%E7%9A%84%E4%BD%BF%E7%94%A8nat%E5%8A%9F%E8%83%BD/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2015-04-23T15:21:25+00:00" />
+<meta property="article:modified_time" content="2015-04-23T15:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="图解pfSense软路由系统的使用（NAT功能）"/>
+<meta name="twitter:description" content="pfsense是一款开源的路由和防火墙产品，它基于freebsd系统定制和开发。pfsene拥有友好的web的配置界面，且具有伸缩性强又不失强大性能，在众多开源网络防火墙中属于佼佼者。
+2004年，pfsense作为m0n0wall项目（基于freebsd内核的嵌入式软防火墙）的分支项目启动，增加了许多m0n0wall没有的功能(pfSense的官方网站称它为the better m0n0wall).pfSense除了包含宽带路由器的基本功能外,还有以下的特点:
+基于稳定可靠的FreeBSD操作系统,能适应全天候运行的要求 具有用户认证功能,使用Web网页的认证方式,配合RADIUS可以实现记费功能 完善的防火墙、流量控制和数据包功能,保证了网络的安全,稳定和高速运行 支持多条WAN线路和负载均衡功能,可大幅度提高网络出口带宽,在带宽拥塞时自动分配负载 内置了IPsec 和PPTP VPN功能,实现不同分支机构的远程互联或远程用户安全地访问内部网 支持802.1Q VLAN标准,可以通过软件模拟的方式使得普通网卡能识别802.1Q的标记,同时为多个VLAN的用户提供服务 支持使用额外的软件包来扩展pfSense功能,为用户提供更多的功能(如FTP和透明代理). 详细的日志功能,方便用户对网络出现的事件分析,统计和处理 使用Web管理界面进行配置(支持SSL),支持远程管理和软件版本自动在线升级 本文简单介绍pfSense的安装及配置过程，完成一个基本的路由器该有的功能，如访问局外网、设置防火墙规则、配置端口映射。这里演示在ESXi虚拟服务器上，解决IP不足的问题。
+创建虚拟机 首先去 https://www.pfsense.org/download/ 下载稳定版本的pfSense，如pfSense-LiveCD-2.2.2-RELEASE-amd64.iso.gz（网上看到有人提到这个版本不稳定，我在使用中偶尔也发现突然很慢，建议2.1.5）。在vSphere上创建虚拟机的过程省略，取名01_pfSense，创建虚拟机操作系统时选择“其他 -&gt; FreeBSD 64位”，单CPU,512Mb内存，4G硬盘。将下载的系统解压成iso后挂载到CD/DVD，并“打开电源时连接”。 下图是网卡情况： 为pfSense分配两个网卡，分别是可以连接公司内网的172.29.88.1/24网段的vSphere_Admin端口组，和IP范围是172.30.31.1/24的内部局域网端口组VM Local。 记录下Mac地址 外网接口：00:0c:29:36:b6:c2 内网接口：00:0c:29:36:b6:cc
+安装pfsense 启动电源后出现欢迎界面，选择1.Boot pfSense [default]，或等待几秒钟自动选择，进入如下界面： 输入I，回车，然后是一个蓝屏，开始安装。
+也可以什么都不用管，系统会一直启动从CD启动得到一个完整的pfSense系统，因为没有安装所以在屏幕下方会有一个选项99） Install pfSense to a hard drive, etc.，输入99同样会进入下面的安装操作系统的过程。 一路保存默认：&lt; Accept these Settings &gt; → &lt; Quick/Easy InStall &gt; → erase all content &lt; OK &gt; → &lt; Standard Kernel &gt; → &lt; Reboot &gt;。
+重启后安装完成，断开CD介质。 详见见官网文档 https://doc."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "图解pfSense软路由系统的使用（NAT功能）",
+      "item": "http://xgknight.com/posts/2015/04/%E5%9B%BE%E8%A7%A3pfsense%E8%BD%AF%E8%B7%AF%E7%94%B1%E7%B3%BB%E7%BB%9F%E7%9A%84%E4%BD%BF%E7%94%A8nat%E5%8A%9F%E8%83%BD/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "图解pfSense软路由系统的使用（NAT功能）",
+  "name": "图解pfSense软路由系统的使用（NAT功能）",
+  "description": "pfsense是一款开源的路由和防火墙产品，它基于freebsd系统定制和开发。pfsene拥有友好的web的配置界面，且具有伸缩性强又不失强大性能，在众多开源网络防火墙中属于佼佼者。\n2004年，pfsense作为m0n0wall项目（基于freebsd内核的嵌入式软防火墙）的分支项目启动，增加了许多m0n0wall没有的功能(pfSense的官方网站称它为the better m0n0wall).pfSense除了包含宽带路由器的基本功能外,还有以下的特点:\n基于稳定可靠的FreeBSD操作系统,能适应全天候运行的要求 具有用户认证功能,使用Web网页的认证方式,配合RADIUS可以实现记费功能 完善的防火墙、流量控制和数据包功能,保证了网络的安全,稳定和高速运行 支持多条WAN线路和负载均衡功能,可大幅度提高网络出口带宽,在带宽拥塞时自动分配负载 内置了IPsec 和PPTP VPN功能,实现不同分支机构的远程互联或远程用户安全地访问内部网 支持802.1Q VLAN标准,可以通过软件模拟的方式使得普通网卡能识别802.1Q的标记,同时为多个VLAN的用户提供服务 支持使用额外的软件包来扩展pfSense功能,为用户提供更多的功能(如FTP和透明代理). 详细的日志功能,方便用户对网络出现的事件分析,统计和处理 使用Web管理界面进行配置(支持SSL),支持远程管理和软件版本自动在线升级 本文简单介绍pfSense的安装及配置过程，完成一个基本的路由器该有的功能，如访问局外网、设置防火墙规则、配置端口映射。这里演示在ESXi虚拟服务器上，解决IP不足的问题。\n创建虚拟机 首先去 https://www.pfsense.org/download/ 下载稳定版本的pfSense，如pfSense-LiveCD-2.2.2-RELEASE-amd64.iso.gz（网上看到有人提到这个版本不稳定，我在使用中偶尔也发现突然很慢，建议2.1.5）。在vSphere上创建虚拟机的过程省略，取名01_pfSense，创建虚拟机操作系统时选择“其他 -\u0026gt; FreeBSD 64位”，单CPU,512Mb内存，4G硬盘。将下载的系统解压成iso后挂载到CD/DVD，并“打开电源时连接”。 下图是网卡情况： 为pfSense分配两个网卡，分别是可以连接公司内网的172.29.88.1/24网段的vSphere_Admin端口组，和IP范围是172.30.31.1/24的内部局域网端口组VM Local。 记录下Mac地址 外网接口：00:0c:29:36:b6:c2 内网接口：00:0c:29:36:b6:cc\n安装pfsense 启动电源后出现欢迎界面，选择1.Boot pfSense [default]，或等待几秒钟自动选择，进入如下界面： 输入I，回车，然后是一个蓝屏，开始安装。\n也可以什么都不用管，系统会一直启动从CD启动得到一个完整的pfSense系统，因为没有安装所以在屏幕下方会有一个选项99） Install pfSense to a hard drive, etc.，输入99同样会进入下面的安装操作系统的过程。 一路保存默认：\u0026lt; Accept these Settings \u0026gt; → \u0026lt; Quick/Easy InStall \u0026gt; → erase all content \u0026lt; OK \u0026gt; → \u0026lt; Standard Kernel \u0026gt; → \u0026lt; Reboot \u0026gt;。\n重启后安装完成，断开CD介质。 详见见官网文档 https://doc.",
+  "keywords": [
+    "pfsense", "vmware"
+  ],
+  "articleBody": "pfsense是一款开源的路由和防火墙产品，它基于freebsd系统定制和开发。pfsene拥有友好的web的配置界面，且具有伸缩性强又不失强大性能，在众多开源网络防火墙中属于佼佼者。\n2004年，pfsense作为m0n0wall项目（基于freebsd内核的嵌入式软防火墙）的分支项目启动，增加了许多m0n0wall没有的功能(pfSense的官方网站称它为the better m0n0wall).pfSense除了包含宽带路由器的基本功能外,还有以下的特点:\n基于稳定可靠的FreeBSD操作系统,能适应全天候运行的要求 具有用户认证功能,使用Web网页的认证方式,配合RADIUS可以实现记费功能 完善的防火墙、流量控制和数据包功能,保证了网络的安全,稳定和高速运行 支持多条WAN线路和负载均衡功能,可大幅度提高网络出口带宽,在带宽拥塞时自动分配负载 内置了IPsec 和PPTP VPN功能,实现不同分支机构的远程互联或远程用户安全地访问内部网 支持802.1Q VLAN标准,可以通过软件模拟的方式使得普通网卡能识别802.1Q的标记,同时为多个VLAN的用户提供服务 支持使用额外的软件包来扩展pfSense功能,为用户提供更多的功能(如FTP和透明代理). 详细的日志功能,方便用户对网络出现的事件分析,统计和处理 使用Web管理界面进行配置(支持SSL),支持远程管理和软件版本自动在线升级 本文简单介绍pfSense的安装及配置过程，完成一个基本的路由器该有的功能，如访问局外网、设置防火墙规则、配置端口映射。这里演示在ESXi虚拟服务器上，解决IP不足的问题。\n创建虚拟机 首先去 https://www.pfsense.org/download/ 下载稳定版本的pfSense，如pfSense-LiveCD-2.2.2-RELEASE-amd64.iso.gz（网上看到有人提到这个版本不稳定，我在使用中偶尔也发现突然很慢，建议2.1.5）。在vSphere上创建虚拟机的过程省略，取名01_pfSense，创建虚拟机操作系统时选择“其他 -\u003e FreeBSD 64位”，单CPU,512Mb内存，4G硬盘。将下载的系统解压成iso后挂载到CD/DVD，并“打开电源时连接”。 下图是网卡情况： 为pfSense分配两个网卡，分别是可以连接公司内网的172.29.88.1/24网段的vSphere_Admin端口组，和IP范围是172.30.31.1/24的内部局域网端口组VM Local。 记录下Mac地址 外网接口：00:0c:29:36:b6:c2 内网接口：00:0c:29:36:b6:cc\n安装pfsense 启动电源后出现欢迎界面，选择1.Boot pfSense [default]，或等待几秒钟自动选择，进入如下界面： 输入I，回车，然后是一个蓝屏，开始安装。\n也可以什么都不用管，系统会一直启动从CD启动得到一个完整的pfSense系统，因为没有安装所以在屏幕下方会有一个选项99） Install pfSense to a hard drive, etc.，输入99同样会进入下面的安装操作系统的过程。 一路保存默认：\u003c Accept these Settings \u003e → \u003c Quick/Easy InStall \u003e → erase all content \u003c OK \u003e → \u003c Standard Kernel \u003e → \u003c Reboot \u003e。\n重启后安装完成，断开CD介质。 详见见官网文档 https://doc.pfsense.org/index.php/Installing_pfSense 。\n下面开始配置内外网接口。\n分配接口 从上图可以看到系统默认将em0接口当做WAN（外网），em1当做LAN（内部局域网），但我们不确定em0就是在创建虚拟机时分配的外网接口，需要根据MAC地址判断。\n选择1) Assgin Interfaces，回车 首先询问你是否设置VLAN（用于划分多个子局域网网），Do you want to set up VLANs now [y|n]?，否n： 分配IP 选择2) Set interfce(s) IP address： 先配置WAN的IP，禁用DHCP,配置地址172.29.88.230/24，网关172.29.88.1，禁用IPV6： 再配置LAN，172.30.31.1/24，不配置网关： 完成后会提示可以在浏览器打开http://172.30.31.1/，通过webConfigurator来操作pfSense。\n已打通两端网络：\nsean@seanubt:~$ ssh admin@172.30.31.1 22 Password for admin@pfSense.domain: *** Welcome to pfSense 2.2.2-RELEASE-pfSense (amd64) on pfSense *** WAN (wan) -\u003e em0 -\u003e v4: 172.29.88.230/24 LAN (lan) -\u003e em1 -\u003e v4: 172.30.31.1/24 0) Logout (SSH only) 9) pfTop 1) Assign Interfaces 10) Filter Logs 2) Set interface(s) IP address 11) Restart webConfigurator 3) Reset webConfigurator password 12) pfSense Developer Shell 4) Reset to factory defaults 13) Upgrade from console 5) Reboot system 14) Disable Secure Shell (sshd) 6) Halt system 15) Restore recent configuration 7) Ping host 16) Restart PHP-FPM 8) Shell 7 Enter a host name or IP address: 172.29.88.56 PING 172.29.88.56 (172.29.88.56): 56 data bytes 64 bytes from 172.29.88.56: icmp_seq=0 ttl=64 time=1.406 ms 64 bytes from 172.29.88.56: icmp_seq=1 ttl=64 time=1.215 ms 64 bytes from 172.29.88.56: icmp_seq=2 ttl=64 time=0.480 ms --- 172.29.88.56 ping statistics --- 3 packets transmitted, 3 packets received, 0.0% packet loss round-trip min/avg/max/stddev = 0.480/1.034/1.406/0.399 ms Press ENTER to continue. *** Welcome to pfSense 2.2.2-RELEASE-pfSense (amd64) on pfSense *** WAN (wan) -\u003e em0 -\u003e v4: 172.29.88.230/24 LAN (lan) -\u003e em1 -\u003e v4: 172.30.31.1/24 0) Logout (SSH only) 9) pfTop 1) Assign Interfaces 10) Filter Logs 2) Set interface(s) IP address 11) Restart webConfigurator 3) Reset webConfigurator password 12) pfSense Developer Shell 4) Reset to factory defaults 13) Upgrade from console 5) Reboot system 14) Disable Secure Shell (sshd) 6) Halt system 15) Restore recent configuration 7) Ping host 16) Restart PHP-FPM 8) Shell 8 ping 172.30.31.20 PING 172.30.31.20 (172.30.31.20): 56 data bytes 64 bytes from 172.30.31.20: icmp_seq=0 ttl=64 time=0.239 ms 64 bytes from 172.30.31.20: icmp_seq=1 ttl=64 time=0.211 ms 登录 172.30.31.1是内部局域网的IP，所以只能通过另一台lan上的服务器的浏览器访问： 当然这样操作起来很不方便，，而且假如lan上的其它服务器都是linux而且没有图像界面，没办法使用webConfigurator了。端口转发似乎是一个比较好的方案：在某一台lan服务器上添加一个可以通过你的pc端访问的网卡（我这里的172.29.88.206，它的lan接口IP为172.30.31.20），然后使用rinetd工具转发到172.30.31.1。 这个方法似乎可选，但需要额外的设置： An HTTP_REFERER was detected other than what is defined in System -\u003e Advanced (http://172.29.88.206:8008/index.php?logout). You can disable this check if needed in System -\u003e Advanced -\u003e Admin.\npfSense为了安全起见，不允许任何形式的转发来访问webConfigurator，根据你的需要决定是否关闭这个功能：System -\u003e Advanced -\u003e Admin，勾选Browser HTTP_REFERER enforcement -\u003e Save -\u003e Apply。 登陆的用户名默认为admin/pfsense 使用配置向导 前面是通过命令行的方法对接口和IP进行配置，也可以直接通过webGUI向导对WAN和LAN、网关等设置：System -\u003e Setup Wizard，因为太过简单，就不贴图了。 在设置WAN接口时（Configure WAN Interface）注意两点：\nStatic IP Configuration 部分设置正确的IP和网关，否则会无法进出网络 RFC1918 Networks 默认是勾选的，这是为了避免WAN上也存在与LAN一样的网段。如果要允许wan的其他主机ping通该pfSense，则去掉勾 其它保持为空或默认值。\npfSense的NAT功能 即Port Forward，目的是为了WAN上的其他机器可以访问LAN内部的服务。 Friewall -\u003e NAT 端口映射分为单端口和范围端口。但端口容易理解，访问WAN 172.29.88.230:8000 的 数据包都转发到内部LAN 172.30.31.20:8000；范围端口是在 from m to n 的端口范围内的数据包都发送到内部IP的对应端口上，减少规则的数量。 Save -\u003e Apply Changes，与此同时pfSense会自动在防火墙里添加规则，Firewal -\u003e Rules pfSense做负载均衡 其它功能 pfSense还有几大重要的功能，如快速搭建VPN服务器，作为前端负载均衡服务器，流量限制。由于工作中暂未用到，所以就不加说明了。\n关于负载均衡见 http://xgknight.com/2015/04/24/pfsense-loadbalancer/\n参考\n用pfSense搭建ESXi上的软路由\npfsense 企业应用实例\npfsense 研究- m0n0wall中国论坛\nPFsense学习 - 端口映射\npfSense 2.0 多 WAN 负载均衡设置指南 （中文）\n",
+  "wordCount" : "460",
+  "inLanguage": "en",
+  "datePublished": "2015-04-23T15:21:25Z",
+  "dateModified": "2015-04-23T15:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2015/04/%E5%9B%BE%E8%A7%A3pfsense%E8%BD%AF%E8%B7%AF%E7%94%B1%E7%B3%BB%E7%BB%9F%E7%9A%84%E4%BD%BF%E7%94%A8nat%E5%8A%9F%E8%83%BD/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      图解pfSense软路由系统的使用（NAT功能）
+    </h1>
+    <div class="post-meta"><span title='2015-04-23 15:21:25 +0000 UTC'>April 23, 2015</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>pfsense是一款开源的路由和防火墙产品，它基于freebsd系统定制和开发。pfsene拥有友好的web的配置界面，且具有伸缩性强又不失强大性能，在众多开源网络防火墙中属于佼佼者。</p>
+<p>2004年，pfsense作为m0n0wall项目（基于freebsd内核的嵌入式软防火墙）的分支项目启动，增加了许多m0n0wall没有的功能(pfSense的官方网站称它为the better m0n0wall).pfSense除了包含宽带路由器的基本功能外,还有以下的特点:</p>
+<ul>
+<li>基于稳定可靠的FreeBSD操作系统,能适应全天候运行的要求</li>
+<li>具有用户认证功能,使用Web网页的认证方式,配合RADIUS可以实现记费功能</li>
+<li>完善的防火墙、流量控制和数据包功能,保证了网络的安全,稳定和高速运行</li>
+<li>支持多条WAN线路和负载均衡功能,可大幅度提高网络出口带宽,在带宽拥塞时自动分配负载</li>
+<li>内置了IPsec 和PPTP VPN功能,实现不同分支机构的远程互联或远程用户安全地访问内部网</li>
+<li>支持802.1Q VLAN标准,可以通过软件模拟的方式使得普通网卡能识别802.1Q的标记,同时为多个VLAN的用户提供服务</li>
+<li>支持使用额外的软件包来扩展pfSense功能,为用户提供更多的功能(如FTP和透明代理).</li>
+<li>详细的日志功能,方便用户对网络出现的事件分析,统计和处理</li>
+<li>使用Web管理界面进行配置(支持SSL),支持远程管理和软件版本自动在线升级</li>
+</ul>
+<p>本文简单介绍pfSense的安装及配置过程，完成一个基本的路由器该有的功能，如访问局外网、设置防火墙规则、配置端口映射。这里演示在ESXi虚拟服务器上，解决IP不足的问题。</p>
+<h2 id="创建虚拟机">创建虚拟机<a hidden class="anchor" aria-hidden="true" href="#创建虚拟机">#</a></h2>
+<p>首先去 <a href="https://www.pfsense.org/download/">https://www.pfsense.org/download/</a> 下载稳定版本的pfSense，如pfSense-LiveCD-2.2.2-RELEASE-amd64.iso.gz（网上看到有人提到这个版本不稳定，我在使用中偶尔也发现突然很慢，建议2.1.5）。在vSphere上创建虚拟机的过程省略，取名01_pfSense，创建虚拟机操作系统时选择“其他 -&gt; FreeBSD 64位”，单CPU,512Mb内存，4G硬盘。将下载的系统解压成iso后挂载到CD/DVD，并“打开电源时连接”。
+下图是网卡情况：
+为pfSense分配两个网卡，分别是可以连接公司内网的172.29.88.1/24网段的vSphere_Admin端口组，和IP范围是172.30.31.1/24的内部局域网端口组VM Local。
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/pfsense-vsphere0.png" alt="pfsense-vsphere0.png"  />
+</p>
+<p>记录下Mac地址
+外网接口：00:0c:29:36:b6:c2
+内网接口：00:0c:29:36:b6:cc</p>
+<h2 id="安装pfsense">安装pfsense<a hidden class="anchor" aria-hidden="true" href="#安装pfsense">#</a></h2>
+<p>启动电源后出现欢迎界面，选择<code>1.Boot pfSense [default]</code>，或等待几秒钟自动选择，进入如下界面：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/pfsense-vsphere1.png" alt="pfsense-vsphere1.png"  />
+</p>
+<p>输入I，回车，然后是一个蓝屏，开始安装。</p>
+<!-- raw HTML omitted -->
+<p>也可以什么都不用管，系统会一直启动从CD启动得到一个完整的pfSense系统，因为没有安装所以在屏幕下方会有一个选项<code>99） Install pfSense to a hard drive, etc.</code>，输入99同样会进入下面的安装操作系统的过程。
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/pfsense-vsphere2.png" alt="pfsense-vsphere2.png"  />
+</p>
+<p>一路保存默认：<code>&lt; Accept these Settings &gt;</code> → <code>&lt; Quick/Easy InStall &gt;</code> → <code>erase all content &lt; OK &gt;</code> → <code>&lt; Standard Kernel &gt;</code> → <code>&lt; Reboot &gt;</code>。</p>
+<p>重启后安装完成，断开CD介质。
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/pfsense-vsphere3.png" alt="pfsense-vsphere3.png"  />
+
+详见见官网文档 <a href="https://doc.pfsense.org/index.php/Installing_pfSense">https://doc.pfsense.org/index.php/Installing_pfSense</a> 。</p>
+<p>下面开始配置内外网接口。</p>
+<h2 id="分配接口">分配接口<a hidden class="anchor" aria-hidden="true" href="#分配接口">#</a></h2>
+<p>从上图可以看到系统默认将em0接口当做WAN（外网），em1当做LAN（内部局域网），但我们不确定em0就是在创建虚拟机时分配的外网接口，需要根据MAC地址判断。</p>
+<p>选择<code>1) Assgin Interfaces</code>，回车
+首先询问你是否设置VLAN（用于划分多个子局域网网），Do you want to set up VLANs now [y|n]?，否n：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/pfsense-vsphere4.png" alt="pfsense-vsphere4.png"  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/pfsense-vsphere4-1.png" alt="pfsense-vsphere4-1.png"  />
+</p>
+<h2 id="分配ip">分配IP<a hidden class="anchor" aria-hidden="true" href="#分配ip">#</a></h2>
+<p>选择<code>2) Set interfce(s) IP address</code>：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/pfsense-vsphere5.png" alt="pfsense-vsphere5.png"  />
+
+先配置WAN的IP，禁用DHCP,配置地址172.29.88.230/24，网关172.29.88.1，禁用IPV6：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/pfsense-vsphere5-1.png" alt="pfsense-vsphere5-1.png"  />
+
+再配置LAN，172.30.31.1/24，不配置网关：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/pfsense-vsphere5-2.png" alt="pfsense-vsphere5-2.png"  />
+
+完成后会提示可以在浏览器打开<code>http://172.30.31.1/</code>，通过webConfigurator来操作pfSense。</p>
+<p>已打通两端网络：</p>
+<pre tabindex="0"><code>sean@seanubt:~$ ssh admin@172.30.31.1 22
+Password for admin@pfSense.domain:
+*** Welcome to pfSense 2.2.2-RELEASE-pfSense (amd64) on pfSense ***
+
+ WAN (wan)       -&gt; em0        -&gt; v4: 172.29.88.230/24
+ LAN (lan)       -&gt; em1        -&gt; v4: 172.30.31.1/24
+ 0) Logout (SSH only)                  9) pfTop
+ 1) Assign Interfaces                 10) Filter Logs
+ 2) Set interface(s) IP address       11) Restart webConfigurator
+ 3) Reset webConfigurator password    12) pfSense Developer Shell
+ 4) Reset to factory defaults         13) Upgrade from console
+ 5) Reboot system                     14) Disable Secure Shell (sshd)
+ 6) Halt system                       15) Restore recent configuration
+ 7) Ping host                         16) Restart PHP-FPM
+ 8) Shell
+  
+
+7
+
+
+Enter a host name or IP address: 172.29.88.56
+
+PING 172.29.88.56 (172.29.88.56): 56 data bytes
+64 bytes from 172.29.88.56: icmp_seq=0 ttl=64 time=1.406 ms
+64 bytes from 172.29.88.56: icmp_seq=1 ttl=64 time=1.215 ms
+64 bytes from 172.29.88.56: icmp_seq=2 ttl=64 time=0.480 ms
+
+--- 172.29.88.56 ping statistics ---
+3 packets transmitted, 3 packets received, 0.0% packet loss
+round-trip min/avg/max/stddev = 0.480/1.034/1.406/0.399 ms
+
+Press ENTER to continue.
+
+*** Welcome to pfSense 2.2.2-RELEASE-pfSense (amd64) on pfSense ***
+
+ WAN (wan)       -&gt; em0        -&gt; v4: 172.29.88.230/24
+ LAN (lan)       -&gt; em1        -&gt; v4: 172.30.31.1/24
+ 0) Logout (SSH only)                  9) pfTop
+ 1) Assign Interfaces                 10) Filter Logs
+ 2) Set interface(s) IP address       11) Restart webConfigurator
+ 3) Reset webConfigurator password    12) pfSense Developer Shell
+ 4) Reset to factory defaults         13) Upgrade from console
+ 5) Reboot system                     14) Disable Secure Shell (sshd)
+ 6) Halt system                       15) Restore recent configuration
+ 7) Ping host                         16) Restart PHP-FPM
+ 8) Shell
+  
+
+8
+
+ping 172.30.31.20
+PING 172.30.31.20 (172.30.31.20): 56 data bytes
+64 bytes from 172.30.31.20: icmp_seq=0 ttl=64 time=0.239 ms
+64 bytes from 172.30.31.20: icmp_seq=1 ttl=64 time=0.211 ms
+</code></pre><h2 id="登录">登录<a hidden class="anchor" aria-hidden="true" href="#登录">#</a></h2>
+<p>172.30.31.1是内部局域网的IP，所以只能通过另一台lan上的服务器的浏览器访问：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/pfsense-vsphere6.png" alt="pfsense-vsphere6.png"  />
+
+当然这样操作起来很不方便，，而且假如lan上的其它服务器都是linux而且没有图像界面，没办法使用webConfigurator了。端口转发似乎是一个比较好的方案：在某一台lan服务器上添加一个可以通过你的pc端访问的网卡（我这里的172.29.88.206，它的lan接口IP为172.30.31.20），然后使用rinetd工具转发到172.30.31.1。
+这个方法似乎可选，但需要额外的设置：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/pfsense-vsphere7.png" alt="pfsense-vsphere7.png"  />
+</p>
+<blockquote>
+<p>An HTTP_REFERER was detected other than what is defined in System -&gt; Advanced (http://172.29.88.206:8008/index.php?logout).  You can disable this check if needed in System -&gt; Advanced -&gt; Admin.</p>
+</blockquote>
+<p>pfSense为了安全起见，不允许任何形式的转发来访问webConfigurator，根据你的需要决定是否关闭这个功能：System -&gt; Advanced -&gt; Admin，勾选Browser HTTP_REFERER enforcement -&gt; Save -&gt; Apply。
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/pfsense-vsphere8.png" alt="pfsense-vsphere8.png"  />
+</p>
+<p>登陆的用户名默认为admin/pfsense
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/pfsense-vsphere9.png" alt="pfsense-vsphere9.png"  />
+</p>
+<h2 id="使用配置向导">使用配置向导<a hidden class="anchor" aria-hidden="true" href="#使用配置向导">#</a></h2>
+<p>前面是通过命令行的方法对接口和IP进行配置，也可以直接通过webGUI向导对WAN和LAN、网关等设置：System -&gt; Setup Wizard，因为太过简单，就不贴图了。
+在设置WAN接口时（Configure WAN Interface）注意两点：</p>
+<ul>
+<li>Static IP Configuration 部分设置正确的IP和网关，否则会无法进出网络</li>
+<li>RFC1918 Networks 默认是勾选的，这是为了避免WAN上也存在与LAN一样的网段。如果要允许wan的其他主机ping通该pfSense，则去掉勾</li>
+</ul>
+<p>其它保持为空或默认值。</p>
+<h2 id="pfsense的nat功能">pfSense的NAT功能<a hidden class="anchor" aria-hidden="true" href="#pfsense的nat功能">#</a></h2>
+<p>即Port Forward，目的是为了WAN上的其他机器可以访问LAN内部的服务。
+Friewall -&gt; NAT
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/pfsense-vsphere10.png" alt="pfsense-vsphere10.png"  />
+</p>
+<p>端口映射分为单端口和范围端口。但端口容易理解，访问WAN 172.29.88.230:8000 的 数据包都转发到内部LAN 172.30.31.20:8000；范围端口是在 from <em>m</em> to <code>n</code> 的端口范围内的数据包都发送到内部IP的对应端口上，减少规则的数量。
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/pfsense-vsphere11.png" alt="pfsense-vsphere11.png"  />
+
+Save -&gt; Apply Changes，与此同时pfSense会自动在防火墙里添加规则，Firewal -&gt; Rules
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/pfsense-vsphere12.png" alt="pfsense-vsphere12.png"  />
+</p>
+<h2 id="pfsense做负载均衡">pfSense做负载均衡<a hidden class="anchor" aria-hidden="true" href="#pfsense做负载均衡">#</a></h2>
+<h2 id="其它功能">其它功能<a hidden class="anchor" aria-hidden="true" href="#其它功能">#</a></h2>
+<p>pfSense还有几大重要的功能，如快速搭建VPN服务器，作为前端负载均衡服务器，流量限制。由于工作中暂未用到，所以就不加说明了。</p>
+<p>关于负载均衡见 <a href="http://xgknight.com/2015/04/24/pfsense-loadbalancer/">http://xgknight.com/2015/04/24/pfsense-loadbalancer/</a></p>
+<p><strong>参考</strong></p>
+<ul>
+<li>
+<p><a href="http://bbs.pceva.com.cn/thread-100070-1-1.html">用pfSense搭建ESXi上的软路由</a></p>
+</li>
+<li>
+<p><a href="http://www.pppei.net/blog/post/331">pfsense 企业应用实例</a></p>
+</li>
+<li>
+<p><a href="http://bbs.m0n0china.org/forumdisplay.php?fid=16">pfsense 研究- m0n0wall中国论坛</a></p>
+</li>
+<li>
+<p><a href="http://44001217.blog.51cto.com/462930/180718">PFsense学习 - 端口映射</a></p>
+</li>
+<li>
+<p><a href="https://doc.pfsense.org/index.php/Multi-WAN_2.0">pfSense 2.0 多 WAN 负载均衡设置指南</a> （<a href="http://www.netadmin.com.tw/article_content.aspx?sn=1205110003">中文</a>）</p>
+</li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/pfsense/">pfsense</a></li>
+      <li><a href="http://xgknight.com/tags/vmware/">vmware</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

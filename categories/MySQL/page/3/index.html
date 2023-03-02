@@ -128,6 +128,39 @@
 
 <article class="post-entry tag-entry"> 
   <header class="entry-header">
+    <h2>ProxySQL之读写分离与分库路由演示
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>本文演示使用ProxySQL来完成读写分离和后端分库的一个实际配置过程，安装及配置项介绍见前文 ProxySQL之安装及配置详解。
+环境
+instance0: 10.0.100.100 (db0,db2,db4,db6) instance1: 10.0.100.101 (db1,db3,db5,db7) instance2: 10.0.100.102 (db2,db6,db10,db14) instance3: 10.0.100.103 (db3,db7,db11,db15) instance0 slave: 192.168.10.4:3316 instance1 slave: 192.168.10.4:3326 instance2 slave: 192.168.10.4:3336 instance3 slave: 192.168.10.4:3346 proxysql node0: 10.0.100.36 现在想达到这样一个目的：客户端应用连接上 proxysql 的ip:port，连接时指定分库db名，执行sql时自动路由到对应的实例、对应的库。考虑下面的部署结构： 任何一个proxysql节点都是对等的，路由请求到后端instance的各个database上。
+1. 配置后端DB -- proxysql admin cli insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (100, &#39;10.0.100.100&#39;, 3307, 1, &#39;db0,ReadWrite&#39;), (1000, &#39;10.0.100.100&#39;, 3307, 1, &#39;db0,ReadWrite&#39;),(1000, &#39;192.168.10.4&#39;, 3316, 9, &#39;db0,ReadOnly&#39;); insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (101, &#39;10.0.100.101&#39;, 3307, 1, &#39;db1,ReadWrite&#39;), (1001, &#39;10.0.100.101&#39;, 3307, 1, &#39;db1,ReadWrite&#39;),(1001, &#39;192....</p>
+  </div>
+  <footer class="entry-footer"><span title='2017-04-17 15:32:49 +0000 UTC'>April 17, 2017</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to ProxySQL之读写分离与分库路由演示" href="http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%E4%B8%8E%E5%88%86%E5%BA%93%E8%B7%AF%E7%94%B1%E6%BC%94%E7%A4%BA/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>ProxySQL之安装及配置详解
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>ProxySQL是一个高性能的MySQL中间件，拥有强大的规则引擎。具有以下特性：
+连接池，而且是 multiplexing 主机和用户的最大连接数限制 自动下线后端DB 延迟超过阀值 ping 延迟超过阀值 网络不通或宕机 强大的规则路由引擎 实现读写分离 查询重写 sql流量镜像 支持prepared statement 支持Query Cache 支持负载均衡，与gelera结合自动failover 集这么多优秀特性于一身，那么缺点呢就是项目不够成熟，好在作者一直在及时更新，并且受到 Percona 官方的支持。
+1. 安装 从 https://github.com/sysown/proxysql/releases 下载相应的版本。这里我选择 proxysql-1.3.5-1-centos67.x86_64.rpm，也是当前最新稳定版。
+yum localinstall proxysql-1.3.5-1-centos67.x86_64.rpm -y 可以马上启动了：
+/etc/init.d/proxysql start Starting ProxySQL: DONE! proxysql有个配置文件 /etc/proxysql.cnf，只在第一次启动的时候有用，后续所有的配置修改都是对SQLite数据库操作，并且不会更新到proxysql.cnf文件中。ProxySQL绝大部分配置都可以在线修改，配置存储在 /var/lib/proxysql/proxysql.db 中，后面会介绍它的在线配置的设计方式。
+proxysql 启动后会像 mysqld 一样，马上fork一个子进程，真正处理请求，而父进程负责监控子进程运行状况，如果crash了就拉起来。
+编译安装 安装高版本 gcc-4.8 # cd /etc/yum.repos.d # wget https://copr.fedoraproject.org/coprs/rhscl/devtoolset-3/repo/epel-6/rhscl-devtoolset-3-epel-6.repo \ -O /etc/yum.repos.d/rhscl-devtoolset-3-epel-6.repo # yum install -y scl-utils policycoreutils-python # yum --disablerepo=&#39;*&#39; --enablerepo=&#39;rhscl-devtoolset-3&#39; install devtoolset-3-gcc devtoolset-3-gcc-c&#43;&#43; devtoolset-3-binutils # yum --enablerepo=testing-devtools-2-centos-6 install devtoolset-3-gcc devtoolset-3-gcc-c&#43;&#43; devtoolset-3-binutils 上一步会把 GCC 安装到以下目录 /opt/rh/devtoolset-3/root/usr/bin 接下来需要修改系统的配置，使默认的 gcc 和 g&#43;&#43; 命令使用的是新安装的版本。启用SCL环境中新版本GCC： # scl enable devtoolset-3 bash 现在查看 g&#43;&#43; 的版本号： # gcc --version 编译安装proxysql # cd proxysql-master # make # make install 2....</p>
+  </div>
+  <footer class="entry-footer"><span title='2017-04-10 21:32:49 +0000 UTC'>April 10, 2017</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to ProxySQL之安装及配置详解" href="http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E5%AE%89%E8%A3%85%E5%8F%8A%E9%85%8D%E7%BD%AE%E8%AF%A6%E8%A7%A3/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
     <h2>一次艰辛的字符集转换历程 ACMUG分享
     </h2>
   </header>
@@ -278,41 +311,6 @@ The character set named utf8 uses a maximum of three bytes per character and con
   </div>
   <footer class="entry-footer"><span title='2016-10-23 16:32:49 +0000 UTC'>October 23, 2016</span>&nbsp;·&nbsp;admin</footer>
   <a class="entry-link" aria-label="post link to mysql使用utf8mb4经验吐血总结" href="http://xgknight.com/posts/2016/10/mysql%E4%BD%BF%E7%94%A8utf8mb4%E7%BB%8F%E9%AA%8C%E5%90%90%E8%A1%80%E6%80%BB%E7%BB%93/"></a>
-</article>
-
-<article class="post-entry tag-entry"> 
-  <header class="entry-header">
-    <h2>遇到腾讯云CDB连接字符集设置一个坑
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>最近一个与qq有关的服务迁到腾讯云上，相应的数据库也要从原阿里云RDS迁移到腾讯云CDB上，经过一番摸索，不带任何政治色彩的说，CDB跟RDS相比弱的不止一条街。比如看个错误日志还要提工单，数据库访问没有白名单，数据传输服务竞不支持源库的开启GTID，自带的后台管理是phpMyAdmin，要临时看查询日志也要提工单，当然这些都是可以容忍通过其它方法解决的，但是如果使用上带来了mysql数据库本身的影响，就用的不太爽了。
-最近2个月一直在弄与字符集相关的工作，却还是在cdb踩到一个大坑。情况是这样的，我们旧的RDS上的数据库表定义都是utf8，但由于历史原因，开发一直使用 latin1 去连接的。现在要把这样的一个db迁移到CDB，腾讯云的数据传输服务出了点问题，于是想了办法用阿里云的DTS反向迁。现象是：
-用Navicat客户端latin1连接，旧数据显示都ok 但程序端看到历史数据全是乱码，新数据正常 而且新数据通过navicat去看用 utf8 连接才正常 在mysql命令行下手动 set names latin1 读取旧数据ok，但新数据乱码 这明显是新写入的时候就是以 utf8 连接的，读取的时候新旧数据也以 utf8 连接。但应用端已明确设置使用 latin1 连接来读写。为了验证是否CDB的问题，在相同环境下自建了个mysql实例，一切都ok。
-腾讯云工程师先是怀疑迁移有问题，后来说可能是character_set_server设置的问题，我站在2个月来处理字符集的经验看了虽然不太可能，还是配合截了几个图，在工单、电话了里撕了几个来回：
-因为跟腾讯有合作关系，上头就直接联系到了腾讯云的人，这才找到问题根源：都是--skip-character-set-client-handshake惹的祸。
---character-set-client-handshake Do not ignore character set information sent by the client. To ignore client information and use the default server character set, use --skip-character-set-client-handshake; this makes MySQL behave like MySQL 4.0 一看到这个选项就恍然大悟了，官方文档FAQ里有专门介绍：A.11.11（个人感觉最后一段贴的结果有问题），大意是说为了兼容 mysql 4.0 的习惯，mysqld启动时加上 --skip-character-set-client-handshake 来忽略客户端字符集的设置，强制使用服务端character-set-server的设置。
-但这个选项默认是没有开启的，当你在web控制台修改了实例字符集时，CDB自作自作主张修改了这个参数并重启 character_set_client_handshake = 0 。而这个参数在 show variables 看不到的，隐藏的比较深。正好我建实例的时候选择了utf8，然后修改为utf8mb4，但应用端要求latin1，便中枪了。
-主要是以前没听过这个参数，后来发现老叶也有篇文章讲到它 MySQL字符集的一个坑，其实是很小的东西，结果排查验证问题前后花了2天。。。...</p>
-  </div>
-  <footer class="entry-footer"><span title='2016-10-17 16:32:49 +0000 UTC'>October 17, 2016</span>&nbsp;·&nbsp;admin</footer>
-  <a class="entry-link" aria-label="post link to 遇到腾讯云CDB连接字符集设置一个坑" href="http://xgknight.com/posts/2016/10/%E9%81%87%E5%88%B0%E8%85%BE%E8%AE%AF%E4%BA%91cdb%E8%BF%9E%E6%8E%A5%E5%AD%97%E7%AC%A6%E9%9B%86%E8%AE%BE%E7%BD%AE%E4%B8%80%E4%B8%AA%E5%9D%91/"></a>
-</article>
-
-<article class="post-entry tag-entry"> 
-  <header class="entry-header">
-    <h2>READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>经常会被问到 InnoDB隔离级别中 READ-COMMITED和REPEATABLE-READ 的区别，今天就整理了一下，不再从“脏读”、“幻读”这样的名词解释一样去回答了。
-1. 行锁 InnoDB行锁实际锁的是索引记录，为了防止死锁的产生以及维护所需要的隔离级别，在执行sql语句的全过程中，innodb必须对所需要修改的行每条索引记录上锁。如此一来，如果你执行的 UPDATE 没有很好的索引，那么会导致锁定许多行：
-update employees set store_id = 0 where store_id = 1; ---TRANSACTION 1EAB04, ACTIVE 7 sec 633 lock struct(s), &lt;strong&gt;heap size 96696&lt;/strong&gt;, 218786 row lock(s), undo log entries 1 MySQL thread id 4, OS thread handle 0x7f8dfc35d700, query id 47 localhost root show engine innodb status 上面的 employees 表 store_id 列没有索引。注意 UPDATE 已经执行完成（没有提交），但依然有 218786 个行锁没有释放，还有一个undo记录。这意味着只有一行被更改，但却持有了额外的锁。堆大小（heap size）代表了分配给锁使用的内存数量。
-在 REPEATABLE-READ 级别，事务持有的 每个锁 在整个事务期间一直被持有。
-在 READ-COMMITED 级别，事务里面特定语句结束之后，不匹配该sql语句扫描条件的锁，会被释放。...</p>
-  </div>
-  <footer class="entry-footer"><span title='2016-09-03 16:32:49 +0000 UTC'>September 3, 2016</span>&nbsp;·&nbsp;admin</footer>
-  <a class="entry-link" aria-label="post link to READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同" href="http://xgknight.com/posts/2016/09/read-commited-%E4%B8%8E-repeatable-read-%E4%BA%8B%E5%8A%A1%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E4%B9%8B%E9%97%B4%E7%9A%84%E5%BC%82%E5%90%8C/"></a>
 </article>
 <footer class="page-footer">
   <nav class="pagination">

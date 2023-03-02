@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>CentOS 6 服务器安全配置指南（通用） | Sean Note</title>
+<meta name="keywords" content="安全, ssh">
+<meta name="description" content="Linux是一个开放式系统，可以在网络上找到许多现成的程序和工具，这既方便了用户，也方便了黑客，因为他们也能很容易地找到程序和工具来潜入Linux系统，或者盗取Linux系统上的重要信息。不过，只要我们仔细地设定Linux的各种系统功能，并且加上必要的安全措施，就能让黑客们无机可乘。一般来说，对Linux系统的安全设定包括取消不必要的服务、限制远程存取、隐藏重要资料、修补安全漏洞、采用安全工具以及经常性的安全检查等。
+本文是可参考的实际操作，不涉及如IP欺骗这样的原理，而且安全问题也不算几行命令就能预防的，这里只是linux系统上基本的安全加固方法，后续有新的内容再添加进来。
+注：所有文件在修改之前都要进行备份如 cp /etc/passwd{,.dist}
+1. 禁用不使用的用户 注意：不建议直接删除，当你需要某个用户时，自己重新添加会很麻烦。也可以usermod -L或passwd -l user锁定。
+cp /etc/passwd{,.bak} 修改之前先备份 vi /etc/passwd 编辑用户，在前面加上#注释掉此行
+注释的用户名：
+# cat /etc/passwd|grep ^# #adm:x:3:4:adm:/var/adm:/sbin/nologin #lp:x:4:7:lp:/var/spool/lpd:/sbin/nologin #shutdown:x:6:0:shutdown:/sbin:/sbin/shutdown #halt:x:7:0:halt:/sbin:/sbin/halt #uucp:x:10:14:uucp:/var/spool/uucp:/sbin/nologin #operator:x:11:0:operator:/root:/sbin/nologin #games:x:12:100:games:/usr/games:/sbin/nologin #gopher:x:13:30:gopher:/var/gopher:/sbin/nologin #ftp:x:14:50:FTP User:/var/ftp:/sbin/nologin #nfsnobody:x:65534:65534:Anonymous NFS User:/var/lib/nfs:/sbin/nologin #postfix:x:89:89::/var/spool/postfix:/sbin/nologin 注释的组：
+# cat /etc/group|grep ^# #adm:x:4:adm,daemon #lp:x:7:daemon #uucp:x:14: #games:x:20: #gopher:x:30: #video:x:39: #dip:x:40: #ftp:x:50: #audio:x:63: #floppy:x:19: #postfix:x:89: 2. 关闭不使用的服务 # chkconfig --list |grep &#39;3:on&#39; 邮件服务，使用公司邮件服务器：
+service postfix stop chkconfig postfix --level 2345 off 通用unix打印服务，对服务器无用：
+service cups stop chkconfig cups --level 2345 off 调节cpu速度用来省电，常用在Laptop上：">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2014/09/centos-6-%E6%9C%8D%E5%8A%A1%E5%99%A8%E5%AE%89%E5%85%A8%E9%85%8D%E7%BD%AE%E6%8C%87%E5%8D%97%E9%80%9A%E7%94%A8/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="CentOS 6 服务器安全配置指南（通用）" />
+<meta property="og:description" content="Linux是一个开放式系统，可以在网络上找到许多现成的程序和工具，这既方便了用户，也方便了黑客，因为他们也能很容易地找到程序和工具来潜入Linux系统，或者盗取Linux系统上的重要信息。不过，只要我们仔细地设定Linux的各种系统功能，并且加上必要的安全措施，就能让黑客们无机可乘。一般来说，对Linux系统的安全设定包括取消不必要的服务、限制远程存取、隐藏重要资料、修补安全漏洞、采用安全工具以及经常性的安全检查等。
+本文是可参考的实际操作，不涉及如IP欺骗这样的原理，而且安全问题也不算几行命令就能预防的，这里只是linux系统上基本的安全加固方法，后续有新的内容再添加进来。
+注：所有文件在修改之前都要进行备份如 cp /etc/passwd{,.dist}
+1. 禁用不使用的用户 注意：不建议直接删除，当你需要某个用户时，自己重新添加会很麻烦。也可以usermod -L或passwd -l user锁定。
+cp /etc/passwd{,.bak} 修改之前先备份 vi /etc/passwd 编辑用户，在前面加上#注释掉此行
+注释的用户名：
+# cat /etc/passwd|grep ^# #adm:x:3:4:adm:/var/adm:/sbin/nologin #lp:x:4:7:lp:/var/spool/lpd:/sbin/nologin #shutdown:x:6:0:shutdown:/sbin:/sbin/shutdown #halt:x:7:0:halt:/sbin:/sbin/halt #uucp:x:10:14:uucp:/var/spool/uucp:/sbin/nologin #operator:x:11:0:operator:/root:/sbin/nologin #games:x:12:100:games:/usr/games:/sbin/nologin #gopher:x:13:30:gopher:/var/gopher:/sbin/nologin #ftp:x:14:50:FTP User:/var/ftp:/sbin/nologin #nfsnobody:x:65534:65534:Anonymous NFS User:/var/lib/nfs:/sbin/nologin #postfix:x:89:89::/var/spool/postfix:/sbin/nologin 注释的组：
+# cat /etc/group|grep ^# #adm:x:4:adm,daemon #lp:x:7:daemon #uucp:x:14: #games:x:20: #gopher:x:30: #video:x:39: #dip:x:40: #ftp:x:50: #audio:x:63: #floppy:x:19: #postfix:x:89: 2. 关闭不使用的服务 # chkconfig --list |grep &#39;3:on&#39; 邮件服务，使用公司邮件服务器：
+service postfix stop chkconfig postfix --level 2345 off 通用unix打印服务，对服务器无用：
+service cups stop chkconfig cups --level 2345 off 调节cpu速度用来省电，常用在Laptop上：" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2014/09/centos-6-%E6%9C%8D%E5%8A%A1%E5%99%A8%E5%AE%89%E5%85%A8%E9%85%8D%E7%BD%AE%E6%8C%87%E5%8D%97%E9%80%9A%E7%94%A8/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2014-09-07T01:21:25+00:00" />
+<meta property="article:modified_time" content="2014-09-07T01:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="CentOS 6 服务器安全配置指南（通用）"/>
+<meta name="twitter:description" content="Linux是一个开放式系统，可以在网络上找到许多现成的程序和工具，这既方便了用户，也方便了黑客，因为他们也能很容易地找到程序和工具来潜入Linux系统，或者盗取Linux系统上的重要信息。不过，只要我们仔细地设定Linux的各种系统功能，并且加上必要的安全措施，就能让黑客们无机可乘。一般来说，对Linux系统的安全设定包括取消不必要的服务、限制远程存取、隐藏重要资料、修补安全漏洞、采用安全工具以及经常性的安全检查等。
+本文是可参考的实际操作，不涉及如IP欺骗这样的原理，而且安全问题也不算几行命令就能预防的，这里只是linux系统上基本的安全加固方法，后续有新的内容再添加进来。
+注：所有文件在修改之前都要进行备份如 cp /etc/passwd{,.dist}
+1. 禁用不使用的用户 注意：不建议直接删除，当你需要某个用户时，自己重新添加会很麻烦。也可以usermod -L或passwd -l user锁定。
+cp /etc/passwd{,.bak} 修改之前先备份 vi /etc/passwd 编辑用户，在前面加上#注释掉此行
+注释的用户名：
+# cat /etc/passwd|grep ^# #adm:x:3:4:adm:/var/adm:/sbin/nologin #lp:x:4:7:lp:/var/spool/lpd:/sbin/nologin #shutdown:x:6:0:shutdown:/sbin:/sbin/shutdown #halt:x:7:0:halt:/sbin:/sbin/halt #uucp:x:10:14:uucp:/var/spool/uucp:/sbin/nologin #operator:x:11:0:operator:/root:/sbin/nologin #games:x:12:100:games:/usr/games:/sbin/nologin #gopher:x:13:30:gopher:/var/gopher:/sbin/nologin #ftp:x:14:50:FTP User:/var/ftp:/sbin/nologin #nfsnobody:x:65534:65534:Anonymous NFS User:/var/lib/nfs:/sbin/nologin #postfix:x:89:89::/var/spool/postfix:/sbin/nologin 注释的组：
+# cat /etc/group|grep ^# #adm:x:4:adm,daemon #lp:x:7:daemon #uucp:x:14: #games:x:20: #gopher:x:30: #video:x:39: #dip:x:40: #ftp:x:50: #audio:x:63: #floppy:x:19: #postfix:x:89: 2. 关闭不使用的服务 # chkconfig --list |grep &#39;3:on&#39; 邮件服务，使用公司邮件服务器：
+service postfix stop chkconfig postfix --level 2345 off 通用unix打印服务，对服务器无用：
+service cups stop chkconfig cups --level 2345 off 调节cpu速度用来省电，常用在Laptop上："/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "CentOS 6 服务器安全配置指南（通用）",
+      "item": "http://xgknight.com/posts/2014/09/centos-6-%E6%9C%8D%E5%8A%A1%E5%99%A8%E5%AE%89%E5%85%A8%E9%85%8D%E7%BD%AE%E6%8C%87%E5%8D%97%E9%80%9A%E7%94%A8/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "CentOS 6 服务器安全配置指南（通用）",
+  "name": "CentOS 6 服务器安全配置指南（通用）",
+  "description": "Linux是一个开放式系统，可以在网络上找到许多现成的程序和工具，这既方便了用户，也方便了黑客，因为他们也能很容易地找到程序和工具来潜入Linux系统，或者盗取Linux系统上的重要信息。不过，只要我们仔细地设定Linux的各种系统功能，并且加上必要的安全措施，就能让黑客们无机可乘。一般来说，对Linux系统的安全设定包括取消不必要的服务、限制远程存取、隐藏重要资料、修补安全漏洞、采用安全工具以及经常性的安全检查等。\n本文是可参考的实际操作，不涉及如IP欺骗这样的原理，而且安全问题也不算几行命令就能预防的，这里只是linux系统上基本的安全加固方法，后续有新的内容再添加进来。\n注：所有文件在修改之前都要进行备份如 cp /etc/passwd{,.dist}\n1. 禁用不使用的用户 注意：不建议直接删除，当你需要某个用户时，自己重新添加会很麻烦。也可以usermod -L或passwd -l user锁定。\ncp /etc/passwd{,.bak} 修改之前先备份 vi /etc/passwd 编辑用户，在前面加上#注释掉此行\n注释的用户名：\n# cat /etc/passwd|grep ^# #adm:x:3:4:adm:/var/adm:/sbin/nologin #lp:x:4:7:lp:/var/spool/lpd:/sbin/nologin #shutdown:x:6:0:shutdown:/sbin:/sbin/shutdown #halt:x:7:0:halt:/sbin:/sbin/halt #uucp:x:10:14:uucp:/var/spool/uucp:/sbin/nologin #operator:x:11:0:operator:/root:/sbin/nologin #games:x:12:100:games:/usr/games:/sbin/nologin #gopher:x:13:30:gopher:/var/gopher:/sbin/nologin #ftp:x:14:50:FTP User:/var/ftp:/sbin/nologin #nfsnobody:x:65534:65534:Anonymous NFS User:/var/lib/nfs:/sbin/nologin #postfix:x:89:89::/var/spool/postfix:/sbin/nologin 注释的组：\n# cat /etc/group|grep ^# #adm:x:4:adm,daemon #lp:x:7:daemon #uucp:x:14: #games:x:20: #gopher:x:30: #video:x:39: #dip:x:40: #ftp:x:50: #audio:x:63: #floppy:x:19: #postfix:x:89: 2. 关闭不使用的服务 # chkconfig --list |grep '3:on' 邮件服务，使用公司邮件服务器：\nservice postfix stop chkconfig postfix --level 2345 off 通用unix打印服务，对服务器无用：\nservice cups stop chkconfig cups --level 2345 off 调节cpu速度用来省电，常用在Laptop上：",
+  "keywords": [
+    "安全", "ssh"
+  ],
+  "articleBody": "Linux是一个开放式系统，可以在网络上找到许多现成的程序和工具，这既方便了用户，也方便了黑客，因为他们也能很容易地找到程序和工具来潜入Linux系统，或者盗取Linux系统上的重要信息。不过，只要我们仔细地设定Linux的各种系统功能，并且加上必要的安全措施，就能让黑客们无机可乘。一般来说，对Linux系统的安全设定包括取消不必要的服务、限制远程存取、隐藏重要资料、修补安全漏洞、采用安全工具以及经常性的安全检查等。\n本文是可参考的实际操作，不涉及如IP欺骗这样的原理，而且安全问题也不算几行命令就能预防的，这里只是linux系统上基本的安全加固方法，后续有新的内容再添加进来。\n注：所有文件在修改之前都要进行备份如 cp /etc/passwd{,.dist}\n1. 禁用不使用的用户 注意：不建议直接删除，当你需要某个用户时，自己重新添加会很麻烦。也可以usermod -L或passwd -l user锁定。\ncp /etc/passwd{,.bak} 修改之前先备份 vi /etc/passwd 编辑用户，在前面加上#注释掉此行\n注释的用户名：\n# cat /etc/passwd|grep ^# #adm:x:3:4:adm:/var/adm:/sbin/nologin #lp:x:4:7:lp:/var/spool/lpd:/sbin/nologin #shutdown:x:6:0:shutdown:/sbin:/sbin/shutdown #halt:x:7:0:halt:/sbin:/sbin/halt #uucp:x:10:14:uucp:/var/spool/uucp:/sbin/nologin #operator:x:11:0:operator:/root:/sbin/nologin #games:x:12:100:games:/usr/games:/sbin/nologin #gopher:x:13:30:gopher:/var/gopher:/sbin/nologin #ftp:x:14:50:FTP User:/var/ftp:/sbin/nologin #nfsnobody:x:65534:65534:Anonymous NFS User:/var/lib/nfs:/sbin/nologin #postfix:x:89:89::/var/spool/postfix:/sbin/nologin 注释的组：\n# cat /etc/group|grep ^# #adm:x:4:adm,daemon #lp:x:7:daemon #uucp:x:14: #games:x:20: #gopher:x:30: #video:x:39: #dip:x:40: #ftp:x:50: #audio:x:63: #floppy:x:19: #postfix:x:89: 2. 关闭不使用的服务 # chkconfig --list |grep '3:on' 邮件服务，使用公司邮件服务器：\nservice postfix stop chkconfig postfix --level 2345 off 通用unix打印服务，对服务器无用：\nservice cups stop chkconfig cups --level 2345 off 调节cpu速度用来省电，常用在Laptop上：\nservice cpuspeed stop chkconfig cpuspeed --level 2345 off 蓝牙无线通讯，对服务器无用：\nservice bluetooth stop chkconfig bluetooth --level 2345 off 系统安装后初始设定，第一次启动系统后就没用了：\nservice firstboot stop chkconfig firstboot --level 2345 off 关闭nfs服务及客户端：\nservice netfs stop chkconfig netfs --level 2345 off service nfslock stop chkconfig nfslock --level 2345 off 如果要恢复某一个服务，可以执行下面操作： service acpid start \u0026\u0026 chkconfig acpid on 也可以使用setup工具来设置\n3. 禁用IPV6 IPv6是为了解决IPv4地址耗尽的问题，但我们的服务器一般用不到它，反而禁用IPv6不仅仅会加快网络，还会有助于减少管理开销和提高安全级别。以下几步在CentOS上完全禁用ipv6。\n禁止加载IPv6模块： 让系统不加载ipv6相关模块，这需要修改modprobe相关设定文件，为了管理方便，我们新建设定文件/etc/modprobe.d/ipv6off.conf，内容如下\nalias net-pf-10 off options ipv6 disable=1 禁用基于IPv6网络，使之不会被触发启动：\n# vi /etc/sysconfig/network NETWORKING_IPV6=no 禁用网卡IPv6设置，使之仅在IPv4模式下运行：\n# vi /etc/sysconfig/network-scripts/ifcfg-eth0 IPV6INIT=no IPV6_AUTOCONF=no 关闭ip6tables：\n# chkconfig ip6tables off 重启系统，验证是否生效：\n# lsmod | grep ipv6 # ifconfig | grep -i inet6 如果没有任何输出就说明IPv6模块已被禁用，否则被启用。\n4. iptables规则 启用linux防火墙来禁止非法程序访问。使用iptable的规则来过滤入站、出站和转发的包。我们可以针对来源和目的地址进行特定udp/tcp端口的准许和拒绝访问。\n关于防火墙的设置规则请参考博客文章 iptables设置实例。\n5. SSH安全 如果有可能，第一件事就是修改ssh的默认端口22，改成如20002这样的较大端口会大幅提高安全系数，降低ssh破解登录的可能性。\n创建具备辨识度的应用用户如crm以及系统管理用户sysmgr\n# useradd crm -d /apps/crm # passwd crm # useradd sysmgr # passwd sysmgr 5.1 只允许wheel用户组的用户su切换 # usermod -G wheel sysmgr # vi /etc/pam.d/su # Uncomment the following line to require a user to be in the \"wheel\" group. auth required pam_wheel.so use_uid 其他用户切换root，即使输对密码也会提示 su: incorrect password\n5.2 登录超时 用户在线5分钟无操作则超时断开连接，在/etc/profile中添加：\nexport TMOUT=300 readonly TMOUT 5.3 禁止root直接远程登录 # vi /etc/ssh/sshd_config PermitRootLogin no 5.4 限制登录失败次数并锁定 在/etc/pam.d/login后添加\nauth required pam_tally2.so deny=6 unlock_time=180 even_deny_root root_unlock_time=180 登录失败5次锁定180秒，根据需要设置是否包括root。\n5.5 登录IP限制 （由于要与某一固定IP或IP段绑定，暂未设置） 更严格的限制是在sshd_config中定死允许ssh的用户和来源ip：\n## allowed ssh users sysmgr AllowUsers sysmgr@172.29.73.* 或者使用tcpwrapper:\nvi /etc/hosts.deny sshd:all vi /etc/hosts.allow sshd:172.29.73.23 sshd:172.29.73. 6. 配置只能使用密钥文件登录 使用密钥文件代替普通的简单密码认证也会极大的提高安全性：\n[dir@username ~]$ ssh-keygen -t rsa -b 2048 Generating public/private rsa key pair. Enter file in which to save the key (/root/.ssh/id_rsa): //默认路径，回车 Enter passphrase (empty for no passphrase): //输入你的密钥短语，登录时使用 Enter same passphrase again: Your identification has been saved in /root/.ssh/id_rsa. Your public key has been saved in /root/.ssh/id_rsa.pub. The key fingerprint is: 3e:fd:fc:e5:d3:22:86:8e:2c:4b:a7:3d:92:18:9f:64 root@ibpak.tp-link.net The key's randomart image is: +--[ RSA 2048]----+ | | … | o++o..oo..o| +-----------------+ 将公钥重命名为authorized_key：\n$ mv ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys $ chmod 600 ~/.ssh/authorized_keys 下载私钥文件 id_rsa 到本地（为了更加容易识别，可重命名为hostname_username_id_rsa），保存到安全的地方。以后 username 用户登录这台主机就必须使用这个私钥，配合密码短语来登录（不再使用 username 用户自身的密码）\n另外还要修改/etc/ssh/sshd_config文件 打开注释\nRSAAuthentication yes PubkeyAuthentication yes AuthorizedKeysFile .ssh/authorized_keys 我们要求 username 用户（可以切换到其他用户，特别是root）必须使用ssh密钥文件登录，而其他普通用户可以直接密码登录。因此还需在sshd_config文件最后加入：\nMatch User itsection PasswordAuthentication no 重启sshd服务\n# service sshd restart 另外提醒一句，这对公钥和私钥一定要单独保存在另外的机器上，服务器上丢失公钥或连接端丢失私钥（或密钥短语），可能导致再也无法登陆服务器获得root权限！\n7. 减少history命令记录 执行过的历史命令记录越多，从一定程度上讲会给维护带来简便，但同样会伴随安全问题\nvi /etc/profile 找到 HISTSIZE=1000 改为 HISTSIZE=50。\n或每次退出时清理history，history -c\n8. 增强特殊文件权限 给下面的文件加上不可更改属性，从而防止非授权用户获得权限\nchattr +i /etc/passwd chattr +i /etc/shadow chattr +i /etc/group chattr +i /etc/gshadow chattr +i /etc/services #给系统服务端口列表文件加锁，防止未经许可的删除或添加服务 chattr +i /etc/pam.d/su chattr +i /etc/ssh/sshd_config 显示文件的属性\nlsattr /etc/passwd /etc/shadow /etc/services /etc/ssh/sshd_config 注意：执行以上 chattr 权限修改之后，就无法添加删除用户了。\n如果再要添加删除用户，需要先取消上面的设置，等用户添加删除完成之后，再执行上面的操作，例如取消只读权限chattr -i /etc/passwd。（记得重新设置只读）\n9. 防止一般网络攻击 网络攻击不是几行设置就能避免的，以下都只是些简单的将可能性降到最低，增大攻击的难度但并不能完全阻止。\n9.1 禁ping 阻止ping如果没人能ping通您的系统，安全性自然增加了，可以有效的防止ping洪水。为此，可以在/etc/rc.d/rc.local文件中增加如下一行：\n# echo 1 \u003e /proc/sys/net/ipv4/icmp_echo_ignore_all 或使用iptable禁ping：\niptables -A INPUT -p icmp --icmp-type 0 -s 0/0 -j DROP 不允许ping其他主机： iptables -A OUTPUT -p icmp --icmp-type 8 -j DROP 9.2. 防止IP欺骗 编辑/etc/host.conf文件并增加如下几行来防止IP欺骗攻击。\norder hosts,bind #名称解释顺序 multi on #允许主机拥有多个IP地址 nospoof on #禁止IP地址欺骗 9.3 防止DoS攻击 对系统所有的用户设置资源限制可以防止DoS类型攻击，如最大进程数和内存使用数量等。 可以在/etc/security/limits.conf中添加如下几行：\n* soft core 0 * soft nproc 2048 * hard nproc 16384 * soft nofile 1024 * hard nofile 65536 core 0 表示禁止创建core文件；nproc 128 把最多的进程数限制到20；nofile 64 表示把一个用户同时打开的最大文件数限制为64；* 表示登录到系统的所有用户，不包括root\n然后必须编辑/etc/pam.d/login文件检查下面一行是否存在。\nsession required pam_limits.so limits.conf参数的值需要根据具体情况调整。\n10. 修复已知安全漏洞 在linux上偶尔会爆出毁灭级的漏洞，如udev、heartbleed、shellshock、ghost等，如果服务器暴露在外网，一定及时修复。\n11. 定期做日志安全检查 将日志移动到专用的日志服务器里，这可避免入侵者轻易的改动本地日志。下面是常见linux的默认日志文件及其用处：\n/var/log/message – 记录系统日志或当前活动日志。 /var/log/auth.log – 身份认证日志。 /var/log/cron – Crond 日志 (cron 任务). /var/log/maillog – 邮件服务器日志。 /var/log/secure – 认证日志。 /var/log/wtmp\t历史登录、注销、启动、停机日志和，lastb命令可以查看登录失败的用户 /var/run/utmp\t当前登录的用户信息日志，w、who命令的信息便来源与此 /var/log/yum.log Yum 日志。 参考 深度解析CentOS通过日志反查入侵。\n11.1 安装logwatch Logwatch是使用 Perl 开发的一个日志分析工具。能够对Linux 的日志文件进行分析，并自动发送mail给相关处理人员，可定制需求。\nLogwatch的mail功能是借助宿主系统自带的 mail server 发邮件的，所以系统需安装mail server , 如sendmail,postfix,Qmail等\n安装和配置方法见博文 linux日志监控logwatch。\n12. web服务器安全 像apache或tomcat这样的服务端程序在配置时，如果有安全问题存在可以查阅文档进行安全加固。日后有时间再补充到新的文章。\n参考\nTop 20 OpenSSH Server Best Security Practices ",
+  "wordCount" : "568",
+  "inLanguage": "en",
+  "datePublished": "2014-09-07T01:21:25Z",
+  "dateModified": "2014-09-07T01:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2014/09/centos-6-%E6%9C%8D%E5%8A%A1%E5%99%A8%E5%AE%89%E5%85%A8%E9%85%8D%E7%BD%AE%E6%8C%87%E5%8D%97%E9%80%9A%E7%94%A8/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      CentOS 6 服务器安全配置指南（通用）
+    </h1>
+    <div class="post-meta"><span title='2014-09-07 01:21:25 +0000 UTC'>September 7, 2014</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>Linux是一个开放式系统，可以在网络上找到许多现成的程序和工具，这既方便了用户，也方便了黑客，因为他们也能很容易地找到程序和工具来潜入Linux系统，或者盗取Linux系统上的重要信息。不过，只要我们仔细地设定Linux的各种系统功能，并且加上必要的安全措施，就能让黑客们无机可乘。一般来说，对Linux系统的安全设定包括取消不必要的服务、限制远程存取、隐藏重要资料、修补安全漏洞、采用安全工具以及经常性的安全检查等。</p>
+<p>本文是可参考的实际操作，不涉及如IP欺骗这样的原理，而且安全问题也不算几行命令就能预防的，这里只是linux系统上基本的安全加固方法，后续有新的内容再添加进来。</p>
+<p>注：所有文件在修改之前都要进行备份如 <code>cp /etc/passwd{,.dist}</code></p>
+<h2 id="1-禁用不使用的用户">1. 禁用不使用的用户<a hidden class="anchor" aria-hidden="true" href="#1-禁用不使用的用户">#</a></h2>
+<p>注意：不建议直接删除，当你需要某个用户时，自己重新添加会很麻烦。也可以<code>usermod -L</code>或<code>passwd -l user</code>锁定。</p>
+<p><code>cp /etc/passwd{,.bak}</code>  修改之前先备份
+<code>vi /etc/passwd</code> 编辑用户，在前面加上#注释掉此行</p>
+<!-- raw HTML omitted -->
+<p>注释的用户名：</p>
+<pre><code># cat /etc/passwd|grep ^#
+#adm:x:3:4:adm:/var/adm:/sbin/nologin
+#lp:x:4:7:lp:/var/spool/lpd:/sbin/nologin
+#shutdown:x:6:0:shutdown:/sbin:/sbin/shutdown
+#halt:x:7:0:halt:/sbin:/sbin/halt
+#uucp:x:10:14:uucp:/var/spool/uucp:/sbin/nologin
+#operator:x:11:0:operator:/root:/sbin/nologin
+#games:x:12:100:games:/usr/games:/sbin/nologin
+#gopher:x:13:30:gopher:/var/gopher:/sbin/nologin
+#ftp:x:14:50:FTP User:/var/ftp:/sbin/nologin
+#nfsnobody:x:65534:65534:Anonymous NFS User:/var/lib/nfs:/sbin/nologin
+#postfix:x:89:89::/var/spool/postfix:/sbin/nologin
+</code></pre>
+<p>注释的组：</p>
+<pre><code># cat /etc/group|grep ^#
+#adm:x:4:adm,daemon
+#lp:x:7:daemon
+#uucp:x:14:
+#games:x:20:
+#gopher:x:30:
+#video:x:39:
+#dip:x:40:
+#ftp:x:50:
+#audio:x:63:
+#floppy:x:19:
+#postfix:x:89:
+</code></pre>
+<h2 id="2-关闭不使用的服务">2. 关闭不使用的服务<a hidden class="anchor" aria-hidden="true" href="#2-关闭不使用的服务">#</a></h2>
+<pre><code># chkconfig --list |grep '3:on'
+</code></pre>
+<p>邮件服务，使用公司邮件服务器：</p>
+<pre><code>service postfix stop
+chkconfig postfix --level 2345 off
+</code></pre>
+<p>通用unix打印服务，对服务器无用：</p>
+<pre><code>service cups stop
+chkconfig cups --level 2345 off
+</code></pre>
+<p>调节cpu速度用来省电，常用在Laptop上：</p>
+<pre><code>service cpuspeed stop
+chkconfig cpuspeed --level 2345 off
+</code></pre>
+<p>蓝牙无线通讯，对服务器无用：</p>
+<pre><code>service bluetooth stop
+chkconfig bluetooth --level 2345 off
+</code></pre>
+<p>系统安装后初始设定，第一次启动系统后就没用了：</p>
+<pre><code>service firstboot stop
+chkconfig firstboot --level 2345 off
+</code></pre>
+<p>关闭nfs服务及客户端：</p>
+<pre><code>service netfs stop
+chkconfig netfs --level 2345 off
+service nfslock stop
+chkconfig nfslock --level 2345 off
+</code></pre>
+<p>如果要恢复某一个服务，可以执行下面操作：
+<code>service acpid start &amp;&amp; chkconfig acpid on</code>
+也可以使用<code>setup</code>工具来设置</p>
+<h2 id="3-禁用ipv6">3. 禁用IPV6<a hidden class="anchor" aria-hidden="true" href="#3-禁用ipv6">#</a></h2>
+<p>IPv6是为了解决IPv4地址耗尽的问题，但我们的服务器一般用不到它，反而禁用IPv6不仅仅会加快网络，还会有助于减少管理开销和提高安全级别。以下几步在CentOS上完全禁用ipv6。</p>
+<p>禁止加载IPv6模块：
+让系统不加载ipv6相关模块，这需要修改modprobe相关设定文件，为了管理方便，我们新建设定文件<code>/etc/modprobe.d/ipv6off.conf</code>，内容如下</p>
+<pre><code>alias net-pf-10 off
+options ipv6 disable=1
+</code></pre>
+<p>禁用基于IPv6网络，使之不会被触发启动：</p>
+<pre><code># vi /etc/sysconfig/network
+NETWORKING_IPV6=no
+</code></pre>
+<p>禁用网卡IPv6设置，使之仅在IPv4模式下运行：</p>
+<pre><code># vi /etc/sysconfig/network-scripts/ifcfg-eth0
+IPV6INIT=no
+IPV6_AUTOCONF=no
+</code></pre>
+<p>关闭ip6tables：</p>
+<pre><code># chkconfig ip6tables off
+</code></pre>
+<p>重启系统，验证是否生效：</p>
+<pre><code># lsmod | grep ipv6
+# ifconfig | grep -i inet6
+</code></pre>
+<p>如果没有任何输出就说明IPv6模块已被禁用，否则被启用。</p>
+<h2 id="4-iptables规则">4. iptables规则<a hidden class="anchor" aria-hidden="true" href="#4-iptables规则">#</a></h2>
+<p>启用linux防火墙来禁止非法程序访问。使用iptable的规则来过滤入站、出站和转发的包。我们可以针对来源和目的地址进行特定udp/tcp端口的准许和拒绝访问。</p>
+<p>关于防火墙的设置规则请参考博客文章 <a href="http://xgknight.com/2014/02/26/iptables-example/">iptables设置实例</a>。</p>
+<h2 id="5-ssh安全">5. SSH安全<a hidden class="anchor" aria-hidden="true" href="#5-ssh安全">#</a></h2>
+<p>如果有可能，第一件事就是修改ssh的默认端口22，改成如20002这样的较大端口会大幅提高安全系数，降低ssh破解登录的可能性。</p>
+<p>创建具备辨识度的应用用户如crm以及系统管理用户sysmgr</p>
+<pre><code># useradd crm -d /apps/crm
+# passwd crm
+
+# useradd sysmgr
+# passwd sysmgr
+</code></pre>
+<h3 id="51-只允许wheel用户组的用户su切换">5.1 只允许wheel用户组的用户su切换<a hidden class="anchor" aria-hidden="true" href="#51-只允许wheel用户组的用户su切换">#</a></h3>
+<pre><code># usermod -G wheel sysmgr
+
+# vi /etc/pam.d/su
+# Uncomment the following line to require a user to be in the &quot;wheel&quot; group.
+auth            required        pam_wheel.so use_uid
+</code></pre>
+<p>其他用户切换root，即使输对密码也会提示 su: incorrect password</p>
+<h3 id="52-登录超时">5.2 登录超时<a hidden class="anchor" aria-hidden="true" href="#52-登录超时">#</a></h3>
+<p>用户在线5分钟无操作则超时断开连接，在<code>/etc/profile</code>中添加：</p>
+<pre><code>export TMOUT=300
+readonly TMOUT
+</code></pre>
+<h3 id="53-禁止root直接远程登录">5.3 禁止root直接远程登录<a hidden class="anchor" aria-hidden="true" href="#53-禁止root直接远程登录">#</a></h3>
+<pre><code># vi /etc/ssh/sshd_config
+PermitRootLogin no
+</code></pre>
+<h3 id="54-限制登录失败次数并锁定">5.4 限制登录失败次数并锁定<a hidden class="anchor" aria-hidden="true" href="#54-限制登录失败次数并锁定">#</a></h3>
+<p>在<code>/etc/pam.d/login</code>后添加</p>
+<pre><code>auth required pam_tally2.so deny=6 unlock_time=180 even_deny_root root_unlock_time=180
+</code></pre>
+<p>登录失败5次锁定180秒，根据需要设置是否包括root。</p>
+<h3 id="55-登录ip限制">5.5 登录IP限制<a hidden class="anchor" aria-hidden="true" href="#55-登录ip限制">#</a></h3>
+<p>（由于要与某一固定IP或IP段绑定，暂未设置）
+更严格的限制是在sshd_config中定死允许ssh的用户和来源ip：</p>
+<pre><code>## allowed ssh users sysmgr
+AllowUsers sysmgr@172.29.73.*
+</code></pre>
+<p>或者使用tcpwrapper:</p>
+<pre><code>vi /etc/hosts.deny
+sshd:all
+vi /etc/hosts.allow
+sshd:172.29.73.23
+sshd:172.29.73.
+</code></pre>
+<h2 id="6-配置只能使用密钥文件登录">6. 配置只能使用密钥文件登录<a hidden class="anchor" aria-hidden="true" href="#6-配置只能使用密钥文件登录">#</a></h2>
+<p>使用密钥文件代替普通的简单密码认证也会极大的提高安全性：</p>
+<pre><code>[dir@username ~]$ ssh-keygen -t rsa -b 2048
+Generating public/private rsa key pair.
+Enter file in which to save the key (/root/.ssh/id_rsa):   //默认路径，回车
+Enter passphrase (empty for no passphrase): 	//输入你的密钥短语，登录时使用
+Enter same passphrase again: 
+Your identification has been saved in /root/.ssh/id_rsa.
+Your public key has been saved in /root/.ssh/id_rsa.pub.
+The key fingerprint is:
+3e:fd:fc:e5:d3:22:86:8e:2c:4b:a7:3d:92:18:9f:64 root@ibpak.tp-link.net
+The key's randomart image is:
++--[ RSA 2048]----+
+|                 |
+…
+|      o++o..oo..o|
++-----------------+
+</code></pre>
+<p>将公钥重命名为<code>authorized_key</code>：</p>
+<pre><code>$ mv ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys
+$ chmod 600 ~/.ssh/authorized_keys
+</code></pre>
+<p>下载私钥文件 id_rsa 到本地（为了更加容易识别，可重命名为<code>hostname_username_id_rsa</code>），保存到安全的地方。以后 username 用户登录这台主机就必须使用这个私钥，配合密码短语来登录（不再使用 username 用户自身的密码）</p>
+<p>另外还要修改<code>/etc/ssh/sshd_config</code>文件
+打开注释</p>
+<pre><code>RSAAuthentication yes
+PubkeyAuthentication yes
+AuthorizedKeysFile      .ssh/authorized_keys
+</code></pre>
+<p>我们要求 username 用户（可以切换到其他用户，特别是root）必须使用ssh密钥文件登录，而其他普通用户可以直接密码登录。因此还需在sshd_config文件最后加入：</p>
+<pre><code>Match User itsection
+        PasswordAuthentication no
+</code></pre>
+<p>重启sshd服务</p>
+<pre><code># service sshd restart
+</code></pre>
+<p>另外提醒一句，这对公钥和私钥一定要单独保存在另外的机器上，服务器上丢失公钥或连接端丢失私钥（或密钥短语），可能导致再也无法登陆服务器获得root权限！</p>
+<h2 id="7-减少history命令记录">7. 减少history命令记录<a hidden class="anchor" aria-hidden="true" href="#7-减少history命令记录">#</a></h2>
+<p>执行过的历史命令记录越多，从一定程度上讲会给维护带来简便，但同样会伴随安全问题</p>
+<pre><code>vi /etc/profile
+</code></pre>
+<p>找到 <code>HISTSIZE=1000</code> 改为 <code>HISTSIZE=50</code>。</p>
+<p>或每次退出时清理history，<code>history -c</code></p>
+<h2 id="8-增强特殊文件权限">8. 增强特殊文件权限<a hidden class="anchor" aria-hidden="true" href="#8-增强特殊文件权限">#</a></h2>
+<p>给下面的文件加上不可更改属性，从而防止非授权用户获得权限</p>
+<pre><code>chattr +i /etc/passwd
+chattr +i /etc/shadow
+chattr +i /etc/group
+chattr +i /etc/gshadow
+chattr +i /etc/services #给系统服务端口列表文件加锁，防止未经许可的删除或添加服务
+chattr +i /etc/pam.d/su
+chattr +i /etc/ssh/sshd_config
+</code></pre>
+<p>显示文件的属性</p>
+<pre><code>lsattr /etc/passwd /etc/shadow /etc/services /etc/ssh/sshd_config
+</code></pre>
+<p>注意：执行以上 chattr 权限修改之后，就无法添加删除用户了。</p>
+<p>如果再要添加删除用户，需要先取消上面的设置，等用户添加删除完成之后，再执行上面的操作，例如取消只读权限<code>chattr -i /etc/passwd</code>。（记得重新设置只读）</p>
+<h2 id="9-防止一般网络攻击">9. 防止一般网络攻击<a hidden class="anchor" aria-hidden="true" href="#9-防止一般网络攻击">#</a></h2>
+<p>网络攻击不是几行设置就能避免的，以下都只是些简单的将可能性降到最低，增大攻击的难度但并不能完全阻止。</p>
+<h3 id="91-禁ping">9.1 禁ping<a hidden class="anchor" aria-hidden="true" href="#91-禁ping">#</a></h3>
+<p>阻止ping如果没人能ping通您的系统，安全性自然增加了，可以有效的防止ping洪水。为此，可以在<code>/etc/rc.d/rc.local</code>文件中增加如下一行：</p>
+<pre><code># echo 1 &gt; /proc/sys/net/ipv4/icmp_echo_ignore_all
+</code></pre>
+<p>或使用iptable禁ping：</p>
+<pre><code>iptables -A INPUT -p icmp --icmp-type 0 -s 0/0 -j DROP
+
+不允许ping其他主机：
+iptables -A OUTPUT -p icmp --icmp-type 8 -j DROP
+</code></pre>
+<h3 id="92-防止ip欺骗">9.2. 防止IP欺骗<a hidden class="anchor" aria-hidden="true" href="#92-防止ip欺骗">#</a></h3>
+<p>编辑/etc/host.conf文件并增加如下几行来防止IP欺骗攻击。</p>
+<pre><code>order hosts,bind    #名称解释顺序
+multi on           #允许主机拥有多个IP地址
+nospoof on         #禁止IP地址欺骗
+</code></pre>
+<h3 id="93-防止dos攻击">9.3 防止DoS攻击<a hidden class="anchor" aria-hidden="true" href="#93-防止dos攻击">#</a></h3>
+<p>对系统所有的用户设置资源限制可以防止DoS类型攻击，如最大进程数和内存使用数量等。
+可以在<code>/etc/security/limits.conf</code>中添加如下几行：</p>
+<pre><code>*    soft    core    0
+*    soft    nproc   2048
+*    hard    nproc   16384
+*    soft    nofile 1024
+*    hard    nofile  65536
+</code></pre>
+<p>core 0 表示禁止创建core文件；nproc 128 把最多的进程数限制到20；nofile 64 表示把一个用户同时打开的最大文件数限制为64；* 表示登录到系统的所有用户，不包括root</p>
+<p>然后必须编辑<code>/etc/pam.d/login</code>文件检查下面一行是否存在。</p>
+<pre><code>session    required     pam_limits.so
+</code></pre>
+<p><code>limits.conf</code>参数的值需要根据具体情况调整。</p>
+<h2 id="10-修复已知安全漏洞">10. 修复已知安全漏洞<a hidden class="anchor" aria-hidden="true" href="#10-修复已知安全漏洞">#</a></h2>
+<p>在linux上偶尔会爆出毁灭级的漏洞，如<a href="http://www.ha97.com/1002.html">udev</a>、<a href="https://access.redhat.com/solutions/781793">heartbleed</a>、<a href="http://linux.cn/article-3902-1.html">shellshock</a>、<a href="http://www.36kr.com/p/219344.html">ghost</a>等，如果服务器暴露在外网，一定及时修复。</p>
+<h2 id="11-定期做日志安全检查">11. 定期做日志安全检查<a hidden class="anchor" aria-hidden="true" href="#11-定期做日志安全检查">#</a></h2>
+<p>将日志移动到专用的日志服务器里，这可避免入侵者轻易的改动本地日志。下面是常见linux的默认日志文件及其用处：</p>
+<ul>
+<li><code>/var/log/message</code> – 记录系统日志或当前活动日志。</li>
+<li><code>/var/log/auth.log</code> – 身份认证日志。</li>
+<li><code>/var/log/cron</code>   – Crond 日志 (cron 任务).</li>
+<li><code>/var/log/maillog</code> – 邮件服务器日志。</li>
+<li><code>/var/log/secure</code> – 认证日志。</li>
+<li><code>/var/log/wtmp</code>	历史登录、注销、启动、停机日志和，lastb命令可以查看登录失败的用户</li>
+<li><code>/var/run/utmp</code>	当前登录的用户信息日志，w、who命令的信息便来源与此</li>
+<li><code>/var/log/yum.log</code> Yum 日志。</li>
+</ul>
+<p>参考 <a href="http://linux.it.net.cn/CentOS/safe/2014/0429/985.html">深度解析CentOS通过日志反查入侵</a>。</p>
+<h3 id="111-安装logwatch">11.1 安装logwatch<a hidden class="anchor" aria-hidden="true" href="#111-安装logwatch">#</a></h3>
+<p>Logwatch是使用 Perl 开发的一个日志分析工具。能够对Linux 的日志文件进行分析，并自动发送mail给相关处理人员，可定制需求。</p>
+<p>Logwatch的mail功能是借助宿主系统自带的 mail server 发邮件的，所以系统需安装mail server , 如sendmail,postfix,Qmail等</p>
+<p>安装和配置方法见博文 <a href="http://xgknight.com/2014/08/23/linux-logwatch-usage/">linux日志监控logwatch</a>。</p>
+<h2 id="12-web服务器安全">12. web服务器安全<a hidden class="anchor" aria-hidden="true" href="#12-web服务器安全">#</a></h2>
+<p>像apache或tomcat这样的服务端程序在配置时，如果有安全问题存在可以查阅文档进行安全加固。日后有时间再补充到新的文章。</p>
+<p><strong>参考</strong></p>
+<ul>
+<li><a href="http://www.cyberciti.biz/tips/linux-unix-bsd-openssh-server-best-practices.html">Top 20 OpenSSH Server Best Security Practices</a></li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/%E5%AE%89%E5%85%A8/">安全</a></li>
+      <li><a href="http://xgknight.com/tags/ssh/">ssh</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

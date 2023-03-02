@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>管理多tomcat服务shell脚本（CentOS） | Sean Note</title>
+<meta name="keywords" content="tomcat, script, shell">
+<meta name="description" content="该脚本改自csdn上的一个shell，忘记出处了，只记得它能够简单的通过service tomcat [stop|start|restart]来方便的管理Linux服务器上的tomcat，这可以满足大部分人的需求，然而并不适合我所管理的CentOS上的tomcat应用：通过端口区分的3台tomcat集群。如果每一次管理tomcat或查看日志，都cd /apps/test/tomcat0/log/然后切换到另外一个cd ../../或cd /apps/test/tomcat1/log/，麻烦至极。因此“懒人”创造了这个脚本tomcat：
+#!/bin/bash # author: Sean Chow (seanlook7@gmail.com) # # # chkconfig: 345 80 15 # description: Multiple tomcats service management script. # Source function library. . /etc/rc.d/init.d/functions # 第几个tomcat tcNo=$1 tcName=tomcat$1 basedir=/apps/test/$tcName tclog=${basedir}/logs/catalina.$(date &#43;%Y-%m-%d).out RETVAL=0 start(){ checkrun if [ $RETVAL -eq 0 ]; then echo &#34;-- Starting tomcat...&#34; $basedir/bin/startup.sh touch /var/lock/subsys/${tcNo} checklog status else echo &#34;-- tomcat already running&#34; fi } # 停止某一台tomcat，如果是重启则带re参数，表示不查看日志，等待启动时再提示查看 stop(){ checkrun if [ $RETVAL -eq 1 ]; then echo &#34;-- Shutting down tomcat.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2014/10/%E7%AE%A1%E7%90%86%E5%A4%9Atomcat%E6%9C%8D%E5%8A%A1shell%E8%84%9A%E6%9C%ACcentos/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="管理多tomcat服务shell脚本（CentOS）" />
+<meta property="og:description" content="该脚本改自csdn上的一个shell，忘记出处了，只记得它能够简单的通过service tomcat [stop|start|restart]来方便的管理Linux服务器上的tomcat，这可以满足大部分人的需求，然而并不适合我所管理的CentOS上的tomcat应用：通过端口区分的3台tomcat集群。如果每一次管理tomcat或查看日志，都cd /apps/test/tomcat0/log/然后切换到另外一个cd ../../或cd /apps/test/tomcat1/log/，麻烦至极。因此“懒人”创造了这个脚本tomcat：
+#!/bin/bash # author: Sean Chow (seanlook7@gmail.com) # # # chkconfig: 345 80 15 # description: Multiple tomcats service management script. # Source function library. . /etc/rc.d/init.d/functions # 第几个tomcat tcNo=$1 tcName=tomcat$1 basedir=/apps/test/$tcName tclog=${basedir}/logs/catalina.$(date &#43;%Y-%m-%d).out RETVAL=0 start(){ checkrun if [ $RETVAL -eq 0 ]; then echo &#34;-- Starting tomcat...&#34; $basedir/bin/startup.sh touch /var/lock/subsys/${tcNo} checklog status else echo &#34;-- tomcat already running&#34; fi } # 停止某一台tomcat，如果是重启则带re参数，表示不查看日志，等待启动时再提示查看 stop(){ checkrun if [ $RETVAL -eq 1 ]; then echo &#34;-- Shutting down tomcat." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2014/10/%E7%AE%A1%E7%90%86%E5%A4%9Atomcat%E6%9C%8D%E5%8A%A1shell%E8%84%9A%E6%9C%ACcentos/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2014-10-29T18:21:25+00:00" />
+<meta property="article:modified_time" content="2014-10-29T18:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="管理多tomcat服务shell脚本（CentOS）"/>
+<meta name="twitter:description" content="该脚本改自csdn上的一个shell，忘记出处了，只记得它能够简单的通过service tomcat [stop|start|restart]来方便的管理Linux服务器上的tomcat，这可以满足大部分人的需求，然而并不适合我所管理的CentOS上的tomcat应用：通过端口区分的3台tomcat集群。如果每一次管理tomcat或查看日志，都cd /apps/test/tomcat0/log/然后切换到另外一个cd ../../或cd /apps/test/tomcat1/log/，麻烦至极。因此“懒人”创造了这个脚本tomcat：
+#!/bin/bash # author: Sean Chow (seanlook7@gmail.com) # # # chkconfig: 345 80 15 # description: Multiple tomcats service management script. # Source function library. . /etc/rc.d/init.d/functions # 第几个tomcat tcNo=$1 tcName=tomcat$1 basedir=/apps/test/$tcName tclog=${basedir}/logs/catalina.$(date &#43;%Y-%m-%d).out RETVAL=0 start(){ checkrun if [ $RETVAL -eq 0 ]; then echo &#34;-- Starting tomcat...&#34; $basedir/bin/startup.sh touch /var/lock/subsys/${tcNo} checklog status else echo &#34;-- tomcat already running&#34; fi } # 停止某一台tomcat，如果是重启则带re参数，表示不查看日志，等待启动时再提示查看 stop(){ checkrun if [ $RETVAL -eq 1 ]; then echo &#34;-- Shutting down tomcat."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "管理多tomcat服务shell脚本（CentOS）",
+      "item": "http://xgknight.com/posts/2014/10/%E7%AE%A1%E7%90%86%E5%A4%9Atomcat%E6%9C%8D%E5%8A%A1shell%E8%84%9A%E6%9C%ACcentos/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "管理多tomcat服务shell脚本（CentOS）",
+  "name": "管理多tomcat服务shell脚本（CentOS）",
+  "description": "该脚本改自csdn上的一个shell，忘记出处了，只记得它能够简单的通过service tomcat [stop|start|restart]来方便的管理Linux服务器上的tomcat，这可以满足大部分人的需求，然而并不适合我所管理的CentOS上的tomcat应用：通过端口区分的3台tomcat集群。如果每一次管理tomcat或查看日志，都cd /apps/test/tomcat0/log/然后切换到另外一个cd ../../或cd /apps/test/tomcat1/log/，麻烦至极。因此“懒人”创造了这个脚本tomcat：\n#!/bin/bash # author: Sean Chow (seanlook7@gmail.com) # # # chkconfig: 345 80 15 # description: Multiple tomcats service management script. # Source function library. . /etc/rc.d/init.d/functions # 第几个tomcat tcNo=$1 tcName=tomcat$1 basedir=/apps/test/$tcName tclog=${basedir}/logs/catalina.$(date +%Y-%m-%d).out RETVAL=0 start(){ checkrun if [ $RETVAL -eq 0 ]; then echo \u0026#34;-- Starting tomcat...\u0026#34; $basedir/bin/startup.sh touch /var/lock/subsys/${tcNo} checklog status else echo \u0026#34;-- tomcat already running\u0026#34; fi } # 停止某一台tomcat，如果是重启则带re参数，表示不查看日志，等待启动时再提示查看 stop(){ checkrun if [ $RETVAL -eq 1 ]; then echo \u0026#34;-- Shutting down tomcat.",
+  "keywords": [
+    "tomcat", "script", "shell"
+  ],
+  "articleBody": "该脚本改自csdn上的一个shell，忘记出处了，只记得它能够简单的通过service tomcat [stop|start|restart]来方便的管理Linux服务器上的tomcat，这可以满足大部分人的需求，然而并不适合我所管理的CentOS上的tomcat应用：通过端口区分的3台tomcat集群。如果每一次管理tomcat或查看日志，都cd /apps/test/tomcat0/log/然后切换到另外一个cd ../../或cd /apps/test/tomcat1/log/，麻烦至极。因此“懒人”创造了这个脚本tomcat：\n#!/bin/bash # author: Sean Chow (seanlook7@gmail.com) # # # chkconfig: 345 80 15 # description: Multiple tomcats service management script. # Source function library. . /etc/rc.d/init.d/functions # 第几个tomcat tcNo=$1 tcName=tomcat$1 basedir=/apps/test/$tcName tclog=${basedir}/logs/catalina.$(date +%Y-%m-%d).out RETVAL=0 start(){ checkrun if [ $RETVAL -eq 0 ]; then echo \"-- Starting tomcat...\" $basedir/bin/startup.sh touch /var/lock/subsys/${tcNo} checklog status else echo \"-- tomcat already running\" fi } # 停止某一台tomcat，如果是重启则带re参数，表示不查看日志，等待启动时再提示查看 stop(){ checkrun if [ $RETVAL -eq 1 ]; then echo \"-- Shutting down tomcat...\" $basedir/bin/shutdown.sh if [ \"$1\" != \"re\" ]; then checklog else sleep 5 fi rm -f /var/lock/subsys/${tcNo} status else echo \"-- tomcat not running\" fi } status(){ checkrun if [ $RETVAL -eq 1 ]; then echo -n \"-- Tomcat ( pid \" ps ax --width=1000 |grep ${tcName}|grep \"org.apache.catalina.startup.Bootstrap start\" | awk '{printf $1 \" \"}' echo -n \") is running...\" echo else echo \"-- Tomcat is stopped\" fi #echo \"---------------------------------------------\" } # 查看tomcat日志，带vl参数 log(){ status checklog yes } # 如果tomcat正在运行，强行杀死tomcat进程，关闭tomcat kill(){ checkrun if [ $RETVAL -eq 1 ]; then read -p \"-- Do you really want to kill ${tcName} progress?[no])\" answer case $answer in Y|y|YES|yes|Yes) ps ax --width=1000 |grep ${tcName}|grep \"org.apache.catalina.startup.Bootstrap start\" | awk '{printf $1 \" \"}'|xargs kill -9 status ;; *);; esac else echo \"-- exit with $tcName still running...\" fi } checkrun(){ ps ax --width=1000 |grep ${tcName}| grep \"[o]rg.apache.catalina.startup.Bootstrap start\" | awk '{printf $1 \" \"}' | wc | awk '{print $2}' \u003e/tmp/tomcat_process_count.txt read line \u003c /tmp/tomcat_process_count.txt if [ $line -gt 0 ]; then RETVAL=1 return $RETVAL else RETVAL=0 return $RETVAL fi } # 如果是直接查看日志viewlog，则不提示输入[yes]，否则就是被stop和start调用，需提示是否查看日志 checklog(){ answer=$1 if [ \"$answer\" != \"yes\" ]; then read -p \"-- See Catalina.out log to check $2 status?[yes])\" answer fi case $answer in Y|y|YES|yes|Yes|\"\") tail -f ${tclog} ;; *) # status # exit 0 ;; esac } checkexist(){ if [ ! -d $basedir ]; then echo \"-- tomcat $basedir does not exist.\" exit 0 fi } case \"$2\" in start) checkexist start exit 0 ;; stop) checkexist stop exit 0 ;; restart) checkexist stop re start exit 0 ;; status) checkexist status #$basedir/bin/catalina.sh version exit 0 ;; log) checkexist log exit 0 ;; kill) checkexist status kill exit 0 ;; *) echo \"Usage: $0 {start|stop|restart|status|log|kill}\" echo \" service tomcat {0|1|..} {start|stop|restart|status|log|kill}\" esac exit 0 使用说明：\n使用前设定好baseDir（多tomcat所在路径），各tomcat命名如tomcat0、tomcat1… 脚本名字为tomcat，放到/etc/init.d/下，并基于可执行权限chmod +x /etc/init.d/tomcat 执行用户不允许用root，特别是在线上环境 已处理其他错误参数输入，可用于正式环境 你也可以修改tcName来适应管理一个tomcat服务的情形 使用，以下针对tomcat0（/apps/test/tomcat0） service tomcat 0 start 启动，默认回车会查看启动日志；已启动则仅输出进程号 service tomcat 0 stop 停止，默认回车会查看日志；已停止则无动作；无法停止，则提示是否`kill`（默认No） service tomcat 0 restart 重启tomcat，有日志输出 service tomcat 0 status 查看tomcat是否启动 service tomcat 0 log 使用`tail -f`命令实时查看日志 service tomcat 0 kill 直接`kill`tomcat进程；尽量少用 TO-DO 加入service tomcat 0 clean命令来清除work和tmp目录，正在运行的不允许清除。\n这个脚本最近（2014/11/13）在使用过程中发现一个新的问题，因为服务器上tomcat一直开启着监控端口7091，所以在service tomcat 1 start失败以后，7091端口就被占用了，但使用service tomcat 1 status状态时stopped，其实还是有这个失败的tomcat进程，但用service tomcat 1 kill会失败。脚本里在考虑这个功能的话就有点臃肿了，还是老实结合手动管理吧。\n",
+  "wordCount" : "429",
+  "inLanguage": "en",
+  "datePublished": "2014-10-29T18:21:25Z",
+  "dateModified": "2014-10-29T18:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2014/10/%E7%AE%A1%E7%90%86%E5%A4%9Atomcat%E6%9C%8D%E5%8A%A1shell%E8%84%9A%E6%9C%ACcentos/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      管理多tomcat服务shell脚本（CentOS）
+    </h1>
+    <div class="post-meta"><span title='2014-10-29 18:21:25 +0000 UTC'>October 29, 2014</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>该脚本改自csdn上的一个shell，忘记出处了，只记得它能够简单的通过<code>service tomcat [stop|start|restart]</code>来方便的管理Linux服务器上的tomcat，这可以满足大部分人的需求，然而并不适合我所管理的CentOS上的tomcat应用：通过端口区分的3台tomcat集群。如果每一次管理tomcat或查看日志，都<code>cd /apps/test/tomcat0/log/</code>然后切换到另外一个<code>cd ../../</code>或<code>cd /apps/test/tomcat1/log/</code>，麻烦至极。因此“懒人”创造了这个脚本<code>tomcat</code>：</p>
+<!-- raw HTML omitted -->
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#75715e">#!/bin/bash  
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#75715e"># author: Sean Chow (seanlook7@gmail.com)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#  </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># chkconfig: 345 80 15  </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># description: Multiple tomcats service management script.  </span>
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Source function library.  </span>
+</span></span><span style="display:flex;"><span>. /etc/rc.d/init.d/functions  
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># 第几个tomcat</span>
+</span></span><span style="display:flex;"><span>tcNo<span style="color:#f92672">=</span>$1
+</span></span><span style="display:flex;"><span>tcName<span style="color:#f92672">=</span>tomcat$1
+</span></span><span style="display:flex;"><span>basedir<span style="color:#f92672">=</span>/apps/test/$tcName
+</span></span><span style="display:flex;"><span>tclog<span style="color:#f92672">=</span><span style="color:#e6db74">${</span>basedir<span style="color:#e6db74">}</span>/logs/catalina.<span style="color:#66d9ef">$(</span>date +%Y-%m-%d<span style="color:#66d9ef">)</span>.out
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>RETVAL<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span>  
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>start<span style="color:#f92672">(){</span>
+</span></span><span style="display:flex;"><span>        checkrun  
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> <span style="color:#f92672">[</span> $RETVAL -eq <span style="color:#ae81ff">0</span> <span style="color:#f92672">]</span>; <span style="color:#66d9ef">then</span>  
+</span></span><span style="display:flex;"><span>                echo <span style="color:#e6db74">&#34;-- Starting tomcat...&#34;</span>  
+</span></span><span style="display:flex;"><span>                $basedir/bin/startup.sh  
+</span></span><span style="display:flex;"><span>                touch /var/lock/subsys/<span style="color:#e6db74">${</span>tcNo<span style="color:#e6db74">}</span>
+</span></span><span style="display:flex;"><span>                checklog 
+</span></span><span style="display:flex;"><span>                status
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">else</span>  
+</span></span><span style="display:flex;"><span>                echo <span style="color:#e6db74">&#34;-- tomcat already running&#34;</span>  
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">fi</span>  
+</span></span><span style="display:flex;"><span><span style="color:#f92672">}</span>  
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># 停止某一台tomcat，如果是重启则带re参数，表示不查看日志，等待启动时再提示查看  </span>
+</span></span><span style="display:flex;"><span>stop<span style="color:#f92672">(){</span>
+</span></span><span style="display:flex;"><span>        checkrun  
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> <span style="color:#f92672">[</span> $RETVAL -eq <span style="color:#ae81ff">1</span> <span style="color:#f92672">]</span>; <span style="color:#66d9ef">then</span>  
+</span></span><span style="display:flex;"><span>                echo <span style="color:#e6db74">&#34;-- Shutting down tomcat...&#34;</span>  
+</span></span><span style="display:flex;"><span>                $basedir/bin/shutdown.sh  
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">if</span> <span style="color:#f92672">[</span> <span style="color:#e6db74">&#34;</span>$1<span style="color:#e6db74">&#34;</span> !<span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;re&#34;</span> <span style="color:#f92672">]</span>; <span style="color:#66d9ef">then</span>
+</span></span><span style="display:flex;"><span>                  checklog
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">else</span>
+</span></span><span style="display:flex;"><span>                  sleep <span style="color:#ae81ff">5</span>
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">fi</span>
+</span></span><span style="display:flex;"><span>                rm -f /var/lock/subsys/<span style="color:#e6db74">${</span>tcNo<span style="color:#e6db74">}</span> 
+</span></span><span style="display:flex;"><span>                status
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">else</span>  
+</span></span><span style="display:flex;"><span>                echo <span style="color:#e6db74">&#34;-- tomcat not running&#34;</span>  
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">fi</span>  
+</span></span><span style="display:flex;"><span><span style="color:#f92672">}</span>  
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>status<span style="color:#f92672">(){</span>
+</span></span><span style="display:flex;"><span>        checkrun
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> <span style="color:#f92672">[</span> $RETVAL -eq <span style="color:#ae81ff">1</span> <span style="color:#f92672">]</span>; <span style="color:#66d9ef">then</span>
+</span></span><span style="display:flex;"><span>                echo -n <span style="color:#e6db74">&#34;-- Tomcat ( pid &#34;</span>  
+</span></span><span style="display:flex;"><span>                ps ax --width<span style="color:#f92672">=</span><span style="color:#ae81ff">1000</span> |grep <span style="color:#e6db74">${</span>tcName<span style="color:#e6db74">}</span>|grep <span style="color:#e6db74">&#34;org.apache.catalina.startup.Bootstrap start&#34;</span> | awk <span style="color:#e6db74">&#39;{printf $1 &#34; &#34;}&#39;</span>
+</span></span><span style="display:flex;"><span>                echo -n <span style="color:#e6db74">&#34;) is running...&#34;</span>  
+</span></span><span style="display:flex;"><span>                echo  
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">else</span>
+</span></span><span style="display:flex;"><span>                echo <span style="color:#e6db74">&#34;-- Tomcat is stopped&#34;</span>  
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">fi</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e">#echo &#34;---------------------------------------------&#34;  </span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">}</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># 查看tomcat日志，带vl参数</span>
+</span></span><span style="display:flex;"><span>log<span style="color:#f92672">(){</span>
+</span></span><span style="display:flex;"><span>        status
+</span></span><span style="display:flex;"><span>        checklog yes
+</span></span><span style="display:flex;"><span><span style="color:#f92672">}</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># 如果tomcat正在运行，强行杀死tomcat进程，关闭tomcat</span>
+</span></span><span style="display:flex;"><span>kill<span style="color:#f92672">(){</span>
+</span></span><span style="display:flex;"><span>        checkrun
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> <span style="color:#f92672">[</span> $RETVAL -eq <span style="color:#ae81ff">1</span> <span style="color:#f92672">]</span>; <span style="color:#66d9ef">then</span>
+</span></span><span style="display:flex;"><span>            read -p <span style="color:#e6db74">&#34;-- Do you really want to kill </span><span style="color:#e6db74">${</span>tcName<span style="color:#e6db74">}</span><span style="color:#e6db74"> progress?[no])&#34;</span> answer
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">case</span> $answer in
+</span></span><span style="display:flex;"><span>                Y|y|YES|yes|Yes<span style="color:#f92672">)</span>
+</span></span><span style="display:flex;"><span>                    ps ax --width<span style="color:#f92672">=</span><span style="color:#ae81ff">1000</span> |grep <span style="color:#e6db74">${</span>tcName<span style="color:#e6db74">}</span>|grep <span style="color:#e6db74">&#34;org.apache.catalina.startup.Bootstrap start&#34;</span> | awk <span style="color:#e6db74">&#39;{printf $1 &#34; &#34;}&#39;</span>|xargs kill -9  
+</span></span><span style="display:flex;"><span>                    status
+</span></span><span style="display:flex;"><span>                ;;
+</span></span><span style="display:flex;"><span>                *<span style="color:#f92672">)</span>;;
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">esac</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">else</span>
+</span></span><span style="display:flex;"><span>            echo <span style="color:#e6db74">&#34;-- exit with </span>$tcName<span style="color:#e6db74"> still running...&#34;</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">fi</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">}</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>checkrun<span style="color:#f92672">(){</span>  
+</span></span><span style="display:flex;"><span>        ps ax --width<span style="color:#f92672">=</span><span style="color:#ae81ff">1000</span> |grep <span style="color:#e6db74">${</span>tcName<span style="color:#e6db74">}</span>| grep <span style="color:#e6db74">&#34;[o]rg.apache.catalina.startup.Bootstrap start&#34;</span> | awk <span style="color:#e6db74">&#39;{printf $1 &#34; &#34;}&#39;</span> | wc | awk <span style="color:#e6db74">&#39;{print $2}&#39;</span> &gt;/tmp/tomcat_process_count.txt  
+</span></span><span style="display:flex;"><span>        read line &lt; /tmp/tomcat_process_count.txt  
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> <span style="color:#f92672">[</span> $line -gt <span style="color:#ae81ff">0</span> <span style="color:#f92672">]</span>; <span style="color:#66d9ef">then</span>  
+</span></span><span style="display:flex;"><span>                RETVAL<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>  
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">return</span> $RETVAL  
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">else</span>  
+</span></span><span style="display:flex;"><span>                RETVAL<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span>  
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">return</span> $RETVAL  
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">fi</span>  
+</span></span><span style="display:flex;"><span><span style="color:#f92672">}</span>  
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># 如果是直接查看日志viewlog，则不提示输入[yes]，否则就是被stop和start调用，需提示是否查看日志</span>
+</span></span><span style="display:flex;"><span>checklog<span style="color:#f92672">(){</span>
+</span></span><span style="display:flex;"><span>        answer<span style="color:#f92672">=</span>$1
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> <span style="color:#f92672">[</span> <span style="color:#e6db74">&#34;</span>$answer<span style="color:#e6db74">&#34;</span> !<span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;yes&#34;</span> <span style="color:#f92672">]</span>; <span style="color:#66d9ef">then</span>
+</span></span><span style="display:flex;"><span>            read -p <span style="color:#e6db74">&#34;-- See Catalina.out log to check </span>$2<span style="color:#e6db74"> status?[yes])&#34;</span> answer
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">fi</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">case</span> $answer in
+</span></span><span style="display:flex;"><span>            Y|y|YES|yes|Yes|<span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">)</span>
+</span></span><span style="display:flex;"><span>                tail -f <span style="color:#e6db74">${</span>tclog<span style="color:#e6db74">}</span>
+</span></span><span style="display:flex;"><span>            ;;
+</span></span><span style="display:flex;"><span>            *<span style="color:#f92672">)</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">#    status</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">#    exit 0</span>
+</span></span><span style="display:flex;"><span>            ;;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">esac</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">}</span>
+</span></span><span style="display:flex;"><span>checkexist<span style="color:#f92672">(){</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> <span style="color:#f92672">[</span> ! -d $basedir <span style="color:#f92672">]</span>; <span style="color:#66d9ef">then</span>
+</span></span><span style="display:flex;"><span>            echo <span style="color:#e6db74">&#34;-- tomcat </span>$basedir<span style="color:#e6db74"> does not exist.&#34;</span>
+</span></span><span style="display:flex;"><span>            exit <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">fi</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">}</span>
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">case</span> <span style="color:#e6db74">&#34;</span>$2<span style="color:#e6db74">&#34;</span> in  
+</span></span><span style="display:flex;"><span>start<span style="color:#f92672">)</span>  
+</span></span><span style="display:flex;"><span>        checkexist
+</span></span><span style="display:flex;"><span>        start  
+</span></span><span style="display:flex;"><span>        exit <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>        ;;  
+</span></span><span style="display:flex;"><span>stop<span style="color:#f92672">)</span>  
+</span></span><span style="display:flex;"><span>        checkexist
+</span></span><span style="display:flex;"><span>        stop  
+</span></span><span style="display:flex;"><span>        exit <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>        ;;  
+</span></span><span style="display:flex;"><span>restart<span style="color:#f92672">)</span>  
+</span></span><span style="display:flex;"><span>        checkexist
+</span></span><span style="display:flex;"><span>        stop re 
+</span></span><span style="display:flex;"><span>        start 
+</span></span><span style="display:flex;"><span>        exit <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>        ;;  
+</span></span><span style="display:flex;"><span>status<span style="color:#f92672">)</span>  
+</span></span><span style="display:flex;"><span>        checkexist
+</span></span><span style="display:flex;"><span>        status  
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e">#$basedir/bin/catalina.sh version  </span>
+</span></span><span style="display:flex;"><span>        exit <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>        ;;  
+</span></span><span style="display:flex;"><span>log<span style="color:#f92672">)</span>
+</span></span><span style="display:flex;"><span>        checkexist
+</span></span><span style="display:flex;"><span>        log
+</span></span><span style="display:flex;"><span>        exit <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>        ;;
+</span></span><span style="display:flex;"><span>kill<span style="color:#f92672">)</span>
+</span></span><span style="display:flex;"><span>        checkexist
+</span></span><span style="display:flex;"><span>        status
+</span></span><span style="display:flex;"><span>        kill
+</span></span><span style="display:flex;"><span>        exit <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>        ;;
+</span></span><span style="display:flex;"><span>*<span style="color:#f92672">)</span>  
+</span></span><span style="display:flex;"><span>        echo <span style="color:#e6db74">&#34;Usage: </span>$0<span style="color:#e6db74"> {start|stop|restart|status|log|kill}&#34;</span>  
+</span></span><span style="display:flex;"><span>        echo <span style="color:#e6db74">&#34;       service tomcat {0|1|..} {start|stop|restart|status|log|kill}&#34;</span>  
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">esac</span>  
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>exit <span style="color:#ae81ff">0</span>
+</span></span></code></pre></div><p>使用说明：</p>
+<ol>
+<li>使用前设定好<code>baseDir</code>（多tomcat所在路径），各tomcat命名如<code>tomcat0</code>、<code>tomcat1</code>&hellip;</li>
+<li>脚本名字为<code>tomcat</code>，放到<code>/etc/init.d/</code>下，并基于可执行权限<code>chmod +x /etc/init.d/tomcat</code></li>
+<li>执行用户不允许用<code>root</code>，特别是在线上环境</li>
+<li>已处理其他错误参数输入，可用于正式环境</li>
+<li>你也可以修改<code>tcName</code>来适应管理一个tomcat服务的情形</li>
+<li>使用，以下针对<code>tomcat0</code>（<code>/apps/test/tomcat0</code>）</li>
+</ol>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>service tomcat <span style="color:#ae81ff">0</span> start   启动，默认回车会查看启动日志；已启动则仅输出进程号
+</span></span><span style="display:flex;"><span>service tomcat <span style="color:#ae81ff">0</span> stop    停止，默认回车会查看日志；已停止则无动作；无法停止，则提示是否<span style="color:#e6db74">`</span>kill<span style="color:#e6db74">`</span>（默认No）
+</span></span><span style="display:flex;"><span>service tomcat <span style="color:#ae81ff">0</span> restart 重启tomcat，有日志输出
+</span></span><span style="display:flex;"><span>service tomcat <span style="color:#ae81ff">0</span> status  查看tomcat是否启动
+</span></span><span style="display:flex;"><span>service tomcat <span style="color:#ae81ff">0</span> log     使用<span style="color:#e6db74">`</span>tail -f<span style="color:#e6db74">`</span>命令实时查看日志
+</span></span><span style="display:flex;"><span>service tomcat <span style="color:#ae81ff">0</span> kill    直接<span style="color:#e6db74">`</span>kill<span style="color:#e6db74">`</span>tomcat进程；尽量少用
+</span></span></code></pre></div><p>TO-DO
+加入<code>service tomcat 0 clean</code>命令来清除<code>work</code>和<code>tmp</code>目录，正在运行的不允许清除。</p>
+<p>这个脚本最近（2014/11/13）在使用过程中发现一个新的问题，因为服务器上tomcat一直开启着监控端口7091，所以在<code>service tomcat 1 start</code>失败以后，7091端口就被占用了，但使用<code>service tomcat 1 status</code>状态时<code>stopped</code>，其实还是有这个失败的tomcat进程，但用<code>service tomcat 1 kill</code>会失败。脚本里在考虑这个功能的话就有点臃肿了，还是老实结合手动管理吧。</p>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/tomcat/">tomcat</a></li>
+      <li><a href="http://xgknight.com/tags/script/">script</a></li>
+      <li><a href="http://xgknight.com/tags/shell/">shell</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

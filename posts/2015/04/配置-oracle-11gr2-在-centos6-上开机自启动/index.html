@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>配置 Oracle 11gR2 在 CentOS6 上开机自启动 | Sean Note</title>
+<meta name="keywords" content="oracle, linux">
+<meta name="description" content="修改配置 要达到oracle随开机自启动，一般使用11g自带的dbstart脚本：$ORACLE_HOME/bin/dbstart，但要先修改/etc/oratab的内容，将N改成Y，表示允许实例自启动，假如有2个实例要启动，再写一行：
+$ vi /etc/oratab EXCRMPROD:/db/oracle/product/11.2.0/db_1:Y 然后在oracle用户下执行$ORACLE_HOME/bin/dbstart即可启动，日志被记录在$ORACLE_HOME/startup.log。但是，默认情况dbstart和dbshut脚本不能自动启动或关闭监听，所以也要加以修改：
+$ vi /db/oracle/product/11.2.0/db_1/bin/dbstart ## 找到下面的代码(约第80行)，在实际脚本代码的前面 # First argument is used to bring up Oracle Net Listener ORACLE_HOME_LISTNER=$1 ## 将此处的 ORACLE_HOME_LISTNER=$1 修改为 ORACLE_HOME_LISTNER=$ORACLE_HOME if [ ! $ORACLE_HOME_LISTNER ] ; then echo &#34;ORACLE_HOME_LISTNER is not SET, unable to auto-start Oracle Net Listener&#34; echo &#34;Usage: $0 ORACLE_HOME&#34; else LOG=$ORACLE_HOME_LISTNER/listener.log 同样也修改dbshut脚本（约第50行）：
+$ vi /db/oracle/product/11.2.0/db_1/bin/dbshut # The this to bring down Oracle Net Listener ORACLE_HOME_LISTNER=$ORACLE_HOME if [ ! $ORACLE_HOME_LISTNER ] ; then echo &#34;ORACLE_HOME_LISTNER is not SET, unable to auto-stop Oracle Net Listener&#34; echo &#34;Usage: $0 ORACLE_HOME&#34; else LOG=$ORACLE_HOME_LISTNER/listener.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2015/04/%E9%85%8D%E7%BD%AE-oracle-11gr2-%E5%9C%A8-centos6-%E4%B8%8A%E5%BC%80%E6%9C%BA%E8%87%AA%E5%90%AF%E5%8A%A8/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="配置 Oracle 11gR2 在 CentOS6 上开机自启动" />
+<meta property="og:description" content="修改配置 要达到oracle随开机自启动，一般使用11g自带的dbstart脚本：$ORACLE_HOME/bin/dbstart，但要先修改/etc/oratab的内容，将N改成Y，表示允许实例自启动，假如有2个实例要启动，再写一行：
+$ vi /etc/oratab EXCRMPROD:/db/oracle/product/11.2.0/db_1:Y 然后在oracle用户下执行$ORACLE_HOME/bin/dbstart即可启动，日志被记录在$ORACLE_HOME/startup.log。但是，默认情况dbstart和dbshut脚本不能自动启动或关闭监听，所以也要加以修改：
+$ vi /db/oracle/product/11.2.0/db_1/bin/dbstart ## 找到下面的代码(约第80行)，在实际脚本代码的前面 # First argument is used to bring up Oracle Net Listener ORACLE_HOME_LISTNER=$1 ## 将此处的 ORACLE_HOME_LISTNER=$1 修改为 ORACLE_HOME_LISTNER=$ORACLE_HOME if [ ! $ORACLE_HOME_LISTNER ] ; then echo &#34;ORACLE_HOME_LISTNER is not SET, unable to auto-start Oracle Net Listener&#34; echo &#34;Usage: $0 ORACLE_HOME&#34; else LOG=$ORACLE_HOME_LISTNER/listener.log 同样也修改dbshut脚本（约第50行）：
+$ vi /db/oracle/product/11.2.0/db_1/bin/dbshut # The this to bring down Oracle Net Listener ORACLE_HOME_LISTNER=$ORACLE_HOME if [ ! $ORACLE_HOME_LISTNER ] ; then echo &#34;ORACLE_HOME_LISTNER is not SET, unable to auto-stop Oracle Net Listener&#34; echo &#34;Usage: $0 ORACLE_HOME&#34; else LOG=$ORACLE_HOME_LISTNER/listener." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2015/04/%E9%85%8D%E7%BD%AE-oracle-11gr2-%E5%9C%A8-centos6-%E4%B8%8A%E5%BC%80%E6%9C%BA%E8%87%AA%E5%90%AF%E5%8A%A8/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2015-04-11T15:21:25+00:00" />
+<meta property="article:modified_time" content="2015-04-11T15:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="配置 Oracle 11gR2 在 CentOS6 上开机自启动"/>
+<meta name="twitter:description" content="修改配置 要达到oracle随开机自启动，一般使用11g自带的dbstart脚本：$ORACLE_HOME/bin/dbstart，但要先修改/etc/oratab的内容，将N改成Y，表示允许实例自启动，假如有2个实例要启动，再写一行：
+$ vi /etc/oratab EXCRMPROD:/db/oracle/product/11.2.0/db_1:Y 然后在oracle用户下执行$ORACLE_HOME/bin/dbstart即可启动，日志被记录在$ORACLE_HOME/startup.log。但是，默认情况dbstart和dbshut脚本不能自动启动或关闭监听，所以也要加以修改：
+$ vi /db/oracle/product/11.2.0/db_1/bin/dbstart ## 找到下面的代码(约第80行)，在实际脚本代码的前面 # First argument is used to bring up Oracle Net Listener ORACLE_HOME_LISTNER=$1 ## 将此处的 ORACLE_HOME_LISTNER=$1 修改为 ORACLE_HOME_LISTNER=$ORACLE_HOME if [ ! $ORACLE_HOME_LISTNER ] ; then echo &#34;ORACLE_HOME_LISTNER is not SET, unable to auto-start Oracle Net Listener&#34; echo &#34;Usage: $0 ORACLE_HOME&#34; else LOG=$ORACLE_HOME_LISTNER/listener.log 同样也修改dbshut脚本（约第50行）：
+$ vi /db/oracle/product/11.2.0/db_1/bin/dbshut # The this to bring down Oracle Net Listener ORACLE_HOME_LISTNER=$ORACLE_HOME if [ ! $ORACLE_HOME_LISTNER ] ; then echo &#34;ORACLE_HOME_LISTNER is not SET, unable to auto-stop Oracle Net Listener&#34; echo &#34;Usage: $0 ORACLE_HOME&#34; else LOG=$ORACLE_HOME_LISTNER/listener."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "配置 Oracle 11gR2 在 CentOS6 上开机自启动",
+      "item": "http://xgknight.com/posts/2015/04/%E9%85%8D%E7%BD%AE-oracle-11gr2-%E5%9C%A8-centos6-%E4%B8%8A%E5%BC%80%E6%9C%BA%E8%87%AA%E5%90%AF%E5%8A%A8/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "配置 Oracle 11gR2 在 CentOS6 上开机自启动",
+  "name": "配置 Oracle 11gR2 在 CentOS6 上开机自启动",
+  "description": "修改配置 要达到oracle随开机自启动，一般使用11g自带的dbstart脚本：$ORACLE_HOME/bin/dbstart，但要先修改/etc/oratab的内容，将N改成Y，表示允许实例自启动，假如有2个实例要启动，再写一行：\n$ vi /etc/oratab EXCRMPROD:/db/oracle/product/11.2.0/db_1:Y 然后在oracle用户下执行$ORACLE_HOME/bin/dbstart即可启动，日志被记录在$ORACLE_HOME/startup.log。但是，默认情况dbstart和dbshut脚本不能自动启动或关闭监听，所以也要加以修改：\n$ vi /db/oracle/product/11.2.0/db_1/bin/dbstart ## 找到下面的代码(约第80行)，在实际脚本代码的前面 # First argument is used to bring up Oracle Net Listener ORACLE_HOME_LISTNER=$1 ## 将此处的 ORACLE_HOME_LISTNER=$1 修改为 ORACLE_HOME_LISTNER=$ORACLE_HOME if [ ! $ORACLE_HOME_LISTNER ] ; then echo \u0026#34;ORACLE_HOME_LISTNER is not SET, unable to auto-start Oracle Net Listener\u0026#34; echo \u0026#34;Usage: $0 ORACLE_HOME\u0026#34; else LOG=$ORACLE_HOME_LISTNER/listener.log 同样也修改dbshut脚本（约第50行）：\n$ vi /db/oracle/product/11.2.0/db_1/bin/dbshut # The this to bring down Oracle Net Listener ORACLE_HOME_LISTNER=$ORACLE_HOME if [ ! $ORACLE_HOME_LISTNER ] ; then echo \u0026#34;ORACLE_HOME_LISTNER is not SET, unable to auto-stop Oracle Net Listener\u0026#34; echo \u0026#34;Usage: $0 ORACLE_HOME\u0026#34; else LOG=$ORACLE_HOME_LISTNER/listener.",
+  "keywords": [
+    "oracle", "linux"
+  ],
+  "articleBody": "修改配置 要达到oracle随开机自启动，一般使用11g自带的dbstart脚本：$ORACLE_HOME/bin/dbstart，但要先修改/etc/oratab的内容，将N改成Y，表示允许实例自启动，假如有2个实例要启动，再写一行：\n$ vi /etc/oratab EXCRMPROD:/db/oracle/product/11.2.0/db_1:Y 然后在oracle用户下执行$ORACLE_HOME/bin/dbstart即可启动，日志被记录在$ORACLE_HOME/startup.log。但是，默认情况dbstart和dbshut脚本不能自动启动或关闭监听，所以也要加以修改：\n$ vi /db/oracle/product/11.2.0/db_1/bin/dbstart ## 找到下面的代码(约第80行)，在实际脚本代码的前面 # First argument is used to bring up Oracle Net Listener ORACLE_HOME_LISTNER=$1 ## 将此处的 ORACLE_HOME_LISTNER=$1 修改为 ORACLE_HOME_LISTNER=$ORACLE_HOME if [ ! $ORACLE_HOME_LISTNER ] ; then echo \"ORACLE_HOME_LISTNER is not SET, unable to auto-start Oracle Net Listener\" echo \"Usage: $0 ORACLE_HOME\" else LOG=$ORACLE_HOME_LISTNER/listener.log 同样也修改dbshut脚本（约第50行）：\n$ vi /db/oracle/product/11.2.0/db_1/bin/dbshut # The this to bring down Oracle Net Listener ORACLE_HOME_LISTNER=$ORACLE_HOME if [ ! $ORACLE_HOME_LISTNER ] ; then echo \"ORACLE_HOME_LISTNER is not SET, unable to auto-stop Oracle Net Listener\" echo \"Usage: $0 ORACLE_HOME\" else LOG=$ORACLE_HOME_LISTNER/listener.log 开机启动 这两个脚本在执行时会自动去搜索/etc/oratab文件的内容，将这两个命令分别加入开机启动和关闭脚本里。\n/etc/rc.local Linux系统开机初始化的最后过程会执行该脚本，加入以下内容：\nsu - oracle -lc \"$ORACLE_HOME/bin/dbstart\" /etc/rc.local.shutdown 这个脚本时系统里没有的，完成的功能是关机自动停止服务，/etc/rc.d/rc.local.shutdown：\n#!/bin/bash # chkconfig: - 00 00 # description: Do custom commands before shutdown or reboot ### BEGIN INIT INFO # Provides: custom-halt # Required-Start: # Required-Stop: # Default-Start: 0 6 # Default-Stop: # Short-Description: Custom halt commands # Description: Do custom commands before shutdown or reboot ### END INIT INFO export ORACLE_BASE=/db/oracle export ORACLE_HOME=$ORACLE_BASE/product/11.2.0/db_1 export ORACLE_SID=EXCRMPROD export PATH=$PATH:$ORACLE_HOME/bin su - oracle -lc \"$ORACLE_HOME/bin/dbshut /dev/null 2\u003e\u00261\" exit 让它运行在0和6运行级别runlevel：\n# chmod 755 /etc/rc.d/rc.local.shutdown # ln -s /etc/rc.d/rc.local.shutdown /etc/rc.local.shutdown # ln -s /etc/rc.d/rc.local.shutdown /etc/init.d/custom-halt # chkconfig --add custom-halt # chkconfig --level 06 custom-halt on 另外网上也有文章不是利用 oracle 自带的 dbstart 来实现自启动，而是自己写 service 脚本，执行 sqlplus 然后运行 shutdown immediate ，个人觉得这有点重复做oracle的事情了；还有把通过类似service oracle start/stop这样的形式去管理，方便是方便一点，但要知道oracle数据库轻易不会频繁重启，如有需要，我们更愿意自己使用sqlplus连上数据库，自己执行shutdown命令，因为对数据库的操作还是以慎重为主，在配置了Active Data Guard等复杂环境下，对备库也不适用，所以这里就没做这个工作。\n",
+  "wordCount" : "209",
+  "inLanguage": "en",
+  "datePublished": "2015-04-11T15:21:25Z",
+  "dateModified": "2015-04-11T15:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2015/04/%E9%85%8D%E7%BD%AE-oracle-11gr2-%E5%9C%A8-centos6-%E4%B8%8A%E5%BC%80%E6%9C%BA%E8%87%AA%E5%90%AF%E5%8A%A8/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      配置 Oracle 11gR2 在 CentOS6 上开机自启动
+    </h1>
+    <div class="post-meta"><span title='2015-04-11 15:21:25 +0000 UTC'>April 11, 2015</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><h2 id="修改配置">修改配置<a hidden class="anchor" aria-hidden="true" href="#修改配置">#</a></h2>
+<p>要达到oracle随开机自启动，一般使用11g自带的dbstart脚本：<code>$ORACLE_HOME/bin/dbstart</code>，但要先修改<code>/etc/oratab</code>的内容，将N改成Y，表示允许实例自启动，假如有2个实例要启动，再写一行：</p>
+<pre tabindex="0"><code>$ vi /etc/oratab
+EXCRMPROD:/db/oracle/product/11.2.0/db_1:Y
+</code></pre><p>然后在oracle用户下执行<code>$ORACLE_HOME/bin/dbstart</code>即可启动，日志被记录在<code>$ORACLE_HOME/startup.log</code>。但是，默认情况<code>dbstart</code>和<code>dbshut</code>脚本不能自动启动或关闭监听，所以也要加以修改：</p>
+<pre tabindex="0"><code>$ vi /db/oracle/product/11.2.0/db_1/bin/dbstart
+## 找到下面的代码(约第80行)，在实际脚本代码的前面
+# First argument is used to bring up Oracle Net Listener
+ORACLE_HOME_LISTNER=$1
+## 将此处的 ORACLE_HOME_LISTNER=$1 修改为 ORACLE_HOME_LISTNER=$ORACLE_HOME
+if [ ! $ORACLE_HOME_LISTNER ] ; then
+echo &#34;ORACLE_HOME_LISTNER is not SET, unable to auto-start Oracle Net Listener&#34;
+echo &#34;Usage: $0 ORACLE_HOME&#34;
+else
+LOG=$ORACLE_HOME_LISTNER/listener.log
+</code></pre><p>同样也修改dbshut脚本（约第50行）：</p>
+<pre tabindex="0"><code>$ vi /db/oracle/product/11.2.0/db_1/bin/dbshut
+
+# The this to bring down Oracle Net Listener
+ORACLE_HOME_LISTNER=$ORACLE_HOME
+if [ ! $ORACLE_HOME_LISTNER ] ; then
+echo &#34;ORACLE_HOME_LISTNER is not SET, unable to auto-stop Oracle Net Listener&#34;
+echo &#34;Usage: $0 ORACLE_HOME&#34;
+else
+LOG=$ORACLE_HOME_LISTNER/listener.log
+</code></pre><h2 id="开机启动">开机启动<a hidden class="anchor" aria-hidden="true" href="#开机启动">#</a></h2>
+<p>这两个脚本在执行时会自动去搜索<code>/etc/oratab</code>文件的内容，将这两个命令分别加入开机启动和关闭脚本里。</p>
+<!-- raw HTML omitted -->
+<p><strong>/etc/rc.local</strong>
+Linux系统开机初始化的最后过程会执行该脚本，加入以下内容：</p>
+<pre tabindex="0"><code>su - oracle -lc &#34;$ORACLE_HOME/bin/dbstart&#34;
+</code></pre><p><strong>/etc/rc.local.shutdown</strong>
+这个脚本时系统里没有的，完成的功能是关机自动停止服务，<code>/etc/rc.d/rc.local.shutdown</code>：</p>
+<pre tabindex="0"><code>#!/bin/bash
+
+# chkconfig: - 00 00
+# description: Do custom commands before shutdown or reboot
+
+### BEGIN INIT INFO
+# Provides: custom-halt
+# Required-Start:
+# Required-Stop:
+# Default-Start: 0 6
+# Default-Stop:
+# Short-Description: Custom halt commands
+# Description: Do custom commands before shutdown or reboot
+### END INIT INFO
+
+export ORACLE_BASE=/db/oracle
+export ORACLE_HOME=$ORACLE_BASE/product/11.2.0/db_1
+export ORACLE_SID=EXCRMPROD
+export PATH=$PATH:$ORACLE_HOME/bin
+
+su - oracle -lc &#34;$ORACLE_HOME/bin/dbshut /dev/null 2&gt;&amp;1&#34;
+
+exit
+</code></pre><p>让它运行在<code>0</code>和<code>6</code>运行级别runlevel：</p>
+<pre tabindex="0"><code># chmod 755 /etc/rc.d/rc.local.shutdown
+# ln -s /etc/rc.d/rc.local.shutdown /etc/rc.local.shutdown
+# ln -s /etc/rc.d/rc.local.shutdown /etc/init.d/custom-halt
+
+# chkconfig --add custom-halt
+# chkconfig --level 06 custom-halt on 
+</code></pre><p>另外网上也有文章不是利用 oracle 自带的 dbstart 来实现自启动，而是自己写 service 脚本，执行 sqlplus 然后运行 shutdown immediate ，个人觉得这有点重复做oracle的事情了；还有把通过类似<code>service oracle start/stop</code>这样的形式去管理，方便是方便一点，但要知道oracle数据库轻易不会频繁重启，如有需要，我们更愿意自己使用<code>sqlplus</code>连上数据库，自己执行<code>shutdown</code>命令，因为对数据库的操作还是以慎重为主，在配置了Active Data Guard等复杂环境下，对备库也不适用，所以这里就没做这个工作。</p>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/oracle/">oracle</a></li>
+      <li><a href="http://xgknight.com/tags/linux/">linux</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

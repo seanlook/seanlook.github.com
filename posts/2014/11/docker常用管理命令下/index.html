@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>docker常用管理命令（下） | Sean Note</title>
+<meta name="keywords" content="docker, command, linux">
+<meta name="description" content="本文承接docker专题(2)：docker常用管理命令（上）。
+1. 开启/停止/重启container（start/stop/restart） 容器可以通过run新建一个来运行，也可以重新start已经停止的container，但start不能够再指定容器启动时运行的指令，因为docker只能有一个前台进程。 容器stop（或Ctrl&#43;D）时，会在保存当前容器的状态之后退出，下次start时保有上次关闭时更改。而且每次进入attach进去的界面是一样的，与第一次run启动或commit提交的时刻相同。
+CONTAINER_ID=$(docker start &lt;containner_id&gt;) docker stop $CONTAINER_ID docker restart $CONTAINER_ID 关于这几个命令可以通过一个完整的实例使用：docker如何创建一个运行后台进程的容器并同时提供shell终端。
+2. 连接到正在运行中的container（attach） 要attach上去的容器必须正在运行，可以同时连接上同一个container来共享屏幕（与screen命令的attach类似）。 官方文档中说attach后可以通过CTRL-C来detach，但实际上经过我的测试，如果container当前在运行bash，CTRL-C自然是当前行的输入，没有退出；如果container当前正在前台运行进程，如输出nginx的access.log日志，CTRL-C不仅会导致退出容器，而且还stop了。这不是我们想要的，detach的意思按理应该是脱离容器终端，但容器依然运行。好在attach是可以带上 --sig-proxy=false来确保CTRL-D或CTRL-C不会关闭容器。
+# docker attach --sig-proxy=false $CONTAINER_ID 3. 查看image或container的底层信息（inspect） inspect的对象可以是image、运行中的container和停止的container。
+查看容器的内部IP # docker inspect --format=&#39;{\{.NetworkSettings.IPAddress}}&#39; $CONTAINER_ID 172.17.42.35 （注：由于代码块解析的问题，上面NetworkSettings前面的 \ 去掉） 4. 删除一个或多个container、image（rm、rmi） 你可能在使用过程中会build或commit许多镜像，无用的镜像需要删除。但删除这些镜像是有一些条件的：
+同一个IMAGE ID可能会有多个TAG（可能还在不同的仓库），首先你要根据这些 image names 来删除标签，当删除最后一个tag的时候就会自动删除镜像； 承上，如果要删除的多个IMAGE NAME在同一个REPOSITORY，可以通过docker rmi &lt;image_id&gt;来同时删除剩下的TAG；若在不同Repo则还是需要手动逐个删除TAG； 还存在由这个镜像启动的container时（即便已经停止），也无法删除镜像； TO-DO 如何查看镜像与容器的依存关系
+** 删除容器 ** docker rm &lt;container_id/contaner_name&gt;
+删除所有停止的容器 docker rm $(docker ps -a -q) ** 删除镜像 ** docker rmi &lt;image_id/image_name .">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2014/11/docker%E5%B8%B8%E7%94%A8%E7%AE%A1%E7%90%86%E5%91%BD%E4%BB%A4%E4%B8%8B/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="docker常用管理命令（下）" />
+<meta property="og:description" content="本文承接docker专题(2)：docker常用管理命令（上）。
+1. 开启/停止/重启container（start/stop/restart） 容器可以通过run新建一个来运行，也可以重新start已经停止的container，但start不能够再指定容器启动时运行的指令，因为docker只能有一个前台进程。 容器stop（或Ctrl&#43;D）时，会在保存当前容器的状态之后退出，下次start时保有上次关闭时更改。而且每次进入attach进去的界面是一样的，与第一次run启动或commit提交的时刻相同。
+CONTAINER_ID=$(docker start &lt;containner_id&gt;) docker stop $CONTAINER_ID docker restart $CONTAINER_ID 关于这几个命令可以通过一个完整的实例使用：docker如何创建一个运行后台进程的容器并同时提供shell终端。
+2. 连接到正在运行中的container（attach） 要attach上去的容器必须正在运行，可以同时连接上同一个container来共享屏幕（与screen命令的attach类似）。 官方文档中说attach后可以通过CTRL-C来detach，但实际上经过我的测试，如果container当前在运行bash，CTRL-C自然是当前行的输入，没有退出；如果container当前正在前台运行进程，如输出nginx的access.log日志，CTRL-C不仅会导致退出容器，而且还stop了。这不是我们想要的，detach的意思按理应该是脱离容器终端，但容器依然运行。好在attach是可以带上 --sig-proxy=false来确保CTRL-D或CTRL-C不会关闭容器。
+# docker attach --sig-proxy=false $CONTAINER_ID 3. 查看image或container的底层信息（inspect） inspect的对象可以是image、运行中的container和停止的container。
+查看容器的内部IP # docker inspect --format=&#39;{\{.NetworkSettings.IPAddress}}&#39; $CONTAINER_ID 172.17.42.35 （注：由于代码块解析的问题，上面NetworkSettings前面的 \ 去掉） 4. 删除一个或多个container、image（rm、rmi） 你可能在使用过程中会build或commit许多镜像，无用的镜像需要删除。但删除这些镜像是有一些条件的：
+同一个IMAGE ID可能会有多个TAG（可能还在不同的仓库），首先你要根据这些 image names 来删除标签，当删除最后一个tag的时候就会自动删除镜像； 承上，如果要删除的多个IMAGE NAME在同一个REPOSITORY，可以通过docker rmi &lt;image_id&gt;来同时删除剩下的TAG；若在不同Repo则还是需要手动逐个删除TAG； 还存在由这个镜像启动的container时（即便已经停止），也无法删除镜像； TO-DO 如何查看镜像与容器的依存关系
+** 删除容器 ** docker rm &lt;container_id/contaner_name&gt;
+删除所有停止的容器 docker rm $(docker ps -a -q) ** 删除镜像 ** docker rmi &lt;image_id/image_name ." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2014/11/docker%E5%B8%B8%E7%94%A8%E7%AE%A1%E7%90%86%E5%91%BD%E4%BB%A4%E4%B8%8B/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2014-11-05T16:21:25+00:00" />
+<meta property="article:modified_time" content="2014-11-05T16:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="docker常用管理命令（下）"/>
+<meta name="twitter:description" content="本文承接docker专题(2)：docker常用管理命令（上）。
+1. 开启/停止/重启container（start/stop/restart） 容器可以通过run新建一个来运行，也可以重新start已经停止的container，但start不能够再指定容器启动时运行的指令，因为docker只能有一个前台进程。 容器stop（或Ctrl&#43;D）时，会在保存当前容器的状态之后退出，下次start时保有上次关闭时更改。而且每次进入attach进去的界面是一样的，与第一次run启动或commit提交的时刻相同。
+CONTAINER_ID=$(docker start &lt;containner_id&gt;) docker stop $CONTAINER_ID docker restart $CONTAINER_ID 关于这几个命令可以通过一个完整的实例使用：docker如何创建一个运行后台进程的容器并同时提供shell终端。
+2. 连接到正在运行中的container（attach） 要attach上去的容器必须正在运行，可以同时连接上同一个container来共享屏幕（与screen命令的attach类似）。 官方文档中说attach后可以通过CTRL-C来detach，但实际上经过我的测试，如果container当前在运行bash，CTRL-C自然是当前行的输入，没有退出；如果container当前正在前台运行进程，如输出nginx的access.log日志，CTRL-C不仅会导致退出容器，而且还stop了。这不是我们想要的，detach的意思按理应该是脱离容器终端，但容器依然运行。好在attach是可以带上 --sig-proxy=false来确保CTRL-D或CTRL-C不会关闭容器。
+# docker attach --sig-proxy=false $CONTAINER_ID 3. 查看image或container的底层信息（inspect） inspect的对象可以是image、运行中的container和停止的container。
+查看容器的内部IP # docker inspect --format=&#39;{\{.NetworkSettings.IPAddress}}&#39; $CONTAINER_ID 172.17.42.35 （注：由于代码块解析的问题，上面NetworkSettings前面的 \ 去掉） 4. 删除一个或多个container、image（rm、rmi） 你可能在使用过程中会build或commit许多镜像，无用的镜像需要删除。但删除这些镜像是有一些条件的：
+同一个IMAGE ID可能会有多个TAG（可能还在不同的仓库），首先你要根据这些 image names 来删除标签，当删除最后一个tag的时候就会自动删除镜像； 承上，如果要删除的多个IMAGE NAME在同一个REPOSITORY，可以通过docker rmi &lt;image_id&gt;来同时删除剩下的TAG；若在不同Repo则还是需要手动逐个删除TAG； 还存在由这个镜像启动的container时（即便已经停止），也无法删除镜像； TO-DO 如何查看镜像与容器的依存关系
+** 删除容器 ** docker rm &lt;container_id/contaner_name&gt;
+删除所有停止的容器 docker rm $(docker ps -a -q) ** 删除镜像 ** docker rmi &lt;image_id/image_name ."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "docker常用管理命令（下）",
+      "item": "http://xgknight.com/posts/2014/11/docker%E5%B8%B8%E7%94%A8%E7%AE%A1%E7%90%86%E5%91%BD%E4%BB%A4%E4%B8%8B/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "docker常用管理命令（下）",
+  "name": "docker常用管理命令（下）",
+  "description": "本文承接docker专题(2)：docker常用管理命令（上）。\n1. 开启/停止/重启container（start/stop/restart） 容器可以通过run新建一个来运行，也可以重新start已经停止的container，但start不能够再指定容器启动时运行的指令，因为docker只能有一个前台进程。 容器stop（或Ctrl+D）时，会在保存当前容器的状态之后退出，下次start时保有上次关闭时更改。而且每次进入attach进去的界面是一样的，与第一次run启动或commit提交的时刻相同。\nCONTAINER_ID=$(docker start \u0026lt;containner_id\u0026gt;) docker stop $CONTAINER_ID docker restart $CONTAINER_ID 关于这几个命令可以通过一个完整的实例使用：docker如何创建一个运行后台进程的容器并同时提供shell终端。\n2. 连接到正在运行中的container（attach） 要attach上去的容器必须正在运行，可以同时连接上同一个container来共享屏幕（与screen命令的attach类似）。 官方文档中说attach后可以通过CTRL-C来detach，但实际上经过我的测试，如果container当前在运行bash，CTRL-C自然是当前行的输入，没有退出；如果container当前正在前台运行进程，如输出nginx的access.log日志，CTRL-C不仅会导致退出容器，而且还stop了。这不是我们想要的，detach的意思按理应该是脱离容器终端，但容器依然运行。好在attach是可以带上 --sig-proxy=false来确保CTRL-D或CTRL-C不会关闭容器。\n# docker attach --sig-proxy=false $CONTAINER_ID 3. 查看image或container的底层信息（inspect） inspect的对象可以是image、运行中的container和停止的container。\n查看容器的内部IP # docker inspect --format=\u0026#39;{\\{.NetworkSettings.IPAddress}}\u0026#39; $CONTAINER_ID 172.17.42.35 （注：由于代码块解析的问题，上面NetworkSettings前面的 \\ 去掉） 4. 删除一个或多个container、image（rm、rmi） 你可能在使用过程中会build或commit许多镜像，无用的镜像需要删除。但删除这些镜像是有一些条件的：\n同一个IMAGE ID可能会有多个TAG（可能还在不同的仓库），首先你要根据这些 image names 来删除标签，当删除最后一个tag的时候就会自动删除镜像； 承上，如果要删除的多个IMAGE NAME在同一个REPOSITORY，可以通过docker rmi \u0026lt;image_id\u0026gt;来同时删除剩下的TAG；若在不同Repo则还是需要手动逐个删除TAG； 还存在由这个镜像启动的container时（即便已经停止），也无法删除镜像； TO-DO 如何查看镜像与容器的依存关系\n** 删除容器 ** docker rm \u0026lt;container_id/contaner_name\u0026gt;\n删除所有停止的容器 docker rm $(docker ps -a -q) ** 删除镜像 ** docker rmi \u0026lt;image_id/image_name .",
+  "keywords": [
+    "docker", "command", "linux"
+  ],
+  "articleBody": "本文承接docker专题(2)：docker常用管理命令（上）。\n1. 开启/停止/重启container（start/stop/restart） 容器可以通过run新建一个来运行，也可以重新start已经停止的container，但start不能够再指定容器启动时运行的指令，因为docker只能有一个前台进程。 容器stop（或Ctrl+D）时，会在保存当前容器的状态之后退出，下次start时保有上次关闭时更改。而且每次进入attach进去的界面是一样的，与第一次run启动或commit提交的时刻相同。\nCONTAINER_ID=$(docker start ) docker stop $CONTAINER_ID docker restart $CONTAINER_ID 关于这几个命令可以通过一个完整的实例使用：docker如何创建一个运行后台进程的容器并同时提供shell终端。\n2. 连接到正在运行中的container（attach） 要attach上去的容器必须正在运行，可以同时连接上同一个container来共享屏幕（与screen命令的attach类似）。 官方文档中说attach后可以通过CTRL-C来detach，但实际上经过我的测试，如果container当前在运行bash，CTRL-C自然是当前行的输入，没有退出；如果container当前正在前台运行进程，如输出nginx的access.log日志，CTRL-C不仅会导致退出容器，而且还stop了。这不是我们想要的，detach的意思按理应该是脱离容器终端，但容器依然运行。好在attach是可以带上 --sig-proxy=false来确保CTRL-D或CTRL-C不会关闭容器。\n# docker attach --sig-proxy=false $CONTAINER_ID 3. 查看image或container的底层信息（inspect） inspect的对象可以是image、运行中的container和停止的container。\n查看容器的内部IP # docker inspect --format='{\\{.NetworkSettings.IPAddress}}' $CONTAINER_ID 172.17.42.35 （注：由于代码块解析的问题，上面NetworkSettings前面的 \\ 去掉） 4. 删除一个或多个container、image（rm、rmi） 你可能在使用过程中会build或commit许多镜像，无用的镜像需要删除。但删除这些镜像是有一些条件的：\n同一个IMAGE ID可能会有多个TAG（可能还在不同的仓库），首先你要根据这些 image names 来删除标签，当删除最后一个tag的时候就会自动删除镜像； 承上，如果要删除的多个IMAGE NAME在同一个REPOSITORY，可以通过docker rmi 来同时删除剩下的TAG；若在不同Repo则还是需要手动逐个删除TAG； 还存在由这个镜像启动的container时（即便已经停止），也无法删除镜像； TO-DO 如何查看镜像与容器的依存关系\n** 删除容器 ** docker rm 删除所有停止的容器 docker rm $(docker ps -a -q) ** 删除镜像 ** docker rmi 下面是一个完整的示例：\n# docker images \u003c== ubuntu 13.10 195eb90b5349 4 months ago 184.6 MB ubuntu saucy 195eb90b5349 4 months ago 184.6 MB seanlook/ubuntu rm_test 195eb90b5349 4 months ago 184.6 MB 使用195eb90b5349启动、停止一个容器后，删除这个镜像 # docker rmi 195eb90b5349 Error response from daemon: Conflict, cannot delete image 195eb90b5349 because it is tagged in multiple repositories, use -f to force 2014/11/04 14:19:00 Error: failed to remove one or more images 删除seanlook仓库中的tag \u003c== # docker rmi seanlook/ubuntu:rm_test Untagged: seanlook/ubuntu:rm_test 现在删除镜像，还会由于container的存在不能rmi # docker rmi 195eb90b5349 Error response from daemon: Conflict, cannot delete 195eb90b5349 because the container eef3648a6e77 is using it, use -f to force 2014/11/04 14:24:15 Error: failed to remove one or more images 先删除由这个镜像启动的容器 \u003c== # docker rm eef3648a6e77 删除镜像 \u003c== # docker rmi 195eb90b5349 Deleted: 195eb90b534950d334188c3627f860fbdf898e224d8a0a11ec54ff453175e081 Deleted: 209ea56fda6dc2fb013e4d1e40cb678b2af91d1b54a71529f7df0bd867adc961 Deleted: 0f4aac48388f5d65a725ccf8e7caada42f136026c566528a5ee9b02467dac90a Deleted: fae16849ebe23b48f2bedcc08aaabd45408c62b531ffd8d3088592043d5e7364 Deleted: f127542f0b6191e99bb015b672f5cf48fa79d974784ac8090b11aeac184eaaff 注意，上面的删除过程我所举的例子比较特殊——镜像被tag在多个仓库，也有启动过的容器。按照\u003c==指示的顺序进行即可。\n5. docker build 使用此配置生成新的image build命令可以从Dockerfile和上下文来创建镜像： docker build [OPTIONS] PATH | URL | - 上面的PATH或URL中的文件被称作上下文，build image的过程会先把这些文件传送到docker的服务端来进行的。 如果PATH直接就是一个单独的Dockerfile文件则可以不需要上下文；如果URL是一个Git仓库地址，那么创建image的过程中会自动git clone一份到本机的临时目录，它就成为了本次build的上下文。无论指定的PATH是什么，Dockerfile是至关重要的，请参考Dockerfile Reference。 请看下面的例子：\n# cat Dockerfile FROM seanlook/nginx:bash_vim EXPOSE 80 ENTRYPOINT /usr/sbin/nginx -c /etc/nginx/nginx.conf \u0026\u0026 /bin/bash # docker build -t seanlook/nginx:bash_vim_Df . Sending build context to Docker daemon 73.45 MB Sending build context to Docker daemon Step 0 : FROM seanlook/nginx:bash_vim ---\u003e aa8516fa0bb7 Step 1 : EXPOSE 80 ---\u003e Using cache ---\u003e fece07e2b515 Step 2 : ENTRYPOINT /usr/sbin/nginx -c /etc/nginx/nginx.conf \u0026\u0026 /bin/bash ---\u003e Running in e08963fd5afb ---\u003e d9bbd13f5066 Removing intermediate container e08963fd5afb Successfully built d9bbd13f5066 上面的PATH为.，所以在当前目录下的所有文件（不包括.dockerignore中的）将会被tar打包并传送到docker daemon（一般在本机），从输出我们可以到Sending build context...，最后有个Removing intermediate container的过程，可以通过--rm=false来保留容器。 TO-DO docker build github.com/creack/docker-firefox失败。\n6. 给镜像打上标签（tag） tag的作用主要有两点：一是为镜像起一个容易理解的名字，二是可以通过docker tag来重新指定镜像的仓库，这样在push时自动提交到仓库。\n将同一IMAGE_ID的所有tag，合并为一个新的 # docker tag 195eb90b5349 seanlook/ubuntu:rm_test 新建一个tag，保留旧的那条记录 # docker tag Registry/Repos:Tag New_Registry/New_Repos:New_Tag 7. 查看容器的信息container（ps） docker ps命令可以查看容器的CONTAINER ID、NAME、IMAGE NAME、端口开启及绑定、容器启动后执行的COMMNAD。经常通过ps来找到CONTAINER_ID。 docker ps 默认显示当前正在运行中的container docker ps -a 查看包括已经停止的所有容器 docker ps -l 显示最新启动的一个容器（包括已停止的）\n8. 查看容器中正在运行的进程（top） 容器运行时不一定有/bin/bash终端来交互执行top命令，查看container中正在运行的进程，况且还不一定有top命令，这是docker top 就很有用了。实际上在host上使用ps -ef|grep docker也可以看到一组类似的进程信息，把container里的进程看成是host上启动docker的子进程就对了。\n9. 其他命令 docker还有一些如login、cp、logs、export、import、load、kill等不是很常用的命令，比较简单，请参考官网。\n参考 Official Command Line Reference docker中文指南cli-widuu翻译 Docker —— 从入门到实践 Docker基础与高级 ",
+  "wordCount" : "356",
+  "inLanguage": "en",
+  "datePublished": "2014-11-05T16:21:25Z",
+  "dateModified": "2014-11-05T16:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2014/11/docker%E5%B8%B8%E7%94%A8%E7%AE%A1%E7%90%86%E5%91%BD%E4%BB%A4%E4%B8%8B/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      docker常用管理命令（下）
+    </h1>
+    <div class="post-meta"><span title='2014-11-05 16:21:25 +0000 UTC'>November 5, 2014</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>本文承接<a href="http://xgknight.com/2014/10/31/docker-command-best-use-1/">docker专题(2)：docker常用管理命令（上）</a>。</p>
+<h3 id="1-开启停止重启containerstartstoprestart">1. 开启/停止/重启container（start/stop/restart）<a hidden class="anchor" aria-hidden="true" href="#1-开启停止重启containerstartstoprestart">#</a></h3>
+<p>容器可以通过<code>run</code>新建一个来运行，也可以重新<code>start</code>已经停止的container，但<code>start</code>不能够再指定容器启动时运行的指令，因为docker只能有一个前台进程。
+容器stop（或<code>Ctrl+D</code>）时，会在保存当前容器的状态之后退出，下次start时保有上次关闭时更改。而且每次进入<code>attach</code>进去的界面是一样的，与第一次run启动或commit提交的时刻相同。</p>
+<pre tabindex="0"><code>CONTAINER_ID=$(docker start &lt;containner_id&gt;)
+docker stop $CONTAINER_ID
+docker restart $CONTAINER_ID
+</code></pre><p>关于这几个命令可以通过一个完整的实例使用：<a href="http://xgknight.com/2014/11/03/docker-run-container-with-shell-daemon_process/">docker如何创建一个运行后台进程的容器并同时提供shell终端</a>。</p>
+<h3 id="2-连接到正在运行中的containerattach">2. 连接到正在运行中的container（attach）<a hidden class="anchor" aria-hidden="true" href="#2-连接到正在运行中的containerattach">#</a></h3>
+<p>要<code>attach</code>上去的容器必须正在运行，可以同时连接上同一个container来共享屏幕（与<code>screen</code>命令的attach类似）。
+官方文档中说<code>attach</code>后可以通过<code>CTRL-C</code>来detach，但实际上经过我的测试，如果container当前在运行bash，<code>CTRL-C</code>自然是当前行的输入，没有退出；如果container当前正在前台运行进程，如输出nginx的access.log日志，<code>CTRL-C</code>不仅会导致退出容器，而且还stop了。这不是我们想要的，detach的意思按理应该是脱离容器终端，但容器依然运行。好在<code>attach</code>是可以带上<code> --sig-proxy=false</code>来确保<code>CTRL-D</code>或<code>CTRL-C</code>不会关闭容器。</p>
+<!-- raw HTML omitted -->
+<pre tabindex="0"><code># docker attach --sig-proxy=false $CONTAINER_ID
+</code></pre><h3 id="3-查看image或container的底层信息inspect">3. 查看image或container的底层信息（inspect）<a hidden class="anchor" aria-hidden="true" href="#3-查看image或container的底层信息inspect">#</a></h3>
+<p><code>inspect</code>的对象可以是image、运行中的container和停止的container。</p>
+<pre tabindex="0"><code>查看容器的内部IP
+# docker inspect --format=&#39;{\{.NetworkSettings.IPAddress}}&#39; $CONTAINER_ID
+172.17.42.35
+（注：由于代码块解析的问题，上面NetworkSettings前面的 \ 去掉）
+</code></pre><h3 id="4-删除一个或多个containerimagermrmi">4. 删除一个或多个container、image（rm、rmi）<a hidden class="anchor" aria-hidden="true" href="#4-删除一个或多个containerimagermrmi">#</a></h3>
+<p>你可能在使用过程中会<code>build</code>或<code>commit</code>许多镜像，无用的镜像需要删除。但删除这些镜像是有一些条件的：</p>
+<ul>
+<li>同一个<code>IMAGE ID</code>可能会有多个<code>TAG</code>（可能还在不同的仓库），首先你要根据这些 image names 来删除标签，当删除最后一个tag的时候就会自动删除镜像；</li>
+<li>承上，如果要删除的多个<code>IMAGE NAME</code>在同一个<code>REPOSITORY</code>，可以通过<code>docker rmi &lt;image_id&gt;</code>来同时删除剩下的<code>TAG</code>；若在不同Repo则还是需要手动逐个删除<code>TAG</code>；</li>
+<li>还存在由这个镜像启动的container时（即便已经停止），也无法删除镜像；</li>
+</ul>
+<p>TO-DO
+如何查看镜像与容器的依存关系</p>
+<p>** 删除容器 **
+<code>docker rm &lt;container_id/contaner_name&gt;</code></p>
+<pre tabindex="0"><code>删除所有停止的容器
+docker rm $(docker ps -a -q)
+</code></pre><p>** 删除镜像 **
+<code>docker rmi &lt;image_id/image_name ...&gt;</code>
+下面是一个完整的示例：</p>
+<pre tabindex="0"><code># docker images            &lt;==
+ubuntu            13.10        195eb90b5349       4 months ago       184.6 MB
+ubuntu            saucy        195eb90b5349       4 months ago       184.6 MB
+seanlook/ubuntu   rm_test      195eb90b5349       4 months ago       184.6 MB
+
+使用195eb90b5349启动、停止一个容器后，删除这个镜像
+# docker rmi 195eb90b5349
+Error response from daemon: Conflict, cannot delete image 195eb90b5349 because it is 
+tagged in multiple repositories, use -f to force
+2014/11/04 14:19:00 Error: failed to remove one or more images
+
+删除seanlook仓库中的tag     &lt;==
+# docker rmi seanlook/ubuntu:rm_test
+Untagged: seanlook/ubuntu:rm_test
+
+现在删除镜像，还会由于container的存在不能rmi
+# docker rmi 195eb90b5349
+Error response from daemon: Conflict, cannot delete 195eb90b5349 because the 
+ container eef3648a6e77 is using it, use -f to force
+2014/11/04 14:24:15 Error: failed to remove one or more images
+
+先删除由这个镜像启动的容器    &lt;==
+# docker rm eef3648a6e77
+
+删除镜像                    &lt;==
+# docker rmi 195eb90b5349
+Deleted: 195eb90b534950d334188c3627f860fbdf898e224d8a0a11ec54ff453175e081
+Deleted: 209ea56fda6dc2fb013e4d1e40cb678b2af91d1b54a71529f7df0bd867adc961
+Deleted: 0f4aac48388f5d65a725ccf8e7caada42f136026c566528a5ee9b02467dac90a
+Deleted: fae16849ebe23b48f2bedcc08aaabd45408c62b531ffd8d3088592043d5e7364
+Deleted: f127542f0b6191e99bb015b672f5cf48fa79d974784ac8090b11aeac184eaaff
+</code></pre><p>注意，上面的删除过程我所举的例子比较特殊——镜像被tag在多个仓库，也有启动过的容器。按照<code>&lt;==</code>指示的顺序进行即可。</p>
+<h3 id="5-docker-build-path-使用此配置生成新的image">5. docker build <!-- raw HTML omitted --> 使用此配置生成新的image<a hidden class="anchor" aria-hidden="true" href="#5-docker-build-path-使用此配置生成新的image">#</a></h3>
+<p><code>build</code>命令可以从<code>Dockerfile</code>和上下文来创建镜像：
+<code>  docker build [OPTIONS] PATH | URL | -</code>
+上面的<code>PATH</code>或<code>URL</code>中的文件被称作上下文，build image的过程会先把这些文件传送到docker的服务端来进行的。
+如果<code>PATH</code>直接就是一个单独的<code>Dockerfile</code>文件则可以不需要上下文；如果<code>URL</code>是一个Git仓库地址，那么创建image的过程中会自动<code>git clone</code>一份到本机的临时目录，它就成为了本次build的上下文。无论指定的<code>PATH</code>是什么，<code>Dockerfile</code>是至关重要的，请参考<a href="http://docs.docker.com/reference/builder/">Dockerfile Reference</a>。
+请看下面的例子：</p>
+<pre tabindex="0"><code># cat Dockerfile 
+FROM seanlook/nginx:bash_vim
+EXPOSE 80
+ENTRYPOINT /usr/sbin/nginx -c /etc/nginx/nginx.conf &amp;&amp; /bin/bash
+
+# docker build -t seanlook/nginx:bash_vim_Df .
+Sending build context to Docker daemon 73.45 MB
+Sending build context to Docker daemon 
+Step 0 : FROM seanlook/nginx:bash_vim
+ ---&gt; aa8516fa0bb7
+Step 1 : EXPOSE 80
+ ---&gt; Using cache
+ ---&gt; fece07e2b515
+Step 2 : ENTRYPOINT /usr/sbin/nginx -c /etc/nginx/nginx.conf &amp;&amp; /bin/bash
+ ---&gt; Running in e08963fd5afb
+ ---&gt; d9bbd13f5066
+Removing intermediate container e08963fd5afb
+Successfully built d9bbd13f5066
+</code></pre><p>上面的<code>PATH</code>为<code>.</code>，所以在当前目录下的所有文件（不包括<code>.dockerignore</code>中的）将会被<code>tar</code>打包并传送到<code>docker daemon</code>（一般在本机），从输出我们可以到<code>Sending build context...</code>，最后有个<code>Removing intermediate container</code>的过程，可以通过<code>--rm=false</code>来保留容器。
+TO-DO
+<code>docker build github.com/creack/docker-firefox</code>失败。</p>
+<h3 id="6-给镜像打上标签tag">6. 给镜像打上标签（tag）<a hidden class="anchor" aria-hidden="true" href="#6-给镜像打上标签tag">#</a></h3>
+<p>tag的作用主要有两点：一是为镜像起一个容易理解的名字，二是可以通过<code>docker tag</code>来重新指定镜像的仓库，这样在<code>push</code>时自动提交到仓库。</p>
+<pre tabindex="0"><code>将同一IMAGE_ID的所有tag，合并为一个新的
+# docker tag 195eb90b5349 seanlook/ubuntu:rm_test
+
+新建一个tag，保留旧的那条记录
+# docker tag Registry/Repos:Tag New_Registry/New_Repos:New_Tag
+</code></pre><h3 id="7-查看容器的信息containerps">7. 查看容器的信息container（ps）<a hidden class="anchor" aria-hidden="true" href="#7-查看容器的信息containerps">#</a></h3>
+<p><code>docker ps</code>命令可以查看容器的<code>CONTAINER ID</code>、<code>NAME</code>、<code>IMAGE NAME</code>、端口开启及绑定、容器启动后执行的<code>COMMNAD</code>。经常通过<code>ps</code>来找到<code>CONTAINER_ID</code>。
+<code>docker ps</code> 默认显示当前正在运行中的container
+<code>docker ps -a</code> 查看包括已经停止的所有容器
+<code>docker ps -l</code> 显示最新启动的一个容器（包括已停止的）</p>
+<h3 id="8-查看容器中正在运行的进程top">8. 查看容器中正在运行的进程（top）<a hidden class="anchor" aria-hidden="true" href="#8-查看容器中正在运行的进程top">#</a></h3>
+<p>容器运行时不一定有<code>/bin/bash</code>终端来交互执行top命令，查看container中正在运行的进程，况且还不一定有<code>top</code>命令，这是<code>docker top &lt;container_id/container_name&gt;</code>就很有用了。实际上在host上使用<code>ps -ef|grep docker</code>也可以看到一组类似的进程信息，把container里的进程看成是host上启动docker的子进程就对了。</p>
+<h3 id="9-其他命令">9. 其他命令<a hidden class="anchor" aria-hidden="true" href="#9-其他命令">#</a></h3>
+<p>docker还有一些如<code>login</code>、<code>cp</code>、<code>logs</code>、<code>export</code>、<code>import</code>、<code>load</code>、<code>kill</code>等不是很常用的命令，比较简单，请参考官网。</p>
+<h3 id="参考">参考<a hidden class="anchor" aria-hidden="true" href="#参考">#</a></h3>
+<ul>
+<li><a href="http://docs.docker.com/v1.1/reference/commandline/cli/">Official Command Line Reference</a></li>
+<li><a href="http://www.widuu.com/docker/">docker中文指南cli-widuu翻译</a></li>
+<li><a href="http://www.dockerpool.com/static/books/docker_practice/">Docker —— 从入门到实践</a></li>
+<li><a href="http://17173ops.com/2014/10/13/docker%E5%9F%BA%E7%A1%80%E4%B8%8E%E9%AB%98%E7%BA%A7.shtml">Docker基础与高级</a></li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/docker/">docker</a></li>
+      <li><a href="http://xgknight.com/tags/command/">command</a></li>
+      <li><a href="http://xgknight.com/tags/linux/">linux</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

@@ -143,6 +143,81 @@
 
 <article class="post-entry"> 
   <header class="entry-header">
+    <h2>使用sysbench对mysql压力测试
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>sysbench是一个模块化的、跨平台、多线程基准测试工具，主要用于评估测试各种不同系统参数下的数据库负载情况。关于这个项目的详细介绍请看：https://github.com/akopytov/sysbench 。 它主要包括以下几种方式的测试：
+cpu性能 磁盘io性能 调度程序性能 内存分配及传输速度 POSIX线程性能 数据库性能(OLTP基准测试) sysbench的数据库OLTP测试支持MySQL、PostgreSQL、Oracle，目前主要用于Linux操作系统，开源社区已经将sysbench移植到了Windows，并支持SQL Server的基准测试。
+废话不多说，开始。
+1. sysbench安装 mysql版本: mysql-community-server-5.6.29 OS: CentOS 6.7 X86_64 sysbench 0.5相比0.4版本有一些变化，包括oltp测试结合了lua脚本，还多了一些隐藏选项，本文会涉及得到一部分。 目前许多仓库里已编译好的二进制sysbench还是0.4.x版本，不过现在主流也还是github上的0.5，可以从 这里下载0.5版本的rpm包直接安装，不过我选择自己编译，因为只有这个办法是通用的。
+// 先安装编译依赖环境 $ sudo yum install gcc gcc-c&#43;&#43; automake make libtool mysql-community-devel $ cd /tmp &amp;&amp; git clone https://github.com/akopytov/sysbench.git $ cd /tmp/sysbench &amp;&amp; ./autogen.sh $ ./configure --prefix=/usr/local/sysbench-0.5 $ ./make &amp;&amp; sudo make install // 0.5版本需要oltp.lua测试脚本 // 如果是rpm包方式安装的，在 /usr/share/doc/sysbench/tests/db/ 下可找到 $ cd /usr/local/sysbench &amp;&amp; sudo mkdir -p share/tests/db $ cp /tmp/sysbench/sysbench/tests/db/*....</p>
+  </div>
+  <footer class="entry-footer"><span title='2016-03-28 16:32:49 +0000 UTC'>March 28, 2016</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 使用sysbench对mysql压力测试" href="http://xgknight.com/posts/2016/03/%E4%BD%BF%E7%94%A8sysbench%E5%AF%B9mysql%E5%8E%8B%E5%8A%9B%E6%B5%8B%E8%AF%95/"></a>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
+    <h2>记一次Mac mini折腾过程（鼠键共享，更换SSD）
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>从公司网管那捣鼓来一个“遗弃” Mac mini，说其它人觉得用起来太卡，正好我的工作PC( CPU 4×i3，MEM 8G, HDD 500G)软件开多了也觉得有些卡，特别是我使用浏览器的习惯不太好，每次搜索统一结果都要打开好多标签页对比，文章性质的觉得有用想将来记录下来就没关闭页面，一两个星期下来只Chrome使用的内存就达到4G多。不用也浪费，于是就拿Mac mini分摊一下压力。
+刚拿到手时心想得有多不堪配置才使得的Mac mini卡到嫌弃的地步，看了下底面的型号，A1347——这是2014年底出的新款，没有我想象的那么旧，还好。于是找来显示器、鼠键准备开用了（在某宝上买根八字电源线）。
+但是开机密码没有啊！虽然简单重装是个办法，但我还是想看看里面现在是什么样的，杀鸡焉用牛刀。直接Crack root…
+1. 破解Mac root密码 找到这篇文章 http://wowking.blog.51cto.com/1638252/753774 。我们平头百姓手头哪会有刻录的Mac OS光盘，而且也没移动光驱，所以方法一就不考虑了。方法二是单用户模式，毕竟 OS X 也是*nix血统，命令行几个命令倒难不到我。
+可是众所周知，Mac的键盘跟普通键盘是不一样的，开机启动的时候command &#43; S在一般美式键盘下到底能不能进入单用户模式呢？嗯，行的，按下mini的开机按钮之后不断 win &#43; S。进入Single user model之后提示符#root&gt;，逐步输入以下命令：
+# 执行硬盘检测（只读）, 这一步可以省略 /sbin/fsck -y # 加载文件系统（读/写） /sbin/mount -uaw # 删除初始化设置时的OSX生成的隐藏文件”.applesetupdone” rm /var/db/.AppleSetupDone # 重启 reboot 重启后开机画面会指导你创建一个新的管理员账号，然后这个新的账号密码登陆。就是这么简单，接下来删用户抹除一切使用痕迹😄。
+进去之后着实令我窃喜：OS X Yosemite, 2.6 GHZ Intel Core i5, 8G DDR3, Intel Iris 1536 MB, 1TB HDD，就这配置比得上我当前的Win PC了，高兴得捡了块宝似的。优胜美地系统与我自己的Mac Book Pro一样，无缝立马开始用。
+然而面临的一个问题来了，现在2台工作电脑，配有2套鼠标键盘，切换太不方便了。于是我用大腿想了想，嗯，应该有专门的多台电脑间共享鼠键的软件。啪啪啪几下锁定两款Sharemouse、Synergy。
+2. 跨平台共享鼠标键盘-synergy 先来简单说一下Sharemouse，收费，但你懂的，但这东西毕竟用的人少，要分别在在windows和Mac两个平台上找到相同版本的破解版是多么不容易。中间折腾就不说了，成功使用 V2....</p>
+  </div>
+  <footer class="entry-footer"><span title='2016-01-18 16:32:49 +0000 UTC'>January 18, 2016</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 记一次Mac mini折腾过程（鼠键共享，更换SSD）" href="http://xgknight.com/posts/2016/01/%E8%AE%B0%E4%B8%80%E6%AC%A1mac-mini%E6%8A%98%E8%85%BE%E8%BF%87%E7%A8%8B%E9%BC%A0%E9%94%AE%E5%85%B1%E4%BA%AB%E6%9B%B4%E6%8D%A2ssd/"></a>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
+    <h2>生产环境使用 pt-table-checksum 检查MySQL数据一致性
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>公司数据中心从托管机房迁移到阿里云，需要对mysql迁移（Replication）后的数据一致性进行校验，但又不能对生产环境使用造成影响，pt-table-checksum 成为了绝佳也是唯一的检查工具。
+pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、从库的数据是否一致。其原理是在主库执行基于statement的sql语句来生成主库数据块的checksum，把相同的sql语句传递到从库执行，并在从库上计算相同数据块的checksum，最后，比较主从库上相同数据块的checksum值，由此判断主从数据是否一致。检测过程根据唯一索引将表按row切分为块（chunk），以为单位计算，可以避免锁表。检测时会自动判断复制延迟、 master的负载， 超过阀值后会自动将检测暂停，减小对线上服务的影响。
+pt-table-checksum 默认情况下可以应对绝大部分场景，官方说，即使上千个库、上万亿的行，它依然可以很好的工作，这源自于设计很简单，一次检查一个表，不需要太多的内存和多余的操作；必要时，pt-table-checksum 会根据服务器负载动态改变 chunk 大小，减少从库的延迟。
+为了减少对数据库的干预，pt-table-checksum还会自动侦测并连接到从库，当然如果失败，可以指定--recursion-method选项来告诉从库在哪里。它的易用性还体现在，复制若有延迟，在从库 checksum 会暂停直到赶上主库的计算时间点（也通过选项--设定一个可容忍的延迟最大值，超过这个值也认为不一致）。
+为了保证主数据库服务的安全，该工具实现了许多保护措施：
+自动设置 innodb_lock_wait_timeout 为1s，避免引起 默认当数据库有25个以上的并发查询时，pt-table-checksum会暂停。可以设置 --max-load 选项来设置这个阀值 当用 Ctrl&#43;C 停止任务后，工具会正常的完成当前 chunk 检测，下次使用 --resume 选项启动可以恢复继续下一个 chunk 工作过程 直接看 nettedfish 的说明：
+1. 连接到主库：pt工具连接到主库，然后自动发现主库的所有从库。默认采用show full processlist来查找从库，但是这只有在主从实例端口相同的情况下才有效。 3. 查找主库或者从库是否有复制过滤规则：这是为了安全而默认检查的选项。你可以关闭这个检查，但是这可能导致checksum的sql语句要么不会同步到从库，要么到了从库发现从库没有要被checksum的表，这都会导致从库同步卡库。 5. 开始获取表，一个个的计算。 6. 如果是表的第一个chunk，那么chunk-size一般为1000；如果不是表的第一个chunk，那么采用19步中分析出的结果。 7. 检查表结构，进行数据类型转换等，生成checksum的sql语句。 8. 根据表上的索引和数据的分布，选择最合适的split表的方法。 9. 开始checksum表。 10. 默认在chunk一个表之前，先删除上次这个表相关的计算结果。除非–resume。 14. 根据explain的结果，判断chunk的size是否超过了你定义的chunk-size的上限。如果超过了，为了不影响线上性能，这个chunk将被忽略。 15. 把要checksum的行加上for update锁，并计算。 17-18. 把计算结果存储到master_crc master_count列中。 19. 调整下一个chunk的大小。 20. 等待从库追上主库。如果没有延迟备份的从库在运行，最好检查所有的从库，如果发现延迟最大的从库延迟超过max-lag秒，pt工具在这里将暂停。 21. 如果发现主库的max-load超过某个阈值，pt工具在这里将暂停。 22. 继续下一个chunk，直到这个table被chunk完毕。 23-24. 等待从库执行完checksum，便于生成汇总的统计结果。每个表汇总并统计一次。 25-26....</p>
+  </div>
+  <footer class="entry-footer"><span title='2015-12-29 10:21:25 +0000 UTC'>December 29, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 生产环境使用 pt-table-checksum 检查MySQL数据一致性" href="http://xgknight.com/posts/2015/12/%E7%94%9F%E4%BA%A7%E7%8E%AF%E5%A2%83%E4%BD%BF%E7%94%A8-pt-table-checksum-%E6%A3%80%E6%9F%A5mysql%E6%95%B0%E6%8D%AE%E4%B8%80%E8%87%B4%E6%80%A7/"></a>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
+    <h2>使用 Xtrabackup 在线对MySQL做主从复制
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>1. 说明 1.1 xtrabackup mysqldump对于导出10G以下的数据库或几个表，还是适用的，而且更快捷。一旦数据量达到100-500G，无论是对原库的压力还是导出的性能，mysqldump就力不从心了。Percona-Xtrabackup备份工具，是实现MySQL在线热备工作的不二选择，可进行全量、增量、单表备份和还原。（但当数据量更大时，可能需要考虑分库分表，或使用 LVM 快照来加快备份速度了）
+2.2版本 xtrabackup 能对InnoDB和XtraDB存储引擎的数据库非阻塞地备份，innobackupex通过perl封装了一层xtrabackup，对MyISAM的备份通过加表读锁的方式实现。2.3版本 xtrabackup 命令直接支持MyISAM引擎。
+XtraBackup优势 ：
+无需停止数据库进行InnoDB热备 增量备份MySQL 流压缩到传输到其它服务器 能比较容易地创建主从同步 备份MySQL时不会增大服务器负载 1.2 replication 为什么要做主从复制？ 我想这是要在实施以前要想清楚的问题。是为了实现读写分离，减轻主库负载或数据分析？ 为了数据安全，做备份恢复？主从切换做高可用？ 大部分场景下，以上三个问号一主一从都能够解决，而且任何生产环境都建议你至少要有一个从库，假如你的读操作压力特别大，甚至要做一主多从，还可以不同的slave扮演不同的角色，例如使用不同的索引，或者不同的存储引擎，或使用一个小内存server做slave只用于备份。（当然slave太多也会对master的负载和网络带宽造成压力，此时可以考虑级联复制，即 A-&gt;B-&gt;C ）
+还有需要考虑的是，一主一从，一旦做了主从切换，不通过其它HA手段干预的话，业务访问的还是原IP，而且原主库很容易就作废了。于是 主-主 复制就产生了，凭借各自不同的 server-id ，可以避免 “A的变化同步到B，B应用变化又同步到A” 这样循环复制的问题。但建议是，主主复制，其中一个主库强制设置为只读，主从切换后架构依然是可用的。
+复制过程是slave主动向master拉取，而不是master去推的，所以理想情况下做搭建主从时不需要master做出任何改变甚至停服，slave失败也不影响主库。
+复制类型
+基于语句的复制：STATEMENT，在主服务器上执行的SQL语句，在从服务器上执行同样的语句，有可能会由于SQL执行上下文环境不同而是数据不一致，例如调用NOW()函数。MySQL在5.7.7以前默认采用基于语句的复制，在 5.7.7 及以后版本默认改用 row-based。 基于行的复制：ROW，把改变的内容复制过去，而不是把命令在从服务器上执行一遍。从mysql5.0开始支持，能够严格保证数据完全一致，但此时用mysqlbinlog去分析日志就没啥意义。因为任何一条update语句，都会把涉及到的行数据全部set值，所以binlog文件会比较大。 （遇到的一个坑是，迁移时，从库改正了字段默认值定义，但数据在主库更改后，即使产生的新数据默认值是正确的，但基于行的复制依然用不正确的值字段全部更新了） 混合类型的复制: MIXED，默认采用基于语句的复制，一旦发现基于语句的无法精确的复制时，就会采用基于行的复制。 mysql系统库mysql库里面表的日志记录格式需要说明：在通过如INSERT、UPDATE、DELETE、TRUNCATE等方式直接修改数据的语句，使用 binlog_format指定的方式记录，但使用GRANT、ALTER、CREATE、RENAME等改动的mysql库里数据的，会强制使用statement-based方式记录binlog。
+可以在线修改二进制日志类型，如SET SESSION binlog_format=MIXED;，需要SUPER权限。
+复制类型还可以分为 异步复制和半同步复制。 通常没说明指的都是异步，即主库执行完Commit后，在主库写入Binlog日志后即可成功返回客户端，无需等等Binlog日志传送给从库，一旦主库宕机，有可能会丢失日志。而半同步复制，是等待其中一个从库也接收到Binlog事务并成功写入Relay Log之后，才返回Commit操作成功给客户端；如此半同步就保证了事务成功提交后至少有两份日志记录，一份在主库Binlog上，另一份在从库的Relay Log上，从而进一步保证数据完整性；半同步复制很大程度取决于主从网络RTT（往返时延），以插件 semisync_master/semisync_slave 形式存在。 原理 (1) master将改变记录到二进制日志(binary log)中（这些记录叫做二进制日志事件，binary log events）； (2) slave将master的binary log events拷贝到它的中继日志(relay log)； (3) slave重做中继日志中的事件，将改变反映它自己的数据。 该过程的第一部分就是master记录二进制日志。在每个事务更新数据完成之前，master在二进制日志记录这些改变。MySQL将事务串行的写入二进制日志，即使事务中的语句都是交叉执行的。在事件写入二进制日志完成后，master通知存储引擎提交事务。 下一步将master的binary log拷贝到它自己的中继日志。首先，slave开始一个工作线程——I/O线程。I/O线程在master上打开一个普通的连接，请求从指定日志文件的指定位置之后的日志内容，然后开始binlog dump process。Binlog dump process从master的二进制日志中读取事件，如果已经跟上master，它会睡眠并等待master产生新的事件。I/O线程将这些事件写入中继日志。 SQL slave thread（SQL从线程）处理该过程的最后一步。SQL线程从中继日志读取事件，并重放其中的事件而更新slave的数据，使其与master中的数据一致。只要该线程与I/O线程保持一致，中继日志通常会位于OS的缓存中，所以中继日志的开销很小。 此外，在master中也有一个工作线程：和其它MySQL的连接一样，slave在master中打开一个连接也会使得master开始一个线程。复制过程有一个很重要的限制——复制在slave上是串行化的，也就是说master上的并行更新操作不能在slave上并行操作。...</p>
+  </div>
+  <footer class="entry-footer"><span title='2015-12-14 10:21:25 +0000 UTC'>December 14, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 使用 Xtrabackup 在线对MySQL做主从复制" href="http://xgknight.com/posts/2015/12/%E4%BD%BF%E7%94%A8-xtrabackup-%E5%9C%A8%E7%BA%BF%E5%AF%B9mysql%E5%81%9A%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6/"></a>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
     <h2>南山南
     </h2>
   </header>
@@ -270,85 +345,6 @@ PC端的功能稍微复杂一点，但界面简直就是qq的副本，没了qq�
   </div>
   <footer class="entry-footer"><span title='2015-07-07 00:49:31 +0000 UTC'>July 7, 2015</span>&nbsp;·&nbsp;admin</footer>
   <a class="entry-link" aria-label="post link to EC的第一天" href="http://xgknight.com/posts/2015/07/ec%E7%9A%84%E7%AC%AC%E4%B8%80%E5%A4%A9/"></a>
-</article>
-
-<article class="post-entry"> 
-  <header class="entry-header">
-    <h2>解答一个关于日志系统的思路
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>在一个群里看到一个面试题，试着去解答一下，毕竟正好花时间了解过日志这方面的内容。
-希望能达到的使用场景：
-在写业务逻辑时也能进行结构化的log, 并且log被转移到一个数据库， 一个UI前端以这个log数据库为支持， 可以可视化各种指标， 并且保留未来可以对指标进行alarm的可能性
-希望从两个方面考虑这个问题：
-技术通路实现。 在每一步会用些什么技术? 一些核心组件比如log采集和log数据库有哪些已有方案， 是否有优劣？ 从运维角度看， 这套系统可能在哪些方面有需要考量的地方。 比如log采集是否会影响业务进程？ log数据库的运维可能遇到哪些问题？ 可以看出问题提出者比较在意解决这些问题过程中的思维方式和学习能力，弱化实践经验的要求。
-首先根据要求确认一下要达到效果：
-log日志采集 log存储 log展示 alarm报警(附加) 1 确定日志流向/架构 因为一开始脑海里也不知道原型是怎样的，就是以前用过linux自带的rsyslog功能感觉很类似：在日志服务器上通过配置rsyslog存入mysql的插件，而其它的各个服务器上默认rsyslog都是开启的，修改conf的系统日志、mail、cron等不输出到本地，而是指向mysql数据库。前端通过loganalyzer从数据库获取数据，图形化显示（简陋到不想说了。。。），但是显示的柱形图/饼图没有什么意义，默认对系统messages处理比较方便，要记录nginx或业务逻辑的log还需做其它额外操作。
-但rsyslog并不是一无是处，它的整个架构特别是消息队列的设计，跟后面要讲的许多分布式日志系统是很像的。所以脑海里日记采集的原型出来了：
-业务逻辑的日志输出到文件file，服务上的日志采集客户端agent实时监控这个logfile，作为输入；日志中心服务器server接受来自agent的消息，存入后端数据库。另有一个UI从这个数据库取得数据显示，并提供搜索、统计图表。 然而有以下几个问题需要考虑，这也就是为什么出现各种开源解决方案： 日志产生数量过大，不能及时发送到server怎么办 可以使用队列或redis来缓冲 日志中心服务器server故障怎么办，肯定不能丢失日志，即可靠性 有的解决办法是对 log server 做集群，通过zookeeper来同步配置；有的是在agent上本地暂时存放，等恢复后重新传输，redis就可以承担这个角色 考虑到这个日志平台的可扩展性，新的日志来源input不一定是file，比如rsyslog 至少需要支持常用的input 是否支持过滤功能 filter可以在日志发送之前就把不匹配的日志内容排除掉 log结构化 收集的日志初始是一长字符串，为了后面使用方便，需要将日志结构化存储（后面会有说明） 存储采用关系型数据库对海量日志存储，性能肯定很大问题 log日志存储没有一致性的要求，甚至可以说一条日志根本就没意义，而是需要通过大量的日志，通过分析、比较趋势具备用处。于是日志的存储各显大招，主流有两种：hadoop分布式文件系统HDFS，elasticsearch（后面简称es）全文搜索引擎，它们都具备很强的可伸缩性和多节点高可用性 由于存储方式的不同，数据分析与展示也就有各自的阵营 HDFS一般采用MapReduce处理数据，es既可以通过其丰富的插件显示或搜索数据，也可以通过推荐使用的kibana来展示数据 总结下来大致流程图如下：
-2 log结构化 当然可能你一直存在这样一个疑问：log的结构化问题处理
-代码里logger的内容大概是timestamp,log_level,module,message… ，一下是nginx的access示例：
-172.16.30.88 - [08/Jun/2015:00:08:38 &#43;0800] &#34;POST /notice/statement_findStatementVByPage.htm?1433637553824 HTTP/1.1&#34; 200 114 &#34;http://service.tp-link.net/&#34; &#34;Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)&#34; 处理这条非结构话的字符串或消息，无非就是在它发送到日志中心之前格式化，像最简单的rsyslog处理方法是通过数据库表字段Mapping来存放，而es则是通过编写Grok规则来结构化，如将IP、日期、请求方式、响应状态码、响应时间等组合成json字符串。（然而Grok写起来是非常痛苦的，以至于官方github上专门维护了一份通用规则表）...</p>
-  </div>
-  <footer class="entry-footer"><span title='2015-06-09 16:32:49 +0000 UTC'>June 9, 2015</span>&nbsp;·&nbsp;admin</footer>
-  <a class="entry-link" aria-label="post link to 解答一个关于日志系统的思路" href="http://xgknight.com/posts/2015/06/%E8%A7%A3%E7%AD%94%E4%B8%80%E4%B8%AA%E5%85%B3%E4%BA%8E%E6%97%A5%E5%BF%97%E7%B3%BB%E7%BB%9F%E7%9A%84%E6%80%9D%E8%B7%AF/"></a>
-</article>
-
-<article class="post-entry"> 
-  <header class="entry-header">
-    <h2>Linux进阶培训-tplink
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>本文没啥实际内容，是给新人做linux培训的第二课进阶篇，主要着眼于体系，把一些工具混个眼熟。
-目录 Linux磁盘管理(进阶) Linux内存管理 Linux进程管理(进阶) Linux网络管理(进阶) Linux系统状态监控与调优 常见服务 Linux安全策略 其他 Linux磁盘管理（进阶） ext4文件系统格式 Inode、block、superblock、MBR VFS LVM pv、lv、vg lvdisplay、lvextend、vgdisplay、pvcreate… RAID raid0、raid1、raid5、raid10 r/w速度、磁盘利用率、安全性的权衡 磁盘IO性能 dd、iostat、iotop I/O等待 Linux内存管里（基础） 物理内存与虚拟内存 Swap space，分页存取 buffer与cache区分 内存监控命令 free、vmstat /proc文件系统 Linux进程管理（进阶） 进程与线程 进程优先级 进程监控命令 pidstat、lsof strace（系统调用跟踪） 后台进程 Ctrl&#43;z、jobs、bg、fg、&amp;、nohup screen Linux的网络管理 一些概念
-防火墙
-路由/网关
-子网掩码
-网络接口（参数）
-MAC
-TCP/IP协议
-应用层协议
-Linux网络管理 iptables
-Linux网络管理 主机网络流量监控 iftop、iptraf、sar tcpdump抓包 wireshark数据包分析工具 ##Linux网络管理
-iproute2 ip、ss Linux系统状态监控与调优 一些工具 sar、sysstat perf、logwatch 一些配置文件 sysctl.conf limits.conf Linux安全策略 禁止root直接登录 锁定不使用的账号 关闭ipv6 启用防火墙 定期检查日志 … Linux常见服务 tcp_wrappers SSH postfix FTP NFS/Samba DNS Apache/nginx … Linux其他 Linux开机过程分析 pam模块解读lsmod 编译make、ldd、ldconfig、gcc、gdb ACL Linux集群 内核模块 linux编程 … 本文链接地址：http://xgknight....</p>
-  </div>
-  <footer class="entry-footer"><span title='2014-10-06 16:32:49 +0000 UTC'>October 6, 2014</span>&nbsp;·&nbsp;admin</footer>
-  <a class="entry-link" aria-label="post link to Linux进阶培训-tplink" href="http://xgknight.com/posts/2014/10/linux%E8%BF%9B%E9%98%B6%E5%9F%B9%E8%AE%AD-tplink/"></a>
-</article>
-
-<article class="post-entry"> 
-  <header class="entry-header">
-    <h2>
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>title: apache&#43;3tomcat&#43;jk&#43;memcached集群环境搭建 date: 2014-10-29 10:21:25 updated: 2015-03-26 00:46:23 tags: [apache, tomcat, 集群, mod_jk, memcached, centos] categories: [Linux, Web_Server] 注意本文不讨论原理，只讲述具体的搭建过程，而且步骤都经过了整理，否则过程可能会出现其他异常，请自行google。apache与tomcat整合的方式除了jk之外，使用apache自带的mod_ajp_proxy模块也可以很方便的完成。 先来看一下架构图： 属于正式环境中原session复制方案的改进。
-1. 所需软件包 jrrt-3.1.2-1.6.0-linux-x64.bin（或jdk1.6.0_33） jvm httpd-2.2.26.tar.gz web服务器，处理静态资源 apache-tomcat-6.0.32.tar.gz 应用服务器，Servlet容器处理动态请求 tomcat-connectors-1.2.30-src.tar.gz apache与tomcat整合插件mod_jk.so tomcat-native.tar.gz APR加速tomcat，提高线程并发能力。使用tomcat自带版本。 memcached-session-manager 使用msm解决多tomcat集群时session同步问题所需jar包 asm-3.2.jar, couchbase-client-1.2.2.jar, kryo-1.04.jar, kryo-serializers-0.11.jar msm-kryo-serializer-1.6.5.jar memcached-session-manager-1.6.5.jar memcached-session-manager-tc6-1.6.5.jar minlog-1.2.jar, reflectasm-1.01.jar spymemcached-2.10.2.jar 2. 安装过程 2.1 JDK 下载将JRockit二进制安装文件，赋予可执行权限
-# pwd /apps/test/java # chmod o&#43;x jrrt*.bin # ./jrrt-3.1.2-1.6.0-linux-x64.bin 可不必为整个linux环境设置JAVA_HOME=&#34;/apps/test/java/jrrt-3.1.2-1.6.0&#34;，在tomcat中指定即可。
-2.2 编译安装apache 因为tomcat-native依赖于apr，所以这里先直接从 httpd-2.2.26/srclib 目录下安装apache自带的apr和apr-util。
-[root@cachets httpd-2.2.26]# pwd /apps/test/soft_src/httpd-2.2.26 [root@test httpd-2....</p>
-  </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
-</article>
-
-<article class="post-entry"> 
-  <header class="entry-header">
-    <h2>
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>title: 我为何厌恶百度的产品 date: 2015-02-28 15:21:25 updated: 2015-02-28 16:46:23 tags: feelings categories: Feel 今天因为使用百度云同步盘出错，导致我的文件永远丢失，忍无可忍又给“百度倾听”发了条牢骚。
-事情是这样的，我在 MarkdownPad2 修改最近写的3篇文章，文章正好在百度云同步盘的同步目录下，因为一直养成了一边编辑一边Ctrl&#43;S保存的习惯，难道由于这3篇文章反复修改，百度云同步盘竟然支撑不住？弹出窗口大概是说同步出错，需要重启应用（近期出现过好几次），随手点了个确定，MarkdownPad2提示我当前编辑的文件不存在，是否继续保留在窗口，反正文章修改完了，也没多想，duang，悲剧发生了，两个小星期的成果都不见了。还在失落当中……
-为什么叫“又”呢，因为在去年1月份的时候也在手机上使用过百度云同步盘，不记得是同步什么，也不是文件丢失。Android版有一个“仅在wifi下同步”的选项，像我这种3G流量哪够同步文件使用啊，当时还觉得挺贴心的，开着应用在后台一上午，中午吃饭拿起手看时，尼玛提示我本月流量已超50多M，也给百度意见反馈写了200多字的声讨书，结果几天后回复的内容不知是从哪摘抄的一段无价值的内容。还有一次是登录注销的问题，20多天后才回复邮件，结尾还不忘带上小米的广告，简直让用户抓狂。（邮件正文就不贴了，每每出现这样的问题都十分狂躁，不少脏话）
-我想这样的同步工具最多对于百度是个附属产品，并不能带来多大收益，在团队投入上并不尽心。给我自己的教诲是，选择产品或工具，不能因为公司名声大而就给予信任，一个公司能够把一件事情做好了就会迎来不错的口碑，选择它的主打产品。说到这里不得不继续吐槽了，百度搜索应该是它的命脉了，但对于我用习惯了google来说，没有条件不得不使用百度搜索，索引到的结果，唉~ 大！惊！失！色！
-如此种种，不得不让我怀疑百度其他产品的使用问题。
-无奈 Dropbox 在国内被封，也只有偶尔在家用电脑时打开VPN才能访问，被百度云同步盘伤过那么多次心之后，感觉再也不会用了，还是老老实实挂VPN吧，虽麻烦但也免去了不必要的担忧。</p>
-  </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
 </article>
 <footer class="page-footer">
   <nav class="pagination">

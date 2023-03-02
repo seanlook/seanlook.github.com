@@ -128,6 +128,39 @@
 
 <article class="post-entry tag-entry"> 
   <header class="entry-header">
+    <h2>小心MySQL的隐式类型转换陷阱
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>1. 隐式类型转换实例 今天生产库上突然出现MySQL线程数告警，IOPS很高，实例会话里面出现许多类似下面的sql：(修改了相关字段和值)
+SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233) 用 explain 看了下扫描行数和索引选择情况：
+mysql&gt;explain SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233); &#43;------&#43;---------------&#43;---------&#43;--------&#43;--------------------------------&#43;---------------&#43;------------&#43;--------&#43;--------&#43;------------------------------------&#43; | id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra | &#43;------&#43;---------------&#43;---------&#43;--------&#43;--------------------------------&#43;---------------&#43;------------&#43;--------&#43;--------&#43;------------------------------------&#43; | 1 | SIMPLE | t_tb1 | ref | uid_type_frid,idx_corpid_qq1id | uid_type_frid | 8 | const | 1386 | Using index condition; Using where | &#43;------&#43;---------------&#43;---------&#43;--------&#43;--------------------------------&#43;---------------&#43;------------&#43;--------&#43;--------&#43;------------------------------------&#43; 共返回 1 行记录,花费 11....</p>
+  </div>
+  <footer class="entry-footer"><span title='2016-05-05 16:32:49 +0000 UTC'>May 5, 2016</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 小心MySQL的隐式类型转换陷阱" href="http://xgknight.com/posts/2016/05/%E5%B0%8F%E5%BF%83mysql%E7%9A%84%E9%9A%90%E5%BC%8F%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E9%99%B7%E9%98%B1/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>MySQL数字类型int与tinyint、float与decimal如何选择
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>最近在准备给开发做一个mysql数据库开发规范方面培训，一步一步来，结合在生产环境发现的数据库方面的问题，从几个常用的数据类型说起。
+int、tinyint与bigint 它们都是（精确）整型数据类型，但是占用字节数和表达的范围不同。首先没有这个表就说不过去了：
+Type Storage Minimum Value Maximum Value (Bytes) (Signed/Unsigned) (Signed/Unsigned) TINYINT 1 -128 127 0 255 SMALLINT 2 -32768 32767 0 65535 MEDIUMINT 3 -8388608 8388607 0 16777215 INT 4 -2147483648 2147483647 0 4294967295 BIGINT 8 -9223372036854775808 9223372036854775807 0 18446744073709551615 只需要知道对应类型占多少字节就能推算出范围了，比如int占 4 bytes,即4*8=32bits，大约10位数字，也能理解为什么int默认显示位数是11。
+遇到比较多的是tinyint和bigint，tinyint一般用于存放status,type这种数值小的数据，不够用时可能会用smallint。bigint一般用于自增主键。
+为了避免数据库被过度设计，布尔、枚举类型也采用tinyint。
+还有一点也是经常被提到的关于 int(M) 中M的理解，int型数据无论是int(4)还是int(11)，都已经占用了 4 bytes 存储空间，M表示的只是显示宽度(display width, max value 255)，并不是定义int的长度。
+例如：
+mysql&gt; CREATE TABLE `tc_integer` ( `f_id` bigint(20) PRIMARY KEY AUTO_INCREMENT, `f_type` tinyint, `f_flag` tinyint(1), `f_num` smallint(5) unsigned ZEROFILL ) ENGINE=InnoDB DEFAULT CHARSET=utf8; mysql&gt; desc tc_integer; &#43;----------------&#43;-------------------------------&#43;------&#43;-----&#43;---------&#43;----------------&#43; | Field | Type | Null | Key | Default | Extra | &#43;----------------&#43;-------------------------------&#43;------&#43;-----&#43;---------&#43;----------------&#43; | f_id | bigint(20) | NO | PRI | NULL | auto_increment | | f_type | tinyint(4) | YES | | NULL | | | f_flag | tinyint(1) | YES | | NULL | | | f_num | smallint(5) unsigned zerofill | YES | | NULL | | &#43;----------------&#43;-------------------------------&#43;------&#43;-----&#43;---------&#43;----------------&#43; 4 rows in set (0....</p>
+  </div>
+  <footer class="entry-footer"><span title='2016-04-29 16:32:49 +0000 UTC'>April 29, 2016</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to MySQL数字类型int与tinyint、float与decimal如何选择" href="http://xgknight.com/posts/2016/04/mysql%E6%95%B0%E5%AD%97%E7%B1%BB%E5%9E%8Bint%E4%B8%8Etinyintfloat%E4%B8%8Edecimal%E5%A6%82%E4%BD%95%E9%80%89%E6%8B%A9/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
     <h2>MySQL字符数据类型char与varchar的区别
     </h2>
   </header>
@@ -196,6 +229,95 @@ cpu性能 磁盘io性能 调度程序性能 内存分配及传输速度 POSIX线
   </div>
   <footer class="entry-footer"><span title='2016-03-28 16:32:49 +0000 UTC'>March 28, 2016</span>&nbsp;·&nbsp;admin</footer>
   <a class="entry-link" aria-label="post link to 使用sysbench对mysql压力测试" href="http://xgknight.com/posts/2016/03/%E4%BD%BF%E7%94%A8sysbench%E5%AF%B9mysql%E5%8E%8B%E5%8A%9B%E6%B5%8B%E8%AF%95/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>生产环境使用 pt-table-checksum 检查MySQL数据一致性
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>公司数据中心从托管机房迁移到阿里云，需要对mysql迁移（Replication）后的数据一致性进行校验，但又不能对生产环境使用造成影响，pt-table-checksum 成为了绝佳也是唯一的检查工具。
+pt-table-checksum 是 Percona-Toolkit 的组件之一，用于检测MySQL主、从库的数据是否一致。其原理是在主库执行基于statement的sql语句来生成主库数据块的checksum，把相同的sql语句传递到从库执行，并在从库上计算相同数据块的checksum，最后，比较主从库上相同数据块的checksum值，由此判断主从数据是否一致。检测过程根据唯一索引将表按row切分为块（chunk），以为单位计算，可以避免锁表。检测时会自动判断复制延迟、 master的负载， 超过阀值后会自动将检测暂停，减小对线上服务的影响。
+pt-table-checksum 默认情况下可以应对绝大部分场景，官方说，即使上千个库、上万亿的行，它依然可以很好的工作，这源自于设计很简单，一次检查一个表，不需要太多的内存和多余的操作；必要时，pt-table-checksum 会根据服务器负载动态改变 chunk 大小，减少从库的延迟。
+为了减少对数据库的干预，pt-table-checksum还会自动侦测并连接到从库，当然如果失败，可以指定--recursion-method选项来告诉从库在哪里。它的易用性还体现在，复制若有延迟，在从库 checksum 会暂停直到赶上主库的计算时间点（也通过选项--设定一个可容忍的延迟最大值，超过这个值也认为不一致）。
+为了保证主数据库服务的安全，该工具实现了许多保护措施：
+自动设置 innodb_lock_wait_timeout 为1s，避免引起 默认当数据库有25个以上的并发查询时，pt-table-checksum会暂停。可以设置 --max-load 选项来设置这个阀值 当用 Ctrl&#43;C 停止任务后，工具会正常的完成当前 chunk 检测，下次使用 --resume 选项启动可以恢复继续下一个 chunk 工作过程 直接看 nettedfish 的说明：
+1. 连接到主库：pt工具连接到主库，然后自动发现主库的所有从库。默认采用show full processlist来查找从库，但是这只有在主从实例端口相同的情况下才有效。 3. 查找主库或者从库是否有复制过滤规则：这是为了安全而默认检查的选项。你可以关闭这个检查，但是这可能导致checksum的sql语句要么不会同步到从库，要么到了从库发现从库没有要被checksum的表，这都会导致从库同步卡库。 5. 开始获取表，一个个的计算。 6. 如果是表的第一个chunk，那么chunk-size一般为1000；如果不是表的第一个chunk，那么采用19步中分析出的结果。 7. 检查表结构，进行数据类型转换等，生成checksum的sql语句。 8. 根据表上的索引和数据的分布，选择最合适的split表的方法。 9. 开始checksum表。 10. 默认在chunk一个表之前，先删除上次这个表相关的计算结果。除非–resume。 14. 根据explain的结果，判断chunk的size是否超过了你定义的chunk-size的上限。如果超过了，为了不影响线上性能，这个chunk将被忽略。 15. 把要checksum的行加上for update锁，并计算。 17-18. 把计算结果存储到master_crc master_count列中。 19. 调整下一个chunk的大小。 20. 等待从库追上主库。如果没有延迟备份的从库在运行，最好检查所有的从库，如果发现延迟最大的从库延迟超过max-lag秒，pt工具在这里将暂停。 21. 如果发现主库的max-load超过某个阈值，pt工具在这里将暂停。 22. 继续下一个chunk，直到这个table被chunk完毕。 23-24. 等待从库执行完checksum，便于生成汇总的统计结果。每个表汇总并统计一次。 25-26....</p>
+  </div>
+  <footer class="entry-footer"><span title='2015-12-29 10:21:25 +0000 UTC'>December 29, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 生产环境使用 pt-table-checksum 检查MySQL数据一致性" href="http://xgknight.com/posts/2015/12/%E7%94%9F%E4%BA%A7%E7%8E%AF%E5%A2%83%E4%BD%BF%E7%94%A8-pt-table-checksum-%E6%A3%80%E6%9F%A5mysql%E6%95%B0%E6%8D%AE%E4%B8%80%E8%87%B4%E6%80%A7/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>使用 Xtrabackup 在线对MySQL做主从复制
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>1. 说明 1.1 xtrabackup mysqldump对于导出10G以下的数据库或几个表，还是适用的，而且更快捷。一旦数据量达到100-500G，无论是对原库的压力还是导出的性能，mysqldump就力不从心了。Percona-Xtrabackup备份工具，是实现MySQL在线热备工作的不二选择，可进行全量、增量、单表备份和还原。（但当数据量更大时，可能需要考虑分库分表，或使用 LVM 快照来加快备份速度了）
+2.2版本 xtrabackup 能对InnoDB和XtraDB存储引擎的数据库非阻塞地备份，innobackupex通过perl封装了一层xtrabackup，对MyISAM的备份通过加表读锁的方式实现。2.3版本 xtrabackup 命令直接支持MyISAM引擎。
+XtraBackup优势 ：
+无需停止数据库进行InnoDB热备 增量备份MySQL 流压缩到传输到其它服务器 能比较容易地创建主从同步 备份MySQL时不会增大服务器负载 1.2 replication 为什么要做主从复制？ 我想这是要在实施以前要想清楚的问题。是为了实现读写分离，减轻主库负载或数据分析？ 为了数据安全，做备份恢复？主从切换做高可用？ 大部分场景下，以上三个问号一主一从都能够解决，而且任何生产环境都建议你至少要有一个从库，假如你的读操作压力特别大，甚至要做一主多从，还可以不同的slave扮演不同的角色，例如使用不同的索引，或者不同的存储引擎，或使用一个小内存server做slave只用于备份。（当然slave太多也会对master的负载和网络带宽造成压力，此时可以考虑级联复制，即 A-&gt;B-&gt;C ）
+还有需要考虑的是，一主一从，一旦做了主从切换，不通过其它HA手段干预的话，业务访问的还是原IP，而且原主库很容易就作废了。于是 主-主 复制就产生了，凭借各自不同的 server-id ，可以避免 “A的变化同步到B，B应用变化又同步到A” 这样循环复制的问题。但建议是，主主复制，其中一个主库强制设置为只读，主从切换后架构依然是可用的。
+复制过程是slave主动向master拉取，而不是master去推的，所以理想情况下做搭建主从时不需要master做出任何改变甚至停服，slave失败也不影响主库。
+复制类型
+基于语句的复制：STATEMENT，在主服务器上执行的SQL语句，在从服务器上执行同样的语句，有可能会由于SQL执行上下文环境不同而是数据不一致，例如调用NOW()函数。MySQL在5.7.7以前默认采用基于语句的复制，在 5.7.7 及以后版本默认改用 row-based。 基于行的复制：ROW，把改变的内容复制过去，而不是把命令在从服务器上执行一遍。从mysql5.0开始支持，能够严格保证数据完全一致，但此时用mysqlbinlog去分析日志就没啥意义。因为任何一条update语句，都会把涉及到的行数据全部set值，所以binlog文件会比较大。 （遇到的一个坑是，迁移时，从库改正了字段默认值定义，但数据在主库更改后，即使产生的新数据默认值是正确的，但基于行的复制依然用不正确的值字段全部更新了） 混合类型的复制: MIXED，默认采用基于语句的复制，一旦发现基于语句的无法精确的复制时，就会采用基于行的复制。 mysql系统库mysql库里面表的日志记录格式需要说明：在通过如INSERT、UPDATE、DELETE、TRUNCATE等方式直接修改数据的语句，使用 binlog_format指定的方式记录，但使用GRANT、ALTER、CREATE、RENAME等改动的mysql库里数据的，会强制使用statement-based方式记录binlog。
+可以在线修改二进制日志类型，如SET SESSION binlog_format=MIXED;，需要SUPER权限。
+复制类型还可以分为 异步复制和半同步复制。 通常没说明指的都是异步，即主库执行完Commit后，在主库写入Binlog日志后即可成功返回客户端，无需等等Binlog日志传送给从库，一旦主库宕机，有可能会丢失日志。而半同步复制，是等待其中一个从库也接收到Binlog事务并成功写入Relay Log之后，才返回Commit操作成功给客户端；如此半同步就保证了事务成功提交后至少有两份日志记录，一份在主库Binlog上，另一份在从库的Relay Log上，从而进一步保证数据完整性；半同步复制很大程度取决于主从网络RTT（往返时延），以插件 semisync_master/semisync_slave 形式存在。 原理 (1) master将改变记录到二进制日志(binary log)中（这些记录叫做二进制日志事件，binary log events）； (2) slave将master的binary log events拷贝到它的中继日志(relay log)； (3) slave重做中继日志中的事件，将改变反映它自己的数据。 该过程的第一部分就是master记录二进制日志。在每个事务更新数据完成之前，master在二进制日志记录这些改变。MySQL将事务串行的写入二进制日志，即使事务中的语句都是交叉执行的。在事件写入二进制日志完成后，master通知存储引擎提交事务。 下一步将master的binary log拷贝到它自己的中继日志。首先，slave开始一个工作线程——I/O线程。I/O线程在master上打开一个普通的连接，请求从指定日志文件的指定位置之后的日志内容，然后开始binlog dump process。Binlog dump process从master的二进制日志中读取事件，如果已经跟上master，它会睡眠并等待master产生新的事件。I/O线程将这些事件写入中继日志。 SQL slave thread（SQL从线程）处理该过程的最后一步。SQL线程从中继日志读取事件，并重放其中的事件而更新slave的数据，使其与master中的数据一致。只要该线程与I/O线程保持一致，中继日志通常会位于OS的缓存中，所以中继日志的开销很小。 此外，在master中也有一个工作线程：和其它MySQL的连接一样，slave在master中打开一个连接也会使得master开始一个线程。复制过程有一个很重要的限制——复制在slave上是串行化的，也就是说master上的并行更新操作不能在slave上并行操作。...</p>
+  </div>
+  <footer class="entry-footer"><span title='2015-12-14 10:21:25 +0000 UTC'>December 14, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 使用 Xtrabackup 在线对MySQL做主从复制" href="http://xgknight.com/posts/2015/12/%E4%BD%BF%E7%94%A8-xtrabackup-%E5%9C%A8%E7%BA%BF%E5%AF%B9mysql%E5%81%9A%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>MySQL备份命令mysqldump参数说明与示例
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>1. 语法选项说明 -h, --host=name 主机名
+-P[ port_num], --port=port_num 用于连接MySQL服务器的的TCP/IP端口号
+--master-data 这个选项可以把binlog的位置和文件名添加到输出中，如果等于1，将会打印成一个CHANGE MASTER命令；如果等于2，会加上注释前缀。并且这个选项会自动打开--lock-all-tables，除非同时设置了--single-transaction（这种情况下，全局读锁只会在开始dump的时候加上一小段时间，不要忘了阅读--single-transaction的部分）。在任何情况下，所有日志中的操作都会发生在导出的准确时刻。这个选项会自动关闭--lock-tables。
+-x, --lock-all-tables 锁定所有库中所有的表。这是通过在整个dump的过程中持有全局读锁来实现的。会自动关闭--single-transaction和--lock-tables。
+--single-transaction 通过将导出操作封装在一个事务内来使得导出的数据是一个一致性快照。只有当表使用支持MVCC的存储引擎（目前只有InnoDB）时才可以工作；其他引擎不能保证导出是一致的。当导出开启了--single-transaction选项时，要确保导出文件有效（正确的表数据和二进制日志位置），就要保证没有其他连接会执行如下语句：ALTER TABLE, DROP TABLE, RENAME TABLE, TRUNCATE TABLE，这会导致一致性快照失效。这个选项开启后会自动关闭--lock-tables。
+-l, --lock-tables 对所有表加读锁。（默认是打开的，用--skip-lock-tables来关闭，上面的选项会把关闭-l选项）
+-F, --flush-logs 在开始导出前刷新服务器的日志文件。注意，如果你一次性导出很多数据库（使用 -databases=或--all-databases选项），导出每个库时都会触发日志刷新。例外是当使用了--lock-all-tables或--master-data时：日志只会被刷新一次，那个时候所有表都会被锁住。所以如果你希望你的导出和日志刷新发生在同一个确定的时刻，你需要使用--lock-all-tables，或者--master-data配合--flush-logs。
+--delete-master-logs 备份完成后删除主库上的日志。这个选项会自动打开``–master-data`。
+--opt 同-add-drop-table, --add-locks, --create-options, --quick, --extended-insert, --lock-tables, --set-charset, --disable-keys。（默认已开启，--skip-opt关闭表示这些选项保持它的默认值）应该给你为读入一个MySQL服务器的尽可能最快的导出，--compact差不多是禁用上面的选项。
+-q, --quick
+不缓冲查询，直接导出至stdout。（默认打开，用--skip-quick来关闭）该选项用于转储大的表。
+--set-charset 将SET NAMES default_character_set加到输出中。该选项默认启用。要想禁用SET NAMES语句，使用--skip-set-charset。
+--add-drop-tables 在每个CREATE TABLE语句前添加DROP TABLE语句。默认开启。
+--add-locks 在每个表导出之前增加LOCK TABLES并且之后UNLOCK TABLE。(为了使得更快地插入到MySQL)。默认开启。
+--create-option 在CREATE TABLE语句中包括所有MySQL表选项。默认开启，使用--skip-create-options来关闭。
+-e, --extended-insert 使用全新多行INSERT语法，默认开启（给出更紧缩并且更快的插入语句）
+-d, --no-data 不写入表的任何行信息。如果你只想得到一个表的结构的导出，这是很有用的。
+--add-drop-database 在create数据库之前先DROP DATABASE，默认关闭，所以一般在导入时需要保证数据库已存在。...</p>
+  </div>
+  <footer class="entry-footer"><span title='2014-12-05 20:21:25 +0000 UTC'>December 5, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to MySQL备份命令mysqldump参数说明与示例" href="http://xgknight.com/posts/2014/12/mysql%E5%A4%87%E4%BB%BD%E5%91%BD%E4%BB%A4mysqldump%E5%8F%82%E6%95%B0%E8%AF%B4%E6%98%8E%E4%B8%8E%E7%A4%BA%E4%BE%8B/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>MySQL增量备份与恢复实例
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>小量的数据库可以每天进行完整备份，因为这也用不了多少时间，但当数据库很大时，就不太可能每天进行一次完整备份了，这时候就可以使用增量备份。增量备份的原理就是使用了mysql的binlog日志。 本次操作的MySQL版本为5.5.40 for Linux (x86_64)。
+增量备份要确保打开了二进制日志，参考mysql的日志系统：
+mysql&gt; show variables like &#39;%log_bin%&#39;; 首先对pak数据库做一个完整备份：
+$ mysqldump -h localhost -upak -ppwd -P3306 --master-data=2 --single-transaction --opt pak &gt; pak_bak_full.sql 这时候就会得到一个全备文件pak_bak_full.sql。mysqldump操作会导致滚动一次log，假设新的binlog文件是mysql-bin.000002。
+1. 模拟插入数据和误操作 a. 在pak库的某个表插入一些数据，然后执行flush logs命令。这时将会产生一个新的二进制日志文件mysql-bin.000003，mysql-bin.000002则保存了全备过后的所有更改，既增加记录的操作也保存在了mysql-bin.00002中。
+b. 再在pak库中的t_user表中增加两条记录，然后误删除t_user表。t_user中增加记录的操作和删除表的操作都记录在mysql-bin.000003中。
+2. 开始恢复 恢复过程不要记录日志：
+mysql &gt; set global sql_log_bin=0; 3. 首先导入全备数据 $ mysql -h localhost -upak -ppwd &lt; pak_bak_full.sql 或 mysql&gt; source /path/backup/pak_bak_full.sql 我们也可以看到全备时的binlog位置：
+head -50 backup-file.sql |grep &#39;CHANGE MASTER&#39; -- CHANGE MASTER TO MASTER_LOG_FILE=&#39;mysql-bin.000001&#39;, MASTER_LOG_POS=4321; 查看当前所在二进制日志中的位置：
+mysql&gt; show master status; 根据上面两个position能大概确定需要完整恢复哪几个binlog文件。...</p>
+  </div>
+  <footer class="entry-footer"><span title='2014-12-05 09:21:25 +0000 UTC'>December 5, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to MySQL增量备份与恢复实例" href="http://xgknight.com/posts/2014/12/mysql%E5%A2%9E%E9%87%8F%E5%A4%87%E4%BB%BD%E4%B8%8E%E6%81%A2%E5%A4%8D%E5%AE%9E%E4%BE%8B/"></a>
 </article>
 <footer class="page-footer">
   <nav class="pagination">

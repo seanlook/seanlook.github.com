@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>在Linux上使用logwatch分析监控日志文件 | Sean Note</title>
+<meta name="keywords" content="logwatch, linux, 日志">
+<meta name="description" content="1. 介绍 在维护Linux服务器时，经常需要查看系统中各种服务的日志，以检查服务器的运行状态。 如登陆历史、邮件、软件安装等日志。系统管理员一个个去检查会十分不方便；且大多时候，这会是一种被动的检查，即只有在发现系统运行异常时才会想到去查看日志以获取异常的信息。那么如何主动、集中的分析这些日志，并产生报告，定时发送给管理员就会显得十分重要。
+logwatch 是一款用 Perl 语言编写的开源日志解析分析器。它能对原始的日志文件进行解析并转换成结构化格式的文档，也能根据您的使用情况和需求来定制报告。logwatch 的主要目的是生成更易于使用的日志摘要，并不是用来对日志进行实时的处理和监控的。正因为如此，logwatch 通常被设定好时间和频率的自动定时任务来调度运行或者是有需要日志处理的时候从命令行里手动运行。一旦日志报告生成，logwatch 可以通过电子邮件把这报告发送给您，您可以把它保存成文件或者直接显示在屏幕上。
+Logwatch 报告的详细程度和报告覆盖范围是完全可定制化的。Logwatch 的日志处理引擎也是可扩展的，从某种意义上来说，如果您想在一个新的应用程序中使用 logwatch 功能的话，只需要为这个应用程序的日志文件编写一个日志处理脚本（使用 Perl 语言），然后挂接到 logwatch 上就行。
+logwatch 有一点不好的就是，在它生成的报告中没有详细的时间戳信息，而原来的日志文件中是存在的。您只能知道被记录下来的一段时间之内的特定事件，如果想要知道精确的时间点的信息，就不得不去查看原日志文件了。
+2. 安装与配置说明 2.1 安装 无论在Debian系还是Redhat系上，安装logwatch都非常简单：
+# apt-get install logwatch //Debian、Ubuntu.etc # yum install logwatch -y //Redhat、Centos.etc 以下内容基于 CentOS 6.x，其余系统相差不大。
+2.2 配置 2.2.1 配置文件说明 安装后的目录文件说明： /usr/share/logwatch default.conf/ # 配置目录 logwatch.conf # 主配置文件，收件人，级别等 logfiles/ # 定义待分析服务的日志文件组路径，相对于/var/log(*.conf) services/ # 自定义需分析日志的Service目录(*.conf) scripts/ # 可执行脚本 logwatch.pl # 启动分析的perl脚本，/usr/sbin/logwatch的源链接 logfiles/ # 可包含多个logwatch日志文件组的子目录，对应的日志服务运行的时候，子目录下的脚本会自动被调用 services/ # logwatch日志服务的过滤脚本，一一对应 shared/ # 可被多个logwatch日志服务引用的脚本 dist.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2014/08/%E5%9C%A8linux%E4%B8%8A%E4%BD%BF%E7%94%A8logwatch%E5%88%86%E6%9E%90%E7%9B%91%E6%8E%A7%E6%97%A5%E5%BF%97%E6%96%87%E4%BB%B6/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="在Linux上使用logwatch分析监控日志文件" />
+<meta property="og:description" content="1. 介绍 在维护Linux服务器时，经常需要查看系统中各种服务的日志，以检查服务器的运行状态。 如登陆历史、邮件、软件安装等日志。系统管理员一个个去检查会十分不方便；且大多时候，这会是一种被动的检查，即只有在发现系统运行异常时才会想到去查看日志以获取异常的信息。那么如何主动、集中的分析这些日志，并产生报告，定时发送给管理员就会显得十分重要。
+logwatch 是一款用 Perl 语言编写的开源日志解析分析器。它能对原始的日志文件进行解析并转换成结构化格式的文档，也能根据您的使用情况和需求来定制报告。logwatch 的主要目的是生成更易于使用的日志摘要，并不是用来对日志进行实时的处理和监控的。正因为如此，logwatch 通常被设定好时间和频率的自动定时任务来调度运行或者是有需要日志处理的时候从命令行里手动运行。一旦日志报告生成，logwatch 可以通过电子邮件把这报告发送给您，您可以把它保存成文件或者直接显示在屏幕上。
+Logwatch 报告的详细程度和报告覆盖范围是完全可定制化的。Logwatch 的日志处理引擎也是可扩展的，从某种意义上来说，如果您想在一个新的应用程序中使用 logwatch 功能的话，只需要为这个应用程序的日志文件编写一个日志处理脚本（使用 Perl 语言），然后挂接到 logwatch 上就行。
+logwatch 有一点不好的就是，在它生成的报告中没有详细的时间戳信息，而原来的日志文件中是存在的。您只能知道被记录下来的一段时间之内的特定事件，如果想要知道精确的时间点的信息，就不得不去查看原日志文件了。
+2. 安装与配置说明 2.1 安装 无论在Debian系还是Redhat系上，安装logwatch都非常简单：
+# apt-get install logwatch //Debian、Ubuntu.etc # yum install logwatch -y //Redhat、Centos.etc 以下内容基于 CentOS 6.x，其余系统相差不大。
+2.2 配置 2.2.1 配置文件说明 安装后的目录文件说明： /usr/share/logwatch default.conf/ # 配置目录 logwatch.conf # 主配置文件，收件人，级别等 logfiles/ # 定义待分析服务的日志文件组路径，相对于/var/log(*.conf) services/ # 自定义需分析日志的Service目录(*.conf) scripts/ # 可执行脚本 logwatch.pl # 启动分析的perl脚本，/usr/sbin/logwatch的源链接 logfiles/ # 可包含多个logwatch日志文件组的子目录，对应的日志服务运行的时候，子目录下的脚本会自动被调用 services/ # logwatch日志服务的过滤脚本，一一对应 shared/ # 可被多个logwatch日志服务引用的脚本 dist." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2014/08/%E5%9C%A8linux%E4%B8%8A%E4%BD%BF%E7%94%A8logwatch%E5%88%86%E6%9E%90%E7%9B%91%E6%8E%A7%E6%97%A5%E5%BF%97%E6%96%87%E4%BB%B6/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2014-08-23T01:21:25+00:00" />
+<meta property="article:modified_time" content="2014-08-23T01:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="在Linux上使用logwatch分析监控日志文件"/>
+<meta name="twitter:description" content="1. 介绍 在维护Linux服务器时，经常需要查看系统中各种服务的日志，以检查服务器的运行状态。 如登陆历史、邮件、软件安装等日志。系统管理员一个个去检查会十分不方便；且大多时候，这会是一种被动的检查，即只有在发现系统运行异常时才会想到去查看日志以获取异常的信息。那么如何主动、集中的分析这些日志，并产生报告，定时发送给管理员就会显得十分重要。
+logwatch 是一款用 Perl 语言编写的开源日志解析分析器。它能对原始的日志文件进行解析并转换成结构化格式的文档，也能根据您的使用情况和需求来定制报告。logwatch 的主要目的是生成更易于使用的日志摘要，并不是用来对日志进行实时的处理和监控的。正因为如此，logwatch 通常被设定好时间和频率的自动定时任务来调度运行或者是有需要日志处理的时候从命令行里手动运行。一旦日志报告生成，logwatch 可以通过电子邮件把这报告发送给您，您可以把它保存成文件或者直接显示在屏幕上。
+Logwatch 报告的详细程度和报告覆盖范围是完全可定制化的。Logwatch 的日志处理引擎也是可扩展的，从某种意义上来说，如果您想在一个新的应用程序中使用 logwatch 功能的话，只需要为这个应用程序的日志文件编写一个日志处理脚本（使用 Perl 语言），然后挂接到 logwatch 上就行。
+logwatch 有一点不好的就是，在它生成的报告中没有详细的时间戳信息，而原来的日志文件中是存在的。您只能知道被记录下来的一段时间之内的特定事件，如果想要知道精确的时间点的信息，就不得不去查看原日志文件了。
+2. 安装与配置说明 2.1 安装 无论在Debian系还是Redhat系上，安装logwatch都非常简单：
+# apt-get install logwatch //Debian、Ubuntu.etc # yum install logwatch -y //Redhat、Centos.etc 以下内容基于 CentOS 6.x，其余系统相差不大。
+2.2 配置 2.2.1 配置文件说明 安装后的目录文件说明： /usr/share/logwatch default.conf/ # 配置目录 logwatch.conf # 主配置文件，收件人，级别等 logfiles/ # 定义待分析服务的日志文件组路径，相对于/var/log(*.conf) services/ # 自定义需分析日志的Service目录(*.conf) scripts/ # 可执行脚本 logwatch.pl # 启动分析的perl脚本，/usr/sbin/logwatch的源链接 logfiles/ # 可包含多个logwatch日志文件组的子目录，对应的日志服务运行的时候，子目录下的脚本会自动被调用 services/ # logwatch日志服务的过滤脚本，一一对应 shared/ # 可被多个logwatch日志服务引用的脚本 dist."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "在Linux上使用logwatch分析监控日志文件",
+      "item": "http://xgknight.com/posts/2014/08/%E5%9C%A8linux%E4%B8%8A%E4%BD%BF%E7%94%A8logwatch%E5%88%86%E6%9E%90%E7%9B%91%E6%8E%A7%E6%97%A5%E5%BF%97%E6%96%87%E4%BB%B6/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "在Linux上使用logwatch分析监控日志文件",
+  "name": "在Linux上使用logwatch分析监控日志文件",
+  "description": "1. 介绍 在维护Linux服务器时，经常需要查看系统中各种服务的日志，以检查服务器的运行状态。 如登陆历史、邮件、软件安装等日志。系统管理员一个个去检查会十分不方便；且大多时候，这会是一种被动的检查，即只有在发现系统运行异常时才会想到去查看日志以获取异常的信息。那么如何主动、集中的分析这些日志，并产生报告，定时发送给管理员就会显得十分重要。\nlogwatch 是一款用 Perl 语言编写的开源日志解析分析器。它能对原始的日志文件进行解析并转换成结构化格式的文档，也能根据您的使用情况和需求来定制报告。logwatch 的主要目的是生成更易于使用的日志摘要，并不是用来对日志进行实时的处理和监控的。正因为如此，logwatch 通常被设定好时间和频率的自动定时任务来调度运行或者是有需要日志处理的时候从命令行里手动运行。一旦日志报告生成，logwatch 可以通过电子邮件把这报告发送给您，您可以把它保存成文件或者直接显示在屏幕上。\nLogwatch 报告的详细程度和报告覆盖范围是完全可定制化的。Logwatch 的日志处理引擎也是可扩展的，从某种意义上来说，如果您想在一个新的应用程序中使用 logwatch 功能的话，只需要为这个应用程序的日志文件编写一个日志处理脚本（使用 Perl 语言），然后挂接到 logwatch 上就行。\nlogwatch 有一点不好的就是，在它生成的报告中没有详细的时间戳信息，而原来的日志文件中是存在的。您只能知道被记录下来的一段时间之内的特定事件，如果想要知道精确的时间点的信息，就不得不去查看原日志文件了。\n2. 安装与配置说明 2.1 安装 无论在Debian系还是Redhat系上，安装logwatch都非常简单：\n# apt-get install logwatch //Debian、Ubuntu.etc # yum install logwatch -y //Redhat、Centos.etc 以下内容基于 CentOS 6.x，其余系统相差不大。\n2.2 配置 2.2.1 配置文件说明 安装后的目录文件说明： /usr/share/logwatch default.conf/ # 配置目录 logwatch.conf # 主配置文件，收件人，级别等 logfiles/ # 定义待分析服务的日志文件组路径，相对于/var/log(*.conf) services/ # 自定义需分析日志的Service目录(*.conf) scripts/ # 可执行脚本 logwatch.pl # 启动分析的perl脚本，/usr/sbin/logwatch的源链接 logfiles/ # 可包含多个logwatch日志文件组的子目录，对应的日志服务运行的时候，子目录下的脚本会自动被调用 services/ # logwatch日志服务的过滤脚本，一一对应 shared/ # 可被多个logwatch日志服务引用的脚本 dist.",
+  "keywords": [
+    "logwatch", "linux", "日志"
+  ],
+  "articleBody": "1. 介绍 在维护Linux服务器时，经常需要查看系统中各种服务的日志，以检查服务器的运行状态。 如登陆历史、邮件、软件安装等日志。系统管理员一个个去检查会十分不方便；且大多时候，这会是一种被动的检查，即只有在发现系统运行异常时才会想到去查看日志以获取异常的信息。那么如何主动、集中的分析这些日志，并产生报告，定时发送给管理员就会显得十分重要。\nlogwatch 是一款用 Perl 语言编写的开源日志解析分析器。它能对原始的日志文件进行解析并转换成结构化格式的文档，也能根据您的使用情况和需求来定制报告。logwatch 的主要目的是生成更易于使用的日志摘要，并不是用来对日志进行实时的处理和监控的。正因为如此，logwatch 通常被设定好时间和频率的自动定时任务来调度运行或者是有需要日志处理的时候从命令行里手动运行。一旦日志报告生成，logwatch 可以通过电子邮件把这报告发送给您，您可以把它保存成文件或者直接显示在屏幕上。\nLogwatch 报告的详细程度和报告覆盖范围是完全可定制化的。Logwatch 的日志处理引擎也是可扩展的，从某种意义上来说，如果您想在一个新的应用程序中使用 logwatch 功能的话，只需要为这个应用程序的日志文件编写一个日志处理脚本（使用 Perl 语言），然后挂接到 logwatch 上就行。\nlogwatch 有一点不好的就是，在它生成的报告中没有详细的时间戳信息，而原来的日志文件中是存在的。您只能知道被记录下来的一段时间之内的特定事件，如果想要知道精确的时间点的信息，就不得不去查看原日志文件了。\n2. 安装与配置说明 2.1 安装 无论在Debian系还是Redhat系上，安装logwatch都非常简单：\n# apt-get install logwatch //Debian、Ubuntu.etc # yum install logwatch -y //Redhat、Centos.etc 以下内容基于 CentOS 6.x，其余系统相差不大。\n2.2 配置 2.2.1 配置文件说明 安装后的目录文件说明： /usr/share/logwatch default.conf/ # 配置目录 logwatch.conf # 主配置文件，收件人，级别等 logfiles/ # 定义待分析服务的日志文件组路径，相对于/var/log(*.conf) services/ # 自定义需分析日志的Service目录(*.conf) scripts/ # 可执行脚本 logwatch.pl # 启动分析的perl脚本，/usr/sbin/logwatch的源链接 logfiles/ # 可包含多个logwatch日志文件组的子目录，对应的日志服务运行的时候，子目录下的脚本会自动被调用 services/ # logwatch日志服务的过滤脚本，一一对应 shared/ # 可被多个logwatch日志服务引用的脚本 dist.conf/ logfiles/ services/ lib/ 默认情况下使用的是/usr/share/logwatch/default.conf/logwatch.conf作为主配置文件，但在/etc/logwatch/conf/logwatch.conf中的存在配置选项会覆盖前一个（/usr/share/logwatch下的logwatch.conf还是会起作用，比如在/etc/logwatch的logwatch.conf中没有的选项）。但优先级最高的是在执行命令行中指定的选项。\n在/etc/logwatch下也存在一个与/usr/share/logwatch类似的目录结构，可以在这里添加自定义的监控日志信息。\n从上面的目录结构划分大概可以了解到 logwatch 的原理：logwatch 首先要知道针对哪一个服务, 从这个服务中得到需要处理的 log 文件信息, 然后这个文件送给过滤脚本处理，之后把处理后格式化的信息展现出。内部细节请看第3篇参考。\n2.2.2 编辑配置 在/usr/share/doc/logwatch-7.3.6/HOWTO-Customize-LogWatch文件中有这里的详细的配置说明。\n个人还是习惯在/etc/logwatch/下管理配置文件，但又不太希望同时两个配置文件生效，所以对/usr/share/logwatch/default.conf/logwatch.conf备份，然后软链接/etc/logwatch/conf/logwatch.conf：\nln -s /usr/share/logwatch/default.conf/logwatch.conf /etc/logwatch/conf/logwatch.conf 试着执行logwatch --service sshd --print感受一下处理的结果。接下来修改/etc/logwatch/conf/logwatch.conf文件的默认配置来做些个性化设置。\n修改日志分析级别\nDetail = “Detail” 配置指令控制着 logwatch 报告的详细程度。它可以是个正整数，也可以是分别代表着10、5和0数字的 High、Med、Low 几个选项。这里设置成High。（配置文件中是不区分大小写的）\n指定报告收件人\nMailTo = youremailaddress@yourdomain.com MailFrom = youremailaddress@yourdomain.com MailTo指定logwatch日志报告接收人，要把一份报告发送给多个用户，只需要把他们的邮件地址用空格或逗号隔开，但是logwatch认为你已经配置好本地邮件服务器（sendmail或postfix），并能正确传递给用户邮箱。\nMailFrom，顾名思义，指定发件人。邮件地址可以说完整的收件人地址，也可以是服务器上的本地用户如root（有的邮件服务器不支持显示发件人别名）。\n指定发送邮件的客户端\nmailer = \"sendmail -t\" 默认采用的是sendmail（不是sendmail服务器），而且一般没什么问题。在我的环境下有点特殊，邮件服务器必须通过smtp认证才能发送邮件，不支持匿名和其他本地MTA投递的邮件，而sendmail我一直没有找到设置smtp用户和密码认证的地方（知道的烦请告知），所以就改用了mailer = \"mailx -t\"，然后在/etc/mail.rc中设置from、smtp、smtp-auth-user、smtp-auth-password、smtp-auth参数，但使用mailx带来的问题是后面设置邮件报告格式为html时，无法设置header信息从而foxmail不能解析html正文。尝试了 sendEmail 也没很好的解决。\n大部分人情况可能没这么复杂，其实就是一个发件客户端的功能，网上得知有 mutt 结合 msmtp 可以解决该问题：\n# yum install -y mutt //mutt其实可以不安装 # tar jxvf msmtp-1.4.16.tar.bz2 \u0026\u0026 cd msmtp-1.4.16 # ./configure \u0026\u0026 make \u0026\u0026 make install # vi ~/.msmtprc account default host your.smtp-server.com from username@smtp-server.com auth login user username password your_auth_pwd logfile ~/msmtp.log # 如果使用mutt发送，还需要设置~/.muttrc 将 mailer 改成mailer = \"msmtp -t\"。\n输出格式\nOutput = 默认不指定输出格式（plain text）,系统管理员通过邮件客户端（如foxmail）看到的邮件内容是文本形式，比较简单、节省带宽；可以指定为html，此时看到的是可点击链接的友好的页面。\n当同时设定了Save = /tmp/logwatch时，便不会发送邮件报告了，将会根据Output指定的格式保存到一个Save文件中。\n另外在有的文章里指定Format选项，经过本人试验在7.3.6版本中无效。\n收集日志的范围\nRange = Range配置指令定义了生成 logwatch 报告的时间段信息。这个指令通常可选的值是 Yesterday、Today、All。当作用了Rang = All时，Archive = yes 这个指令项也必须配置上，那么所有的已存档的日志文件 (比如，/var/log/maillog、/var/log/maillog-20150111)都会被处理到。\n如果我们是通过 crontab 每天收集的话，可以只报告昨天或今天的日志情况。\n收集哪些服务的日志\nService = Service = . . . Service选项指定想要监控的一个或多个服务。在/usr/share/logwatch/scripts/services目录下列出的服务都能被监控，它们已经涵盖了重要的系统服务（例如：pam,secure,iptables,syslogd 等），也涵盖了一些像 sudo、sshd、http、fail2ban、samba等主流的应用服务。如果您想添加新的服务到列表中，得编写一个相应的日志处理 Perl 脚本，并把它放在这个目录中。 对于一个综合日志分析工具，logwatch推荐大多数人使用Service = \"All\"，然后通过继续添加Service = \"-service_name\" 等来去掉那些不监控的日志。当然在服务器上，并不是所有script下的服务都有启动，有些并没有日志。\n命令行指定logwatch选项\n如果您不想个性化 /etc/logwatch/conf/logwatch.conf，您可以不修改此文件让其默认，然后在命令行里运行如下所示的命令：\n# logwatch --detail 10 --mailto youremailaddress@yourdomain.com --range today \\ \u003e --service sshd --service postfix --service zz-disk_space --service -zz-network \\ \u003e --output mail logwatch.conf完整示例\nLogDir = /var/log TmpDir = /var/cache/logwatch Print = No Range = yesterday Detail = High MailTo = zhouxiao@example.com.net MailFrom = itsection@example.com.net mailer = \"msmtp -t\" Output = html Service = All Service = \"-zz-network\" Service = \"-zz-sys\" Service = \"-eximstats\" 3. 扩展 3.1 cron daily 我们可以看到在 crontab 定时任务设定目录下存在/etc/cron.daily/0logwatch：\n#!/bin/bash DailyReport=`grep -e \"^[[:space:]]*DailyReport[[:space:]]*=[[:space:]]*\" /usr/share/logwatch/default.conf/logwatch.conf | head -n1 | sed -e \"s|^\\s*DailyReport\\s*=\\s*||\"` if [ \"$DailyReport\" != \"No\" ] \u0026\u0026 [ \"$DailyReport\" != \"no\" ] then logwatch fi 如果在logwatch.conf中显式设置了选项DailyReport = No，则会取消logwatch每日执行任务。如果你要修改cron.daily的执行时间，可以删掉这个0logwatch然后添加到/etc/crontab里，或者修改/etc/anacrontab的START_HOURS_RANGE。\n所以 logwatch 的工作不是监控日志异常后及时报警的工具，因为默认它是每天一封整合的邮件，并不具有及时性（安装perl的CPAN模块后可以更精确的控制logwatch时间，详见第一份参考）。\n3.2 定制自己要监控的日志 用一个简单的例子介绍自定义logwatch的配置方法。\n首先创建logwatch日志文件组 /etc/logwatch/conf/logfiles/test.conf：\nLogFile = /path/to/your/logfile LogFile = /path/to/your/second/logfile 然后创建logwatch服务配置文件 /etc/logwatch/conf/services/test.conf：\nTitle = test title # 日志文件里的标题 LogFile = test # logwatch日志文件组的名字，通常是对应的配置文件的文件名部分 创建logwatch服务过滤器脚本 /etc/logwatch/scripts/services/test：\n#!/bin/bash grep -i ERROR 上面的脚本会从日志文件里过滤出包含ERROR的行。最后，为新建的脚本添加执行权限:\nchmod +x /etc/logwatch/scripts/services/test 参考\nLinux 系统中使用 logwatch 监控日志文件 （英文）\nLogWatch Introduction\nManaging your log files\nLogwatch简单配置教程\n",
+  "wordCount" : "390",
+  "inLanguage": "en",
+  "datePublished": "2014-08-23T01:21:25Z",
+  "dateModified": "2014-08-23T01:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2014/08/%E5%9C%A8linux%E4%B8%8A%E4%BD%BF%E7%94%A8logwatch%E5%88%86%E6%9E%90%E7%9B%91%E6%8E%A7%E6%97%A5%E5%BF%97%E6%96%87%E4%BB%B6/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      在Linux上使用logwatch分析监控日志文件
+    </h1>
+    <div class="post-meta"><span title='2014-08-23 01:21:25 +0000 UTC'>August 23, 2014</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><h1 id="1-介绍">1. 介绍<a hidden class="anchor" aria-hidden="true" href="#1-介绍">#</a></h1>
+<p>在维护Linux服务器时，经常需要查看系统中各种服务的日志，以检查服务器的运行状态。 如登陆历史、邮件、软件安装等日志。系统管理员一个个去检查会十分不方便；且大多时候，这会是一种被动的检查，即只有在发现系统运行异常时才会想到去查看日志以获取异常的信息。那么如何主动、集中的分析这些日志，并产生报告，定时发送给管理员就会显得十分重要。</p>
+<p>logwatch 是一款用 Perl 语言编写的开源日志解析分析器。它能对原始的日志文件进行解析并转换成结构化格式的文档，也能根据您的使用情况和需求来定制报告。logwatch 的主要目的是生成更易于使用的日志摘要，并不是用来对日志进行实时的处理和监控的。正因为如此，logwatch 通常被设定好时间和频率的自动定时任务来调度运行或者是有需要日志处理的时候从命令行里手动运行。一旦日志报告生成，logwatch 可以通过电子邮件把这报告发送给您，您可以把它保存成文件或者直接显示在屏幕上。</p>
+<p>Logwatch 报告的详细程度和报告覆盖范围是完全可定制化的。Logwatch 的日志处理引擎也是可扩展的，从某种意义上来说，如果您想在一个新的应用程序中使用 logwatch 功能的话，只需要为这个应用程序的日志文件编写一个日志处理脚本（使用 Perl 语言），然后挂接到 logwatch 上就行。</p>
+<p>logwatch 有一点不好的就是，在它生成的报告中没有详细的时间戳信息，而原来的日志文件中是存在的。您只能知道被记录下来的一段时间之内的特定事件，如果想要知道精确的时间点的信息，就不得不去查看原日志文件了。</p>
+<h1 id="2-安装与配置说明">2. 安装与配置说明<a hidden class="anchor" aria-hidden="true" href="#2-安装与配置说明">#</a></h1>
+<h2 id="21-安装">2.1 安装<a hidden class="anchor" aria-hidden="true" href="#21-安装">#</a></h2>
+<p>无论在Debian系还是Redhat系上，安装logwatch都非常简单：</p>
+<pre><code># apt-get install logwatch     //Debian、Ubuntu.etc
+# yum install logwatch -y       //Redhat、Centos.etc
+</code></pre>
+<!-- raw HTML omitted -->
+<p>以下内容基于 CentOS 6.x，其余系统相差不大。</p>
+<h2 id="22-配置">2.2 配置<a hidden class="anchor" aria-hidden="true" href="#22-配置">#</a></h2>
+<h3 id="221-配置文件说明">2.2.1 配置文件说明<a hidden class="anchor" aria-hidden="true" href="#221-配置文件说明">#</a></h3>
+<p>安装后的目录文件说明：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/logwatch-dir-structure.jpg" alt="logwatch-dir-structure"  />
+</p>
+<pre tabindex="0"><code>/usr/share/logwatch
+    default.conf/     # 配置目录
+        logwatch.conf   # 主配置文件，收件人，级别等
+        logfiles/       # 定义待分析服务的日志文件组路径，相对于/var/log(*.conf)
+        services/       # 自定义需分析日志的Service目录(*.conf)
+    scripts/          # 可执行脚本
+        logwatch.pl     # 启动分析的perl脚本，/usr/sbin/logwatch的源链接
+        logfiles/       # 可包含多个logwatch日志文件组的子目录，对应的日志服务运行的时候，子目录下的脚本会自动被调用
+        services/       # logwatch日志服务的过滤脚本，一一对应
+        shared/         # 可被多个logwatch日志服务引用的脚本
+    dist.conf/
+        logfiles/
+        services/
+    lib/
+</code></pre><p>默认情况下使用的是<code>/usr/share/logwatch/default.conf/logwatch.conf</code>作为主配置文件，但在<code>/etc/logwatch/conf/logwatch.conf</code>中的存在配置选项会覆盖前一个（<code>/usr/share/logwatch</code>下的<code>logwatch.conf</code>还是会起作用，比如在<code>/etc/logwatch</code>的<code>logwatch.conf</code>中没有的选项）。但优先级最高的是在执行命令行中指定的选项。</p>
+<p>在<code>/etc/logwatch</code>下也存在一个与<code>/usr/share/logwatch</code>类似的目录结构，可以在这里添加自定义的监控日志信息。</p>
+<p>从上面的目录结构划分大概可以了解到 logwatch 的原理：logwatch 首先要知道针对哪一个服务, 从这个服务中得到需要处理的 log 文件信息, 然后这个文件送给过滤脚本处理，之后把处理后格式化的信息展现出。内部细节请看第3篇参考。</p>
+<h3 id="222-编辑配置">2.2.2 编辑配置<a hidden class="anchor" aria-hidden="true" href="#222-编辑配置">#</a></h3>
+<p>在<code>/usr/share/doc/logwatch-7.3.6/HOWTO-Customize-LogWatch</code>文件中有这里的详细的配置说明。</p>
+<p>个人还是习惯在<code>/etc/logwatch/</code>下管理配置文件，但又不太希望同时两个配置文件生效，所以对<code>/usr/share/logwatch/default.conf/logwatch.conf</code>备份，然后软链接<code>/etc/logwatch/conf/logwatch.conf</code>：</p>
+<pre><code>ln -s /usr/share/logwatch/default.conf/logwatch.conf /etc/logwatch/conf/logwatch.conf
+</code></pre>
+<p>试着执行<code>logwatch --service sshd --print</code>感受一下处理的结果。接下来修改<code>/etc/logwatch/conf/logwatch.conf</code>文件的默认配置来做些个性化设置。</p>
+<p><strong>修改日志分析级别</strong></p>
+<pre><code>Detail = &lt;Low, Med, High, or a number&gt;
+</code></pre>
+<p>“Detail” 配置指令控制着 logwatch 报告的详细程度。它可以是个正整数，也可以是分别代表着10、5和0数字的 High、Med、Low 几个选项。这里设置成<code>High</code>。（配置文件中是不区分大小写的）</p>
+<p><strong>指定报告收件人</strong></p>
+<pre><code>MailTo = youremailaddress@yourdomain.com
+
+MailFrom = youremailaddress@yourdomain.com
+</code></pre>
+<p><code>MailTo</code>指定logwatch日志报告接收人，要把一份报告发送给多个用户，只需要把他们的邮件地址用空格或逗号隔开，但是logwatch认为你已经配置好本地邮件服务器（sendmail或postfix），并能正确传递给用户邮箱。</p>
+<p><code>MailFrom</code>，顾名思义，指定发件人。邮件地址可以说完整的收件人地址，也可以是服务器上的本地用户如root（有的邮件服务器不支持显示发件人别名）。</p>
+<p><strong>指定发送邮件的客户端</strong></p>
+<pre><code>mailer = &quot;sendmail -t&quot;
+</code></pre>
+<p>默认采用的是sendmail（不是sendmail服务器），而且一般没什么问题。在我的环境下有点特殊，邮件服务器必须通过smtp认证才能发送邮件，不支持匿名和其他本地MTA投递的邮件，而sendmail我一直没有找到设置smtp用户和密码认证的地方（知道的烦请告知），所以就改用了<code>mailer = &quot;mailx -t&quot;</code>，然后在<code>/etc/mail.rc</code>中设置<code>from</code>、<code>smtp</code>、<code>smtp-auth-user</code>、<code>smtp-auth-password</code>、<code>smtp-auth</code>参数，但使用mailx带来的问题是后面设置邮件报告格式为html时，无法设置header信息从而foxmail不能解析html正文。尝试了 <a href="http://blog.csdn.net/leshami/article/details/8314570">sendEmail</a> 也没很好的解决。</p>
+<p>大部分人情况可能没这么复杂，其实就是一个发件客户端的功能，网上得知有 mutt 结合 <a href="http://sourceforge.net/projects/msmtp/files/msmtp/1.4.16/msmtp-1.4.16.tar.bz2/download">msmtp</a> 可以解决该问题：</p>
+<pre><code># yum install -y mutt       //mutt其实可以不安装
+# tar jxvf msmtp-1.4.16.tar.bz2 &amp;&amp; cd msmtp-1.4.16
+# ./configure &amp;&amp; make &amp;&amp; make install
+
+# vi ~/.msmtprc 
+  account default
+  host your.smtp-server.com
+  from username@smtp-server.com
+  auth login
+  user username
+  password your_auth_pwd
+  logfile ~/msmtp.log
+
+# 如果使用mutt发送，还需要设置~/.muttrc
+</code></pre>
+<p>将 mailer 改成<code>mailer = &quot;msmtp -t&quot;</code>。</p>
+<p><strong>输出格式</strong></p>
+<pre><code>Output = &lt;mail, html or unformatted&gt;
+</code></pre>
+<p>默认不指定输出格式（plain text）,系统管理员通过邮件客户端（如foxmail）看到的邮件内容是文本形式，比较简单、节省带宽；可以指定为<code>html</code>，此时看到的是可点击链接的友好的页面。</p>
+<p>当同时设定了<code>Save = /tmp/logwatch</code>时，便不会发送邮件报告了，将会根据<code>Output</code>指定的格式保存到一个<code>Save</code>文件中。</p>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/logwatch-html-mail.png" alt="logwatch_mail_html"  />
+</p>
+<p>另外在有的文章里指定<code>Format</code>选项，经过本人试验在7.3.6版本中无效。</p>
+<p><strong>收集日志的范围</strong></p>
+<pre><code>Range = &lt;Yesterday|Today|All&gt;
+</code></pre>
+<p><code>Range</code>配置指令定义了生成 logwatch 报告的时间段信息。这个指令通常可选的值是 Yesterday、Today、All。当作用了<code>Rang = All</code>时，<code>Archive = yes</code> 这个指令项也必须配置上，那么所有的已存档的日志文件 (比如，/var/log/maillog、/var/log/maillog-20150111)都会被处理到。</p>
+<p>如果我们是通过 crontab 每天收集的话，可以只报告昨天或今天的日志情况。</p>
+<p><strong>收集哪些服务的日志</strong></p>
+<pre><code>Service = &lt;service-name-1&gt;
+Service = &lt;service-name-2&gt;
+. . .
+</code></pre>
+<p><code>Service</code>选项指定想要监控的一个或多个服务。在<code>/usr/share/logwatch/scripts/services</code>目录下列出的服务都能被监控，它们已经涵盖了重要的系统服务（例如：pam,secure,iptables,syslogd 等），也涵盖了一些像 sudo、sshd、http、fail2ban、samba等主流的应用服务。如果您想添加新的服务到列表中，得编写一个相应的日志处理 Perl 脚本，并把它放在这个目录中。
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/logwatch-script-service.png" alt="logwatch-script-service"  />
+</p>
+<p>对于一个综合日志分析工具，logwatch推荐大多数人使用<code>Service = &quot;All&quot;</code>，然后通过继续添加<code>Service = &quot;-service_name&quot; </code>等来去掉那些不监控的日志。当然在服务器上，并不是所有script下的服务都有启动，有些并没有日志。</p>
+<p><strong>命令行指定logwatch选项</strong></p>
+<p>如果您不想个性化 <code>/etc/logwatch/conf/logwatch.conf</code>，您可以不修改此文件让其默认，然后在命令行里运行如下所示的命令：</p>
+<pre><code># logwatch --detail 10 --mailto youremailaddress@yourdomain.com --range today \
+&gt;  --service sshd --service postfix --service zz-disk_space --service -zz-network \
+&gt; --output mail 
+</code></pre>
+<p><strong><code>logwatch.conf</code>完整示例</strong></p>
+<pre tabindex="0"><code>LogDir = /var/log
+TmpDir = /var/cache/logwatch
+Print = No
+
+Range = yesterday
+Detail = High
+
+MailTo = zhouxiao@example.com.net
+MailFrom = itsection@example.com.net
+mailer = &#34;msmtp -t&#34;
+Output = html
+
+Service = All
+Service = &#34;-zz-network&#34; 
+Service = &#34;-zz-sys&#34;
+Service = &#34;-eximstats&#34; 
+</code></pre><h1 id="3-扩展">3. 扩展<a hidden class="anchor" aria-hidden="true" href="#3-扩展">#</a></h1>
+<h2 id="31-cron-daily">3.1 cron daily<a hidden class="anchor" aria-hidden="true" href="#31-cron-daily">#</a></h2>
+<p>我们可以看到在 crontab 定时任务设定目录下存在<code>/etc/cron.daily/0logwatch</code>：</p>
+<pre tabindex="0"><code>#!/bin/bash
+
+DailyReport=`grep -e &#34;^[[:space:]]*DailyReport[[:space:]]*=[[:space:]]*&#34; /usr/share/logwatch/default.conf/logwatch.conf | head -n1 | sed -e &#34;s|^\s*DailyReport\s*=\s*||&#34;`
+
+if [ &#34;$DailyReport&#34; != &#34;No&#34; ] &amp;&amp; [ &#34;$DailyReport&#34; != &#34;no&#34; ]
+then
+    logwatch
+fi
+</code></pre><p>如果在<code>logwatch.conf</code>中显式设置了选项<code>DailyReport = No</code>，则会取消logwatch每日执行任务。如果你要修改<code>cron.daily</code>的执行时间，可以删掉这个<code>0logwatch</code>然后添加到<code>/etc/crontab</code>里，或者修改<a href="https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Deployment_Guide/ch-Automating_System_Tasks.html#s2-configuring-anacron-jobs"><code>/etc/anacrontab</code></a>的<code>START_HOURS_RANGE</code>。</p>
+<p>所以 logwatch 的工作不是监控日志异常后及时报警的工具，因为默认它是每天一封整合的邮件，并不具有及时性（安装perl的<code>CPAN</code>模块后可以更精确的控制logwatch时间，详见第一份参考）。</p>
+<h2 id="32-定制自己要监控的日志">3.2 定制自己要监控的日志<a hidden class="anchor" aria-hidden="true" href="#32-定制自己要监控的日志">#</a></h2>
+<p>用一个简单的例子介绍自定义logwatch的配置方法。</p>
+<p><strong>首先创建logwatch日志文件组</strong>
+<code>/etc/logwatch/conf/logfiles/test.conf</code>：</p>
+<pre><code>LogFile = /path/to/your/logfile
+LogFile = /path/to/your/second/logfile
+</code></pre>
+<p><strong>然后创建logwatch服务配置文件</strong>
+<code>/etc/logwatch/conf/services/test.conf</code>：</p>
+<pre><code>Title = test title     # 日志文件里的标题
+LogFile = test   # logwatch日志文件组的名字，通常是对应的配置文件的文件名部分
+</code></pre>
+<p><strong>创建logwatch服务过滤器脚本</strong>
+<code>/etc/logwatch/scripts/services/test</code>：</p>
+<pre tabindex="0"><code>#!/bin/bash
+
+grep -i ERROR
+</code></pre><p>上面的脚本会从日志文件里过滤出包含ERROR的行。最后，为新建的脚本添加执行权限:</p>
+<pre><code>chmod +x /etc/logwatch/scripts/services/test
+</code></pre>
+<p><strong>参考</strong></p>
+<ul>
+<li>
+<p><a href="http://linux.cn/article-4490-1.html">Linux 系统中使用 logwatch 监控日志文件</a> （<a href="http://xmodulo.com/monitor-log-file-linux-logwatch.html">英文</a>）</p>
+</li>
+<li>
+<p><a href="http://dylanninin.com/blog/2013/06/21/logwatch.html">LogWatch Introduction</a></p>
+</li>
+<li>
+<p><a href="http://tuxradar.com/content/managing-your-log-files">Managing your log files</a></p>
+</li>
+<li>
+<p><a href="http://blog.atime.me/note/logwatch.html">Logwatch简单配置教程</a></p>
+</li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/logwatch/">logwatch</a></li>
+      <li><a href="http://xgknight.com/tags/linux/">linux</a></li>
+      <li><a href="http://xgknight.com/tags/%E6%97%A5%E5%BF%97/">日志</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

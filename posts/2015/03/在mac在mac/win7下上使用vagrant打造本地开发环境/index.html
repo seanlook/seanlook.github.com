@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>在Mac在Mac/win7下上使用Vagrant打造本地开发环境 | Sean Note</title>
+<meta name="keywords" content="vagrant, virtualbox, 虚拟化, 开发环境">
+<meta name="description" content="1. vagrant介绍 1.1 vagrant能做什么 做Web开发（java/php/python/ruby&hellip;）少不了要在本地搭建好开发环境，虽然说目前各种脚本/语言都有对应的Windows版，甚至是一键安装包，但很多时候和Windows环境的兼容性（如配置文件、编译的模块）并不是那么好，麻烦的问题是实际部署的环境通常是Linux，常常还要面临着开发和部署环境不一致，上线前还要大量的调试。而如果让每个开发人员都自己去搭建本地环境，安装虚拟机、下载ISO镜像、选择规格安装创建vm、安装OS、配置，会耗费非常多的时间，如果是团队开发应该要尽量保持每个人的运行环境一致。此时vagrant正式你所需要的。不适用正式环境部署。
+vagrant实际上一套虚拟机管理工具，基于Ruby开发，底层支持VirtualBox、VMware甚至AWS、docker等作为虚拟化系统。我们可以通过 Vagrant 封装一个 Linux 的开发环境，分发给团队成员。成员可以在自己喜欢的桌面系统（Mac/Windows/Linux）上开发程序，代码却能统一在封装好的环境里运行，“代码在我机子上运行没有问题”这种说辞将成为历史。
+通过上面的介绍如果你还在困惑有virtualbox或vmware为什么还要加入vagrant，纠结于要不要使用，可以参考这个问答 使用vagrant的意义在哪，另外docker作为后起之秀也可以做vagrant能完成的事情，stackoverflow有关于两位作者讨论各自应用场景的精彩&quot;互掐&quot;，传送门→ （中文）。
+1.2 几个概念 Provider：供应商，在这里指Vagrant调用的虚拟化工具。Vagrant本身并没有能力创建虚拟机，它是调用一些虚拟化工具来创建，如VirtualBox、VMWare、Xen、Docker，甚至AWS，这些虚拟化工具只要安装好了，vagrant会自动封装在底层通过统一的命令调用。也就是说使用vagrant时你电脑上还需要安装对应的Provider，默认是免费开源的virtualbox。 Box：可被Vagrant直接使用的虚拟机镜像文件，大小根据内容的不同从200M-2G不等。针对不同的Provider，Box文件的格式是不一样的，从 vagrantcloud.com 你可以找到社区维护的box。
+Vagrantfile：Vagrant根据Vagrantfile中的配置来创建虚拟机，是Vagrant的核心。在Vagrantfile文件中你需要指明使用哪个Box（可以下载好的或自己制作，或指定在线的URL地址），虚拟机使用的内存大小和CPU，需要预安装哪些软件，虚拟机的网络配置，与host的共享目录等。
+Provisioner：是Vagrant的插件的一种。大部分现成的box并不是你正好想要的，通过使用你熟悉的provisioner，比如Puppet，可以在你使用vagrant up启动虚拟机时自动的安装软件、修改配置等初始化操作。当然你也可以在最先启动虚拟机后，使用vagrant ssh进去然后手动安装软件，但毕竟不是所有人都是系统管理员，写好Vagrantfile后无需人工干预马上就可以使用vm。目前支持并实现的provisioning有Puppet、Salt、Ansible、Chef这些知名的自动化运维工具，当然需要一定的使用经验；也可以使用shell provisioner，故名思议这个插件就是通过执行shell命令完成统一的作用。
+Guest Additions：这个是常在下载 base box 介绍里有的，一般用来实现host到vm的端口转发、目录共享，在开发环境上都建议装上以便测试。
+2. 安装vagrant VirtualBox: 4.3.12，https://www.virtualbox.org/wiki/Download_Old_Builds_4_3 。我上手使用的是4.3.20，折腾出过几个问题，据说说4.3.12版本较稳定。 建议选择VirtualBox ，即使你电脑上已经安装VMware Workstation或Fushion，它的vagrant插件还是要收费的 Vagrant: 1.7.1，http://www.vagrantup.com/downloads-archive.html 选择适合你的平台（Windows、Mac、Linux），下载对应格式的安装包。如Mac下 vagrant_1.7.1.dmg、VirtualBox-4.3.20-96997-OSX.dmg 。
+3. 使用vagrant打造一个本地开发环境 本文将会演示从 nrel CentOS6.5 开始，安装必要的开发包、python、插件、Puppet，然后打包成一个box分发给团队的全过程。你也可以在别人box的基础上进一步通过Vagrantfile定制自己的环境。
+3.1 初始化 3.1.1 vagrant box add {box-name} {box-url} $ vagrant box add ct65_00 Downloads/centos65.box ==&gt; box: Adding box &#39;ct65_00&#39; (v0) for provider: box: Downloading: file:///Users/sean/Downloads/centos65.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2015/03/%E5%9C%A8mac%E5%9C%A8mac/win7%E4%B8%8B%E4%B8%8A%E4%BD%BF%E7%94%A8vagrant%E6%89%93%E9%80%A0%E6%9C%AC%E5%9C%B0%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="在Mac在Mac/win7下上使用Vagrant打造本地开发环境" />
+<meta property="og:description" content="1. vagrant介绍 1.1 vagrant能做什么 做Web开发（java/php/python/ruby&hellip;）少不了要在本地搭建好开发环境，虽然说目前各种脚本/语言都有对应的Windows版，甚至是一键安装包，但很多时候和Windows环境的兼容性（如配置文件、编译的模块）并不是那么好，麻烦的问题是实际部署的环境通常是Linux，常常还要面临着开发和部署环境不一致，上线前还要大量的调试。而如果让每个开发人员都自己去搭建本地环境，安装虚拟机、下载ISO镜像、选择规格安装创建vm、安装OS、配置，会耗费非常多的时间，如果是团队开发应该要尽量保持每个人的运行环境一致。此时vagrant正式你所需要的。不适用正式环境部署。
+vagrant实际上一套虚拟机管理工具，基于Ruby开发，底层支持VirtualBox、VMware甚至AWS、docker等作为虚拟化系统。我们可以通过 Vagrant 封装一个 Linux 的开发环境，分发给团队成员。成员可以在自己喜欢的桌面系统（Mac/Windows/Linux）上开发程序，代码却能统一在封装好的环境里运行，“代码在我机子上运行没有问题”这种说辞将成为历史。
+通过上面的介绍如果你还在困惑有virtualbox或vmware为什么还要加入vagrant，纠结于要不要使用，可以参考这个问答 使用vagrant的意义在哪，另外docker作为后起之秀也可以做vagrant能完成的事情，stackoverflow有关于两位作者讨论各自应用场景的精彩&quot;互掐&quot;，传送门→ （中文）。
+1.2 几个概念 Provider：供应商，在这里指Vagrant调用的虚拟化工具。Vagrant本身并没有能力创建虚拟机，它是调用一些虚拟化工具来创建，如VirtualBox、VMWare、Xen、Docker，甚至AWS，这些虚拟化工具只要安装好了，vagrant会自动封装在底层通过统一的命令调用。也就是说使用vagrant时你电脑上还需要安装对应的Provider，默认是免费开源的virtualbox。 Box：可被Vagrant直接使用的虚拟机镜像文件，大小根据内容的不同从200M-2G不等。针对不同的Provider，Box文件的格式是不一样的，从 vagrantcloud.com 你可以找到社区维护的box。
+Vagrantfile：Vagrant根据Vagrantfile中的配置来创建虚拟机，是Vagrant的核心。在Vagrantfile文件中你需要指明使用哪个Box（可以下载好的或自己制作，或指定在线的URL地址），虚拟机使用的内存大小和CPU，需要预安装哪些软件，虚拟机的网络配置，与host的共享目录等。
+Provisioner：是Vagrant的插件的一种。大部分现成的box并不是你正好想要的，通过使用你熟悉的provisioner，比如Puppet，可以在你使用vagrant up启动虚拟机时自动的安装软件、修改配置等初始化操作。当然你也可以在最先启动虚拟机后，使用vagrant ssh进去然后手动安装软件，但毕竟不是所有人都是系统管理员，写好Vagrantfile后无需人工干预马上就可以使用vm。目前支持并实现的provisioning有Puppet、Salt、Ansible、Chef这些知名的自动化运维工具，当然需要一定的使用经验；也可以使用shell provisioner，故名思议这个插件就是通过执行shell命令完成统一的作用。
+Guest Additions：这个是常在下载 base box 介绍里有的，一般用来实现host到vm的端口转发、目录共享，在开发环境上都建议装上以便测试。
+2. 安装vagrant VirtualBox: 4.3.12，https://www.virtualbox.org/wiki/Download_Old_Builds_4_3 。我上手使用的是4.3.20，折腾出过几个问题，据说说4.3.12版本较稳定。 建议选择VirtualBox ，即使你电脑上已经安装VMware Workstation或Fushion，它的vagrant插件还是要收费的 Vagrant: 1.7.1，http://www.vagrantup.com/downloads-archive.html 选择适合你的平台（Windows、Mac、Linux），下载对应格式的安装包。如Mac下 vagrant_1.7.1.dmg、VirtualBox-4.3.20-96997-OSX.dmg 。
+3. 使用vagrant打造一个本地开发环境 本文将会演示从 nrel CentOS6.5 开始，安装必要的开发包、python、插件、Puppet，然后打包成一个box分发给团队的全过程。你也可以在别人box的基础上进一步通过Vagrantfile定制自己的环境。
+3.1 初始化 3.1.1 vagrant box add {box-name} {box-url} $ vagrant box add ct65_00 Downloads/centos65.box ==&gt; box: Adding box &#39;ct65_00&#39; (v0) for provider: box: Downloading: file:///Users/sean/Downloads/centos65." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2015/03/%E5%9C%A8mac%E5%9C%A8mac/win7%E4%B8%8B%E4%B8%8A%E4%BD%BF%E7%94%A8vagrant%E6%89%93%E9%80%A0%E6%9C%AC%E5%9C%B0%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2015-03-25T11:21:25+00:00" />
+<meta property="article:modified_time" content="2015-03-25T11:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="在Mac在Mac/win7下上使用Vagrant打造本地开发环境"/>
+<meta name="twitter:description" content="1. vagrant介绍 1.1 vagrant能做什么 做Web开发（java/php/python/ruby&hellip;）少不了要在本地搭建好开发环境，虽然说目前各种脚本/语言都有对应的Windows版，甚至是一键安装包，但很多时候和Windows环境的兼容性（如配置文件、编译的模块）并不是那么好，麻烦的问题是实际部署的环境通常是Linux，常常还要面临着开发和部署环境不一致，上线前还要大量的调试。而如果让每个开发人员都自己去搭建本地环境，安装虚拟机、下载ISO镜像、选择规格安装创建vm、安装OS、配置，会耗费非常多的时间，如果是团队开发应该要尽量保持每个人的运行环境一致。此时vagrant正式你所需要的。不适用正式环境部署。
+vagrant实际上一套虚拟机管理工具，基于Ruby开发，底层支持VirtualBox、VMware甚至AWS、docker等作为虚拟化系统。我们可以通过 Vagrant 封装一个 Linux 的开发环境，分发给团队成员。成员可以在自己喜欢的桌面系统（Mac/Windows/Linux）上开发程序，代码却能统一在封装好的环境里运行，“代码在我机子上运行没有问题”这种说辞将成为历史。
+通过上面的介绍如果你还在困惑有virtualbox或vmware为什么还要加入vagrant，纠结于要不要使用，可以参考这个问答 使用vagrant的意义在哪，另外docker作为后起之秀也可以做vagrant能完成的事情，stackoverflow有关于两位作者讨论各自应用场景的精彩&quot;互掐&quot;，传送门→ （中文）。
+1.2 几个概念 Provider：供应商，在这里指Vagrant调用的虚拟化工具。Vagrant本身并没有能力创建虚拟机，它是调用一些虚拟化工具来创建，如VirtualBox、VMWare、Xen、Docker，甚至AWS，这些虚拟化工具只要安装好了，vagrant会自动封装在底层通过统一的命令调用。也就是说使用vagrant时你电脑上还需要安装对应的Provider，默认是免费开源的virtualbox。 Box：可被Vagrant直接使用的虚拟机镜像文件，大小根据内容的不同从200M-2G不等。针对不同的Provider，Box文件的格式是不一样的，从 vagrantcloud.com 你可以找到社区维护的box。
+Vagrantfile：Vagrant根据Vagrantfile中的配置来创建虚拟机，是Vagrant的核心。在Vagrantfile文件中你需要指明使用哪个Box（可以下载好的或自己制作，或指定在线的URL地址），虚拟机使用的内存大小和CPU，需要预安装哪些软件，虚拟机的网络配置，与host的共享目录等。
+Provisioner：是Vagrant的插件的一种。大部分现成的box并不是你正好想要的，通过使用你熟悉的provisioner，比如Puppet，可以在你使用vagrant up启动虚拟机时自动的安装软件、修改配置等初始化操作。当然你也可以在最先启动虚拟机后，使用vagrant ssh进去然后手动安装软件，但毕竟不是所有人都是系统管理员，写好Vagrantfile后无需人工干预马上就可以使用vm。目前支持并实现的provisioning有Puppet、Salt、Ansible、Chef这些知名的自动化运维工具，当然需要一定的使用经验；也可以使用shell provisioner，故名思议这个插件就是通过执行shell命令完成统一的作用。
+Guest Additions：这个是常在下载 base box 介绍里有的，一般用来实现host到vm的端口转发、目录共享，在开发环境上都建议装上以便测试。
+2. 安装vagrant VirtualBox: 4.3.12，https://www.virtualbox.org/wiki/Download_Old_Builds_4_3 。我上手使用的是4.3.20，折腾出过几个问题，据说说4.3.12版本较稳定。 建议选择VirtualBox ，即使你电脑上已经安装VMware Workstation或Fushion，它的vagrant插件还是要收费的 Vagrant: 1.7.1，http://www.vagrantup.com/downloads-archive.html 选择适合你的平台（Windows、Mac、Linux），下载对应格式的安装包。如Mac下 vagrant_1.7.1.dmg、VirtualBox-4.3.20-96997-OSX.dmg 。
+3. 使用vagrant打造一个本地开发环境 本文将会演示从 nrel CentOS6.5 开始，安装必要的开发包、python、插件、Puppet，然后打包成一个box分发给团队的全过程。你也可以在别人box的基础上进一步通过Vagrantfile定制自己的环境。
+3.1 初始化 3.1.1 vagrant box add {box-name} {box-url} $ vagrant box add ct65_00 Downloads/centos65.box ==&gt; box: Adding box &#39;ct65_00&#39; (v0) for provider: box: Downloading: file:///Users/sean/Downloads/centos65."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "在Mac在Mac/win7下上使用Vagrant打造本地开发环境",
+      "item": "http://xgknight.com/posts/2015/03/%E5%9C%A8mac%E5%9C%A8mac/win7%E4%B8%8B%E4%B8%8A%E4%BD%BF%E7%94%A8vagrant%E6%89%93%E9%80%A0%E6%9C%AC%E5%9C%B0%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "在Mac在Mac/win7下上使用Vagrant打造本地开发环境",
+  "name": "在Mac在Mac\/win7下上使用Vagrant打造本地开发环境",
+  "description": "1. vagrant介绍 1.1 vagrant能做什么 做Web开发（java/php/python/ruby\u0026hellip;）少不了要在本地搭建好开发环境，虽然说目前各种脚本/语言都有对应的Windows版，甚至是一键安装包，但很多时候和Windows环境的兼容性（如配置文件、编译的模块）并不是那么好，麻烦的问题是实际部署的环境通常是Linux，常常还要面临着开发和部署环境不一致，上线前还要大量的调试。而如果让每个开发人员都自己去搭建本地环境，安装虚拟机、下载ISO镜像、选择规格安装创建vm、安装OS、配置，会耗费非常多的时间，如果是团队开发应该要尽量保持每个人的运行环境一致。此时vagrant正式你所需要的。不适用正式环境部署。\nvagrant实际上一套虚拟机管理工具，基于Ruby开发，底层支持VirtualBox、VMware甚至AWS、docker等作为虚拟化系统。我们可以通过 Vagrant 封装一个 Linux 的开发环境，分发给团队成员。成员可以在自己喜欢的桌面系统（Mac/Windows/Linux）上开发程序，代码却能统一在封装好的环境里运行，“代码在我机子上运行没有问题”这种说辞将成为历史。\n通过上面的介绍如果你还在困惑有virtualbox或vmware为什么还要加入vagrant，纠结于要不要使用，可以参考这个问答 使用vagrant的意义在哪，另外docker作为后起之秀也可以做vagrant能完成的事情，stackoverflow有关于两位作者讨论各自应用场景的精彩\u0026quot;互掐\u0026quot;，传送门→ （中文）。\n1.2 几个概念 Provider：供应商，在这里指Vagrant调用的虚拟化工具。Vagrant本身并没有能力创建虚拟机，它是调用一些虚拟化工具来创建，如VirtualBox、VMWare、Xen、Docker，甚至AWS，这些虚拟化工具只要安装好了，vagrant会自动封装在底层通过统一的命令调用。也就是说使用vagrant时你电脑上还需要安装对应的Provider，默认是免费开源的virtualbox。 Box：可被Vagrant直接使用的虚拟机镜像文件，大小根据内容的不同从200M-2G不等。针对不同的Provider，Box文件的格式是不一样的，从 vagrantcloud.com 你可以找到社区维护的box。\nVagrantfile：Vagrant根据Vagrantfile中的配置来创建虚拟机，是Vagrant的核心。在Vagrantfile文件中你需要指明使用哪个Box（可以下载好的或自己制作，或指定在线的URL地址），虚拟机使用的内存大小和CPU，需要预安装哪些软件，虚拟机的网络配置，与host的共享目录等。\nProvisioner：是Vagrant的插件的一种。大部分现成的box并不是你正好想要的，通过使用你熟悉的provisioner，比如Puppet，可以在你使用vagrant up启动虚拟机时自动的安装软件、修改配置等初始化操作。当然你也可以在最先启动虚拟机后，使用vagrant ssh进去然后手动安装软件，但毕竟不是所有人都是系统管理员，写好Vagrantfile后无需人工干预马上就可以使用vm。目前支持并实现的provisioning有Puppet、Salt、Ansible、Chef这些知名的自动化运维工具，当然需要一定的使用经验；也可以使用shell provisioner，故名思议这个插件就是通过执行shell命令完成统一的作用。\nGuest Additions：这个是常在下载 base box 介绍里有的，一般用来实现host到vm的端口转发、目录共享，在开发环境上都建议装上以便测试。\n2. 安装vagrant VirtualBox: 4.3.12，https://www.virtualbox.org/wiki/Download_Old_Builds_4_3 。我上手使用的是4.3.20，折腾出过几个问题，据说说4.3.12版本较稳定。 建议选择VirtualBox ，即使你电脑上已经安装VMware Workstation或Fushion，它的vagrant插件还是要收费的 Vagrant: 1.7.1，http://www.vagrantup.com/downloads-archive.html 选择适合你的平台（Windows、Mac、Linux），下载对应格式的安装包。如Mac下 vagrant_1.7.1.dmg、VirtualBox-4.3.20-96997-OSX.dmg 。\n3. 使用vagrant打造一个本地开发环境 本文将会演示从 nrel CentOS6.5 开始，安装必要的开发包、python、插件、Puppet，然后打包成一个box分发给团队的全过程。你也可以在别人box的基础上进一步通过Vagrantfile定制自己的环境。\n3.1 初始化 3.1.1 vagrant box add {box-name} {box-url} $ vagrant box add ct65_00 Downloads/centos65.box ==\u0026gt; box: Adding box \u0026#39;ct65_00\u0026#39; (v0) for provider: box: Downloading: file:///Users/sean/Downloads/centos65.",
+  "keywords": [
+    "vagrant", "virtualbox", "虚拟化", "开发环境"
+  ],
+  "articleBody": "1. vagrant介绍 1.1 vagrant能做什么 做Web开发（java/php/python/ruby…）少不了要在本地搭建好开发环境，虽然说目前各种脚本/语言都有对应的Windows版，甚至是一键安装包，但很多时候和Windows环境的兼容性（如配置文件、编译的模块）并不是那么好，麻烦的问题是实际部署的环境通常是Linux，常常还要面临着开发和部署环境不一致，上线前还要大量的调试。而如果让每个开发人员都自己去搭建本地环境，安装虚拟机、下载ISO镜像、选择规格安装创建vm、安装OS、配置，会耗费非常多的时间，如果是团队开发应该要尽量保持每个人的运行环境一致。此时vagrant正式你所需要的。不适用正式环境部署。\nvagrant实际上一套虚拟机管理工具，基于Ruby开发，底层支持VirtualBox、VMware甚至AWS、docker等作为虚拟化系统。我们可以通过 Vagrant 封装一个 Linux 的开发环境，分发给团队成员。成员可以在自己喜欢的桌面系统（Mac/Windows/Linux）上开发程序，代码却能统一在封装好的环境里运行，“代码在我机子上运行没有问题”这种说辞将成为历史。\n通过上面的介绍如果你还在困惑有virtualbox或vmware为什么还要加入vagrant，纠结于要不要使用，可以参考这个问答 使用vagrant的意义在哪，另外docker作为后起之秀也可以做vagrant能完成的事情，stackoverflow有关于两位作者讨论各自应用场景的精彩\"互掐\"，传送门→ （中文）。\n1.2 几个概念 Provider：供应商，在这里指Vagrant调用的虚拟化工具。Vagrant本身并没有能力创建虚拟机，它是调用一些虚拟化工具来创建，如VirtualBox、VMWare、Xen、Docker，甚至AWS，这些虚拟化工具只要安装好了，vagrant会自动封装在底层通过统一的命令调用。也就是说使用vagrant时你电脑上还需要安装对应的Provider，默认是免费开源的virtualbox。 Box：可被Vagrant直接使用的虚拟机镜像文件，大小根据内容的不同从200M-2G不等。针对不同的Provider，Box文件的格式是不一样的，从 vagrantcloud.com 你可以找到社区维护的box。\nVagrantfile：Vagrant根据Vagrantfile中的配置来创建虚拟机，是Vagrant的核心。在Vagrantfile文件中你需要指明使用哪个Box（可以下载好的或自己制作，或指定在线的URL地址），虚拟机使用的内存大小和CPU，需要预安装哪些软件，虚拟机的网络配置，与host的共享目录等。\nProvisioner：是Vagrant的插件的一种。大部分现成的box并不是你正好想要的，通过使用你熟悉的provisioner，比如Puppet，可以在你使用vagrant up启动虚拟机时自动的安装软件、修改配置等初始化操作。当然你也可以在最先启动虚拟机后，使用vagrant ssh进去然后手动安装软件，但毕竟不是所有人都是系统管理员，写好Vagrantfile后无需人工干预马上就可以使用vm。目前支持并实现的provisioning有Puppet、Salt、Ansible、Chef这些知名的自动化运维工具，当然需要一定的使用经验；也可以使用shell provisioner，故名思议这个插件就是通过执行shell命令完成统一的作用。\nGuest Additions：这个是常在下载 base box 介绍里有的，一般用来实现host到vm的端口转发、目录共享，在开发环境上都建议装上以便测试。\n2. 安装vagrant VirtualBox: 4.3.12，https://www.virtualbox.org/wiki/Download_Old_Builds_4_3 。我上手使用的是4.3.20，折腾出过几个问题，据说说4.3.12版本较稳定。 建议选择VirtualBox ，即使你电脑上已经安装VMware Workstation或Fushion，它的vagrant插件还是要收费的 Vagrant: 1.7.1，http://www.vagrantup.com/downloads-archive.html 选择适合你的平台（Windows、Mac、Linux），下载对应格式的安装包。如Mac下 vagrant_1.7.1.dmg、VirtualBox-4.3.20-96997-OSX.dmg 。\n3. 使用vagrant打造一个本地开发环境 本文将会演示从 nrel CentOS6.5 开始，安装必要的开发包、python、插件、Puppet，然后打包成一个box分发给团队的全过程。你也可以在别人box的基础上进一步通过Vagrantfile定制自己的环境。\n3.1 初始化 3.1.1 vagrant box add {box-name} {box-url} $ vagrant box add ct65_00 Downloads/centos65.box ==\u003e box: Adding box 'ct65_00' (v0) for provider: box: Downloading: file:///Users/sean/Downloads/centos65.box ==\u003e box: Successfully added box 'ct65_00' (v0) for 'virtualbox'! $ ll ~/.vagrant.d/boxes/ct65_00 $ vagrant box list # vagrant box list ct65_00 (virtualbox, 0) centos64-i386 (virtualbox, 0) 这一条命令就是根据给出的box（镜像）文件地址，解压一份到用户目录~/.vagrant.d/boxes/{box-name}/0/virtualbox/下，所以你尽量应该以同一用户来管理进行vagrant所有操作。\n*F*K GFW 在GFW保护之下，这简单获取box文件反而一开始就难到我们了。官方提供的在线安装在墙外是极为方便的，vagrant box add minimal/centos6便自动从vagrantcloud.com(现更名为https://atlas.hashicorp.com/search/boxes)下载，直接进入第二步。\n还有一种方法是，先vagrant init minimal/centos6，然后直接启动vagrant up --provider virtualbox。当然这些都与下载boxes到本地效果是一样的，下载方法就是在vagrantcloud.com上点开你所需要的box版本，然后再URL里加入/providers/virtualbox.box便得到文件地址，如 https://atlas.hashicorp.com/hashicorp/boxes/precise64 对应的文件为 https://atlas.hashicorp.com/hashicorp/boxes/precise64/providers/virtualbox.box 。\n在墙内直接在线安装启动box，会报错：\nThe box 'ubuntu/trusty64' could not be found or could not be accessed in the remote catalog. If this is a private box on HashiCorp's Atlas, please verify you're logged in via `vagrant login`. Also, please double-check the name. The expanded URL and error message are shown below: URL: [\"https://atlas.hashicorp.com/ubuntu/trusty64\"] Error: 一个办法是ubuntu来 http://uec-images.ubuntu.com/vagrant/ 下载，centos来 http://nrel.github.io/vagrant-boxes/ 下载。我也从墙外下了几个典型的box放到了自己的百度云上共享了:http://pan.baidu.com/s/1sjHQBa1 。\n2015-04-01更新：无意间发现现在不用梯子也可以访问了，Happy April Fool’s Day!\n3.1.2 vagrant init {box-name} $ mkdir ~/vagrant \u0026\u0026 cd ~/vagrant //这个目录的目的就是统一管理你的Vagrantfile $ vagrant init ct65_00 A `Vagrantfile` has been placed in this directory. You are now ready to `vagrant up` your first virtual environment! Please read the comments in the Vagrantfile as well as documentation on `vagrantup.com` for more information on using Vagrant. $ vi Vagrantfile ... Vagrant.configure(2) do |config| config.vm.box = \"ct65_00\" onfig.vm.network \"forwarded_port\", guest: 80, host: 8080 # config.vm.synced_folder \"../data\", \"/vagrant_data\" config.vm.provider \"virtualbox\" do |vb| vb.memory = \"384\" vb.cpus = 1 end config.vm.hostname = \"vg-ct65_00.tp-link.net\" ... init只是在当前目录生成一个Vagrantfile文件和.vagrant/目录，可以对它进行修改，比如定义 vm guest machine 的hostname、memory、cpu等，具体有关语法介绍见后文。\n用户后面up虚拟机，这个 box-name 与上面add的相同，如果是 base 则可以省略。\n3.2 启动虚拟机 # vagrant up Bringing machine 'default' up with 'virtualbox' provider... ==\u003e default: Importing base box 'ct65_00'... ==\u003e default: Matching MAC address for NAT networking... ==\u003e default: Setting the name of the VM: v-box_default_1427284884787_97348 ==\u003e default: Clearing any previously set network interfaces... ==\u003e default: Preparing network interfaces based on configuration... default: Adapter 1: nat ==\u003e default: Forwarding ports... default: 22 =\u003e 2222 (adapter 1) ==\u003e default: Booting VM... ==\u003e default: Waiting for machine to boot. This may take a few minutes... default: SSH address: 127.0.0.1:2222 default: SSH username: vagrant default: SSH auth method: private key default: Warning: Connection timeout. Retrying... default: Warning: Connection timeout. Retrying... ... default: Warning: Remote connection disconnect. Retrying... default: Warning: Remote connection disconnect. Retrying... ==\u003e default: Machine booted and ready! ==\u003e default: Checking for guest additions in VM... ==\u003e default: Mounting shared folders... default: /vagrant =\u003e /root/vagrant/v-box/ct65_00 up过程是默认会根据当前目录下的Vagrantfile来启动vm，如果当前目录没有Vagrantfile，则去上层目录寻找，依次类推。第一次vagrant up ct65_00时会从~/.vagrant.d/boxes中导入相应的box文件到~/VirtualBox VMs/，可以通过vboxmanage showvminfo {VM-ID}看到该虚拟机的配置（Mac上为VBoxManage）。如果你想让虚拟机存储在指定位置，如我的Mac SSD硬盘空间贵，可以运行VirtualBox，手动设置存储/storage的路径。\n默认 localhost:2222 转发到 guest:22 以供ssh连接；用户名/密码：vagrant/vagrant；默认共享目录就是host上Vagrantfile所在目录；如果电脑配置比较低导致启动时间比较长，或者VirtualBox启动出错，可能会提示上面的 Connection timeout 。\n另外提示一下，某次我在Linux上测试，由于Linux host本身也是vSphere虚拟机，通过vagrant启动virtualbox另一个虚拟机（即嵌套），一直Retrying，后来根据上面 stackoverflow 打开了VBox GUI，发现是CPU架构的问题，一直堵塞，所以就不建议虚拟机上再装虚拟机了：\nVT-x/AMD-V hardware acceleration is not available on your system. Your 64-bit guest will fail to detect a 64-bit CPU and will not be able to boot. 3.2 连接虚拟机，初始化环境 vagrant ssh $ vagrant ssh Last login: Tue Mar 31 02:15:38 2015 from 10.0.2.2 Welcome to your Vagrant-built virtual machine. 一般建立box时约定的用户名/密码：vagrant/vagrant，root密码也是 vagrant，默认的网络连接方式是Host-Only。\n定制你的环境 如安装jdk，创建用户，解压tomcat，修改server.xml，添加yum源等。这里一步到位，唯一要说明的是tomcat conf/server.xml 的 ...应用目录设置为共享目录。\n3.3 打包成box 3.3.1 安装必要软件 打包是为了分发出去，做扩展用\n# yum install -y lrzsz telnet vim puppet puppetmaster 如果你是从0开始建立一个box，当然还需要创建vagrant用户以及public key，具体可以参考如何制作一个vagrant的base box。\n3.3.2 安装Virtualbox Guest Additions 每个人电脑上安装的Virtualbox版本很可能不一样，vagrant up可能会有提示版本不兼容（同一大版本号还好，可省略这一步），导致host到guest共享目录模块失败，最终无法启动虚拟机。\n安装方法可以有 vagrant-vbguest（注意这是vagrant插件，不是virtualbox插件），使用超级详细，只需执行vagrant plugin install vagrant-vbguest，默认从本地找 VBoxGuestAdditions.iso （各平台路径一般都可以找到），如果没找到则去http://download.virtualbox.org/virtualbox/%{version}/VBoxGuestAdditions_%{version}.iso 下载，直接启动vm便可安装或更新virtualbox guest additions ，甚至可以通过vagrant vbguest命令给正在运行的vm安装，缺点是 plugin install 得连网。下面是手动在vm内部安装：\n一般最小化的box不带有CDROM，需要通过VirtualBox图形化界面添加一个DVD/CD存储设备，然后在启动VM后 Devices -\u003e Insert Guest Additions CD 。（相信你可以可以找到办法直接挂载 .iso 文件到vm里面，免去添加多余设备）\nfor linux : /usr/share/virtualbox/VBoxGuestAdditions.iso for Mac : /Applications/VirtualBox.app/Contents/MacOS/VBoxGuestAdditions.iso for Windows : %PROGRAMFILES%/Oracle/VirtualBox/VBoxGuestAdditions.iso\n$ sudo yum install linux-headers-$(uname -r) build-essential dkms $ sudo mount /dev/cdrom /media/cdrom $ sudo sh /media/cdrom/VBoxLinuxAdditions.run --nox11 官方参考：http://docs.vagrantup.com/v2/virtualbox/boxes.html\n3.3.3 vagrant package 打包导出：\nvagrant package --output sean-vg-ct65_ts.box ==\u003e default: Attempting graceful shutdown of VM... ==\u003e default: Clearing any previously set forwarded ports... ==\u003e default: Exporting VM... ==\u003e default: Compressing package to: /Users/sean/vagrant/sean-vg-ct65_ts.box 当前目录下若存在同名package.box则会export失败。打包的来源并不是.vagrant.d而是VirtualBox虚拟机本身，可以通过--base vm-name来指定所导出的虚拟机名称，--vagrantfile file-pathname可以将Vagrantfile直接封进box中。以后就可以把这个 .box 文件分发给开发人员使用了。\n4. 其他 4.1 命令 vagrant suspend将虚拟机置于休眠状态。这时候主机会保存虚拟机的当前状态。再用vagrant up启动虚拟机时能够返回之前工作的状态。这种方式优点是休眠和启动速度都很快，只有几秒钟。缺点是需要额外的磁盘空间来存储当前状态。\nvagrant halt则是关机。如果想再次启动还是使用vagrant up命令，不过需要多花些时间。\nvagrant destroy则会将虚拟机从磁盘中删除。如果想重新创建还是使用vagrant up命令。\nvagrant reload从Vagrantfile重新启动虚拟机。\nvagrant global-status输出所有虚拟机当前运行状态，关机、已启动等。\n另外1.2以上版本的Vagrant还引用了插件机制。可以通过vagrant plugin来添加各种各样的plugin，这给Vagrant的应用带来了更大的灵活性和针对性。比如可以添加vagrant-windows的插件来增加对windows系统的支持，通过添加vagrant-aws插件来实现给AWS创建虚拟机的功能。你也可以编写自己的插件。由于Vagrant是ruby写的一个gem，其插件的编写也是使用的Ruby语言。\n关于 Vagrantfile说明以及网络、多机器管理的配置，见 Varantfile说明。\n4.2 问题集 选用配置略高一点的电脑做host，否则启动会相当慢而且会提示Warning: Connection timeout. Retrying...，如果在300s内没有boot up，你可能需要启用GUI界面可以帮我们诊断一些启动失败的问题，vb.gui = true。坚决不要在虚拟机里玩vagrant！\n不要轻易在VirtualBox图形界面下强行关闭虚拟机，可能会出现意想不到的错误，如 The guest machine entered an invalid state while waiting for it to boot. Valid states are ‘starting, running’. The machine is in the ‘poweroff’ state … 针对这个问题的解决办法，issue 2175 没能搞定，直接destroy重来。\n我在ubuntu trustry 64-bit 安装virtualbox时，提示依赖没装（libgl1-mesa-glx libqt4-network libqt4-opengl libqtcore4 libqtgui4 libxcursor1 libxinerama1 libxmu6 libxt6）， 使用apt-get install libqt4-opengl来安装上面的依赖，如果报错The following packages have unmet dependencies...，执行apt-get -f install 解决。\n安装 virtualbox guest additions 失败 在 3.3.2节安装Virtualbox Guest Additions时，运行./media/cdrom/VBoxLinuxAdditions.run后提示：\nThe headers for the current running kernel were not found. If the following module compilation fails then this could be the reason. The missing package can be probably installed with yum install kernel-devel-2.6.32-431.el6.x86_64 Building the main Guest Additions module [FAILED] ... 关机后启动虚拟机，相应的会提示：\nFailed to mount folders in Linux guest. This is usually because the \"vboxsf\" file system is not available. Please verify that the guest additions are properly installed in the guest and can work properly. The command attempted was: mount -t vboxsf -o uid=id -u vagrant,gid=getent group vagrant | cut -d: -f3 vagrant /vagrant mount -t vboxsf -o uid=id -u vagrant,gid=id -g vagrant vagrant /vagrant The error output from the last command was: /sbin/mount.vboxsf: mounting failed with the error: No such device 原因就是旧版本卸载成功但新版本guest additions却因为yum install kernel-devel找不到软件包（No package available）失败。这种情况很少见，kernel-devel 一般都可以装上去解决。如果像我这样提示死活没这个软件包的，换个box吧！\n硬盘扩容 进入到虚拟机后，通过df -h你可能看到磁盘空间不足，需要扩容（不允许缩小空间），就可以通过以下方法完成。\n手动方式，与是否使用vagrant无关 halt关闭虚拟机虚拟机后，使用 VBoxManage modifyhd box-disk1.vdi --resize 10240 即完成修改。但是如果虚拟机磁盘格式创建时使用的是vmdk，则不支持直接vmdk格式修改，需要通过VBoxManage clonehd box_disk1.vmdk box_disk2.vdi --format VDI转换成vdi格式，然后在图形化VirtualBox中选择这个新的磁盘。另外提醒一句，这里的扩容是修改动态分配的磁盘的虚拟大小而不是实际大小，所以假如resize后的值比预分配的磁盘要小的话，会提示 Progress state: VBOX_E_NOT_SUPPORTED ..VBoxManage: error: Resize hard disk operation for this format is not implemented yet! 相关参考：Resizing disk space on vagrant box、 VirtualBox VBOX_E_NOT_SUPPORTED Drive Resize Error、Resize a Hard Disk for a Virtual Machine 。\n通过Vagrantfile指令修改\nconfig.vm.provider \"virtualbox\" do |vb| vb.customize 'pre-boot', ['modifyhd', 'e91678c3-b49b-489b-b280-4e138533252d', '--resize', '10240'] end 上面那串数字字母，是虚拟磁盘的UUID，可以先通过ps -ef|grep Virtual(Mac, virtualbox in Linux )查到虚拟机UUID，再通过VBoxManage showvminfo {VM UUID}|grep vdi看到这个 disk UUID。参考 Add some way to increase disk space from Vagrantfile。 扩容完成后把Vagrantfile中对应的部分去掉，以免每次启动都进行这步操作。\nHello Vagrant 使用 Vagrant 打造跨平台开发环境 Vagrant安装配置 Creating a Base Box 如何制作一个vagrant的base box http://blog.icodeu.com/?tag=vagrant ",
+  "wordCount" : "935",
+  "inLanguage": "en",
+  "datePublished": "2015-03-25T11:21:25Z",
+  "dateModified": "2015-03-25T11:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2015/03/%E5%9C%A8mac%E5%9C%A8mac/win7%E4%B8%8B%E4%B8%8A%E4%BD%BF%E7%94%A8vagrant%E6%89%93%E9%80%A0%E6%9C%AC%E5%9C%B0%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      在Mac在Mac/win7下上使用Vagrant打造本地开发环境
+    </h1>
+    <div class="post-meta"><span title='2015-03-25 11:21:25 +0000 UTC'>March 25, 2015</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><h1 id="1-vagrant介绍">1. vagrant介绍<a hidden class="anchor" aria-hidden="true" href="#1-vagrant介绍">#</a></h1>
+<h2 id="11-vagrant能做什么">1.1 vagrant能做什么<a hidden class="anchor" aria-hidden="true" href="#11-vagrant能做什么">#</a></h2>
+<p>做Web开发（java/php/python/ruby&hellip;）少不了要在本地搭建好开发环境，虽然说目前各种脚本/语言都有对应的Windows版，甚至是一键安装包，但很多时候和Windows环境的兼容性（如配置文件、编译的模块）并不是那么好，麻烦的问题是实际部署的环境通常是Linux，常常还要面临着开发和部署环境不一致，上线前还要大量的调试。而如果让每个开发人员都自己去搭建本地环境，安装虚拟机、下载ISO镜像、选择规格安装创建vm、安装OS、配置，会耗费非常多的时间，如果是团队开发应该要尽量保持每个人的运行环境一致。此时vagrant正式你所需要的。不适用正式环境部署。</p>
+<p>vagrant实际上一套虚拟机管理工具，基于Ruby开发，底层支持VirtualBox、VMware甚至AWS、docker等作为虚拟化系统。我们可以通过 Vagrant 封装一个 Linux 的开发环境，分发给团队成员。成员可以在自己喜欢的桌面系统（Mac/Windows/Linux）上开发程序，代码却能统一在封装好的环境里运行，“代码在我机子上运行没有问题”这种说辞将成为历史。</p>
+<p>通过上面的介绍如果你还在困惑有virtualbox或vmware为什么还要加入vagrant，纠结于要不要使用，可以参考这个问答 <a href="http://segmentfault.com/q/1010000002623455">使用vagrant的意义在哪</a>，另外docker作为后起之秀也可以做vagrant能完成的事情，stackoverflow有关于两位作者讨论各自应用场景的精彩&quot;互掐&quot;，<a href="http://stackoverflow.com/questions/16647069/should-i-use-vagrant-or-docker-io-for-creating-an-isolated-environment">传送门→</a> （<a href="http://www.cnblogs.com/vikings-blog/p/3973265.html">中文</a>）。</p>
+<h2 id="12-几个概念">1.2 几个概念<a hidden class="anchor" aria-hidden="true" href="#12-几个概念">#</a></h2>
+<ul>
+<li><code>Provider</code>：供应商，在这里指Vagrant调用的虚拟化工具。Vagrant本身并没有能力创建虚拟机，它是调用一些虚拟化工具来创建，如VirtualBox、VMWare、Xen、Docker，甚至AWS，这些虚拟化工具只要安装好了，vagrant会自动封装在底层通过统一的命令调用。也就是说使用vagrant时你电脑上还需要安装对应的Provider，默认是免费开源的virtualbox。</li>
+</ul>
+<!-- raw HTML omitted -->
+<ul>
+<li>
+<p><code>Box</code>：可被Vagrant直接使用的虚拟机镜像文件，大小根据内容的不同从200M-2G不等。针对不同的Provider，Box文件的格式是不一样的，从 <a href="https://atlas.hashicorp.com/boxes/search?utm_source=vagrantcloud.com&amp;vagrantcloud=1">vagrantcloud.com</a> 你可以找到社区维护的box。</p>
+</li>
+<li>
+<p><code>Vagrantfile</code>：Vagrant根据Vagrantfile中的配置来创建虚拟机，是Vagrant的核心。在Vagrantfile文件中你需要指明使用哪个Box（可以下载好的或自己制作，或指定在线的URL地址），虚拟机使用的内存大小和CPU，需要预安装哪些软件，虚拟机的网络配置，与host的共享目录等。</p>
+</li>
+<li>
+<p><code>Provisioner</code>：是Vagrant的插件的一种。大部分现成的box并不是你正好想要的，通过使用你熟悉的provisioner，比如<code>Puppet</code>，可以在你使用<code>vagrant up</code>启动虚拟机时自动的安装软件、修改配置等初始化操作。当然你也可以在最先启动虚拟机后，使用<code>vagrant ssh</code>进去然后手动安装软件，但毕竟不是所有人都是系统管理员，写好Vagrantfile后无需人工干预马上就可以使用vm。目前支持并实现的provisioning有Puppet、Salt、Ansible、Chef这些知名的自动化运维工具，当然需要一定的使用经验；也可以使用shell provisioner，故名思议这个插件就是通过执行shell命令完成统一的作用。</p>
+</li>
+<li>
+<p><code>Guest Additions</code>：这个是常在下载 base box 介绍里有的，一般用来实现host到vm的端口转发、目录共享，在开发环境上都建议装上以便测试。</p>
+</li>
+</ul>
+<h1 id="2-安装vagrant">2. 安装vagrant<a hidden class="anchor" aria-hidden="true" href="#2-安装vagrant">#</a></h1>
+<ul>
+<li>VirtualBox: 4.3.12，https://www.virtualbox.org/wiki/Download_Old_Builds_4_3 。我上手使用的是4.3.20，折腾出过几个问题，据说说4.3.12版本较稳定。
+建议选择VirtualBox ，即使你电脑上已经安装VMware Workstation或Fushion，它的vagrant插件还是要收费的</li>
+<li>Vagrant: 1.7.1，http://www.vagrantup.com/downloads-archive.html</li>
+</ul>
+<p>选择适合你的平台（Windows、Mac、Linux），下载对应格式的安装包。如Mac下 vagrant_1.7.1.dmg、VirtualBox-4.3.20-96997-OSX.dmg 。</p>
+<h1 id="3-使用vagrant打造一个本地开发环境">3. 使用vagrant打造一个本地开发环境<a hidden class="anchor" aria-hidden="true" href="#3-使用vagrant打造一个本地开发环境">#</a></h1>
+<p>本文将会演示从 <a href="https://atlas.hashicorp.com/nrel/boxes/CentOS-6.5-x86_64">nrel CentOS6.5</a> 开始，安装必要的开发包、python、插件、Puppet，然后打包成一个box分发给团队的全过程。你也可以在别人box的基础上进一步通过Vagrantfile定制自己的环境。</p>
+<h2 id="31-初始化">3.1 初始化<a hidden class="anchor" aria-hidden="true" href="#31-初始化">#</a></h2>
+<h3 id="311-vagrant-box-add-box-name-box-url">3.1.1 vagrant box add {box-name} {box-url}<a hidden class="anchor" aria-hidden="true" href="#311-vagrant-box-add-box-name-box-url">#</a></h3>
+<pre tabindex="0"><code>$ vagrant box add ct65_00 Downloads/centos65.box 
+==&gt; box: Adding box &#39;ct65_00&#39; (v0) for provider: 
+    box: Downloading: file:///Users/sean/Downloads/centos65.box
+==&gt; box: Successfully added box &#39;ct65_00&#39; (v0) for &#39;virtualbox&#39;!
+
+$ ll ~/.vagrant.d/boxes/ct65_00
+$ vagrant box list
+
+# vagrant box list
+ct65_00   (virtualbox, 0)
+centos64-i386  (virtualbox, 0)
+</code></pre><p>这一条命令就是根据给出的box（镜像）文件地址，解压一份到用户目录<code>~/.vagrant.d/boxes/{box-name}/0/virtualbox/</code>下，所以你尽量应该以同一用户来管理进行vagrant所有操作。</p>
+<p>*F*<em>K GFW</em>
+在GFW保护之下，这简单获取box文件反而一开始就难到我们了。官方提供的在线安装在墙外是极为方便的，<code>vagrant box add minimal/centos6</code>便自动从<code>vagrantcloud.com</code>(现更名为<code>https://atlas.hashicorp.com/search/boxes</code>)下载，直接进入第二步。</p>
+<p>还有一种方法是，先<code>vagrant init minimal/centos6</code>，然后直接启动<code>vagrant up --provider virtualbox</code>。当然这些都与下载boxes到本地效果是一样的，下载方法就是在vagrantcloud.com上点开你所需要的box版本，然后再URL里加入<code>/providers/virtualbox.box</code>便得到文件地址，如 <a href="https://atlas.hashicorp.com/hashicorp/boxes/precise64">https://atlas.hashicorp.com/hashicorp/boxes/precise64</a> 对应的文件为 <a href="https://atlas.hashicorp.com/hashicorp/boxes/precise64/providers/virtualbox.box">https://atlas.hashicorp.com/hashicorp/boxes/precise64/providers/virtualbox.box</a> 。</p>
+<p>在墙内直接在线安装启动box，会报错：</p>
+<pre tabindex="0"><code>The box &#39;ubuntu/trusty64&#39; could not be found or
+could not be accessed in the remote catalog. If this is a private
+box on HashiCorp&#39;s Atlas, please verify you&#39;re logged in via
+`vagrant login`. Also, please double-check the name. The expanded
+URL and error message are shown below:
+
+URL: [&#34;https://atlas.hashicorp.com/ubuntu/trusty64&#34;]
+Error:
+</code></pre><p>一个办法是ubuntu来 <a href="http://uec-images.ubuntu.com/vagrant/">http://uec-images.ubuntu.com/vagrant/</a> 下载，centos来 <a href="http://nrel.github.io/vagrant-boxes/">http://nrel.github.io/vagrant-boxes/</a> 下载。我也从墙外下了几个典型的box放到了自己的百度云上共享了:http://pan.baidu.com/s/1sjHQBa1 。</p>
+<p><em>2015-04-01更新：无意间发现现在不用梯子也可以访问了，Happy April Fool&rsquo;s Day!</em></p>
+<h3 id="312-vagrant-init-box-name">3.1.2 vagrant init {box-name}<a hidden class="anchor" aria-hidden="true" href="#312-vagrant-init-box-name">#</a></h3>
+<pre tabindex="0"><code>$ mkdir ~/vagrant &amp;&amp; cd ~/vagrant  //这个目录的目的就是统一管理你的Vagrantfile
+$ vagrant init ct65_00
+A `Vagrantfile` has been placed in this directory. You are now
+ready to `vagrant up` your first virtual environment! Please read
+the comments in the Vagrantfile as well as documentation on
+`vagrantup.com` for more information on using Vagrant.
+
+$ vi Vagrantfile
+...
+Vagrant.configure(2) do |config|
+  config.vm.box = &#34;ct65_00&#34;
+  onfig.vm.network &#34;forwarded_port&#34;, guest: 80, host: 8080
+#  config.vm.synced_folder &#34;../data&#34;, &#34;/vagrant_data&#34;
+  config.vm.provider &#34;virtualbox&#34; do |vb|
+    vb.memory = &#34;384&#34;
+    vb.cpus = 1
+  end
+  config.vm.hostname = &#34;vg-ct65_00.tp-link.net&#34;
+...
+</code></pre><p>init只是在当前目录生成一个<code>Vagrantfile</code>文件和<code>.vagrant/</code>目录，可以对它进行修改，比如定义 vm guest machine 的hostname、memory、cpu等，具体有关语法介绍见后文。</p>
+<p>用户后面<code>up</code>虚拟机，这个 box-name 与上面add的相同，如果是 base 则可以省略。</p>
+<h2 id="32-启动虚拟机">3.2 启动虚拟机<a hidden class="anchor" aria-hidden="true" href="#32-启动虚拟机">#</a></h2>
+<pre tabindex="0"><code># vagrant up
+Bringing machine &#39;default&#39; up with &#39;virtualbox&#39; provider...
+==&gt; default: Importing base box &#39;ct65_00&#39;...
+==&gt; default: Matching MAC address for NAT networking...
+==&gt; default: Setting the name of the VM: v-box_default_1427284884787_97348
+==&gt; default: Clearing any previously set network interfaces...
+==&gt; default: Preparing network interfaces based on configuration...
+    default: Adapter 1: nat
+==&gt; default: Forwarding ports...
+    default: 22 =&gt; 2222 (adapter 1)
+==&gt; default: Booting VM...
+==&gt; default: Waiting for machine to boot. This may take a few minutes...
+    default: SSH address: 127.0.0.1:2222
+    default: SSH username: vagrant
+    default: SSH auth method: private key
+    default: Warning: Connection timeout. Retrying...
+    default: Warning: Connection timeout. Retrying...
+    ...
+    default: Warning: Remote connection disconnect. Retrying...
+    default: Warning: Remote connection disconnect. Retrying...
+==&gt; default: Machine booted and ready!
+==&gt; default: Checking for guest additions in VM...
+==&gt; default: Mounting shared folders...
+    default: /vagrant =&gt; /root/vagrant/v-box/ct65_00
+</code></pre><p>up过程是默认会根据当前目录下的Vagrantfile来启动vm，如果当前目录没有Vagrantfile，则去上层目录寻找，依次类推。第一次<code>vagrant up ct65_00</code>时会从<code>~/.vagrant.d/boxes</code>中导入相应的box文件到<code>~/VirtualBox VMs/</code>，可以通过<code>vboxmanage showvminfo {VM-ID}</code>看到该虚拟机的配置（Mac上为VBoxManage）。如果你想让虚拟机存储在指定位置，如我的Mac SSD硬盘空间贵，可以运行VirtualBox，手动设置存储/storage的路径。</p>
+<p>默认 localhost:2222 转发到 guest:22 以供ssh连接；用户名/密码：vagrant/vagrant；默认共享目录就是host上Vagrantfile所在目录；如果电脑配置比较低导致启动时间比较长，或者VirtualBox启动出错，可能会提示上面的 <a href="http://stackoverflow.com/questions/22575261/vagrant-stuck-connection-timeout-retrying">Connection timeout</a> 。</p>
+<p>另外提示一下，某次我在Linux上测试，由于Linux host本身也是vSphere虚拟机，通过vagrant启动virtualbox另一个虚拟机（即嵌套），一直Retrying，后来根据上面 stackoverflow 打开了VBox GUI，发现是CPU架构的问题，一直堵塞，所以就不建议虚拟机上再装虚拟机了：</p>
+<pre tabindex="0"><code>VT-x/AMD-V hardware acceleration is not available on your system. Your 64-bit guest will fail to detect a 64-bit CPU and will not be able to boot.
+</code></pre><h2 id="32-连接虚拟机初始化环境">3.2 连接虚拟机，初始化环境<a hidden class="anchor" aria-hidden="true" href="#32-连接虚拟机初始化环境">#</a></h2>
+<h3 id="vagrant-ssh">vagrant ssh<a hidden class="anchor" aria-hidden="true" href="#vagrant-ssh">#</a></h3>
+<pre tabindex="0"><code>$ vagrant ssh
+Last login: Tue Mar 31 02:15:38 2015 from 10.0.2.2
+Welcome to your Vagrant-built virtual machine.
+</code></pre><p>一般建立box时约定的用户名/密码：vagrant/vagrant，root密码也是 vagrant，默认的网络连接方式是Host-Only。</p>
+<h3 id="定制你的环境">定制你的环境<a hidden class="anchor" aria-hidden="true" href="#定制你的环境">#</a></h3>
+<p>如安装jdk，创建用户，解压tomcat，修改server.xml，添加yum源等。这里一步到位，唯一要说明的是tomcat conf/server.xml 的
+<code>&lt;Context path=&quot;&quot; docBase=&quot;/vagrant_data&quot; reloadable=&quot;true&quot; &gt;...</code>应用目录设置为共享目录。</p>
+<h2 id="33-打包成box">3.3 打包成box<a hidden class="anchor" aria-hidden="true" href="#33-打包成box">#</a></h2>
+<h3 id="331-安装必要软件">3.3.1 安装必要软件<a hidden class="anchor" aria-hidden="true" href="#331-安装必要软件">#</a></h3>
+<p>打包是为了分发出去，做扩展用</p>
+<pre tabindex="0"><code># yum install -y lrzsz telnet vim puppet puppetmaster
+</code></pre><p>如果你是从0开始建立一个box，当然还需要创建vagrant用户以及public key，具体可以参考<a href="http://blog.csdn.net/samxx8/article/details/38943395">如何制作一个vagrant的base box</a>。</p>
+<h3 id="332-安装virtualbox-guest-additions">3.3.2 安装Virtualbox Guest Additions<a hidden class="anchor" aria-hidden="true" href="#332-安装virtualbox-guest-additions">#</a></h3>
+<p>每个人电脑上安装的Virtualbox版本很可能不一样，<code>vagrant up</code>可能会有提示版本不兼容（同一大版本号还好，可省略这一步），导致host到guest共享目录模块失败，最终无法启动虚拟机。</p>
+<p>安装方法可以有 <a href="https://github.com/dotless-de/vagrant-vbguest">vagrant-vbguest</a>（注意这是vagrant插件，不是virtualbox插件），使用超级详细，只需执行<code>vagrant plugin install vagrant-vbguest</code>，默认从本地找 VBoxGuestAdditions.iso （各平台路径一般都可以找到），如果没找到则去<code>http://download.virtualbox.org/virtualbox/%{version}/VBoxGuestAdditions_%{version}.iso</code> 下载，直接启动vm便可安装或更新virtualbox guest additions ，甚至可以通过<code>vagrant vbguest</code>命令给正在运行的vm安装，缺点是 plugin install 得连网。下面是手动在vm内部安装：</p>
+<p>一般最小化的box不带有CDROM，需要通过VirtualBox图形化界面添加一个DVD/CD存储设备，然后在启动VM后 Devices -&gt; Insert Guest Additions CD 。（相信你可以可以找到办法直接挂载 .iso 文件到vm里面，免去添加多余设备）</p>
+<blockquote>
+<p>for linux : /usr/share/virtualbox/VBoxGuestAdditions.iso
+for Mac : /Applications/VirtualBox.app/Contents/MacOS/VBoxGuestAdditions.iso
+for Windows : %PROGRAMFILES%/Oracle/VirtualBox/VBoxGuestAdditions.iso</p>
+</blockquote>
+<pre tabindex="0"><code>$ sudo yum install linux-headers-$(uname -r) build-essential dkms 
+$ sudo mount /dev/cdrom /media/cdrom
+$ sudo sh /media/cdrom/VBoxLinuxAdditions.run --nox11
+</code></pre><p>官方参考：http://docs.vagrantup.com/v2/virtualbox/boxes.html</p>
+<h3 id="333-vagrant-package">3.3.3 vagrant package<a hidden class="anchor" aria-hidden="true" href="#333-vagrant-package">#</a></h3>
+<p>打包导出：</p>
+<pre tabindex="0"><code> vagrant package --output sean-vg-ct65_ts.box
+==&gt; default: Attempting graceful shutdown of VM...
+==&gt; default: Clearing any previously set forwarded ports...
+==&gt; default: Exporting VM...
+==&gt; default: Compressing package to: /Users/sean/vagrant/sean-vg-ct65_ts.box
+</code></pre><p>当前目录下若存在同名package.box则会export失败。打包的来源并不是<code>.vagrant.d</code>而是VirtualBox虚拟机本身，可以通过<code>--base vm-name</code>来指定所导出的虚拟机名称，<code>--vagrantfile file-pathname</code>可以将Vagrantfile直接封进box中。以后就可以把这个 .box 文件分发给开发人员使用了。</p>
+<h1 id="4-其他">4. 其他<a hidden class="anchor" aria-hidden="true" href="#4-其他">#</a></h1>
+<h2 id="41-命令">4.1 命令<a hidden class="anchor" aria-hidden="true" href="#41-命令">#</a></h2>
+<p><code>vagrant suspend</code>将虚拟机置于休眠状态。这时候主机会保存虚拟机的当前状态。再用vagrant up启动虚拟机时能够返回之前工作的状态。这种方式优点是休眠和启动速度都很快，只有几秒钟。缺点是需要额外的磁盘空间来存储当前状态。</p>
+<p><code>vagrant halt</code>则是关机。如果想再次启动还是使用vagrant up命令，不过需要多花些时间。</p>
+<p><code>vagrant destroy</code>则会将虚拟机从磁盘中删除。如果想重新创建还是使用vagrant up命令。</p>
+<p><code>vagrant reload</code>从Vagrantfile重新启动虚拟机。</p>
+<p><code>vagrant global-status</code>输出所有虚拟机当前运行状态，关机、已启动等。</p>
+<p>另外1.2以上版本的Vagrant还引用了插件机制。可以通过vagrant plugin来添加各种各样的plugin，这给Vagrant的应用带来了更大的灵活性和针对性。比如可以添加vagrant-windows的插件来增加对windows系统的支持，通过添加vagrant-aws插件来实现给AWS创建虚拟机的功能。你也可以编写自己的插件。由于Vagrant是ruby写的一个gem，其插件的编写也是使用的Ruby语言。</p>
+<p>关于 Vagrantfile说明以及网络、多机器管理的配置，见 <a href="http://xgknight.com/2015/04/01/vagrantfile/">Varantfile说明</a>。</p>
+<h2 id="42-问题集">4.2 问题集<a hidden class="anchor" aria-hidden="true" href="#42-问题集">#</a></h2>
+<ul>
+<li>
+<p>选用配置略高一点的电脑做host，否则启动会相当慢而且会提示<code>Warning: Connection timeout. Retrying...</code>，如果在300s内没有boot up，你可能需要启用GUI界面可以帮我们诊断一些启动失败的问题，<code>vb.gui = true</code>。坚决不要在虚拟机里玩vagrant！</p>
+</li>
+<li>
+<p>不要轻易在VirtualBox图形界面下强行关闭虚拟机，可能会出现意想不到的错误，如 The guest machine entered an invalid state while waiting for it
+to boot. Valid states are &lsquo;starting, running&rsquo;. The machine is in the
+&lsquo;poweroff&rsquo; state &hellip; 针对这个问题的解决办法，<a href="https://github.com/mitchellh/vagrant/issues/2157">issue 2175</a> 没能搞定，直接destroy重来。</p>
+</li>
+<li>
+<p>我在ubuntu trustry 64-bit 安装virtualbox时，提示依赖没装（libgl1-mesa-glx libqt4-network libqt4-opengl libqtcore4 libqtgui4 libxcursor1 libxinerama1 libxmu6 libxt6），
+使用<code>apt-get install libqt4-opengl</code>来安装上面的依赖，如果报错<code>The following packages have unmet dependencies...</code>，执行<code>apt-get -f install</code> 解决。</p>
+</li>
+<li>
+<p>安装 virtualbox guest additions 失败
+在 3.3.2节安装Virtualbox Guest Additions时，运行<code>./media/cdrom/VBoxLinuxAdditions.run</code>后提示：</p>
+</li>
+</ul>
+<pre tabindex="0"><code>The headers for the current running kernel were not found. If the following module 
+compilation fails then this could be the reason. The missing package can be probably
+ installed with yum install kernel-devel-2.6.32-431.el6.x86_64
+
+Building the main Guest Additions module                   [FAILED]
+...
+</code></pre><p>关机后启动虚拟机，相应的会提示：</p>
+<pre tabindex="0"><code>Failed to mount folders in Linux guest. This is usually because the &#34;vboxsf&#34; file 
+system is not available. Please verify that the guest additions are properly 
+installed in the guest and can work properly. The command attempted was:
+
+
+mount -t vboxsf -o uid=id -u vagrant,gid=getent group vagrant | cut -d: -f3 vagrant /vagrant
+mount -t vboxsf -o uid=id -u vagrant,gid=id -g vagrant vagrant /vagrant
+
+The error output from the last command was:
+
+/sbin/mount.vboxsf: mounting failed with the error: No such device
+</code></pre><p>原因就是旧版本卸载成功但新版本guest additions却因为<code>yum install kernel-devel</code>找不到软件包（No package available）失败。这种情况很少见，kernel-devel 一般都可以装上去解决。如果像我这样提示死活没这个软件包的，换个box吧！</p>
+<ul>
+<li>
+<p>硬盘扩容
+进入到虚拟机后，通过<code>df -h</code>你可能看到磁盘空间不足，需要扩容（不允许缩小空间），就可以通过以下方法完成。</p>
+<ol>
+<li>
+<p>手动方式，与是否使用vagrant无关
+halt关闭虚拟机虚拟机后，使用 <code>VBoxManage modifyhd box-disk1.vdi --resize 10240</code> 即完成修改。但是如果虚拟机磁盘格式创建时使用的是vmdk，则不支持直接vmdk格式修改，需要通过<code>VBoxManage clonehd box_disk1.vmdk box_disk2.vdi --format VDI</code>转换成vdi格式，然后在图形化VirtualBox中选择这个新的磁盘。另外提醒一句，这里的扩容是修改动态分配的磁盘的虚拟大小而不是实际大小，所以假如resize后的值比预分配的磁盘要小的话，会提示 Progress state: VBOX_E_NOT_SUPPORTED ..VBoxManage: error: Resize hard disk operation for this format is not implemented yet!
+相关参考：<a href="http://stackoverflow.com/questions/14917353/resizing-disk-space-on-vagrant-box">Resizing disk space on vagrant box</a>、
+<a href="http://www.streamwave.com/systems-administration/how-to-extend-your-virtualbox-virtual-hard-drive/">VirtualBox VBOX_E_NOT_SUPPORTED Drive Resize Error</a>、<a href="https://gist.github.com/christopher-hopper/9755310">Resize a Hard Disk for a Virtual Machine</a> 。</p>
+</li>
+<li>
+<p>通过Vagrantfile指令修改</p>
+</li>
+</ol>
+</li>
+</ul>
+<pre tabindex="0"><code>  config.vm.provider &#34;virtualbox&#34; do |vb|
+    vb.customize &#39;pre-boot&#39;, [&#39;modifyhd&#39;, &#39;e91678c3-b49b-489b-b280-4e138533252d&#39;, &#39;--resize&#39;, &#39;10240&#39;]
+  end
+</code></pre><p>上面那串数字字母，是虚拟磁盘的UUID，可以先通过<code>ps -ef|grep Virtual</code>(Mac, <code>virtualbox</code> in Linux )查到虚拟机UUID，再通过<code>VBoxManage showvminfo {VM UUID}|grep vdi</code>看到这个 disk UUID。参考 <a href="https://github.com/mitchellh/vagrant/issues/2339">Add some way to increase disk space from Vagrantfile</a>。
+扩容完成后把Vagrantfile中对应的部分去掉，以免每次启动都进行这步操作。</p>
+<ul>
+<li><a href="http://www.cnblogs.com/huang0925/p/3349841.html">Hello Vagrant</a></li>
+<li><a href="http://segmentfault.com/a/1190000000264347">使用 Vagrant 打造跨平台开发环境</a></li>
+<li><a href="https://github.com/astaxie/Go-in-Action/blob/master/ebook/zh/01.2.md">Vagrant安装配置</a></li>
+<li><a href="http://docs.vagrantup.com/v2/virtualbox/boxes.html">Creating a Base Box</a></li>
+<li><a href="http://blog.csdn.net/samxx8/article/details/38943395">如何制作一个vagrant的base box</a></li>
+<li><a href="http://blog.icodeu.com/?tag=vagrant">http://blog.icodeu.com/?tag=vagrant</a></li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/vagrant/">vagrant</a></li>
+      <li><a href="http://xgknight.com/tags/virtualbox/">virtualbox</a></li>
+      <li><a href="http://xgknight.com/tags/%E8%99%9A%E6%8B%9F%E5%8C%96/">虚拟化</a></li>
+      <li><a href="http://xgknight.com/tags/%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83/">开发环境</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

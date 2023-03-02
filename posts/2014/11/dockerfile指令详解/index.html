@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>Dockerfile指令详解 | Sean Note</title>
+<meta name="keywords" content="docker, dockerfile, linux">
+<meta name="description" content="Docker可以从Dockerfile中一步一步的读取指令来自动的创建镜像，常使用Dockerfile来创建用户自定义的镜像。格式如下：
+# Comment INSTRUCTION arguments 虽然前面的指令大小写不敏感，但习惯性的还是建议大写。docker是严格按照顺序（#注释起来的忽略）运行指令的。 下面逐个来介绍几个必要的指令。
+FROM FROM &lt;image&gt; 或 FROM &lt;image&gt;:&lt;tag&gt; 在Dockerfile中第一条非注释INSTRUCTION一定是FROM，它决定了以哪一个镜像作为基准，&lt;image&gt;首选本地是否存在，如果不存在则会从公共仓库下载（当然也可以使用私有仓库的格式）。
+RUN RUN &lt;commnad&gt; 或 RUN [&#34;executable&#34;, &#34;param1&#34;, &#34;param2&#34;] RUN指令会在当前镜像的顶层执行任何命令，并commit成新的（中间）镜像，提交的镜像会在后面继续用到。 上面看到RUN后的格式有两种写法。
+shell格式，相当于执行/bin/sh -c &quot;&lt;command&gt;&quot;：
+RUN apt-get install vim -y exec格式，不会触发shell，所以$HOME这样的环境变量无法使用，但它可以在没有bash的镜像中执行，而且可以避免错误的解析命令字符串：
+RUN [&#34;apt-get&#34;, &#34;install&#34;, &#34;vim&#34;, &#34;-y&#34;] 或 RUN [&#34;/bin/bash&#34;, &#34;-c&#34;, &#34;apt-get install vim -y&#34;] 与shell风格相同 ENTRYPOINT ENTRYPOINT命令设置在容器启动时执行命令，如果有多个ENTRYPOINT指令，那只有最后一个生效。有以下两种命令格式：
+ENTRYPOINT [&#34;executable&#34;, &#34;param1&#34;, &#34;param2&#34;] 数组/exec格式，推荐 或 ENTRYPOINT command param1 param2 shell格式 比如：
+docker run -i -t --rm -p 80:80 nginx 使用exec格式，在docker run &lt;image&gt;的所有参数，都会追加到ENTRYPOINT之后，并且会覆盖CMD所指定的参数（如果有的话）。当然可以在run时使用--entrypoint来覆盖ENTRYPOINT指令。 使用shell格式，ENTRYPOINT相当于执行/bin/sh -c &lt;command.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2014/11/dockerfile%E6%8C%87%E4%BB%A4%E8%AF%A6%E8%A7%A3/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="Dockerfile指令详解" />
+<meta property="og:description" content="Docker可以从Dockerfile中一步一步的读取指令来自动的创建镜像，常使用Dockerfile来创建用户自定义的镜像。格式如下：
+# Comment INSTRUCTION arguments 虽然前面的指令大小写不敏感，但习惯性的还是建议大写。docker是严格按照顺序（#注释起来的忽略）运行指令的。 下面逐个来介绍几个必要的指令。
+FROM FROM &lt;image&gt; 或 FROM &lt;image&gt;:&lt;tag&gt; 在Dockerfile中第一条非注释INSTRUCTION一定是FROM，它决定了以哪一个镜像作为基准，&lt;image&gt;首选本地是否存在，如果不存在则会从公共仓库下载（当然也可以使用私有仓库的格式）。
+RUN RUN &lt;commnad&gt; 或 RUN [&#34;executable&#34;, &#34;param1&#34;, &#34;param2&#34;] RUN指令会在当前镜像的顶层执行任何命令，并commit成新的（中间）镜像，提交的镜像会在后面继续用到。 上面看到RUN后的格式有两种写法。
+shell格式，相当于执行/bin/sh -c &quot;&lt;command&gt;&quot;：
+RUN apt-get install vim -y exec格式，不会触发shell，所以$HOME这样的环境变量无法使用，但它可以在没有bash的镜像中执行，而且可以避免错误的解析命令字符串：
+RUN [&#34;apt-get&#34;, &#34;install&#34;, &#34;vim&#34;, &#34;-y&#34;] 或 RUN [&#34;/bin/bash&#34;, &#34;-c&#34;, &#34;apt-get install vim -y&#34;] 与shell风格相同 ENTRYPOINT ENTRYPOINT命令设置在容器启动时执行命令，如果有多个ENTRYPOINT指令，那只有最后一个生效。有以下两种命令格式：
+ENTRYPOINT [&#34;executable&#34;, &#34;param1&#34;, &#34;param2&#34;] 数组/exec格式，推荐 或 ENTRYPOINT command param1 param2 shell格式 比如：
+docker run -i -t --rm -p 80:80 nginx 使用exec格式，在docker run &lt;image&gt;的所有参数，都会追加到ENTRYPOINT之后，并且会覆盖CMD所指定的参数（如果有的话）。当然可以在run时使用--entrypoint来覆盖ENTRYPOINT指令。 使用shell格式，ENTRYPOINT相当于执行/bin/sh -c &lt;command." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2014/11/dockerfile%E6%8C%87%E4%BB%A4%E8%AF%A6%E8%A7%A3/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2014-11-17T15:21:25+00:00" />
+<meta property="article:modified_time" content="2014-11-17T15:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Dockerfile指令详解"/>
+<meta name="twitter:description" content="Docker可以从Dockerfile中一步一步的读取指令来自动的创建镜像，常使用Dockerfile来创建用户自定义的镜像。格式如下：
+# Comment INSTRUCTION arguments 虽然前面的指令大小写不敏感，但习惯性的还是建议大写。docker是严格按照顺序（#注释起来的忽略）运行指令的。 下面逐个来介绍几个必要的指令。
+FROM FROM &lt;image&gt; 或 FROM &lt;image&gt;:&lt;tag&gt; 在Dockerfile中第一条非注释INSTRUCTION一定是FROM，它决定了以哪一个镜像作为基准，&lt;image&gt;首选本地是否存在，如果不存在则会从公共仓库下载（当然也可以使用私有仓库的格式）。
+RUN RUN &lt;commnad&gt; 或 RUN [&#34;executable&#34;, &#34;param1&#34;, &#34;param2&#34;] RUN指令会在当前镜像的顶层执行任何命令，并commit成新的（中间）镜像，提交的镜像会在后面继续用到。 上面看到RUN后的格式有两种写法。
+shell格式，相当于执行/bin/sh -c &quot;&lt;command&gt;&quot;：
+RUN apt-get install vim -y exec格式，不会触发shell，所以$HOME这样的环境变量无法使用，但它可以在没有bash的镜像中执行，而且可以避免错误的解析命令字符串：
+RUN [&#34;apt-get&#34;, &#34;install&#34;, &#34;vim&#34;, &#34;-y&#34;] 或 RUN [&#34;/bin/bash&#34;, &#34;-c&#34;, &#34;apt-get install vim -y&#34;] 与shell风格相同 ENTRYPOINT ENTRYPOINT命令设置在容器启动时执行命令，如果有多个ENTRYPOINT指令，那只有最后一个生效。有以下两种命令格式：
+ENTRYPOINT [&#34;executable&#34;, &#34;param1&#34;, &#34;param2&#34;] 数组/exec格式，推荐 或 ENTRYPOINT command param1 param2 shell格式 比如：
+docker run -i -t --rm -p 80:80 nginx 使用exec格式，在docker run &lt;image&gt;的所有参数，都会追加到ENTRYPOINT之后，并且会覆盖CMD所指定的参数（如果有的话）。当然可以在run时使用--entrypoint来覆盖ENTRYPOINT指令。 使用shell格式，ENTRYPOINT相当于执行/bin/sh -c &lt;command."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "Dockerfile指令详解",
+      "item": "http://xgknight.com/posts/2014/11/dockerfile%E6%8C%87%E4%BB%A4%E8%AF%A6%E8%A7%A3/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Dockerfile指令详解",
+  "name": "Dockerfile指令详解",
+  "description": "Docker可以从Dockerfile中一步一步的读取指令来自动的创建镜像，常使用Dockerfile来创建用户自定义的镜像。格式如下：\n# Comment INSTRUCTION arguments 虽然前面的指令大小写不敏感，但习惯性的还是建议大写。docker是严格按照顺序（#注释起来的忽略）运行指令的。 下面逐个来介绍几个必要的指令。\nFROM FROM \u0026lt;image\u0026gt; 或 FROM \u0026lt;image\u0026gt;:\u0026lt;tag\u0026gt; 在Dockerfile中第一条非注释INSTRUCTION一定是FROM，它决定了以哪一个镜像作为基准，\u0026lt;image\u0026gt;首选本地是否存在，如果不存在则会从公共仓库下载（当然也可以使用私有仓库的格式）。\nRUN RUN \u0026lt;commnad\u0026gt; 或 RUN [\u0026#34;executable\u0026#34;, \u0026#34;param1\u0026#34;, \u0026#34;param2\u0026#34;] RUN指令会在当前镜像的顶层执行任何命令，并commit成新的（中间）镜像，提交的镜像会在后面继续用到。 上面看到RUN后的格式有两种写法。\nshell格式，相当于执行/bin/sh -c \u0026quot;\u0026lt;command\u0026gt;\u0026quot;：\nRUN apt-get install vim -y exec格式，不会触发shell，所以$HOME这样的环境变量无法使用，但它可以在没有bash的镜像中执行，而且可以避免错误的解析命令字符串：\nRUN [\u0026#34;apt-get\u0026#34;, \u0026#34;install\u0026#34;, \u0026#34;vim\u0026#34;, \u0026#34;-y\u0026#34;] 或 RUN [\u0026#34;/bin/bash\u0026#34;, \u0026#34;-c\u0026#34;, \u0026#34;apt-get install vim -y\u0026#34;] 与shell风格相同 ENTRYPOINT ENTRYPOINT命令设置在容器启动时执行命令，如果有多个ENTRYPOINT指令，那只有最后一个生效。有以下两种命令格式：\nENTRYPOINT [\u0026#34;executable\u0026#34;, \u0026#34;param1\u0026#34;, \u0026#34;param2\u0026#34;] 数组/exec格式，推荐 或 ENTRYPOINT command param1 param2 shell格式 比如：\ndocker run -i -t --rm -p 80:80 nginx 使用exec格式，在docker run \u0026lt;image\u0026gt;的所有参数，都会追加到ENTRYPOINT之后，并且会覆盖CMD所指定的参数（如果有的话）。当然可以在run时使用--entrypoint来覆盖ENTRYPOINT指令。 使用shell格式，ENTRYPOINT相当于执行/bin/sh -c \u0026lt;command.",
+  "keywords": [
+    "docker", "dockerfile", "linux"
+  ],
+  "articleBody": "Docker可以从Dockerfile中一步一步的读取指令来自动的创建镜像，常使用Dockerfile来创建用户自定义的镜像。格式如下：\n# Comment INSTRUCTION arguments 虽然前面的指令大小写不敏感，但习惯性的还是建议大写。docker是严格按照顺序（#注释起来的忽略）运行指令的。 下面逐个来介绍几个必要的指令。\nFROM FROM 或 FROM : 在Dockerfile中第一条非注释INSTRUCTION一定是FROM，它决定了以哪一个镜像作为基准，首选本地是否存在，如果不存在则会从公共仓库下载（当然也可以使用私有仓库的格式）。\nRUN RUN 或 RUN [\"executable\", \"param1\", \"param2\"] RUN指令会在当前镜像的顶层执行任何命令，并commit成新的（中间）镜像，提交的镜像会在后面继续用到。 上面看到RUN后的格式有两种写法。\nshell格式，相当于执行/bin/sh -c \"\"：\nRUN apt-get install vim -y exec格式，不会触发shell，所以$HOME这样的环境变量无法使用，但它可以在没有bash的镜像中执行，而且可以避免错误的解析命令字符串：\nRUN [\"apt-get\", \"install\", \"vim\", \"-y\"] 或 RUN [\"/bin/bash\", \"-c\", \"apt-get install vim -y\"] 与shell风格相同 ENTRYPOINT ENTRYPOINT命令设置在容器启动时执行命令，如果有多个ENTRYPOINT指令，那只有最后一个生效。有以下两种命令格式：\nENTRYPOINT [\"executable\", \"param1\", \"param2\"] 数组/exec格式，推荐 或 ENTRYPOINT command param1 param2 shell格式 比如：\ndocker run -i -t --rm -p 80:80 nginx 使用exec格式，在docker run 的所有参数，都会追加到ENTRYPOINT之后，并且会覆盖CMD所指定的参数（如果有的话）。当然可以在run时使用--entrypoint来覆盖ENTRYPOINT指令。 使用shell格式，ENTRYPOINT相当于执行/bin/sh -c ，这种格式会忽略docker run和CMD的所有参数。\n以推荐使用的exec格式为例： 我们可以使用ENTRYPOINT来设置基本不会变化的命令，用CMD来设置其它的可能改变的默认启动命令或选项（docker run会覆盖的）。\nFROM ubuntu ENTRYPOINT [\"top\", \"-b\"] CMD [\"-c\"] docker build -t registry.tp-link.net:8000/ubuntu:dockerfile_test . 运行\n$ docker run -it --rm --name test 44f178c416b0 -H 这里的top后的选项会追加到上面的ENTRYPOINT，同时会覆盖CMD的，所以实际相当于执行top -b -H，没有-c： top - 04:32:07 up 10 days, 11:27, 0 users, load average: 0.01, 0.03, 0.00 Threads: 1 total, 1 running, 0 sleeping, 0 stopped, 0 zombie %Cpu(s): 0.1 us, 0.1 sy, 0.0 ni, 99.7 id, 0.2 wa, 0.0 hi, 0.0 si, 0.0 st KiB Mem: 4056784 total, 3749188 used, 307596 free, 209372 buffers KiB Swap: 0 total, 0 used, 0 free. 571388 cached Mem PID USER PR NI VIRT RES SHR S %CPU %MEM TIME+ COMMAND 1 root 20 0 19688 1208 940 R 0.0 0.0 0:00.01 top 如果在使用的docker版本在v1.3及以上，则可以使用docker exec继续在容器中验证，看到完整的top命令docker exec -it test ps aux\nCMD CMD [\"executable\",\"param1\",\"param2\"] （数组/exec格式） CMD [\"param1\",\"param2\"] (as default parameters to ENTRYPOINT) CMD command param1 param2 (shell格式) 一个Dockerfile里只能有一个CMD，如果有多个，只有最后一个生效。CMD指令的主要功能是在build完成后，为了给docker run启动到容器时提供默认命令或参数，这些默认值可以包含可执行的命令，也可以只是参数（此时可执行命令就必须提前在ENTRYPOINT中指定）。\n它与ENTRYPOINT的功能极为相似，区别在于如果docker run后面出现与CMD指定的相同命令，那么CMD会被覆盖；而ENTRYPOINT会把容器名后面的所有内容都当成参数传递给其指定的命令（不会对命令覆盖）。另外CMD还可以单独作为ENTRYPOINT的所接命令的可选参数。 CMD与RUN的区别在于，RUN是在build成镜像时就运行的，先于CMD和ENTRYPOINT的，CMD会在每次启动容器的时候运行，而RUN只在创建镜像时执行一次，固化在image中。\n举例1：\nDockerfile: CMD [\"echo CMD_args\"] 运行 docker run echo run_arg 结果 输出 run_arg 因为echo run_arg覆盖了CMD。如果run后没有echo run_arg，则输出CMD_args。\n举例2：\nDockerfile: ENTRYPOINT [\"echo\", \"ENTRYPOINT_args\"] 运行 docker run run_arg 结果 输出 ENTRYPOINT_args run_arg 因为echo run_arg追加到ENTRYPOIINT的echo后面了。如果在ENTRYPOINT后再加入一行CMD [\"CMD_args\"]，则结果依旧，除非去掉run后的所有参数。 当出现ENTRYPOINT指令时CMD指令只可能(当ENTRYPOINT指令使用exec方式执行时)被当做ENTRYPOINT指令的参数使用，其他情况则会被忽略。\nEXPOSE EXPOSE指令告诉容器在运行时要监听的端口，但是这个端口是用于多个容器之间通信用的（links），外面的host是访问不到的。要把端口暴露给外面的主机，在启动容器时使用-p选项。 示例：\n# expose memcached(s) port EXPOSE 11211 11212 ADD ADD ... 将文件拷贝到container的文件系统对应的路径下。 可以是文件、文件夹、URL，对于文件和文件夹必须是在Dockerfile的相对路径下（build context path），即只能是相对路径且不能包含../path/。 只能是容器中的绝对路径。如果路径不存在则会自动级联创建，根据你的需要是里是否需要反斜杠/，习惯使用/结尾从而避免被当成文件。 示例：\n支持模糊匹配 ADD hom* /mydir/ # adds all files starting with \"hom\" ADD hom?.txt /mydir/ # ? is replaced with any single character ADD requirements.txt /tmp/ RUN pip install /tmp/requirements.txt ADD . /tmp/ 另外ADD支持远程URL获取文件，但官方认为是strongly discouraged，建议使用wget或curl代替。 ADD还支持自动解压tar文件，比如ADD trusty-core-amd64.tar.gz /会线自动解压内容再COPY到在容器的/目录下。\nADD只有在build镜像的时候运行一次，后面运行container的时候不会再重新加载，也就是你不能在运行时通过这种方式向容器中传送文件，-v选项映射本地到容器的目录。\nCOPY Same as ‘ADD’ but without the tar and remote url handling.\nCOPY的语法与功能与ADD相同，只是不支持上面讲到的是远程URL、自动解压这两个特性，但是Best Practices for Writing Dockerfiles建议尽量使用COPY，并使用RUN与COPY的组合来代替ADD，这是因为虽然COPY只支持本地文件拷贝到container，但它的处理比ADD更加透明，建议只在复制tar文件时使用ADD，如ADD trusty-core-amd64.tar.gz /。\nENV 用于设置环境变量：\nENV 设置了后，后续的RUN命令都可以使用，当运行生成的镜像时这些环境变量依然有效，如果需要在运行时更改这些环境变量可以在运行docker run时添加-env =参数来修改。\nVOLUME VOLUME指令用来在容器中设置一个挂载点，可以用来让其他容器挂载以实现数据共享或对容器数据的备份、恢复或迁移。请参考文章docker容器间通信\nWORKDIR WORKDIR指令用于设置Dockerfile中的RUN、CMD和ENTRYPOINT指令执行命令的工作目录(默认为/目录)，该指令在Dockerfile文件中可以出现多次，如果使用相对路径则为相对于WORKDIR上一次的值，例如WORKDIR /a，WORKDIR b，RUN pwd最终输出的当前目录是/a/b。（RUN cd /a/b，RUN pwd是得不到/a/b的）\nONBUILD ONBUILD指令用来设置一些触发的指令，用于在当该镜像被作为基础镜像来创建其他镜像时(也就是Dockerfile中的FROM为当前镜像时)执行一些操作，ONBUILD中定义的指令会在用于生成其他镜像的Dockerfile文件的FROM指令之后被执行，上述介绍的任何一个指令都可以用于ONBUILD指令，可以用来执行一些因为环境而变化的操作，使镜像更加通用。\n注意：\nONBUILD中定义的指令在当前镜像的build中不会被执行。 可以通过查看docker inspect 命令执行结果的OnBuild键来查看某个镜像ONBUILD指令定义的内容。 ONBUILD中定义的指令会当做引用该镜像的Dockerfile文件的FROM指令的一部分来执行，执行顺序会按ONBUILD定义的先后顺序执行，如果ONBUILD中定义的任何一个指令运行失败，则会使FROM指令中断并导致整个build失败，当所有的ONBUILD中定义的指令成功完成后，会按正常顺序继续执行build。 ONBUILD中定义的指令不会继承到当前引用的镜像中，也就是当引用ONBUILD的镜像创建完成后将会清除所有引用的ONBUILD指令。 ONBUILD指令不允许嵌套，例如ONBUILD ONBUILD ADD . /data是不允许的。 ONBUILD指令不会执行其定义的FROM或MAINTAINER指令。 例如，Dockerfile使用如下的内容创建了镜像 image-A ：\n[...] ONBUILD ADD . /app/src ONBUILD RUN /usr/local/bin/python-build --dir /app/src [...] 如果基于 image-A 创建新的镜像时，新的Dockerfile中使用FROM image-A指定基础镜像时，会自动执行ONBUILD指令内容，等价于在后面添加了两条指令。\nFROM image-A #Automatically run the following ADD . /app/src RUN /usr/local/bin/python-build --dir /app/src USER 为运行镜像时或者任何接下来的RUN指令指定运行用户名或UID：\nUSER daemon MAINTAINER 使用MAINTAINER指令来为生成的镜像署名作者\nMAINTAINER author's name mailaddress The .dockerignore file .dockerignore用来忽略上下文目录中包含的一些image用不到的文件，它们不会传送到docker daemon。规则使用go语言的匹配语法。如：\n$ cat .dockerignore .git tmp* 更多内容参考Dockerfile最佳实践系列。官方有个Dockerfile tutorial练习Dockerfile的写法，非常简单但对于养成良好的格式、注释有一些帮助。\nDockerfile示例 下面的Dockerfile是MySQL官方镜像的构建过程。从ubuntu基础镜像开始构建，安装mysql-server、配置权限、映射目录和端口，CMD在从这个镜像运行到容器时启动mysql。其中VOLUME定义的两个可挂载点，用于在host中挂载，因为数据库保存在主机上而非容器中才是比较安全的。\n# # MySQL Dockerfile # # https://github.com/dockerfile/mysql # # Pull base image. FROM dockerfile/ubuntu # Install MySQL. RUN \\ apt-get update \u0026\u0026 \\ DEBIAN_FRONTEND=noninteractive apt-get install -y mysql-server \u0026\u0026 \\ rm -rf /var/lib/apt/lists/* \u0026\u0026 \\ sed -i 's/^\\(bind-address\\s.*\\)/# \\1/' /etc/mysql/my.cnf \u0026\u0026 \\ sed -i 's/^\\(log_error\\s.*\\)/# \\1/' /etc/mysql/my.cnf \u0026\u0026 \\ echo \"mysqld_safe \u0026\" \u003e /tmp/config \u0026\u0026 \\ echo \"mysqladmin --silent --wait=30 ping || exit 1\" \u003e\u003e /tmp/config \u0026\u0026 \\ echo \"mysql -e 'GRANT ALL PRIVILEGES ON *.* TO \\\"root\\\"@\\\"%\\\" WITH GRANT OPTION;'\" \u003e\u003e /tmp/config \u0026\u0026 \\ bash /tmp/config \u0026\u0026 \\ rm -f /tmp/config # Define mountable directories. VOLUME [\"/etc/mysql\", \"/var/lib/mysql\"] # Define working directory. WORKDIR /data # Define default command. CMD [\"mysqld_safe\"] # Expose ports. EXPOSE 3306 使用：\n$ docker build -t=\"dockerfile/mysql\" github.com/dockerfile/mysql 或下载Dockerfile内容再当前目录： $ docker build -t=\"dockerfile/mysql\" . （提示，上述第一条命令，如果你的host不可以连接Docker Hub，那么需要在启动docker服务时使用HTTP_PROXY=——用于build的时更新下载软件，同时执行docker build的终端设置http_proxy和https_proxy用于下载Dockerfile）\n运行：\n$ docker run -d --name mysql -p 3306:3306 dockerfile/mysql 或 $ docker run -it --rm --link mysql:mysql dockerfile/mysql bash -c 'mysql -h $MYSQL_PORT_3306_TCP_ADDR' 参考 Dockerfile Reference 中文 Dockerfile详解 dockerpool-build-instructions https://docs.docker.com/reference/builder/ https://docs.docker.com/articles/dockerfile_best-practices/ http://syntaxsugar.cn/2014/07/09/dockerfile/ ",
+  "wordCount" : "583",
+  "inLanguage": "en",
+  "datePublished": "2014-11-17T15:21:25Z",
+  "dateModified": "2014-11-17T15:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2014/11/dockerfile%E6%8C%87%E4%BB%A4%E8%AF%A6%E8%A7%A3/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      Dockerfile指令详解
+    </h1>
+    <div class="post-meta"><span title='2014-11-17 15:21:25 +0000 UTC'>November 17, 2014</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>Docker可以从<code>Dockerfile</code>中一步一步的读取指令来自动的创建镜像，常使用Dockerfile来创建用户自定义的镜像。格式如下：</p>
+<pre tabindex="0"><code># Comment
+INSTRUCTION arguments
+</code></pre><p>虽然前面的指令大小写不敏感，但习惯性的还是建议大写。docker是严格按照顺序（<code>#</code>注释起来的忽略）运行指令的。
+下面逐个来介绍几个必要的指令。</p>
+<h3 id="from">FROM<a hidden class="anchor" aria-hidden="true" href="#from">#</a></h3>
+<pre tabindex="0"><code>FROM  &lt;image&gt;
+或
+FROM &lt;image&gt;:&lt;tag&gt;
+</code></pre><p>在Dockerfile中第一条非注释INSTRUCTION一定是<code>FROM</code>，它决定了以哪一个镜像作为基准，<code>&lt;image&gt;</code>首选本地是否存在，如果不存在则会从公共仓库下载（当然也可以使用私有仓库的格式）。</p>
+<h3 id="run">RUN<a hidden class="anchor" aria-hidden="true" href="#run">#</a></h3>
+<pre tabindex="0"><code>RUN &lt;commnad&gt;
+或
+RUN [&#34;executable&#34;, &#34;param1&#34;, &#34;param2&#34;]
+</code></pre><p><code>RUN</code>指令会在当前镜像的顶层执行任何命令，并commit成新的（中间）镜像，提交的镜像会在后面继续用到。
+上面看到<code>RUN</code>后的格式有两种写法。</p>
+<!-- raw HTML omitted -->
+<p>shell格式，相当于执行<code>/bin/sh -c &quot;&lt;command&gt;&quot;</code>：</p>
+<pre tabindex="0"><code>RUN apt-get install vim -y
+</code></pre><p>exec格式，不会触发shell，所以<code>$HOME</code>这样的环境变量无法使用，但它可以在没有<code>bash</code>的镜像中执行，而且可以避免错误的解析命令字符串：</p>
+<pre tabindex="0"><code>RUN [&#34;apt-get&#34;, &#34;install&#34;, &#34;vim&#34;, &#34;-y&#34;]
+或
+RUN [&#34;/bin/bash&#34;, &#34;-c&#34;, &#34;apt-get install vim -y&#34;]  与shell风格相同
+</code></pre><h3 id="entrypoint">ENTRYPOINT<a hidden class="anchor" aria-hidden="true" href="#entrypoint">#</a></h3>
+<p><code>ENTRYPOINT</code>命令设置在容器启动时执行命令，如果有多个<code>ENTRYPOINT</code>指令，那只有最后一个生效。有以下两种命令格式：</p>
+<pre tabindex="0"><code>ENTRYPOINT [&#34;executable&#34;, &#34;param1&#34;, &#34;param2&#34;]  数组/exec格式，推荐
+或
+ENTRYPOINT command param1 param2    shell格式
+</code></pre><p>比如：</p>
+<pre tabindex="0"><code>docker run -i -t --rm -p 80:80 nginx
+</code></pre><p>使用exec格式，在<code>docker run &lt;image&gt;</code>的所有参数，都会追加到<code>ENTRYPOINT</code>之后，并且会覆盖<code>CMD</code>所指定的参数（如果有的话）。当然可以在<code>run</code>时使用<code>--entrypoint</code>来覆盖<code>ENTRYPOINT</code>指令。
+使用shell格式，<code>ENTRYPOINT</code>相当于执行<code>/bin/sh -c &lt;command..&gt;</code>，这种格式会忽略<code>docker run</code>和<code>CMD</code>的所有参数。</p>
+<p>以推荐使用的exec格式为例：
+我们可以使用<code>ENTRYPOINT</code>来设置基本不会变化的命令，用<code>CMD</code>来设置其它的可能改变的默认启动命令或选项（<code>docker run</code>会覆盖的）。</p>
+<pre tabindex="0"><code>FROM ubuntu
+ENTRYPOINT [&#34;top&#34;, &#34;-b&#34;]
+CMD [&#34;-c&#34;]
+</code></pre><p><code>docker build -t registry.tp-link.net:8000/ubuntu:dockerfile_test .</code>
+运行</p>
+<pre tabindex="0"><code>$ docker run -it --rm --name test 44f178c416b0 -H
+这里的top后的选项会追加到上面的ENTRYPOINT，同时会覆盖CMD的，所以实际相当于执行top -b -H，没有-c：
+top - 04:32:07 up 10 days, 11:27,  0 users,  load average: 0.01, 0.03, 0.00
+Threads:   1 total,   1 running,   0 sleeping,   0 stopped,   0 zombie
+%Cpu(s):  0.1 us,  0.1 sy,  0.0 ni, 99.7 id,  0.2 wa,  0.0 hi,  0.0 si,  0.0 st
+KiB Mem:   4056784 total,  3749188 used,   307596 free,   209372 buffers
+KiB Swap:        0 total,        0 used,        0 free.   571388 cached Mem
+
+  PID USER      PR  NI    VIRT    RES    SHR S %CPU %MEM     TIME+ COMMAND
+    1 root      20   0   19688   1208    940 R  0.0  0.0   0:00.01 top
+</code></pre><p>如果在使用的docker版本在v1.3及以上，则可以使用<code>docker exec</code>继续在容器中验证，看到完整的top命令<code>docker exec -it test ps aux</code></p>
+<h3 id="cmd">CMD<a hidden class="anchor" aria-hidden="true" href="#cmd">#</a></h3>
+<pre tabindex="0"><code>CMD [&#34;executable&#34;,&#34;param1&#34;,&#34;param2&#34;]  （数组/exec格式）
+CMD [&#34;param1&#34;,&#34;param2&#34;]  (as default parameters to ENTRYPOINT)
+CMD command param1 param2  (shell格式)
+</code></pre><p>一个Dockerfile里只能有一个CMD，如果有多个，只有最后一个生效。<code>CMD</code>指令的主要功能是在build完成后，为了给<code>docker run</code>启动到容器时提供默认命令或参数，这些默认值可以包含可执行的命令，也可以只是参数（此时可执行命令就必须提前在<code>ENTRYPOINT</code>中指定）。</p>
+<p>它与<code>ENTRYPOINT</code>的功能极为相似，区别在于如果<code>docker run</code>后面出现与<code>CMD</code>指定的相同命令，那么CMD会被覆盖；而<code>ENTRYPOINT</code>会把容器名后面的所有内容都当成参数传递给其指定的命令（不会对命令覆盖）。另外<code>CMD</code>还可以单独作为<code>ENTRYPOINT</code>的所接命令的可选参数。
+<code>CMD</code>与<code>RUN</code>的区别在于，<code>RUN</code>是在<code>build</code>成镜像时就运行的，先于<code>CMD</code>和<code>ENTRYPOINT</code>的，<code>CMD</code>会在每次启动容器的时候运行，而<code>RUN</code>只在创建镜像时执行一次，固化在image中。</p>
+<p>举例1：</p>
+<pre tabindex="0"><code>Dockerfile:
+    CMD [&#34;echo CMD_args&#34;]
+运行
+    docker run &lt;image&gt; echo run_arg
+结果
+    输出 run_arg
+</code></pre><p>因为<code>echo run_arg</code>覆盖了<code>CMD</code>。如果<code>run</code>后没有<code>echo run_arg</code>，则输出<code>CMD_args</code>。</p>
+<p>举例2：</p>
+<pre tabindex="0"><code>Dockerfile:
+    ENTRYPOINT [&#34;echo&#34;, &#34;ENTRYPOINT_args&#34;]
+运行
+    docker run &lt;image&gt; run_arg
+结果
+    输出 ENTRYPOINT_args run_arg
+</code></pre><p>因为<code>echo run_arg</code>追加到<code>ENTRYPOIINT</code>的<code>echo</code>后面了。如果在<code>ENTRYPOINT</code>后再加入一行<code>CMD [&quot;CMD_args&quot;]</code>，则结果依旧，除非去掉run后的所有参数。
+当出现<code>ENTRYPOINT</code>指令时<code>CMD</code>指令只可能(当<code>ENTRYPOINT</code>指令使用exec方式执行时)被当做<code>ENTRYPOINT</code>指令的参数使用，其他情况则会被忽略。</p>
+<h3 id="expose">EXPOSE<a hidden class="anchor" aria-hidden="true" href="#expose">#</a></h3>
+<p><code>EXPOSE</code>指令告诉容器在运行时要监听的端口，但是这个端口是用于多个容器之间通信用的（links），外面的host是访问不到的。要把端口暴露给外面的主机，在启动容器时使用<code>-p</code>选项。
+示例：</p>
+<pre tabindex="0"><code># expose memcached(s) port
+EXPOSE 11211 11212
+</code></pre><h3 id="add">ADD<a hidden class="anchor" aria-hidden="true" href="#add">#</a></h3>
+<pre tabindex="0"><code>ADD &lt;src&gt;... &lt;dest&gt;
+</code></pre><p>将文件<code>&lt;src&gt;</code>拷贝到container的文件系统对应的路径<code>&lt;dest&gt;</code>下。
+<code>&lt;src&gt;</code>可以是文件、文件夹、URL，对于文件和文件夹<code>&lt;src&gt;</code>必须是在Dockerfile的相对路径下（build context path），即只能是相对路径且不能包含<code>../path/</code>。
+<code>&lt;dest&gt;</code>只能是容器中的绝对路径。如果路径不存在则会自动级联创建，根据你的需要是<code>&lt;dest&gt;</code>里是否需要反斜杠<code>/</code>，习惯使用<code>/</code>结尾从而避免被当成文件。
+示例：</p>
+<pre tabindex="0"><code>支持模糊匹配
+ADD hom* /mydir/        # adds all files starting with &#34;hom&#34;
+ADD hom?.txt /mydir/    # ? is replaced with any single character
+
+ADD requirements.txt /tmp/
+RUN pip install /tmp/requirements.txt
+ADD . /tmp/
+</code></pre><p>另外<code>ADD</code>支持远程URL获取文件，但官方认为是<code>strongly discouraged</code>，建议使用<code>wget</code>或<code>curl</code>代替。
+<code>ADD</code>还支持自动解压tar文件，比如<code>ADD trusty-core-amd64.tar.gz /</code>会线自动解压内容再COPY到在容器的<code>/</code>目录下。</p>
+<p>ADD只有在build镜像的时候运行一次，后面运行container的时候不会再重新加载，也就是你不能在运行时通过这种方式向容器中传送文件，<code>-v</code>选项映射本地到容器的目录。</p>
+<h3 id="copy">COPY<a hidden class="anchor" aria-hidden="true" href="#copy">#</a></h3>
+<p>Same as &lsquo;ADD&rsquo; but without the tar and remote url handling.</p>
+<p><code>COPY</code>的语法与功能与<code>ADD</code>相同，只是不支持上面讲到的<code>&lt;src&gt;</code>是远程URL、自动解压这两个特性，但是<a href="https://docs.docker.com/articles/dockerfile_best-practices/">Best Practices for Writing Dockerfiles</a>建议<strong>尽量使用<code>COPY</code></strong>，并使用<code>RUN</code>与<code>COPY</code>的组合来代替<code>ADD</code>，这是因为虽然<code>COPY</code>只支持本地文件拷贝到container，但它的处理比<code>ADD</code>更加透明，建议只在复制tar文件时使用<code>ADD</code>，如<code>ADD trusty-core-amd64.tar.gz /</code>。</p>
+<h3 id="env">ENV<a hidden class="anchor" aria-hidden="true" href="#env">#</a></h3>
+<p>用于设置环境变量：</p>
+<pre tabindex="0"><code>ENV &lt;key&gt; &lt;value&gt;
+</code></pre><p>设置了后，后续的RUN命令都可以使用，当运行生成的镜像时这些环境变量依然有效，如果需要在运行时更改这些环境变量可以在运行<code>docker run</code>时添加<code>-env &lt;key&gt;=&lt;value&gt;</code>参数来修改。</p>
+<h3 id="volume">VOLUME<a hidden class="anchor" aria-hidden="true" href="#volume">#</a></h3>
+<p>VOLUME指令用来在容器中设置一个挂载点，可以用来让其他容器挂载以实现数据共享或对容器数据的备份、恢复或迁移。请参考文章<a href="http://seanlook/2014/12/17/docker_comun">docker容器间通信</a></p>
+<h3 id="workdir">WORKDIR<a hidden class="anchor" aria-hidden="true" href="#workdir">#</a></h3>
+<p><code>WORKDIR指</code>令用于设置<code>Dockerfile</code>中的<code>RUN</code>、<code>CMD</code>和<code>ENTRYPOINT</code>指令执行命令的工作目录(默认为<code>/</code>目录)，该指令在<code>Dockerfile</code>文件中可以出现多次，如果使用相对路径则为相对于<code>WORKDIR</code>上一次的值，例如<code>WORKDIR /a</code>，<code>WORKDIR b</code>，<code>RUN pwd</code>最终输出的当前目录是<code>/a/b</code>。（<code>RUN cd /a/b</code>，<code>RUN pwd</code>是得不到<code>/a/b</code>的）</p>
+<h3 id="onbuild">ONBUILD<a hidden class="anchor" aria-hidden="true" href="#onbuild">#</a></h3>
+<p><code>ONBUILD</code>指令用来设置一些触发的指令，用于在当该镜像被作为基础镜像来创建其他镜像时(也就是<code>Dockerfile</code>中的<code>FROM</code>为当前镜像时)执行一些操作，<code>ONBUILD中</code>定义的指令会在用于生成其他镜像的<code>Dockerfile</code>文件的<code>FROM</code>指令之后被执行，上述介绍的任何一个指令都可以用于<code>ONBUILD</code>指令，可以用来执行一些因为环境而变化的操作，使镜像更加通用。</p>
+<p>注意：</p>
+<ol>
+<li>ONBUILD中定义的指令在当前镜像的build中不会被执行。</li>
+<li>可以通过查看<code>docker inspect &lt;image&gt;</code>命令执行结果的OnBuild键来查看某个镜像ONBUILD指令定义的内容。</li>
+<li>ONBUILD中定义的指令会当做引用该镜像的Dockerfile文件的FROM指令的一部分来执行，执行顺序会按ONBUILD定义的先后顺序执行，如果ONBUILD中定义的任何一个指令运行失败，则会使FROM指令中断并导致整个build失败，当所有的ONBUILD中定义的指令成功完成后，会按正常顺序继续执行build。</li>
+<li>ONBUILD中定义的指令不会继承到当前引用的镜像中，也就是当引用ONBUILD的镜像创建完成后将会清除所有引用的ONBUILD指令。</li>
+<li>ONBUILD指令不允许嵌套，例如<code>ONBUILD ONBUILD ADD . /data</code>是不允许的。</li>
+<li>ONBUILD指令不会执行其定义的FROM或MAINTAINER指令。</li>
+</ol>
+<p>例如，<code>Dockerfile</code>使用如下的内容创建了镜像 image-A ：</p>
+<pre tabindex="0"><code>[...]
+ONBUILD ADD . /app/src
+ONBUILD RUN /usr/local/bin/python-build --dir /app/src
+[...]
+</code></pre><p>如果基于 image-A 创建新的镜像时，新的<code>Dockerfile</code>中使用<code>FROM image-A</code>指定基础镜像时，会自动执行<code>ONBUILD</code>指令内容，等价于在后面添加了两条指令。</p>
+<pre tabindex="0"><code>FROM image-A
+
+#Automatically run the following
+ADD . /app/src
+RUN /usr/local/bin/python-build --dir /app/src
+</code></pre><h3 id="user">USER<a hidden class="anchor" aria-hidden="true" href="#user">#</a></h3>
+<p>为运行镜像时或者任何接下来的<code>RUN</code>指令指定运行用户名或UID：</p>
+<pre><code>USER daemon
+</code></pre>
+<h3 id="maintainer">MAINTAINER<a hidden class="anchor" aria-hidden="true" href="#maintainer">#</a></h3>
+<p>使用MAINTAINER指令来为生成的镜像署名作者</p>
+<pre><code>MAINTAINER author's name mailaddress
+</code></pre>
+<h3 id="the-dockerignore-file">The <code>.dockerignore</code> file<a hidden class="anchor" aria-hidden="true" href="#the-dockerignore-file">#</a></h3>
+<p><code>.dockerignore</code>用来忽略上下文目录中包含的一些image用不到的文件，它们不会传送到docker daemon。规则使用go语言的匹配语法。如：</p>
+<pre tabindex="0"><code>$ cat .dockerignore
+.git
+tmp*
+</code></pre><p>更多内容参考<a href="http://xgknight.com/2014/12/20/dockerfile_best_practice1">Dockerfile最佳实践</a>系列。官方有个<a href="%E6%A0%BC%E5%BC%8F">Dockerfile tutorial</a>练习Dockerfile的写法，非常简单但对于养成良好的格式、注释有一些帮助。</p>
+<h3 id="dockerfile示例">Dockerfile示例<a hidden class="anchor" aria-hidden="true" href="#dockerfile示例">#</a></h3>
+<p>下面的<code>Dockerfile</code>是MySQL官方镜像的构建过程。从ubuntu基础镜像开始构建，安装mysql-server、配置权限、映射目录和端口，<code>CMD</code>在从这个镜像运行到容器时启动mysql。其中<code>VOLUME</code>定义的两个可挂载点，用于在host中挂载，因为数据库保存在主机上而非容器中才是比较安全的。</p>
+<pre tabindex="0"><code>#
+# MySQL Dockerfile
+#
+# https://github.com/dockerfile/mysql
+#
+
+# Pull base image.
+FROM dockerfile/ubuntu
+
+# Install MySQL.
+RUN \
+  apt-get update &amp;&amp; \
+  DEBIAN_FRONTEND=noninteractive apt-get install -y mysql-server &amp;&amp; \
+  rm -rf /var/lib/apt/lists/* &amp;&amp; \
+  sed -i &#39;s/^\(bind-address\s.*\)/# \1/&#39; /etc/mysql/my.cnf &amp;&amp; \
+  sed -i &#39;s/^\(log_error\s.*\)/# \1/&#39; /etc/mysql/my.cnf &amp;&amp; \
+  echo &#34;mysqld_safe &amp;&#34; &gt; /tmp/config &amp;&amp; \
+  echo &#34;mysqladmin --silent --wait=30 ping || exit 1&#34; &gt;&gt; /tmp/config &amp;&amp; \
+  echo &#34;mysql -e &#39;GRANT ALL PRIVILEGES ON *.* TO \&#34;root\&#34;@\&#34;%\&#34; WITH GRANT OPTION;&#39;&#34; &gt;&gt; /tmp/config &amp;&amp; \
+  bash /tmp/config &amp;&amp; \
+  rm -f /tmp/config
+
+# Define mountable directories.
+VOLUME [&#34;/etc/mysql&#34;, &#34;/var/lib/mysql&#34;]
+
+# Define working directory.
+WORKDIR /data
+
+# Define default command.
+CMD [&#34;mysqld_safe&#34;]
+
+# Expose ports.
+EXPOSE 3306
+</code></pre><p>使用：</p>
+<pre tabindex="0"><code>$ docker build -t=&#34;dockerfile/mysql&#34; github.com/dockerfile/mysql
+
+或下载Dockerfile内容再当前目录：
+$ docker build -t=&#34;dockerfile/mysql&#34; .
+</code></pre><p>（提示，上述第一条命令，如果你的host不可以连接Docker Hub，那么需要在启动docker服务时使用<code>HTTP_PROXY=</code>——用于build的时更新下载软件，同时执行<code>docker build</code>的终端设置<code>http_proxy</code>和<code>https_proxy</code>用于下载Dockerfile）</p>
+<p>运行：</p>
+<pre tabindex="0"><code>$ docker run -d --name mysql -p 3306:3306 dockerfile/mysql
+或
+$ docker run -it --rm --link mysql:mysql dockerfile/mysql bash -c &#39;mysql -h $MYSQL_PORT_3306_TCP_ADDR&#39;
+</code></pre><h3 id="参考">参考<a hidden class="anchor" aria-hidden="true" href="#参考">#</a></h3>
+<ul>
+<li><a href="https://github.com/HoO-Group/docker-heat/wiki/Dockerfile-Reference">Dockerfile Reference 中文</a></li>
+<li><a href="http://www.leiem.com/post-222.html">Dockerfile详解</a></li>
+<li><a href="http://www.dockerpool.com/static/books/docker_practice/dockerfile/instructions.html">dockerpool-build-instructions</a></li>
+<li><a href="https://docs.docker.com/reference/builder/">https://docs.docker.com/reference/builder/</a></li>
+<li><a href="https://docs.docker.com/articles/dockerfile_best-practices/">https://docs.docker.com/articles/dockerfile_best-practices/</a></li>
+<li><a href="http://syntaxsugar.cn/2014/07/09/dockerfile/">http://syntaxsugar.cn/2014/07/09/dockerfile/</a></li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/docker/">docker</a></li>
+      <li><a href="http://xgknight.com/tags/dockerfile/">dockerfile</a></li>
+      <li><a href="http://xgknight.com/tags/linux/">linux</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

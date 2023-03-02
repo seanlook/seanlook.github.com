@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>高效Linux bash快捷键及alias总结 | Sean Note</title>
+<meta name="keywords" content="bash, linux">
+<meta name="description" content="bash快捷键 习惯使用编辑的快捷键可以大大提高效率，记忆学习过程要有意识的忽略功能键、方向键和数字小键盘。以下快捷键适用在bash处于默认的Emacs模式下，是由一个名为Readline的库实现的，用户可以通过命令bind添加新快捷键，或者修改系统中已经存在的快捷键。（如果你有set -o vi，就处于 vi 模式就不适用了）
+另外下面的内容并不包含所有快捷键，只是我个人适用频率最高的几种，但相信已经可以大大提高工作效率了。以下所有 Alt 键可以以 Esc 键代替。
+Ctrl &#43; l ：清除屏幕，同clear
+Ctrl &#43; a ：将光标定位到命令的开头
+Ctrl &#43; e ：与上一个快捷键相反，将光标定位到命令的结尾
+Ctrl &#43; u ：剪切光标之前的内容，在输错命令或密码
+Ctrl &#43; k ：与上一个快捷键相反，剪切光标之后的内容
+Ctrl &#43; y ：粘贴以上两个快捷键所剪切的内容。Alt&#43;y粘贴更早的内容
+Ctrl &#43; w ：删除光标左边的参数（选项）或内容（实际是以空格为单位向前剪切一个word）
+Ctrl &#43; / ：撤销，同Ctrl&#43;x &#43; Ctrl&#43;u
+Ctrl &#43; f ：按字符前移（右向），同→
+Ctrl &#43; b ：按字符后移（左向），同←
+Alt &#43; f ：按单词前移，标点等特殊字符与空格一样分隔单词（右向），同Ctrl&#43;→
+Alt &#43; b ：按单词后移（左向），同Ctrl&#43;←
+Alt &#43; d ：从光标处删除至字尾。可以Ctrl&#43;y粘贴回来
+Alt &#43; \ ：删除当前光标前面所有的空白字符
+Ctrl &#43; d ：删除光标处的字符，同Del键。没有命令是表示注销用户">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2014/03/%E9%AB%98%E6%95%88linux-bash%E5%BF%AB%E6%8D%B7%E9%94%AE%E5%8F%8Aalias%E6%80%BB%E7%BB%93/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="高效Linux bash快捷键及alias总结" />
+<meta property="og:description" content="bash快捷键 习惯使用编辑的快捷键可以大大提高效率，记忆学习过程要有意识的忽略功能键、方向键和数字小键盘。以下快捷键适用在bash处于默认的Emacs模式下，是由一个名为Readline的库实现的，用户可以通过命令bind添加新快捷键，或者修改系统中已经存在的快捷键。（如果你有set -o vi，就处于 vi 模式就不适用了）
+另外下面的内容并不包含所有快捷键，只是我个人适用频率最高的几种，但相信已经可以大大提高工作效率了。以下所有 Alt 键可以以 Esc 键代替。
+Ctrl &#43; l ：清除屏幕，同clear
+Ctrl &#43; a ：将光标定位到命令的开头
+Ctrl &#43; e ：与上一个快捷键相反，将光标定位到命令的结尾
+Ctrl &#43; u ：剪切光标之前的内容，在输错命令或密码
+Ctrl &#43; k ：与上一个快捷键相反，剪切光标之后的内容
+Ctrl &#43; y ：粘贴以上两个快捷键所剪切的内容。Alt&#43;y粘贴更早的内容
+Ctrl &#43; w ：删除光标左边的参数（选项）或内容（实际是以空格为单位向前剪切一个word）
+Ctrl &#43; / ：撤销，同Ctrl&#43;x &#43; Ctrl&#43;u
+Ctrl &#43; f ：按字符前移（右向），同→
+Ctrl &#43; b ：按字符后移（左向），同←
+Alt &#43; f ：按单词前移，标点等特殊字符与空格一样分隔单词（右向），同Ctrl&#43;→
+Alt &#43; b ：按单词后移（左向），同Ctrl&#43;←
+Alt &#43; d ：从光标处删除至字尾。可以Ctrl&#43;y粘贴回来
+Alt &#43; \ ：删除当前光标前面所有的空白字符
+Ctrl &#43; d ：删除光标处的字符，同Del键。没有命令是表示注销用户" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2014/03/%E9%AB%98%E6%95%88linux-bash%E5%BF%AB%E6%8D%B7%E9%94%AE%E5%8F%8Aalias%E6%80%BB%E7%BB%93/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2014-03-09T01:21:25+00:00" />
+<meta property="article:modified_time" content="2014-03-09T01:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="高效Linux bash快捷键及alias总结"/>
+<meta name="twitter:description" content="bash快捷键 习惯使用编辑的快捷键可以大大提高效率，记忆学习过程要有意识的忽略功能键、方向键和数字小键盘。以下快捷键适用在bash处于默认的Emacs模式下，是由一个名为Readline的库实现的，用户可以通过命令bind添加新快捷键，或者修改系统中已经存在的快捷键。（如果你有set -o vi，就处于 vi 模式就不适用了）
+另外下面的内容并不包含所有快捷键，只是我个人适用频率最高的几种，但相信已经可以大大提高工作效率了。以下所有 Alt 键可以以 Esc 键代替。
+Ctrl &#43; l ：清除屏幕，同clear
+Ctrl &#43; a ：将光标定位到命令的开头
+Ctrl &#43; e ：与上一个快捷键相反，将光标定位到命令的结尾
+Ctrl &#43; u ：剪切光标之前的内容，在输错命令或密码
+Ctrl &#43; k ：与上一个快捷键相反，剪切光标之后的内容
+Ctrl &#43; y ：粘贴以上两个快捷键所剪切的内容。Alt&#43;y粘贴更早的内容
+Ctrl &#43; w ：删除光标左边的参数（选项）或内容（实际是以空格为单位向前剪切一个word）
+Ctrl &#43; / ：撤销，同Ctrl&#43;x &#43; Ctrl&#43;u
+Ctrl &#43; f ：按字符前移（右向），同→
+Ctrl &#43; b ：按字符后移（左向），同←
+Alt &#43; f ：按单词前移，标点等特殊字符与空格一样分隔单词（右向），同Ctrl&#43;→
+Alt &#43; b ：按单词后移（左向），同Ctrl&#43;←
+Alt &#43; d ：从光标处删除至字尾。可以Ctrl&#43;y粘贴回来
+Alt &#43; \ ：删除当前光标前面所有的空白字符
+Ctrl &#43; d ：删除光标处的字符，同Del键。没有命令是表示注销用户"/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "高效Linux bash快捷键及alias总结",
+      "item": "http://xgknight.com/posts/2014/03/%E9%AB%98%E6%95%88linux-bash%E5%BF%AB%E6%8D%B7%E9%94%AE%E5%8F%8Aalias%E6%80%BB%E7%BB%93/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "高效Linux bash快捷键及alias总结",
+  "name": "高效Linux bash快捷键及alias总结",
+  "description": "bash快捷键 习惯使用编辑的快捷键可以大大提高效率，记忆学习过程要有意识的忽略功能键、方向键和数字小键盘。以下快捷键适用在bash处于默认的Emacs模式下，是由一个名为Readline的库实现的，用户可以通过命令bind添加新快捷键，或者修改系统中已经存在的快捷键。（如果你有set -o vi，就处于 vi 模式就不适用了）\n另外下面的内容并不包含所有快捷键，只是我个人适用频率最高的几种，但相信已经可以大大提高工作效率了。以下所有 Alt 键可以以 Esc 键代替。\nCtrl + l ：清除屏幕，同clear\nCtrl + a ：将光标定位到命令的开头\nCtrl + e ：与上一个快捷键相反，将光标定位到命令的结尾\nCtrl + u ：剪切光标之前的内容，在输错命令或密码\nCtrl + k ：与上一个快捷键相反，剪切光标之后的内容\nCtrl + y ：粘贴以上两个快捷键所剪切的内容。Alt+y粘贴更早的内容\nCtrl + w ：删除光标左边的参数（选项）或内容（实际是以空格为单位向前剪切一个word）\nCtrl + / ：撤销，同Ctrl+x + Ctrl+u\nCtrl + f ：按字符前移（右向），同→\nCtrl + b ：按字符后移（左向），同←\nAlt + f ：按单词前移，标点等特殊字符与空格一样分隔单词（右向），同Ctrl+→\nAlt + b ：按单词后移（左向），同Ctrl+←\nAlt + d ：从光标处删除至字尾。可以Ctrl+y粘贴回来\nAlt + \\ ：删除当前光标前面所有的空白字符\nCtrl + d ：删除光标处的字符，同Del键。没有命令是表示注销用户",
+  "keywords": [
+    "bash", "linux"
+  ],
+  "articleBody": "bash快捷键 习惯使用编辑的快捷键可以大大提高效率，记忆学习过程要有意识的忽略功能键、方向键和数字小键盘。以下快捷键适用在bash处于默认的Emacs模式下，是由一个名为Readline的库实现的，用户可以通过命令bind添加新快捷键，或者修改系统中已经存在的快捷键。（如果你有set -o vi，就处于 vi 模式就不适用了）\n另外下面的内容并不包含所有快捷键，只是我个人适用频率最高的几种，但相信已经可以大大提高工作效率了。以下所有 Alt 键可以以 Esc 键代替。\nCtrl + l ：清除屏幕，同clear\nCtrl + a ：将光标定位到命令的开头\nCtrl + e ：与上一个快捷键相反，将光标定位到命令的结尾\nCtrl + u ：剪切光标之前的内容，在输错命令或密码\nCtrl + k ：与上一个快捷键相反，剪切光标之后的内容\nCtrl + y ：粘贴以上两个快捷键所剪切的内容。Alt+y粘贴更早的内容\nCtrl + w ：删除光标左边的参数（选项）或内容（实际是以空格为单位向前剪切一个word）\nCtrl + / ：撤销，同Ctrl+x + Ctrl+u\nCtrl + f ：按字符前移（右向），同→\nCtrl + b ：按字符后移（左向），同←\nAlt + f ：按单词前移，标点等特殊字符与空格一样分隔单词（右向），同Ctrl+→\nAlt + b ：按单词后移（左向），同Ctrl+←\nAlt + d ：从光标处删除至字尾。可以Ctrl+y粘贴回来\nAlt + \\ ：删除当前光标前面所有的空白字符\nCtrl + d ：删除光标处的字符，同Del键。没有命令是表示注销用户\nCtrl + h ：删除光标前的字符\nCtrl + r ：逆向搜索命令历史，比history好用\nCtrl + g ：从历史搜索模式退出，同ESC\nCtrl + p ：历史中的上一条命令，同↑\nCtrl + n ：历史中的下一条命令，同↓\nAlt + . ：同!$，输出上一个命令的最后一个参数（选项or单词）。 还有如Alt+0 Alt+. Alt+.，表示输出上上一条命令的的第一个单词（即命令）。 另外有一种写法 !:n，表示上一命令的第n个参数，如你刚备份一个配置文件，马上编辑它：cp nginx.conf nginx.conf，vi !:1，同vi !^。!^表示命令的第一个参数，!$最后一个参数（一般是使用Alt + .代替）。\n这里提一下按字符或字符串，向左向后搜索字符串的命令：\nCtrl + ]　c ：从当前光标处向右定位到字符 c 处 Esc　Ctrl + ]　c ：从当前光标向左定位到字符 c 处。（ bind -P 可以看到绑定信息） Ctrl + r　str ：可以搜索历史，也可以当前光标处向左定位到字符串 str，Esc后可定位继续编辑 Ctrl -s　str ：从当前光标处向右定位到字符串 str 处，Esc 退出。注意，Ctrl + S默认被用户控制 XON/XOFF ，需要在终端里执行stty -ixon或加入profile。 注意上述所有涉及Alt键的实际是Meta键，在xshell中默认是没有勾选“Use Alt key as Meta key”，要充分体验这些键带来的快捷，请在对应的terminal设置。\n参考：高效操作Bash ，Bash (Unix shell) Keyboard shortcuts ，bash中的命令基本操作。\n常用alias 以下bash中别名设置我还并没有完全使用，也是个人觉得非常有用的（多了记起来也麻烦），所以收集在一起，习惯就好。 /etc/profile.d/alias.sh：\nalias wl='ll | wc -l' alias l='ls -l' alias lh='ls -lh' alias grep='grep -i --color' #用颜色标识，更醒目；忽略大小写 alias vi=vim alias c='clear' # 快速清屏 alias p='pwd' # 进入目录并列出文件，如 cdl ../conf.d/ cdl() { cd \"$@\" \u0026\u0026 pwd ; ls -alF; } alias ..=\"cdl ..\" alias ...=\"cd ../..\" # 快速进入上上层目录 alias .3=\"cd ../../..\" alias cd..='cdl ..' # alias cp=\"cp -iv\" # interactive, verbose alias rm=\"rm -i\" # interactive # alias mv=\"mv -iv\" # interactive, verbose alias psg='\\ps aux | grep -v grep | grep --color' # 查看进程信息 alias hg='history|grep' alias netp='netstat -tulanp' # 查看服务器端口连接信息 alias lvim=\"vim -c \\\"normal '0\\\"\" # 编辑vim最近打开的文件 alias tf='tail -f ' # 快速查看文件末尾输出 # 自动在文件末尾加上 .bak-日期 来备份文件，如 bu nginx.conf bak() { cp \"$@\" \"$@.bak\"-`date +%y%m%d`; echo \"`date +%Y-%m-%d` backed up $PWD/$@\"; } # 级联创建目录并进入，如 mcd a/b/c mcd() { mkdir -p $1 \u0026\u0026 cd $1 \u0026\u0026 pwd ; } # 查看去掉#注释和空行的配置文件，如 nocomm /etc/squid/squid.conf alias nocomm='grep -Ev '\\''^(#|$)'\\''' # 快速根据进程号pid杀死进程，如 psid tomcat， 然后 kill9 两个tab键提示要kill的进程号 alias kill9='kill -9'; psid() { [[ ! -n ${1} ]] \u0026\u0026 return; # bail if no argument pro=\"[${1:0:1}]${1:1}\"; # process-name –\u003e [p]rocess-name (makes grep better) ps axo pid,user,command | grep -v grep |grep -i --color ${pro}; # show matching processes pids=\"$(ps axo pid,user,command | grep -v grep | grep -i ${pro} | awk '{print $1}')\"; # get pids complete -W \"${pids}\" kill9 # make a completion list for kk } # 解压所有归档文件工具 function extract { if [ -z \"$1\" ]; then # display usage if no parameters given echo \"Usage: extract .\" else if [ -f $1 ] ; then # NAME=${1%.*} # mkdir $NAME \u0026\u0026 cd $NAME case $1 in *.tar.bz2) tar xvjf $1 ;; *.tar.gz) tar xvzf $1 ;; *.tar.xz) tar xvJf $1 ;; *.lzma) unlzma $1 ;; *.bz2) bunzip2 $1 ;; *.rar) unrar x -ad $1 ;; *.gz) gunzip $1 ;; *.tar) tar xvf $1 ;; *.tbz2) tar xvjf $1 ;; *.tgz) tar xvzf $1 ;; *.zip) unzip $1 ;; *.Z) uncompress $1 ;; *.7z) 7z x $1 ;; *.xz) unxz $1 ;; *.exe) cabextract $1 ;; *) echo \"extract: '$1' - unknown archive method\" ;; esac else echo \"$1 - file does not exist\" fi fi } # 其它你自己的命令 alias nginxreload='sudo /usr/local/nginx/sbin/nginx -s reload' 要去掉别名，请用unalias aliasname，或者临时执行不用别名，执行原始命令\\alias 。\n欢迎补充评论补充~\n参考： 30 Handy Bash Shell Aliases For Linux\n",
+  "wordCount" : "534",
+  "inLanguage": "en",
+  "datePublished": "2014-03-09T01:21:25Z",
+  "dateModified": "2014-03-09T01:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2014/03/%E9%AB%98%E6%95%88linux-bash%E5%BF%AB%E6%8D%B7%E9%94%AE%E5%8F%8Aalias%E6%80%BB%E7%BB%93/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      高效Linux bash快捷键及alias总结
+    </h1>
+    <div class="post-meta"><span title='2014-03-09 01:21:25 +0000 UTC'>March 9, 2014</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><h2 id="bash快捷键">bash快捷键<a hidden class="anchor" aria-hidden="true" href="#bash快捷键">#</a></h2>
+<p>习惯使用编辑的快捷键可以大大提高效率，记忆学习过程要有意识的忽略功能键、方向键和数字小键盘。以下快捷键适用在bash处于默认的Emacs模式下，是由一个名为Readline的库实现的，用户可以通过命令bind添加新快捷键，或者修改系统中已经存在的快捷键。（如果你有<code>set -o vi</code>，就处于 vi 模式就不适用了）</p>
+<p>另外下面的内容并不包含所有快捷键，只是我个人适用频率最高的几种，但相信已经可以大大提高工作效率了。以下所有 Alt 键可以以 Esc 键代替。</p>
+<ul>
+<li>
+<p><code>Ctrl + l</code> ：清除屏幕，同clear</p>
+</li>
+<li>
+<p><code>Ctrl + a</code> ：将光标定位到命令的开头</p>
+</li>
+<li>
+<p><code>Ctrl + e</code> ：与上一个快捷键相反，将光标定位到命令的结尾</p>
+</li>
+<li>
+<p><code>Ctrl + u</code> ：剪切光标之前的内容，在输错命令或密码</p>
+</li>
+<li>
+<p><code>Ctrl + k</code> ：与上一个快捷键相反，剪切光标之后的内容</p>
+</li>
+<li>
+<p><code>Ctrl + y</code> ：粘贴以上两个快捷键所剪切的内容。Alt+y粘贴更早的内容</p>
+</li>
+<li>
+<p><code>Ctrl + w</code> ：删除光标左边的参数（选项）或内容（实际是以空格为单位向前剪切一个word）</p>
+</li>
+<li>
+<p><code>Ctrl + /</code> ：撤销，同<code>Ctrl+x</code> + <code>Ctrl+u</code></p>
+</li>
+<li>
+<p><code>Ctrl + f</code> ：按字符前移（右向），同→</p>
+</li>
+<li>
+<p><code>Ctrl + b</code> ：按字符后移（左向），同←</p>
+</li>
+<li>
+<p><code>Alt + f</code> ：按单词前移，标点等特殊字符与空格一样分隔单词（右向），同Ctrl+→</p>
+</li>
+<li>
+<p><code>Alt + b</code> ：按单词后移（左向），同Ctrl+←</p>
+</li>
+<li>
+<p><code>Alt + d</code> ：从光标处删除至字尾。可以Ctrl+y粘贴回来</p>
+</li>
+<li>
+<p><code>Alt + \</code> ：删除当前光标前面所有的空白字符</p>
+</li>
+<li>
+<p><code>Ctrl + d</code> ：删除光标处的字符，同Del键。没有命令是表示注销用户</p>
+</li>
+<li>
+<p><code>Ctrl + h</code> ：删除光标前的字符</p>
+</li>
+<li>
+<p><code>Ctrl + r</code> ：逆向搜索命令历史，比history好用</p>
+</li>
+<li>
+<p><code>Ctrl + g</code> ：从历史搜索模式退出，同ESC</p>
+</li>
+<li>
+<p><code>Ctrl + p</code> ：历史中的上一条命令，同↑</p>
+</li>
+<li>
+<p><code>Ctrl + n</code> ：历史中的下一条命令，同↓</p>
+</li>
+<li>
+<p><code>Alt + . </code>：同!$，输出上一个命令的最后一个参数（选项or单词）。
+还有如Alt+0 Alt+. Alt+.，表示输出上上一条命令的的第一个单词（即命令）。
+另外有一种写法 <code>!:n</code>，表示上一命令的第n个参数，如你刚备份一个配置文件，马上编辑它：<code>cp nginx.conf nginx.conf</code>，<code>vi !:1</code>，同<code>vi !^</code>。<code>!^</code>表示命令的第一个参数，<code>!$</code>最后一个参数（一般是使用<code>Alt + .</code>代替）。</p>
+</li>
+</ul>
+<!-- raw HTML omitted -->
+<p>这里提一下按字符或字符串，向左向后搜索字符串的命令：</p>
+<ul>
+<li><code>Ctrl + ]</code>　c ：从当前光标处向<em>右</em>定位到<code>字符</code> c 处</li>
+<li><code>Esc</code>　<code>Ctrl + ]</code>　c ：从当前光标向<em>左</em>定位到<code>字符</code> c 处。（ bind -P 可以看到绑定信息）</li>
+<li><code>Ctrl + r</code>　str ：可以搜索历史，也可以当前光标处向<em>左</em>定位到<code>字符串</code> str，<code>Esc</code>后可定位继续编辑</li>
+<li><code>Ctrl -s</code>　str ：从当前光标处向<em>右</em>定位到<code>字符串</code> str 处，Esc 退出。注意，<code>Ctrl + S</code>默认被用户控制 <a href="http://superuser.com/questions/124845/can-you-disable-the-ctrl-s-xoff-keystroke-in-putty">XON/XOFF</a> ，需要在终端里执行<code>stty -ixon</code>或加入profile。</li>
+</ul>
+<p>注意上述所有涉及Alt键的实际是Meta键，在xshell中默认是没有勾选“Use Alt key as Meta key”，要充分体验这些键带来的快捷，请在对应的terminal设置。</p>
+<p><strong>参考</strong>：<a href="http://ahei.info/bash.htm">高效操作Bash</a> ，<a href="http://en.wikipedia.org/wiki/Bash_%28Unix_shell%29#Keyboard_shortcuts">Bash (Unix shell) Keyboard shortcuts</a> ，<a href="http://www.cnblogs.com/nufangrensheng/archive/2013/11/20/3434474.html">bash中的命令基本操作</a>。</p>
+<h2 id="常用alias">常用alias<a hidden class="anchor" aria-hidden="true" href="#常用alias">#</a></h2>
+<p>以下bash中别名设置我还并没有完全使用，也是个人觉得非常有用的（多了记起来也麻烦），所以收集在一起，习惯就好。
+<code>/etc/profile.d/alias.sh</code>：</p>
+<pre tabindex="0"><code>alias wl=&#39;ll | wc -l&#39;
+alias l=&#39;ls -l&#39;
+alias lh=&#39;ls -lh&#39;
+alias grep=&#39;grep -i --color&#39; #用颜色标识，更醒目；忽略大小写
+alias vi=vim
+alias c=&#39;clear&#39;  # 快速清屏
+alias p=&#39;pwd&#39;
+
+# 进入目录并列出文件，如 cdl ../conf.d/
+cdl() { cd &#34;$@&#34; &amp;&amp; pwd ; ls -alF; }
+
+alias ..=&#34;cdl ..&#34;
+alias ...=&#34;cd ../..&#34;   # 快速进入上上层目录
+alias .3=&#34;cd ../../..&#34; 
+alias cd..=&#39;cdl ..&#39;
+
+# alias cp=&#34;cp -iv&#34;      # interactive, verbose
+alias rm=&#34;rm -i&#34;      # interactive
+# alias mv=&#34;mv -iv&#34;       # interactive, verbose
+
+alias psg=&#39;\ps aux | grep -v grep | grep --color&#39; # 查看进程信息
+
+alias hg=&#39;history|grep&#39;
+
+alias netp=&#39;netstat -tulanp&#39;  # 查看服务器端口连接信息
+
+alias lvim=&#34;vim -c \&#34;normal &#39;0\&#34;&#34;  # 编辑vim最近打开的文件
+
+alias tf=&#39;tail -f &#39;  # 快速查看文件末尾输出
+
+# 自动在文件末尾加上 .bak-日期 来备份文件，如 bu nginx.conf
+bak() { cp &#34;$@&#34; &#34;$@.bak&#34;-`date +%y%m%d`; echo &#34;`date +%Y-%m-%d` backed up $PWD/$@&#34;; }
+
+# 级联创建目录并进入，如 mcd a/b/c
+mcd() { mkdir -p $1 &amp;&amp; cd $1 &amp;&amp; pwd ; }
+
+# 查看去掉#注释和空行的配置文件，如 nocomm /etc/squid/squid.conf
+alias nocomm=&#39;grep -Ev &#39;\&#39;&#39;^(#|$)&#39;\&#39;&#39;&#39;
+
+# 快速根据进程号pid杀死进程，如 psid tomcat， 然后 kill9 两个tab键提示要kill的进程号
+alias kill9=&#39;kill -9&#39;;
+psid() {
+  [[ ! -n ${1} ]] &amp;&amp; return;   # bail if no argument
+  pro=&#34;[${1:0:1}]${1:1}&#34;;      # process-name –&gt; [p]rocess-name (makes grep better)
+  ps axo pid,user,command | grep -v grep |grep -i --color ${pro};   # show matching processes
+  pids=&#34;$(ps axo pid,user,command | grep -v grep | grep -i ${pro} | awk &#39;{print $1}&#39;)&#34;;   # get pids
+  complete -W &#34;${pids}&#34; kill9     # make a completion list for kk
+}
+
+# 解压所有归档文件工具
+function extract {
+ if [ -z &#34;$1&#34; ]; then
+    # display usage if no parameters given
+    echo &#34;Usage: extract &lt;path/file_name&gt;.&lt;zip|rar|bz2|gz|tar|tbz2|tgz|Z|7z|xz|ex|tar.bz2|tar.gz|tar.xz&gt;&#34;
+ else
+    if [ -f $1 ] ; then
+        # NAME=${1%.*}
+        # mkdir $NAME &amp;&amp; cd $NAME
+        case $1 in
+          *.tar.bz2)   tar xvjf $1    ;;
+          *.tar.gz)    tar xvzf $1    ;;
+          *.tar.xz)    tar xvJf $1    ;;
+          *.lzma)      unlzma $1      ;;
+          *.bz2)       bunzip2 $1     ;;
+          *.rar)       unrar x -ad $1 ;;
+          *.gz)        gunzip $1      ;;
+          *.tar)       tar xvf $1     ;;
+          *.tbz2)      tar xvjf $1    ;;
+          *.tgz)       tar xvzf $1    ;;
+          *.zip)       unzip $1       ;;
+          *.Z)         uncompress $1  ;;
+          *.7z)        7z x $1        ;;
+          *.xz)        unxz $1        ;;
+          *.exe)       cabextract $1  ;;
+          *)           echo &#34;extract: &#39;$1&#39; - unknown archive method&#34; ;;
+        esac
+    else
+        echo &#34;$1 - file does not exist&#34;
+    fi
+fi
+}
+
+# 其它你自己的命令
+alias nginxreload=&#39;sudo /usr/local/nginx/sbin/nginx -s reload&#39;
+</code></pre><p>要去掉别名，请用<code>unalias aliasname</code>，或者<em>临时</em>执行不用别名，执行原始命令<code>\alias</code> 。</p>
+<p>欢迎补充评论补充~</p>
+<p><strong>参考</strong>： <a href="http://www.cyberciti.biz/tips/bash-aliases-mac-centos-linux-unix.html">30 Handy Bash Shell Aliases For Linux</a></p>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/bash/">bash</a></li>
+      <li><a href="http://xgknight.com/tags/linux/">linux</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

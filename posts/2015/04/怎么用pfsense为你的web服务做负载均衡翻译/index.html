@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>怎么用pfSense为你的web服务做负载均衡（翻译） | Sean Note</title>
+<meta name="keywords" content="pfsense, vmware">
+<meta name="description" content="本文翻译自Howtoforge上的一篇文章 How To Use pfSense To Load Balance Your Web Servers。注意pfSense的负载均衡有两种：一是设置多个WAN做双线负载均衡，二是本文的为LAN内的web服务器做inbound-loadbalancer。
+这篇howto中展示了怎么使用pfSense 2.0 为你的多个web服务器配置负载均衡（load balancer）。这里假定在你的网络环境中已经拥有了一个pfSense服务器和2个以上的apache服务器，并且具有一定的pfSense知识。（参考图解pfSense软路由系统的使用（NAT功能）
+1. 前提 一个安装好的pfSense 2.0 机器（如果它是你的外围防火墙，建议安装在物理机上） 至少2个apache服务器（可以是虚拟机） 确保在apache服务器之间代码文件是同步的（rsync、cororsync或其它可以保持web服务器间文件更新） 2. 配置pfSense pfSense可以使用负载均衡的功能让特定的请求压力由多台服务器分担，这对于有多台应用的服务器很有帮助，因为你可以把负载压力分散到其它节点上而不是死磕一个节点。
+2.1 Monitor 我们正式开始。首先点击Services -&gt; Load Balancers，然后选择Monitor标签。
+点击右边的&#43;加号来添加一条记录，输入monitor的名字Name和描述Description（在这个示例名字和描述我都使用ApacheClusterMon），把类型Type设置成HTTP，主机地址Host设置一个还未使用的IP（后面我们将在这个IP上建立虚拟IP，这个虚拟IP会被分配到故障转移failover节点上，注：也有文章说把它设成WAN IP），HTTP Code保存默认的200 OK，然后点击Save保存并且使修改生效Apply Changes。 2.2 Pool 接着建立服务器池server pool。点击Pools标签的&#43;按钮来添加一个池。
+在该示例我指定ApacheSrvPool为服务池名称，设置Mode为Load Balance，端口80（。这个端口时你后端服务器的监听端口，你当然可以设定其它应用的其它端口，不一定非是web）。为这个池设定上一步创建的ApacheClusterMon，依次将你的所有web服务器IP添加到这个池中Add to pool，保存并应用。 2.3 Virtual Server 最后一步，选择Virtual Servers标签页，点击&#43;来添加一条记录。填写名称ApacheClusterVirtualServer、描述和IP地址，这个IP地址与第1步中说的未使用的IP相同，端口80，所有发送到这个WAN IP:port的连接都会被转发到服务器池中。虚拟服务器池Virtual Server Poll选择上一步创建的。提交并应用。 搞定！最后不要忘记为虚拟服务器IP和池添加防火墙规则。">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2015/04/%E6%80%8E%E4%B9%88%E7%94%A8pfsense%E4%B8%BA%E4%BD%A0%E7%9A%84web%E6%9C%8D%E5%8A%A1%E5%81%9A%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1%E7%BF%BB%E8%AF%91/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="怎么用pfSense为你的web服务做负载均衡（翻译）" />
+<meta property="og:description" content="本文翻译自Howtoforge上的一篇文章 How To Use pfSense To Load Balance Your Web Servers。注意pfSense的负载均衡有两种：一是设置多个WAN做双线负载均衡，二是本文的为LAN内的web服务器做inbound-loadbalancer。
+这篇howto中展示了怎么使用pfSense 2.0 为你的多个web服务器配置负载均衡（load balancer）。这里假定在你的网络环境中已经拥有了一个pfSense服务器和2个以上的apache服务器，并且具有一定的pfSense知识。（参考图解pfSense软路由系统的使用（NAT功能）
+1. 前提 一个安装好的pfSense 2.0 机器（如果它是你的外围防火墙，建议安装在物理机上） 至少2个apache服务器（可以是虚拟机） 确保在apache服务器之间代码文件是同步的（rsync、cororsync或其它可以保持web服务器间文件更新） 2. 配置pfSense pfSense可以使用负载均衡的功能让特定的请求压力由多台服务器分担，这对于有多台应用的服务器很有帮助，因为你可以把负载压力分散到其它节点上而不是死磕一个节点。
+2.1 Monitor 我们正式开始。首先点击Services -&gt; Load Balancers，然后选择Monitor标签。
+点击右边的&#43;加号来添加一条记录，输入monitor的名字Name和描述Description（在这个示例名字和描述我都使用ApacheClusterMon），把类型Type设置成HTTP，主机地址Host设置一个还未使用的IP（后面我们将在这个IP上建立虚拟IP，这个虚拟IP会被分配到故障转移failover节点上，注：也有文章说把它设成WAN IP），HTTP Code保存默认的200 OK，然后点击Save保存并且使修改生效Apply Changes。 2.2 Pool 接着建立服务器池server pool。点击Pools标签的&#43;按钮来添加一个池。
+在该示例我指定ApacheSrvPool为服务池名称，设置Mode为Load Balance，端口80（。这个端口时你后端服务器的监听端口，你当然可以设定其它应用的其它端口，不一定非是web）。为这个池设定上一步创建的ApacheClusterMon，依次将你的所有web服务器IP添加到这个池中Add to pool，保存并应用。 2.3 Virtual Server 最后一步，选择Virtual Servers标签页，点击&#43;来添加一条记录。填写名称ApacheClusterVirtualServer、描述和IP地址，这个IP地址与第1步中说的未使用的IP相同，端口80，所有发送到这个WAN IP:port的连接都会被转发到服务器池中。虚拟服务器池Virtual Server Poll选择上一步创建的。提交并应用。 搞定！最后不要忘记为虚拟服务器IP和池添加防火墙规则。" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2015/04/%E6%80%8E%E4%B9%88%E7%94%A8pfsense%E4%B8%BA%E4%BD%A0%E7%9A%84web%E6%9C%8D%E5%8A%A1%E5%81%9A%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1%E7%BF%BB%E8%AF%91/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2015-04-24T15:21:25+00:00" />
+<meta property="article:modified_time" content="2015-04-24T15:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="怎么用pfSense为你的web服务做负载均衡（翻译）"/>
+<meta name="twitter:description" content="本文翻译自Howtoforge上的一篇文章 How To Use pfSense To Load Balance Your Web Servers。注意pfSense的负载均衡有两种：一是设置多个WAN做双线负载均衡，二是本文的为LAN内的web服务器做inbound-loadbalancer。
+这篇howto中展示了怎么使用pfSense 2.0 为你的多个web服务器配置负载均衡（load balancer）。这里假定在你的网络环境中已经拥有了一个pfSense服务器和2个以上的apache服务器，并且具有一定的pfSense知识。（参考图解pfSense软路由系统的使用（NAT功能）
+1. 前提 一个安装好的pfSense 2.0 机器（如果它是你的外围防火墙，建议安装在物理机上） 至少2个apache服务器（可以是虚拟机） 确保在apache服务器之间代码文件是同步的（rsync、cororsync或其它可以保持web服务器间文件更新） 2. 配置pfSense pfSense可以使用负载均衡的功能让特定的请求压力由多台服务器分担，这对于有多台应用的服务器很有帮助，因为你可以把负载压力分散到其它节点上而不是死磕一个节点。
+2.1 Monitor 我们正式开始。首先点击Services -&gt; Load Balancers，然后选择Monitor标签。
+点击右边的&#43;加号来添加一条记录，输入monitor的名字Name和描述Description（在这个示例名字和描述我都使用ApacheClusterMon），把类型Type设置成HTTP，主机地址Host设置一个还未使用的IP（后面我们将在这个IP上建立虚拟IP，这个虚拟IP会被分配到故障转移failover节点上，注：也有文章说把它设成WAN IP），HTTP Code保存默认的200 OK，然后点击Save保存并且使修改生效Apply Changes。 2.2 Pool 接着建立服务器池server pool。点击Pools标签的&#43;按钮来添加一个池。
+在该示例我指定ApacheSrvPool为服务池名称，设置Mode为Load Balance，端口80（。这个端口时你后端服务器的监听端口，你当然可以设定其它应用的其它端口，不一定非是web）。为这个池设定上一步创建的ApacheClusterMon，依次将你的所有web服务器IP添加到这个池中Add to pool，保存并应用。 2.3 Virtual Server 最后一步，选择Virtual Servers标签页，点击&#43;来添加一条记录。填写名称ApacheClusterVirtualServer、描述和IP地址，这个IP地址与第1步中说的未使用的IP相同，端口80，所有发送到这个WAN IP:port的连接都会被转发到服务器池中。虚拟服务器池Virtual Server Poll选择上一步创建的。提交并应用。 搞定！最后不要忘记为虚拟服务器IP和池添加防火墙规则。"/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "怎么用pfSense为你的web服务做负载均衡（翻译）",
+      "item": "http://xgknight.com/posts/2015/04/%E6%80%8E%E4%B9%88%E7%94%A8pfsense%E4%B8%BA%E4%BD%A0%E7%9A%84web%E6%9C%8D%E5%8A%A1%E5%81%9A%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1%E7%BF%BB%E8%AF%91/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "怎么用pfSense为你的web服务做负载均衡（翻译）",
+  "name": "怎么用pfSense为你的web服务做负载均衡（翻译）",
+  "description": "本文翻译自Howtoforge上的一篇文章 How To Use pfSense To Load Balance Your Web Servers。注意pfSense的负载均衡有两种：一是设置多个WAN做双线负载均衡，二是本文的为LAN内的web服务器做inbound-loadbalancer。\n这篇howto中展示了怎么使用pfSense 2.0 为你的多个web服务器配置负载均衡（load balancer）。这里假定在你的网络环境中已经拥有了一个pfSense服务器和2个以上的apache服务器，并且具有一定的pfSense知识。（参考图解pfSense软路由系统的使用（NAT功能）\n1. 前提 一个安装好的pfSense 2.0 机器（如果它是你的外围防火墙，建议安装在物理机上） 至少2个apache服务器（可以是虚拟机） 确保在apache服务器之间代码文件是同步的（rsync、cororsync或其它可以保持web服务器间文件更新） 2. 配置pfSense pfSense可以使用负载均衡的功能让特定的请求压力由多台服务器分担，这对于有多台应用的服务器很有帮助，因为你可以把负载压力分散到其它节点上而不是死磕一个节点。\n2.1 Monitor 我们正式开始。首先点击Services -\u0026gt; Load Balancers，然后选择Monitor标签。\n点击右边的+加号来添加一条记录，输入monitor的名字Name和描述Description（在这个示例名字和描述我都使用ApacheClusterMon），把类型Type设置成HTTP，主机地址Host设置一个还未使用的IP（后面我们将在这个IP上建立虚拟IP，这个虚拟IP会被分配到故障转移failover节点上，注：也有文章说把它设成WAN IP），HTTP Code保存默认的200 OK，然后点击Save保存并且使修改生效Apply Changes。 2.2 Pool 接着建立服务器池server pool。点击Pools标签的+按钮来添加一个池。\n在该示例我指定ApacheSrvPool为服务池名称，设置Mode为Load Balance，端口80（。这个端口时你后端服务器的监听端口，你当然可以设定其它应用的其它端口，不一定非是web）。为这个池设定上一步创建的ApacheClusterMon，依次将你的所有web服务器IP添加到这个池中Add to pool，保存并应用。 2.3 Virtual Server 最后一步，选择Virtual Servers标签页，点击+来添加一条记录。填写名称ApacheClusterVirtualServer、描述和IP地址，这个IP地址与第1步中说的未使用的IP相同，端口80，所有发送到这个WAN IP:port的连接都会被转发到服务器池中。虚拟服务器池Virtual Server Poll选择上一步创建的。提交并应用。 搞定！最后不要忘记为虚拟服务器IP和池添加防火墙规则。",
+  "keywords": [
+    "pfsense", "vmware"
+  ],
+  "articleBody": "本文翻译自Howtoforge上的一篇文章 How To Use pfSense To Load Balance Your Web Servers。注意pfSense的负载均衡有两种：一是设置多个WAN做双线负载均衡，二是本文的为LAN内的web服务器做inbound-loadbalancer。\n这篇howto中展示了怎么使用pfSense 2.0 为你的多个web服务器配置负载均衡（load balancer）。这里假定在你的网络环境中已经拥有了一个pfSense服务器和2个以上的apache服务器，并且具有一定的pfSense知识。（参考图解pfSense软路由系统的使用（NAT功能）\n1. 前提 一个安装好的pfSense 2.0 机器（如果它是你的外围防火墙，建议安装在物理机上） 至少2个apache服务器（可以是虚拟机） 确保在apache服务器之间代码文件是同步的（rsync、cororsync或其它可以保持web服务器间文件更新） 2. 配置pfSense pfSense可以使用负载均衡的功能让特定的请求压力由多台服务器分担，这对于有多台应用的服务器很有帮助，因为你可以把负载压力分散到其它节点上而不是死磕一个节点。\n2.1 Monitor 我们正式开始。首先点击Services -\u003e Load Balancers，然后选择Monitor标签。\n点击右边的+加号来添加一条记录，输入monitor的名字Name和描述Description（在这个示例名字和描述我都使用ApacheClusterMon），把类型Type设置成HTTP，主机地址Host设置一个还未使用的IP（后面我们将在这个IP上建立虚拟IP，这个虚拟IP会被分配到故障转移failover节点上，注：也有文章说把它设成WAN IP），HTTP Code保存默认的200 OK，然后点击Save保存并且使修改生效Apply Changes。 2.2 Pool 接着建立服务器池server pool。点击Pools标签的+按钮来添加一个池。\n在该示例我指定ApacheSrvPool为服务池名称，设置Mode为Load Balance，端口80（。这个端口时你后端服务器的监听端口，你当然可以设定其它应用的其它端口，不一定非是web）。为这个池设定上一步创建的ApacheClusterMon，依次将你的所有web服务器IP添加到这个池中Add to pool，保存并应用。 2.3 Virtual Server 最后一步，选择Virtual Servers标签页，点击+来添加一条记录。填写名称ApacheClusterVirtualServer、描述和IP地址，这个IP地址与第1步中说的未使用的IP相同，端口80，所有发送到这个WAN IP:port的连接都会被转发到服务器池中。虚拟服务器池Virtual Server Poll选择上一步创建的。提交并应用。 搞定！最后不要忘记为虚拟服务器IP和池添加防火墙规则。\n",
+  "wordCount" : "53",
+  "inLanguage": "en",
+  "datePublished": "2015-04-24T15:21:25Z",
+  "dateModified": "2015-04-24T15:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2015/04/%E6%80%8E%E4%B9%88%E7%94%A8pfsense%E4%B8%BA%E4%BD%A0%E7%9A%84web%E6%9C%8D%E5%8A%A1%E5%81%9A%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1%E7%BF%BB%E8%AF%91/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      怎么用pfSense为你的web服务做负载均衡（翻译）
+    </h1>
+    <div class="post-meta"><span title='2015-04-24 15:21:25 +0000 UTC'>April 24, 2015</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>本文翻译自Howtoforge上的一篇文章 <a href="https://www.howtoforge.com/how-to-use-pfsense-to-load-balance-your-web-servers">How To Use pfSense To Load Balance Your Web Servers</a>。注意pfSense的负载均衡有两种：一是设置<a href="https://doc.pfsense.org/index.php/Multi-WAN">多个WAN做双线负载均衡</a>，二是本文的为LAN内的<a href="https://doc.pfsense.org/index.php/Inbound_Load_Balancing">web服务器做inbound-loadbalancer</a>。</p>
+<p>这篇howto中展示了怎么使用pfSense 2.0 为你的多个web服务器配置负载均衡（load balancer）。这里假定在你的网络环境中已经拥有了一个pfSense服务器和2个以上的apache服务器，并且具有一定的pfSense知识。（<em>参考<a href="http://xgknight.com/2015/04/23/pfsense-usage/">图解pfSense软路由系统的使用（NAT功能</a></em>）</p>
+<h2 id="1-前提">1. 前提<a hidden class="anchor" aria-hidden="true" href="#1-前提">#</a></h2>
+<ul>
+<li>一个安装好的pfSense 2.0 机器（如果它是你的外围防火墙，建议安装在物理机上）</li>
+<li>至少2个apache服务器（可以是虚拟机）</li>
+<li>确保在apache服务器之间代码文件是同步的（rsync、cororsync或其它可以保持web服务器间文件更新）</li>
+</ul>
+<h2 id="2-配置pfsense">2. 配置pfSense<a hidden class="anchor" aria-hidden="true" href="#2-配置pfsense">#</a></h2>
+<p>pfSense可以使用负载均衡的功能让特定的请求压力由多台服务器分担，这对于有多台应用的服务器很有帮助，因为你可以把负载压力分散到其它节点上而不是死磕一个节点。</p>
+<h3 id="21-monitor">2.1 Monitor<a hidden class="anchor" aria-hidden="true" href="#21-monitor">#</a></h3>
+<p>我们正式开始。首先点击<code>Services</code> -&gt; <code>Load Balancers</code>，然后选择<code>Monitor</code>标签。</p>
+<!-- raw HTML omitted -->
+<p>点击右边的<code>+</code>加号来添加一条记录，输入monitor的名字Name和描述Description（在这个示例名字和描述我都使用<code>ApacheClusterMon</code>），把类型Type设置成<code>HTTP</code>，主机地址Host设置一个还未使用的IP（后面我们将在这个IP上建立虚拟IP，这个虚拟IP会被分配到故障转移failover节点上，注：也有文章说把它设成WAN IP），<code>HTTP Code</code>保存默认的<code>200 OK</code>，然后点击<code>Save</code>保存并且使修改生效<code>Apply Changes</code>。
+<img loading="lazy" src="https://www.howtoforge.com/images/using_pfsense_to_load_balance_your_web_servers/image1.jpg" alt="image1.jpg"  />
+
+<img loading="lazy" src="https://www.howtoforge.com/images/using_pfsense_to_load_balance_your_web_servers/image2.jpg" alt="image2.jpg"  />
+</p>
+<h3 id="22-pool">2.2 Pool<a hidden class="anchor" aria-hidden="true" href="#22-pool">#</a></h3>
+<p>接着建立服务器池server pool。点击<code>Pools</code>标签的<code>+</code>按钮来添加一个池。</p>
+<p>在该示例我指定<code>ApacheSrvPool</code>为服务池名称，设置<code>Mode</code>为<code>Load Balance</code>，端口80（。这个端口时你后端服务器的监听端口，你当然可以设定其它应用的其它端口，不一定非是web）。为这个池设定上一步创建的ApacheClusterMon，依次将你的所有web服务器IP添加到这个池中<code>Add to pool</code>，保存并应用。
+<img loading="lazy" src="https://www.howtoforge.com/images/using_pfsense_to_load_balance_your_web_servers/image3.jpg" alt="image3.jpg"  />
+
+<img loading="lazy" src="https://www.howtoforge.com/images/using_pfsense_to_load_balance_your_web_servers/image4.jpg" alt="image4.jpg"  />
+</p>
+<h3 id="23-virtual-server">2.3 Virtual Server<a hidden class="anchor" aria-hidden="true" href="#23-virtual-server">#</a></h3>
+<p>最后一步，选择<code>Virtual Servers</code>标签页，点击<code>+</code>来添加一条记录。填写名称<code>ApacheClusterVirtualServer</code>、描述和IP地址，这个IP地址与第1步中说的未使用的IP相同，端口80，所有发送到这个WAN IP:port的连接都会被转发到服务器池中。虚拟服务器池Virtual Server Poll选择上一步创建的。提交并应用。
+<img loading="lazy" src="https://www.howtoforge.com/images/using_pfsense_to_load_balance_your_web_servers/image5.jpg" alt="image5.jpg"  />
+
+<img loading="lazy" src="https://www.howtoforge.com/images/using_pfsense_to_load_balance_your_web_servers/image6.jpg" alt="image6.jpg"  />
+</p>
+<p>搞定！最后不要忘记为虚拟服务器IP和池添加防火墙规则。</p>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/pfsense/">pfsense</a></li>
+      <li><a href="http://xgknight.com/tags/vmware/">vmware</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

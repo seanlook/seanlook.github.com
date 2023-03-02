@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>记一次错误卸载软件包导致Linux系统崩溃的修复解决过程 | Sean Note</title>
+<meta name="keywords" content="linux, 系统管理, troubleshooting">
+<meta name="description" content="首先问题产生的缘由很简单，是我一同事在安装oracle一套软件时，按照要求需要binutils软件包的32位版本，然而在Oracle Linux已经装有64位，按理说是可以安装i686的，我猜应该是32位的版本低于这个已有的64位所以导致冲突而安装失败，因此同事就用yum remove binutils，这个命令也奇葩，由于是root权限导致依赖于它的200多个软件包也被卸载，最终导致网络断开，系统崩溃，在vSphere虚拟机上重新启动发现再也起不来。下面看问题：
+1. Kernel panic - not syncing: Attempted to kill init! 这个错误时在重新启动Oracle Linux一开始就出现，查阅的相关资料得知Kernel panic问题一般是由驱动模块终端处理终端问题导致的（不懂。。。），一开始我以为是驱动程序依赖于binutils导致被卸载，因此第一反应是想办法把缺失的软件装回去。实际上，是由于安全访问控制模块selinux的问题，参考类似问题。于是检查vi /etc/selinux/config时发现SELINUX=disables，拼写错误，应为disabled。 当再次启动没再出现该错误时，我高兴的认为原来这么简单就帮同事解决了，事实这根本还没到200多个软件包缺失而导致系统崩溃那一步。
+2. 系统启动加载条完成后，一直hang住不动 这无疑要使用LiveCD修复系统了，参考Ultimate method to install package from linux rescue mode或Using Rescue Mode to Fix..Problems。因为知道出问题前做过什么操作，下面直接上解决问题的过程。
+2.1 将系统DVD安装镜像加载到光驱 再次重启就自动进入安装界面，我们当然选择rescue mode： 一路按照提示确定（可以不配置network，这里就不贴图了，很简单），最终会提供给用户一个shell终端，对应的是从DVD光驱加载进来的系统，执行chroot /mnt/sysimage才会进入到原损坏的Linux系统，还好yum和rpm命令还可以使用，悲剧的是我并不知道yum remove命令卸载了哪些软件包。
+2.2 安装缺失的软件包 这里得谢天谢地yum命令的安装卸载日志/var/log/yum.log，这个日志里清楚的记录了installed和erased的所有软件包，用rpm是不可能了，因为270多个包的依赖关系难以解决，只能通过yum方式，而由于rescue模式没有配置网络，因此只能使用本地镜像源。
+在rescue系统下挂载光驱到待修复系统中的/media目录 bash-4.1# mount /dev/cdrom /mnt/sysimage/media chroot进入待修复系统 bash-4.1# chroot /mnt/sysimage 手动编辑一个仓库源（真实待修复的系统） sh-4.1# cd /etc/yum.repos.d/ &amp;&amp; vi Oracle-Media.repo [DVD-media] name=oracle-$releasever - Media baseurl=file:///media gpgcheck=0 enabled=1 建议只留Oracle-Media.repo文件，其他的.repo文件都mv成.bak，以防连接不了这些源而报错，虽然报错关系不大。 获取被依赖erased掉的软件列表
+你可以将yum.log中多余的部分去掉，筛选出应该重新安装的packages： sh-4.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2014/11/%E8%AE%B0%E4%B8%80%E6%AC%A1%E9%94%99%E8%AF%AF%E5%8D%B8%E8%BD%BD%E8%BD%AF%E4%BB%B6%E5%8C%85%E5%AF%BC%E8%87%B4linux%E7%B3%BB%E7%BB%9F%E5%B4%A9%E6%BA%83%E7%9A%84%E4%BF%AE%E5%A4%8D%E8%A7%A3%E5%86%B3%E8%BF%87%E7%A8%8B/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="记一次错误卸载软件包导致Linux系统崩溃的修复解决过程" />
+<meta property="og:description" content="首先问题产生的缘由很简单，是我一同事在安装oracle一套软件时，按照要求需要binutils软件包的32位版本，然而在Oracle Linux已经装有64位，按理说是可以安装i686的，我猜应该是32位的版本低于这个已有的64位所以导致冲突而安装失败，因此同事就用yum remove binutils，这个命令也奇葩，由于是root权限导致依赖于它的200多个软件包也被卸载，最终导致网络断开，系统崩溃，在vSphere虚拟机上重新启动发现再也起不来。下面看问题：
+1. Kernel panic - not syncing: Attempted to kill init! 这个错误时在重新启动Oracle Linux一开始就出现，查阅的相关资料得知Kernel panic问题一般是由驱动模块终端处理终端问题导致的（不懂。。。），一开始我以为是驱动程序依赖于binutils导致被卸载，因此第一反应是想办法把缺失的软件装回去。实际上，是由于安全访问控制模块selinux的问题，参考类似问题。于是检查vi /etc/selinux/config时发现SELINUX=disables，拼写错误，应为disabled。 当再次启动没再出现该错误时，我高兴的认为原来这么简单就帮同事解决了，事实这根本还没到200多个软件包缺失而导致系统崩溃那一步。
+2. 系统启动加载条完成后，一直hang住不动 这无疑要使用LiveCD修复系统了，参考Ultimate method to install package from linux rescue mode或Using Rescue Mode to Fix..Problems。因为知道出问题前做过什么操作，下面直接上解决问题的过程。
+2.1 将系统DVD安装镜像加载到光驱 再次重启就自动进入安装界面，我们当然选择rescue mode： 一路按照提示确定（可以不配置network，这里就不贴图了，很简单），最终会提供给用户一个shell终端，对应的是从DVD光驱加载进来的系统，执行chroot /mnt/sysimage才会进入到原损坏的Linux系统，还好yum和rpm命令还可以使用，悲剧的是我并不知道yum remove命令卸载了哪些软件包。
+2.2 安装缺失的软件包 这里得谢天谢地yum命令的安装卸载日志/var/log/yum.log，这个日志里清楚的记录了installed和erased的所有软件包，用rpm是不可能了，因为270多个包的依赖关系难以解决，只能通过yum方式，而由于rescue模式没有配置网络，因此只能使用本地镜像源。
+在rescue系统下挂载光驱到待修复系统中的/media目录 bash-4.1# mount /dev/cdrom /mnt/sysimage/media chroot进入待修复系统 bash-4.1# chroot /mnt/sysimage 手动编辑一个仓库源（真实待修复的系统） sh-4.1# cd /etc/yum.repos.d/ &amp;&amp; vi Oracle-Media.repo [DVD-media] name=oracle-$releasever - Media baseurl=file:///media gpgcheck=0 enabled=1 建议只留Oracle-Media.repo文件，其他的.repo文件都mv成.bak，以防连接不了这些源而报错，虽然报错关系不大。 获取被依赖erased掉的软件列表
+你可以将yum.log中多余的部分去掉，筛选出应该重新安装的packages： sh-4." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2014/11/%E8%AE%B0%E4%B8%80%E6%AC%A1%E9%94%99%E8%AF%AF%E5%8D%B8%E8%BD%BD%E8%BD%AF%E4%BB%B6%E5%8C%85%E5%AF%BC%E8%87%B4linux%E7%B3%BB%E7%BB%9F%E5%B4%A9%E6%BA%83%E7%9A%84%E4%BF%AE%E5%A4%8D%E8%A7%A3%E5%86%B3%E8%BF%87%E7%A8%8B/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2014-11-03T01:21:25+00:00" />
+<meta property="article:modified_time" content="2014-11-03T01:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="记一次错误卸载软件包导致Linux系统崩溃的修复解决过程"/>
+<meta name="twitter:description" content="首先问题产生的缘由很简单，是我一同事在安装oracle一套软件时，按照要求需要binutils软件包的32位版本，然而在Oracle Linux已经装有64位，按理说是可以安装i686的，我猜应该是32位的版本低于这个已有的64位所以导致冲突而安装失败，因此同事就用yum remove binutils，这个命令也奇葩，由于是root权限导致依赖于它的200多个软件包也被卸载，最终导致网络断开，系统崩溃，在vSphere虚拟机上重新启动发现再也起不来。下面看问题：
+1. Kernel panic - not syncing: Attempted to kill init! 这个错误时在重新启动Oracle Linux一开始就出现，查阅的相关资料得知Kernel panic问题一般是由驱动模块终端处理终端问题导致的（不懂。。。），一开始我以为是驱动程序依赖于binutils导致被卸载，因此第一反应是想办法把缺失的软件装回去。实际上，是由于安全访问控制模块selinux的问题，参考类似问题。于是检查vi /etc/selinux/config时发现SELINUX=disables，拼写错误，应为disabled。 当再次启动没再出现该错误时，我高兴的认为原来这么简单就帮同事解决了，事实这根本还没到200多个软件包缺失而导致系统崩溃那一步。
+2. 系统启动加载条完成后，一直hang住不动 这无疑要使用LiveCD修复系统了，参考Ultimate method to install package from linux rescue mode或Using Rescue Mode to Fix..Problems。因为知道出问题前做过什么操作，下面直接上解决问题的过程。
+2.1 将系统DVD安装镜像加载到光驱 再次重启就自动进入安装界面，我们当然选择rescue mode： 一路按照提示确定（可以不配置network，这里就不贴图了，很简单），最终会提供给用户一个shell终端，对应的是从DVD光驱加载进来的系统，执行chroot /mnt/sysimage才会进入到原损坏的Linux系统，还好yum和rpm命令还可以使用，悲剧的是我并不知道yum remove命令卸载了哪些软件包。
+2.2 安装缺失的软件包 这里得谢天谢地yum命令的安装卸载日志/var/log/yum.log，这个日志里清楚的记录了installed和erased的所有软件包，用rpm是不可能了，因为270多个包的依赖关系难以解决，只能通过yum方式，而由于rescue模式没有配置网络，因此只能使用本地镜像源。
+在rescue系统下挂载光驱到待修复系统中的/media目录 bash-4.1# mount /dev/cdrom /mnt/sysimage/media chroot进入待修复系统 bash-4.1# chroot /mnt/sysimage 手动编辑一个仓库源（真实待修复的系统） sh-4.1# cd /etc/yum.repos.d/ &amp;&amp; vi Oracle-Media.repo [DVD-media] name=oracle-$releasever - Media baseurl=file:///media gpgcheck=0 enabled=1 建议只留Oracle-Media.repo文件，其他的.repo文件都mv成.bak，以防连接不了这些源而报错，虽然报错关系不大。 获取被依赖erased掉的软件列表
+你可以将yum.log中多余的部分去掉，筛选出应该重新安装的packages： sh-4."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "记一次错误卸载软件包导致Linux系统崩溃的修复解决过程",
+      "item": "http://xgknight.com/posts/2014/11/%E8%AE%B0%E4%B8%80%E6%AC%A1%E9%94%99%E8%AF%AF%E5%8D%B8%E8%BD%BD%E8%BD%AF%E4%BB%B6%E5%8C%85%E5%AF%BC%E8%87%B4linux%E7%B3%BB%E7%BB%9F%E5%B4%A9%E6%BA%83%E7%9A%84%E4%BF%AE%E5%A4%8D%E8%A7%A3%E5%86%B3%E8%BF%87%E7%A8%8B/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "记一次错误卸载软件包导致Linux系统崩溃的修复解决过程",
+  "name": "记一次错误卸载软件包导致Linux系统崩溃的修复解决过程",
+  "description": "首先问题产生的缘由很简单，是我一同事在安装oracle一套软件时，按照要求需要binutils软件包的32位版本，然而在Oracle Linux已经装有64位，按理说是可以安装i686的，我猜应该是32位的版本低于这个已有的64位所以导致冲突而安装失败，因此同事就用yum remove binutils，这个命令也奇葩，由于是root权限导致依赖于它的200多个软件包也被卸载，最终导致网络断开，系统崩溃，在vSphere虚拟机上重新启动发现再也起不来。下面看问题：\n1. Kernel panic - not syncing: Attempted to kill init! 这个错误时在重新启动Oracle Linux一开始就出现，查阅的相关资料得知Kernel panic问题一般是由驱动模块终端处理终端问题导致的（不懂。。。），一开始我以为是驱动程序依赖于binutils导致被卸载，因此第一反应是想办法把缺失的软件装回去。实际上，是由于安全访问控制模块selinux的问题，参考类似问题。于是检查vi /etc/selinux/config时发现SELINUX=disables，拼写错误，应为disabled。 当再次启动没再出现该错误时，我高兴的认为原来这么简单就帮同事解决了，事实这根本还没到200多个软件包缺失而导致系统崩溃那一步。\n2. 系统启动加载条完成后，一直hang住不动 这无疑要使用LiveCD修复系统了，参考Ultimate method to install package from linux rescue mode或Using Rescue Mode to Fix..Problems。因为知道出问题前做过什么操作，下面直接上解决问题的过程。\n2.1 将系统DVD安装镜像加载到光驱 再次重启就自动进入安装界面，我们当然选择rescue mode： 一路按照提示确定（可以不配置network，这里就不贴图了，很简单），最终会提供给用户一个shell终端，对应的是从DVD光驱加载进来的系统，执行chroot /mnt/sysimage才会进入到原损坏的Linux系统，还好yum和rpm命令还可以使用，悲剧的是我并不知道yum remove命令卸载了哪些软件包。\n2.2 安装缺失的软件包 这里得谢天谢地yum命令的安装卸载日志/var/log/yum.log，这个日志里清楚的记录了installed和erased的所有软件包，用rpm是不可能了，因为270多个包的依赖关系难以解决，只能通过yum方式，而由于rescue模式没有配置网络，因此只能使用本地镜像源。\n在rescue系统下挂载光驱到待修复系统中的/media目录 bash-4.1# mount /dev/cdrom /mnt/sysimage/media chroot进入待修复系统 bash-4.1# chroot /mnt/sysimage 手动编辑一个仓库源（真实待修复的系统） sh-4.1# cd /etc/yum.repos.d/ \u0026amp;\u0026amp; vi Oracle-Media.repo [DVD-media] name=oracle-$releasever - Media baseurl=file:///media gpgcheck=0 enabled=1 建议只留Oracle-Media.repo文件，其他的.repo文件都mv成.bak，以防连接不了这些源而报错，虽然报错关系不大。 获取被依赖erased掉的软件列表\n你可以将yum.log中多余的部分去掉，筛选出应该重新安装的packages： sh-4.",
+  "keywords": [
+    "linux", "系统管理", "troubleshooting"
+  ],
+  "articleBody": "首先问题产生的缘由很简单，是我一同事在安装oracle一套软件时，按照要求需要binutils软件包的32位版本，然而在Oracle Linux已经装有64位，按理说是可以安装i686的，我猜应该是32位的版本低于这个已有的64位所以导致冲突而安装失败，因此同事就用yum remove binutils，这个命令也奇葩，由于是root权限导致依赖于它的200多个软件包也被卸载，最终导致网络断开，系统崩溃，在vSphere虚拟机上重新启动发现再也起不来。下面看问题：\n1. Kernel panic - not syncing: Attempted to kill init! 这个错误时在重新启动Oracle Linux一开始就出现，查阅的相关资料得知Kernel panic问题一般是由驱动模块终端处理终端问题导致的（不懂。。。），一开始我以为是驱动程序依赖于binutils导致被卸载，因此第一反应是想办法把缺失的软件装回去。实际上，是由于安全访问控制模块selinux的问题，参考类似问题。于是检查vi /etc/selinux/config时发现SELINUX=disables，拼写错误，应为disabled。 当再次启动没再出现该错误时，我高兴的认为原来这么简单就帮同事解决了，事实这根本还没到200多个软件包缺失而导致系统崩溃那一步。\n2. 系统启动加载条完成后，一直hang住不动 这无疑要使用LiveCD修复系统了，参考Ultimate method to install package from linux rescue mode或Using Rescue Mode to Fix..Problems。因为知道出问题前做过什么操作，下面直接上解决问题的过程。\n2.1 将系统DVD安装镜像加载到光驱 再次重启就自动进入安装界面，我们当然选择rescue mode： 一路按照提示确定（可以不配置network，这里就不贴图了，很简单），最终会提供给用户一个shell终端，对应的是从DVD光驱加载进来的系统，执行chroot /mnt/sysimage才会进入到原损坏的Linux系统，还好yum和rpm命令还可以使用，悲剧的是我并不知道yum remove命令卸载了哪些软件包。\n2.2 安装缺失的软件包 这里得谢天谢地yum命令的安装卸载日志/var/log/yum.log，这个日志里清楚的记录了installed和erased的所有软件包，用rpm是不可能了，因为270多个包的依赖关系难以解决，只能通过yum方式，而由于rescue模式没有配置网络，因此只能使用本地镜像源。\n在rescue系统下挂载光驱到待修复系统中的/media目录 bash-4.1# mount /dev/cdrom /mnt/sysimage/media chroot进入待修复系统 bash-4.1# chroot /mnt/sysimage 手动编辑一个仓库源（真实待修复的系统） sh-4.1# cd /etc/yum.repos.d/ \u0026\u0026 vi Oracle-Media.repo [DVD-media] name=oracle-$releasever - Media baseurl=file:///media gpgcheck=0 enabled=1 建议只留Oracle-Media.repo文件，其他的.repo文件都mv成.bak，以防连接不了这些源而报错，虽然报错关系不大。 获取被依赖erased掉的软件列表\n你可以将yum.log中多余的部分去掉，筛选出应该重新安装的packages： sh-4.1# cp /var/log/yum.log{,.bak} sh-4.1# less /var/log/yum.log.bak Oct 29 20:17:34 Erased: gcc-c++ Oct 29 20:18:44 Erased: gcc Oct 29 20:22:59 Erased: xorg-x11-drivers ... Oct 29 20:24:46 Erased: iputils Oct 29 20:24:46 Erased: udev Oct 29 20:24:46 Erased: initscripts Oct 29 20:24:46 Erased: hwdata Oct 29 20:24:46 Erased: module-init-tools Oct 29 20:24:48 Erased: binutils 下面一条命令应该要彻底解决问题了 sh-4.1# awk '{print \"yum install -y \",$5}' /var/log/yum.log.bak |sh \u003e /root/yum_install.log 保险起见，可以查看一下产生的日志文件。此时重启（记得拿出光盘）应该是修复问题了。但我遇见的问题还没完。\n3. An error occurred during the file system check 显然，文件系统损坏。根据提示输入root密码后可以进入到shell中，网上有办法说执行fsck命令来修复分区，又说且不能是mounted状态，但无论我怎么去fsck.ext4 /dev/mapper/vg_fusion_lv_u1，提示：\nWARNING!!! The filesystem is mounted. if you continue you ***WILL*** cause ***SEVERE*** filesystem damage` Do you really want to continue (y/n)? yes fsck.ext4: No such file or directory while trying to open /dev/mapper/vg_fusion_lv_u1 The superblock could not be read or does not describe a correct ext2 filesystem. If the device is valid and it really contains an ext2 filesystem (and not swap or ufs or something else), then the superblock is corrupt, and you might try running e2fsck with an alternate superblock: e2fsck -b 8193 听起来好像还挺严重的，我之前猜想的是不是反复的开关电源来重启导致lvm文件系统corrupt，但事实我发现/dev/mapper/vg_fusion_lv_u1不存在，但lv_fusion_lv_root却完好，执行lvdisplay发现这个命令根本不存在，这才发现原来lvm2软件没有安装（难道是第2部分安装少许出错？）。 这下容易多了，反正现在系统不借助rescue mode就可以起来，重新安装软件包，但是此时的整个文件系统是read only，有两个办法可以解决：\nmount -o remount,rw / 重新挂载根分区为读写，vi /etc/fstab注释掉挂载/u1的那条记录，此时会正常启动，只是有一个文件系统没有挂载，但可以正常安装缺失的lvm2软件，不妨多执行几遍2.2的安装命令。然后手动挂载mount /dev/mapper/vg_fusion_lv_u1 /u1应该就没问题了。记得改回/etc/fstab。 与2.2步骤类似，进入rescue mode→chroot，重新执行awk '{print \"yum install -y \",$5}' /var/log/yum.log.bak |sh \u003e /root/yum_install.log，确保没有报错且已安装lvm。 这下问题总是解决了，避免了删除系统的灾难（测试环境）。\n4. 总结 回头去看这三个问题，其他它们是各自独立的\n第1个问题，是由于设置selinux有人拼写错误，哪怕没做后续的任何操作，重启系统就会启动不了，是早已存在到目前才发现。也有人说遇见过同样的Kernel panic错误但尝试各种办法都难以解决的，这就看具体问题具体分析了。 第2个问题，是真真切切错误卸载重要软件包，导致系统崩溃，修复系统的方法自然也就是利用原镜像在rescue mode下把该装的都装回去，前提是yum.log日志存在，万幸没有执行过yum clean all。 第3个问，题实际文件系统并没有损坏，还是lvm2缺失，但是此处必须小心，免得SEVERE filesystem damage，那么修复过程就没意义了。 以后处理其他系统故障时也可使用类似的方法修复，Redhat、CentOS、OracleLinux、Ubuntu等都适用。\n",
+  "wordCount" : "269",
+  "inLanguage": "en",
+  "datePublished": "2014-11-03T01:21:25Z",
+  "dateModified": "2014-11-03T01:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2014/11/%E8%AE%B0%E4%B8%80%E6%AC%A1%E9%94%99%E8%AF%AF%E5%8D%B8%E8%BD%BD%E8%BD%AF%E4%BB%B6%E5%8C%85%E5%AF%BC%E8%87%B4linux%E7%B3%BB%E7%BB%9F%E5%B4%A9%E6%BA%83%E7%9A%84%E4%BF%AE%E5%A4%8D%E8%A7%A3%E5%86%B3%E8%BF%87%E7%A8%8B/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      记一次错误卸载软件包导致Linux系统崩溃的修复解决过程
+    </h1>
+    <div class="post-meta"><span title='2014-11-03 01:21:25 +0000 UTC'>November 3, 2014</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>首先问题产生的缘由很简单，是我一同事在安装oracle一套软件时，按照要求需要binutils软件包的32位版本，然而在Oracle Linux已经装有64位，按理说是可以安装i686的，我猜应该是32位的版本低于这个已有的64位所以导致冲突而安装失败，因此同事就用<code>yum remove binutils</code>，这个命令也奇葩，由于是root权限导致依赖于它的200多个软件包也被卸载，最终导致网络断开，系统崩溃，在vSphere虚拟机上重新启动发现再也起不来。下面看问题：</p>
+<h2 id="1-kernel-panic---not-syncing-attempted-to-kill-init">1. Kernel panic - not syncing: Attempted to kill init!<a hidden class="anchor" aria-hidden="true" href="#1-kernel-panic---not-syncing-attempted-to-kill-init">#</a></h2>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/kernel-panic.png" alt="kernel_panic"  />
+</p>
+<!-- raw HTML omitted -->
+<p>这个错误时在重新启动Oracle Linux一开始就出现，查阅的<a href="http://blog.51osos.com/linux/linux-kernel-panic/">相关资料</a>得知<code>Kernel panic</code>问题一般是由驱动模块终端处理终端问题导致的（不懂。。。），一开始我以为是驱动程序依赖于binutils导致被卸载，因此第一反应是想办法把缺失的软件装回去。实际上，是由于安全访问控制模块selinux的问题，参考<a href="http://stackoverflow.com/questions/12867591/how-to-solve-kernel-panic-not-syncing-attempted-to-kill-init-without-er">类似问题</a>。于是检查<code>vi /etc/selinux/config</code>时发现<code>SELINUX=disables</code>，拼写错误，应为<code>disabled</code>。
+当再次启动没再出现该错误时，我高兴的认为原来这么简单就帮同事解决了，事实这根本还没到200多个软件包缺失而导致系统崩溃那一步。</p>
+<h2 id="2-系统启动加载条完成后一直hang住不动">2. 系统启动加载条完成后，一直hang住不动<a hidden class="anchor" aria-hidden="true" href="#2-系统启动加载条完成后一直hang住不动">#</a></h2>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/boot_up_fail.png" alt="boot_hang"  />
+</p>
+<p>这无疑要使用LiveCD修复系统了，参考<a href="http://www.slashroot.in/ultimate-method-install-package-linux-rescue-mode">Ultimate method to install package from linux rescue mode</a>或<a href="https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Installation_Guide/rescuemode_drivers.html">Using Rescue Mode to Fix..Problems</a>。因为知道出问题前做过什么操作，下面直接上解决问题的过程。</p>
+<h3 id="21-将系统dvd安装镜像加载到光驱">2.1 将系统DVD安装镜像加载到光驱<a hidden class="anchor" aria-hidden="true" href="#21-将系统dvd安装镜像加载到光驱">#</a></h3>
+<p>再次重启就自动进入安装界面，我们当然选择<code>rescue mode</code>：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/rescue_mode.png" alt="rescue_mode"  />
+</p>
+<p>一路按照提示确定（可以不配置network，这里就不贴图了，很简单），最终会提供给用户一个shell终端，对应的是从DVD光驱加载进来的系统，执行<code>chroot /mnt/sysimage</code>才会进入到原损坏的Linux系统，还好<code>yum</code>和<code>rpm</code>命令还可以使用，悲剧的是我并不知道<code>yum remove</code>命令卸载了哪些软件包。</p>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/chroot_sysimage.png" alt="chroot_sysimage"  />
+</p>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/start_shell_mount.png" alt="start_shell_mount"  />
+</p>
+<h3 id="22-安装缺失的软件包">2.2 安装缺失的软件包<a hidden class="anchor" aria-hidden="true" href="#22-安装缺失的软件包">#</a></h3>
+<p>这里得谢天谢地<code>yum</code>命令的安装卸载日志<code>/var/log/yum.log</code>，这个日志里清楚的记录了<code>installed</code>和<code>erased</code>的所有软件包，用rpm是不可能了，因为270多个包的依赖关系难以解决，只能通过yum方式，而由于rescue模式没有配置网络，因此只能使用本地镜像源。</p>
+<pre tabindex="0"><code>在rescue系统下挂载光驱到待修复系统中的/media目录
+bash-4.1# mount /dev/cdrom /mnt/sysimage/media
+
+chroot进入待修复系统
+bash-4.1# chroot /mnt/sysimage
+
+手动编辑一个仓库源（真实待修复的系统）
+sh-4.1# cd /etc/yum.repos.d/ &amp;&amp; vi Oracle-Media.repo
+[DVD-media]
+name=oracle-$releasever - Media
+baseurl=file:///media
+gpgcheck=0
+enabled=1
+</code></pre><p>建议只留Oracle-Media.repo文件，其他的.repo文件都<code>mv</code>成.bak，以防连接不了这些源而报错，虽然报错关系不大。
+获取被依赖erased掉的软件列表</p>
+<pre tabindex="0"><code>你可以将yum.log中多余的部分去掉，筛选出应该重新安装的packages：
+sh-4.1# cp /var/log/yum.log{,.bak}
+sh-4.1# less /var/log/yum.log.bak
+Oct 29 20:17:34 Erased: gcc-c++
+Oct 29 20:18:44 Erased: gcc
+Oct 29 20:22:59 Erased: xorg-x11-drivers
+...
+Oct 29 20:24:46 Erased: iputils
+Oct 29 20:24:46 Erased: udev
+Oct 29 20:24:46 Erased: initscripts
+Oct 29 20:24:46 Erased: hwdata
+Oct 29 20:24:46 Erased: module-init-tools
+Oct 29 20:24:48 Erased: binutils
+
+下面一条命令应该要彻底解决问题了
+sh-4.1# awk &#39;{print &#34;yum install -y &#34;,$5}&#39; /var/log/yum.log.bak |sh &gt; /root/yum_install.log
+</code></pre><p>保险起见，可以查看一下产生的日志文件。此时重启（记得拿出光盘）应该是修复问题了。但我遇见的问题还没完。</p>
+<h2 id="3-an-error-occurred-during-the-file-system-check">3. An error occurred during the file system check<a hidden class="anchor" aria-hidden="true" href="#3-an-error-occurred-during-the-file-system-check">#</a></h2>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/file_system_check.png" alt="filesystem_check_error"  />
+
+显然，文件系统损坏。根据提示输入root密码后可以进入到shell中，网上有办法说执行<code>fsck</code>命令来修复分区，又说且不能是mounted状态，但无论我怎么去<code>fsck.ext4 /dev/mapper/vg_fusion_lv_u1</code>，提示：</p>
+<pre tabindex="0"><code>WARNING!!!  The filesystem is mounted.   if you continue you ***WILL*** 
+cause ***SEVERE*** filesystem damage`
+
+Do you really want to continue (y/n)? yes
+
+fsck.ext4: No such file or directory while trying to open /dev/mapper/vg_fusion_lv_u1
+
+The superblock could not be read or does not describe a correct ext2 
+filesystem.  If the device is valid and it really contains an ext2 
+filesystem (and not swap or ufs or something else), then the superblock 
+is corrupt, and you might try running e2fsck with an alternate superblock:
+    e2fsck -b 8193 &lt;device&gt;
+</code></pre><p>听起来好像还挺严重的，我之前猜想的是不是反复的开关电源来重启导致lvm文件系统corrupt，但事实我发现<code>/dev/mapper/vg_fusion_lv_u1</code>不存在，但<code>lv_fusion_lv_root</code>却完好，执行<code>lvdisplay</code>发现这个命令根本不存在，这才发现原来lvm2软件没有安装（难道是第2部分安装少许出错？）。
+这下容易多了，反正现在系统不借助<code>rescue mode</code>就可以起来，重新安装软件包，但是此时的整个文件系统是<code>read only</code>，有两个办法可以解决：</p>
+<ol>
+<li><code>mount -o remount,rw /</code>
+重新挂载根分区为读写，<code>vi /etc/fstab</code>注释掉挂载<code>/u1</code>的那条记录，此时会正常启动，只是有一个文件系统没有挂载，但可以正常安装缺失的lvm2软件，不妨多执行几遍2.2的安装命令。然后手动挂载<code>mount /dev/mapper/vg_fusion_lv_u1 /u1</code>应该就没问题了。记得改回/etc/fstab。</li>
+<li>与<code>2.2</code>步骤类似，进入<code>rescue mode</code>→<code>chroot</code>，重新执行<code>awk '{print &quot;yum install -y &quot;,$5}' /var/log/yum.log.bak |sh &gt; /root/yum_install.log</code>，确保没有报错且已安装lvm。</li>
+</ol>
+<p>这下问题总是解决了，避免了删除系统的灾难（测试环境）。</p>
+<h2 id="4-总结">4. 总结<a hidden class="anchor" aria-hidden="true" href="#4-总结">#</a></h2>
+<p>回头去看这三个问题，其他它们是各自独立的</p>
+<ul>
+<li>第1个问题，是由于设置selinux有人拼写错误，哪怕没做后续的任何操作，重启系统就会启动不了，是早已存在到目前才发现。也有人说遇见过同样的<code>Kernel panic</code>错误但尝试各种办法都难以解决的，这就看具体问题具体分析了。</li>
+<li>第2个问题，是真真切切错误卸载重要软件包，导致系统崩溃，修复系统的方法自然也就是利用原镜像在<code>rescue mode</code>下把该装的都装回去，前提是yum.log日志存在，万幸没有执行过<code>yum clean all</code>。</li>
+<li>第3个问，题实际文件系统并没有损坏，还是lvm2缺失，但是此处必须小心，免得<code>SEVERE filesystem damage</code>，那么修复过程就没意义了。</li>
+</ul>
+<p>以后处理其他系统故障时也可使用类似的方法修复，Redhat、CentOS、OracleLinux、Ubuntu等都适用。</p>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/linux/">linux</a></li>
+      <li><a href="http://xgknight.com/tags/%E7%B3%BB%E7%BB%9F%E7%AE%A1%E7%90%86/">系统管理</a></li>
+      <li><a href="http://xgknight.com/tags/troubleshooting/">troubleshooting</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

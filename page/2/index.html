@@ -256,6 +256,39 @@ PPT来源：https://www.percona.com/live/17/sessions/proxysql-tutorial
 
 <article class="post-entry"> 
   <header class="entry-header">
+    <h2>ProxySQL监控方案
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>ProxySQL能监控的信息不多，而且大部分是统计信息，不是性能数据。
+mysql&gt; show tables from stats; &#43;--------------------------------&#43; | tables | &#43;--------------------------------&#43; | global_variables | | stats_mysql_commands_counters | | stats_mysql_connection_pool | | stats_mysql_global | | stats_mysql_processlist | | stats_mysql_query_digest | | stats_mysql_query_digest_reset | | stats_mysql_query_rules | &#43;--------------------------------&#43; 主要关心的指标都在表 stats_mysql_global 里面，源代码 diamond 目录下有个 proxysqlstat.py 脚本，是通过SHOW MYSQL STATUS命令，由diamond收集进程将指标上报到Graphite。有以下几个Metrics：
+并发数 Active_Transactions Questions 连接相关 Client_Connections_connected Server_Connections_connected Server_Connections_aborted 内存相关 Query_Cache_Entries Query_Cache_Memory_bytes SQLite3_memory_bytes ConnPool_memory_bytes 流量相关 mysql_backend_buffers_bytes mysql_frontend_buffers_bytes mysql_session_internal_bytes 其它 MySQL_Monitor_Workers MySQL_Thread_Workers 但是这些远远不够，还有以下更值得关心的指标： 表 stats_mysql_connection_pool:
+对后端DB请求的网络延时 Latency 对后端各个DB的请求数 Queries 后端各个DB的当前活跃连接数 ConnUsed 后端DB的状态 status 表 stats_mysql_processlist:...</p>
+  </div>
+  <footer class="entry-footer"><span title='2017-07-16 21:32:49 +0000 UTC'>July 16, 2017</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to ProxySQL监控方案" href="http://xgknight.com/posts/2017/07/proxysql%E7%9B%91%E6%8E%A7%E6%96%B9%E6%A1%88/"></a>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
+    <h2>ProxySQL高可用方案
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>MySQL的高可用方案现在如 MHA, Galera, InnoDB Cluster，一旦在上游使用中间件之后，中间件本身可能成为单点。所以本文要介绍的是对于ProxySQL自身高可用的方案对比。 首先ProxySQL自身是通过Angel进程的形式运行，即proxysql如果有崩溃，主进程会自动拉起来。但如果是无响应或者网络故障，则需要另外的机制去做到服务的高可用。本文总结了四种方法。
+ProxySQL有关介绍，请参考： http://xgknight.com/2017/04/10/mysql-proxysql-install-config/
+1. 与应用一起部署 所有部署应用的地方，都会部署proxysql节点，当这个proxysql挂掉之后，只影响本机的应用。而且不需要多经过一层网络。 但带来的问题是，如果应用节点很多，proxy的数量也会增加：
+会导致proxysql的配置不容易管理 proxysql对后端db健康检查的请求成倍增加 限制每个用户或后端db的 max_connections 特性用不了 2. 集中式部署，多ip引用 后端一个db集群，对应中间两个以上的 proxysql 节点，前端应用配置多个ip地址，随机挑选一个使用，完全无状态。仅需要多经过一次网络代理。 这种方式的好处是，不需要再对数据库这种基础服务，多引入一个软件来实现高可用（如下节的keepalive或consul），由应用端获取数据库连接的代码逻辑处理。
+但是因为proxysql访问地址是写在配置文件里面的，如果一个节点挂掉，随机挑选还是会落地这个失败的节点。所以优化方案是，ip列表里面默认取某一个，失败之后再选取下一个重试。
+示例代码：
+proxysql_addr_list = [&#39;192.168.1.175&#39;, &#39;192.168.1.176&#39;, &#39;192.168.1.177&#39;] proxysql_addr_list_len = 3 hostname = &#39;this_hostname_for_hash_loadbalance&#39; def get_dbconnection(): list_index = hash(hostname) % proxysql_addr_list_len dbconn = None try: dbconn = DBConnect(dbhost=proxysql_addr_list[ list_index ], dbport=3306) # timeout 1000ms except: if (list_index &#43; 1) == proxysql_addr_list_len: list_index = -1 # like Circular Array dbconn = DBConnec(dbhost=proxysql_addr_list[ list_index &#43; 1 ], dbport=3306) # if failed again, through exception return dbconn 上述并不完美，比如可以改用环形数组轮巡，允许重试其它更多的ip。...</p>
+  </div>
+  <footer class="entry-footer"><span title='2017-07-15 21:32:49 +0000 UTC'>July 15, 2017</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to ProxySQL高可用方案" href="http://xgknight.com/posts/2017/07/proxysql%E9%AB%98%E5%8F%AF%E7%94%A8%E6%96%B9%E6%A1%88/"></a>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
     <h2>ProxySQL之改进patch：记录查询sql完整样例与合并digest多个?
     </h2>
   </header>
@@ -286,40 +319,6 @@ sysbench 压测命令：
   </div>
   <footer class="entry-footer"><span title='2017-04-20 21:32:49 +0000 UTC'>April 20, 2017</span>&nbsp;·&nbsp;admin</footer>
   <a class="entry-link" aria-label="post link to ProxySQL之性能测试对比" href="http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E6%80%A7%E8%83%BD%E6%B5%8B%E8%AF%95%E5%AF%B9%E6%AF%94/"></a>
-</article>
-
-<article class="post-entry"> 
-  <header class="entry-header">
-    <h2>ProxySQL之连接复用（multiplexing）以及相关问题说明
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>ProxySQL在连接池(persistent connection poll)的基础上，还有一个连接复用的概念 multiplexing connection，官方的wiki里没有很明确的说明，但在作者的一些 blog post 和 issue 里能找到解答： https://github.com/sysown/proxysql/issues/939#issuecomment-287489317
-由于SQL可以路由，一个客户端连接上来，可能会到多个 hostgroup 发起连接。复用的意思是，一个后端DB的连接，可以“同时”被多个客户端使用。
-传统的连接池，会在客户端断开连接（会话）后，把连接放回到池里。在ProxySQL中，由于连接复用，连接会在sql语句执行结束后，便将连接放回到池里（客户端会话可能并没有断开），这样便可大大提高后端连接的使用效率，而避免前段请求过大导致后端连接数疯长。
-但这样做有时候并不安全，比如应用端连接时指定了 set NAMES xxx，然后执行查询，那么由于multiplexing可能导致两个语句发到不同的DB上执行，继而没有按照预期的字符集执行。proxysql考虑到了这种情况：
-连接会话里创建了临时表，CREATE TEMPORARY table xxxx... select @开头的变量，如select @@hostname 手动开启了事务，start transaction, commit, rollback等等 连接设置了自己的用户变量，比如set names xxx, set autocommit x, set sql_mode=xxx, set v_uservar=xx等等 第1,2,3点会根据路由规则，会自动禁用multiplex，发到对应hostgroup后，连接未断开之前不会复用到其它客户端。具体是发到主库还是从库，与匹配的规则有关。 issue #941 和 #917 都有提到临时表丢失的问题，可以用不同的rule来避免
-下面对上面几点一一说明。
-1. 临时表与用户变量（验证 1, 2） 以下注意连接的会话窗口及执行顺序，admin打头的是在proxysql管理接口上执行。
--- [session 1] mysql client proxysql (ecdba@10.0.100.36:6033) [(none)]&gt; select 1; &#43;---&#43; | 1 | &#43;---&#43; | 1 | &#43;---&#43; -- [session 2] proxysql admin cli select * from stats_mysql_processlist; Empty set (0....</p>
-  </div>
-  <footer class="entry-footer"><span title='2017-04-17 21:32:49 +0000 UTC'>April 17, 2017</span>&nbsp;·&nbsp;admin</footer>
-  <a class="entry-link" aria-label="post link to ProxySQL之连接复用（multiplexing）以及相关问题说明" href="http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E8%BF%9E%E6%8E%A5%E5%A4%8D%E7%94%A8multiplexing%E4%BB%A5%E5%8F%8A%E7%9B%B8%E5%85%B3%E9%97%AE%E9%A2%98%E8%AF%B4%E6%98%8E/"></a>
-</article>
-
-<article class="post-entry"> 
-  <header class="entry-header">
-    <h2>ProxySQL之读写分离与分库路由演示
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>本文演示使用ProxySQL来完成读写分离和后端分库的一个实际配置过程，安装及配置项介绍见前文 ProxySQL之安装及配置详解。
-环境
-instance0: 10.0.100.100 (db0,db2,db4,db6) instance1: 10.0.100.101 (db1,db3,db5,db7) instance2: 10.0.100.102 (db2,db6,db10,db14) instance3: 10.0.100.103 (db3,db7,db11,db15) instance0 slave: 192.168.10.4:3316 instance1 slave: 192.168.10.4:3326 instance2 slave: 192.168.10.4:3336 instance3 slave: 192.168.10.4:3346 proxysql node0: 10.0.100.36 现在想达到这样一个目的：客户端应用连接上 proxysql 的ip:port，连接时指定分库db名，执行sql时自动路由到对应的实例、对应的库。考虑下面的部署结构： 任何一个proxysql节点都是对等的，路由请求到后端instance的各个database上。
-1. 配置后端DB -- proxysql admin cli insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (100, &#39;10.0.100.100&#39;, 3307, 1, &#39;db0,ReadWrite&#39;), (1000, &#39;10.0.100.100&#39;, 3307, 1, &#39;db0,ReadWrite&#39;),(1000, &#39;192.168.10.4&#39;, 3316, 9, &#39;db0,ReadOnly&#39;); insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (101, &#39;10.0.100.101&#39;, 3307, 1, &#39;db1,ReadWrite&#39;), (1001, &#39;10.0.100.101&#39;, 3307, 1, &#39;db1,ReadWrite&#39;),(1001, &#39;192....</p>
-  </div>
-  <footer class="entry-footer"><span title='2017-04-17 15:32:49 +0000 UTC'>April 17, 2017</span>&nbsp;·&nbsp;admin</footer>
-  <a class="entry-link" aria-label="post link to ProxySQL之读写分离与分库路由演示" href="http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%E4%B8%8E%E5%88%86%E5%BA%93%E8%B7%AF%E7%94%B1%E6%BC%94%E7%A4%BA/"></a>
 </article>
 <footer class="page-footer">
   <nav class="pagination">

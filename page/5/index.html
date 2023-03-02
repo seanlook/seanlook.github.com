@@ -137,6 +137,43 @@
 
 <article class="post-entry"> 
   <header class="entry-header">
+    <h2>使用pt-osc修改主键时注意
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：
+原表上有个复合主键，现在要添加一个自增id作为主键，如何进行 会涉及到以下修改动作：
+删除复合主键定义 添加新的自增主键 原复合主键字段，修改成唯一索引 如果你够聪明，应该会把这三个操作放在同一个 alter table 命令执行。percona手册里有两个地方对修改主键进行了特殊注解：
+–alter A notable exception is when a PRIMARY KEY or UNIQUE INDEX is being created from existing columns as part of the ALTER clause; in that case it will use these column(s) for the DELETE trigger.
+–[no]check-alter
+DROP PRIMARY KEY If –alter contain DROP PRIMARY KEY (case- and space-insensitive), a warning is printed and the tool exits unless –dry-run is specified....</p>
+  </div>
+  <footer class="entry-footer"><span title='2016-05-27 16:32:49 +0000 UTC'>May 27, 2016</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 使用pt-osc修改主键时注意" href="http://xgknight.com/posts/2016/05/%E4%BD%BF%E7%94%A8pt-osc%E4%BF%AE%E6%94%B9%E4%B8%BB%E9%94%AE%E6%97%B6%E6%B3%A8%E6%84%8F/"></a>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
+    <h2>mysql 5.6 原生Online DDL解析
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>做MySQL的都知道，数据库操作里面，DDL操作（比如CREATE,DROP,ALTER等）代价是非常高的，特别是在单表上千万的情况下，加个索引或改个列类型，就有可能堵塞整个表的读写。
+然后 mysql 5.6 开始，大家期待的Online DDL出现了，可以实现修改表结构的同时，依然允许DML操作(select,insert,update,delete)。在这个特性出现以前，用的比较多的工具是pt-online-schema-change，比较请参考pt-online-schema-change使用说明、限制与比较或 ONLINE DDL VS PT-ONLINE-SCHEMA-CHANGE 。
+1. Online DDL 在 MySQL 5.1 （带InnoDB Plugin）和5.5中，有个新特性叫 Fast Index Creation（下称 FIC），就是在添加或者删除二级索引的时候，可以不用复制原表。对于之前的版本对于索引的添加删除这类DDL操作，MySQL数据库的操作过程为如下：
+首先新建Temp table，表结构是 ALTAR TABLE 新定义的结构 然后把原表中数据导入到这个Temp table 删除原表 最后把临时表rename为原来的表名 为了保持数据的一致性，中间复制数据（Copy Table）全程锁表只读，如果有写请求进来将无法提供服务，连接数爆张。
+引入FIC之后，创建二级索引时会对原表加上一个S锁，创建过程不需要重建表（no-rebuild）；删除InnoDB二级索引只需要更新内部视图，并标记这个索引的空间可用，去掉数据库元数据上该索引的定义即可。这个过程也只允许读操作，不能写入，但大大加快了修改索引的速度（不含主键索引，InnoDB IOT的特性决定了修改主键依然需要 Copy Table ）。
+FIC只对索引的创建删除有效，MySQL 5.6 Online DDL把这种特性扩展到了添加列、删除列、修改列类型、列重命名、设置默认值等等，实际效果要看所使用的选项和操作类别来定。
+1.1 Online DDL选项 MySQL 在线DDL分为 INPLACE 和 COPY 两种方式，通过在ALTER语句的ALGORITHM参数指定。
+ALGORITHM=INPLACE，可以避免重建表带来的IO和CPU消耗，保证ddl期间依然有良好的性能和并发。 ALGORITHM=COPY，需要拷贝原始表，所以不允许并发DML写操作，可读。这种copy方式的效率还是不如 inplace ，因为前者需要记录undo和redo log，而且因为临时占用buffer pool引起短时间内性能受影响。 上面只是 Online DDL 内部的实现方式，此外还有 LOCK 选项控制是否锁表，根据不同的DDL操作类型有不同的表现：默认mysql尽可能不去锁表，但是像修改主键这样的昂贵操作不得不选择锁表。
+LOCK=NONE，即DDL期间允许并发读写涉及的表，比如为了保证 ALTER TABLE 时不影响用户注册或支付，可以明确指定，好处是如果不幸该 alter语句不支持对该表的继续写入，则会提示失败，而不会直接发到库上执行。ALGORITHM=COPY默认LOCK级别 LOCK=SHARED，即DDL期间表上的写操作会被阻塞，但不影响读取。 LOCK=DEFAULT，让mysql自己去判断lock的模式，原则是mysql尽可能不去锁表 LOCK=EXCLUSIVE，即DDL期间该表不可用，堵塞任何读写请求。如果你想alter操作在最短的时间内完成，或者表短时间内不可用能接受，可以手动指定。 但是有一点需要说明，无论任何模式下，online ddl开始之前都需要一个短时间排它锁(exclusive)来准备环境，所以alter命令发出后，会首先等待该表上的其它操作完成，在alter命令之后的请求会出现等待waiting meta data lock。同样在ddl结束之前，也要等待alter期间所有的事务完成，也会堵塞一小段时间。所以尽量在ALTER TABLE之前确保没有大事务在执行，否则一样出现连环锁表。...</p>
+  </div>
+  <footer class="entry-footer"><span title='2016-05-24 16:32:49 +0000 UTC'>May 24, 2016</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to mysql 5.6 原生Online DDL解析" href="http://xgknight.com/posts/2016/05/mysql-5.6-%E5%8E%9F%E7%94%9Fonline-ddl%E8%A7%A3%E6%9E%90/"></a>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
     <h2>InnoDB行格式对text/blob大变长字段的影响
     </h2>
   </header>
@@ -281,42 +318,6 @@ select f_crm_id from d_dbname1.t_tbname1 where f_xxx_id = 926067 and (f_mobile =
   </div>
   <footer class="entry-footer"><span title='2016-04-05 16:32:49 +0000 UTC'>April 5, 2016</span>&nbsp;·&nbsp;admin</footer>
   <a class="entry-link" aria-label="post link to MySQL避免索引列使用 OR 条件" href="http://xgknight.com/posts/2016/04/mysql%E9%81%BF%E5%85%8D%E7%B4%A2%E5%BC%95%E5%88%97%E4%BD%BF%E7%94%A8-or-%E6%9D%A1%E4%BB%B6/"></a>
-</article>
-
-<article class="post-entry"> 
-  <header class="entry-header">
-    <h2>使用sysbench对mysql压力测试
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>sysbench是一个模块化的、跨平台、多线程基准测试工具，主要用于评估测试各种不同系统参数下的数据库负载情况。关于这个项目的详细介绍请看：https://github.com/akopytov/sysbench 。 它主要包括以下几种方式的测试：
-cpu性能 磁盘io性能 调度程序性能 内存分配及传输速度 POSIX线程性能 数据库性能(OLTP基准测试) sysbench的数据库OLTP测试支持MySQL、PostgreSQL、Oracle，目前主要用于Linux操作系统，开源社区已经将sysbench移植到了Windows，并支持SQL Server的基准测试。
-废话不多说，开始。
-1. sysbench安装 mysql版本: mysql-community-server-5.6.29 OS: CentOS 6.7 X86_64 sysbench 0.5相比0.4版本有一些变化，包括oltp测试结合了lua脚本，还多了一些隐藏选项，本文会涉及得到一部分。 目前许多仓库里已编译好的二进制sysbench还是0.4.x版本，不过现在主流也还是github上的0.5，可以从 这里下载0.5版本的rpm包直接安装，不过我选择自己编译，因为只有这个办法是通用的。
-// 先安装编译依赖环境 $ sudo yum install gcc gcc-c&#43;&#43; automake make libtool mysql-community-devel $ cd /tmp &amp;&amp; git clone https://github.com/akopytov/sysbench.git $ cd /tmp/sysbench &amp;&amp; ./autogen.sh $ ./configure --prefix=/usr/local/sysbench-0.5 $ ./make &amp;&amp; sudo make install // 0.5版本需要oltp.lua测试脚本 // 如果是rpm包方式安装的，在 /usr/share/doc/sysbench/tests/db/ 下可找到 $ cd /usr/local/sysbench &amp;&amp; sudo mkdir -p share/tests/db $ cp /tmp/sysbench/sysbench/tests/db/*....</p>
-  </div>
-  <footer class="entry-footer"><span title='2016-03-28 16:32:49 +0000 UTC'>March 28, 2016</span>&nbsp;·&nbsp;admin</footer>
-  <a class="entry-link" aria-label="post link to 使用sysbench对mysql压力测试" href="http://xgknight.com/posts/2016/03/%E4%BD%BF%E7%94%A8sysbench%E5%AF%B9mysql%E5%8E%8B%E5%8A%9B%E6%B5%8B%E8%AF%95/"></a>
-</article>
-
-<article class="post-entry"> 
-  <header class="entry-header">
-    <h2>记一次Mac mini折腾过程（鼠键共享，更换SSD）
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>从公司网管那捣鼓来一个“遗弃” Mac mini，说其它人觉得用起来太卡，正好我的工作PC( CPU 4×i3，MEM 8G, HDD 500G)软件开多了也觉得有些卡，特别是我使用浏览器的习惯不太好，每次搜索统一结果都要打开好多标签页对比，文章性质的觉得有用想将来记录下来就没关闭页面，一两个星期下来只Chrome使用的内存就达到4G多。不用也浪费，于是就拿Mac mini分摊一下压力。
-刚拿到手时心想得有多不堪配置才使得的Mac mini卡到嫌弃的地步，看了下底面的型号，A1347——这是2014年底出的新款，没有我想象的那么旧，还好。于是找来显示器、鼠键准备开用了（在某宝上买根八字电源线）。
-但是开机密码没有啊！虽然简单重装是个办法，但我还是想看看里面现在是什么样的，杀鸡焉用牛刀。直接Crack root…
-1. 破解Mac root密码 找到这篇文章 http://wowking.blog.51cto.com/1638252/753774 。我们平头百姓手头哪会有刻录的Mac OS光盘，而且也没移动光驱，所以方法一就不考虑了。方法二是单用户模式，毕竟 OS X 也是*nix血统，命令行几个命令倒难不到我。
-可是众所周知，Mac的键盘跟普通键盘是不一样的，开机启动的时候command &#43; S在一般美式键盘下到底能不能进入单用户模式呢？嗯，行的，按下mini的开机按钮之后不断 win &#43; S。进入Single user model之后提示符#root&gt;，逐步输入以下命令：
-# 执行硬盘检测（只读）, 这一步可以省略 /sbin/fsck -y # 加载文件系统（读/写） /sbin/mount -uaw # 删除初始化设置时的OSX生成的隐藏文件”.applesetupdone” rm /var/db/.AppleSetupDone # 重启 reboot 重启后开机画面会指导你创建一个新的管理员账号，然后这个新的账号密码登陆。就是这么简单，接下来删用户抹除一切使用痕迹😄。
-进去之后着实令我窃喜：OS X Yosemite, 2.6 GHZ Intel Core i5, 8G DDR3, Intel Iris 1536 MB, 1TB HDD，就这配置比得上我当前的Win PC了，高兴得捡了块宝似的。优胜美地系统与我自己的Mac Book Pro一样，无缝立马开始用。
-然而面临的一个问题来了，现在2台工作电脑，配有2套鼠标键盘，切换太不方便了。于是我用大腿想了想，嗯，应该有专门的多台电脑间共享鼠键的软件。啪啪啪几下锁定两款Sharemouse、Synergy。
-2. 跨平台共享鼠标键盘-synergy 先来简单说一下Sharemouse，收费，但你懂的，但这东西毕竟用的人少，要分别在在windows和Mac两个平台上找到相同版本的破解版是多么不容易。中间折腾就不说了，成功使用 V2....</p>
-  </div>
-  <footer class="entry-footer"><span title='2016-01-18 16:32:49 +0000 UTC'>January 18, 2016</span>&nbsp;·&nbsp;admin</footer>
-  <a class="entry-link" aria-label="post link to 记一次Mac mini折腾过程（鼠键共享，更换SSD）" href="http://xgknight.com/posts/2016/01/%E8%AE%B0%E4%B8%80%E6%AC%A1mac-mini%E6%8A%98%E8%85%BE%E8%BF%87%E7%A8%8B%E9%BC%A0%E9%94%AE%E5%85%B1%E4%BA%AB%E6%9B%B4%E6%8D%A2ssd/"></a>
 </article>
 <footer class="page-footer">
   <nav class="pagination">

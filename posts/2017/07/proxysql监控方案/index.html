@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>ProxySQL监控方案 | Sean Note</title>
+<meta name="keywords" content="mysql, 中间件, proxysql">
+<meta name="description" content="ProxySQL能监控的信息不多，而且大部分是统计信息，不是性能数据。
+mysql&gt; show tables from stats; &#43;--------------------------------&#43; | tables | &#43;--------------------------------&#43; | global_variables | | stats_mysql_commands_counters | | stats_mysql_connection_pool | | stats_mysql_global | | stats_mysql_processlist | | stats_mysql_query_digest | | stats_mysql_query_digest_reset | | stats_mysql_query_rules | &#43;--------------------------------&#43; 主要关心的指标都在表 stats_mysql_global 里面，源代码 diamond 目录下有个 proxysqlstat.py 脚本，是通过SHOW MYSQL STATUS命令，由diamond收集进程将指标上报到Graphite。有以下几个Metrics：
+并发数 Active_Transactions Questions 连接相关 Client_Connections_connected Server_Connections_connected Server_Connections_aborted 内存相关 Query_Cache_Entries Query_Cache_Memory_bytes SQLite3_memory_bytes ConnPool_memory_bytes 流量相关 mysql_backend_buffers_bytes mysql_frontend_buffers_bytes mysql_session_internal_bytes 其它 MySQL_Monitor_Workers MySQL_Thread_Workers 但是这些远远不够，还有以下更值得关心的指标： 表 stats_mysql_connection_pool:
+对后端DB请求的网络延时 Latency 对后端各个DB的请求数 Queries 后端各个DB的当前活跃连接数 ConnUsed 后端DB的状态 status 表 stats_mysql_processlist:">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2017/07/proxysql%E7%9B%91%E6%8E%A7%E6%96%B9%E6%A1%88/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="ProxySQL监控方案" />
+<meta property="og:description" content="ProxySQL能监控的信息不多，而且大部分是统计信息，不是性能数据。
+mysql&gt; show tables from stats; &#43;--------------------------------&#43; | tables | &#43;--------------------------------&#43; | global_variables | | stats_mysql_commands_counters | | stats_mysql_connection_pool | | stats_mysql_global | | stats_mysql_processlist | | stats_mysql_query_digest | | stats_mysql_query_digest_reset | | stats_mysql_query_rules | &#43;--------------------------------&#43; 主要关心的指标都在表 stats_mysql_global 里面，源代码 diamond 目录下有个 proxysqlstat.py 脚本，是通过SHOW MYSQL STATUS命令，由diamond收集进程将指标上报到Graphite。有以下几个Metrics：
+并发数 Active_Transactions Questions 连接相关 Client_Connections_connected Server_Connections_connected Server_Connections_aborted 内存相关 Query_Cache_Entries Query_Cache_Memory_bytes SQLite3_memory_bytes ConnPool_memory_bytes 流量相关 mysql_backend_buffers_bytes mysql_frontend_buffers_bytes mysql_session_internal_bytes 其它 MySQL_Monitor_Workers MySQL_Thread_Workers 但是这些远远不够，还有以下更值得关心的指标： 表 stats_mysql_connection_pool:
+对后端DB请求的网络延时 Latency 对后端各个DB的请求数 Queries 后端各个DB的当前活跃连接数 ConnUsed 后端DB的状态 status 表 stats_mysql_processlist:" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2017/07/proxysql%E7%9B%91%E6%8E%A7%E6%96%B9%E6%A1%88/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2017-07-16T21:32:49+00:00" />
+<meta property="article:modified_time" content="2017-07-16T21:32:49+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="ProxySQL监控方案"/>
+<meta name="twitter:description" content="ProxySQL能监控的信息不多，而且大部分是统计信息，不是性能数据。
+mysql&gt; show tables from stats; &#43;--------------------------------&#43; | tables | &#43;--------------------------------&#43; | global_variables | | stats_mysql_commands_counters | | stats_mysql_connection_pool | | stats_mysql_global | | stats_mysql_processlist | | stats_mysql_query_digest | | stats_mysql_query_digest_reset | | stats_mysql_query_rules | &#43;--------------------------------&#43; 主要关心的指标都在表 stats_mysql_global 里面，源代码 diamond 目录下有个 proxysqlstat.py 脚本，是通过SHOW MYSQL STATUS命令，由diamond收集进程将指标上报到Graphite。有以下几个Metrics：
+并发数 Active_Transactions Questions 连接相关 Client_Connections_connected Server_Connections_connected Server_Connections_aborted 内存相关 Query_Cache_Entries Query_Cache_Memory_bytes SQLite3_memory_bytes ConnPool_memory_bytes 流量相关 mysql_backend_buffers_bytes mysql_frontend_buffers_bytes mysql_session_internal_bytes 其它 MySQL_Monitor_Workers MySQL_Thread_Workers 但是这些远远不够，还有以下更值得关心的指标： 表 stats_mysql_connection_pool:
+对后端DB请求的网络延时 Latency 对后端各个DB的请求数 Queries 后端各个DB的当前活跃连接数 ConnUsed 后端DB的状态 status 表 stats_mysql_processlist:"/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "ProxySQL监控方案",
+      "item": "http://xgknight.com/posts/2017/07/proxysql%E7%9B%91%E6%8E%A7%E6%96%B9%E6%A1%88/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "ProxySQL监控方案",
+  "name": "ProxySQL监控方案",
+  "description": "ProxySQL能监控的信息不多，而且大部分是统计信息，不是性能数据。\nmysql\u0026gt; show tables from stats; +--------------------------------+ | tables | +--------------------------------+ | global_variables | | stats_mysql_commands_counters | | stats_mysql_connection_pool | | stats_mysql_global | | stats_mysql_processlist | | stats_mysql_query_digest | | stats_mysql_query_digest_reset | | stats_mysql_query_rules | +--------------------------------+ 主要关心的指标都在表 stats_mysql_global 里面，源代码 diamond 目录下有个 proxysqlstat.py 脚本，是通过SHOW MYSQL STATUS命令，由diamond收集进程将指标上报到Graphite。有以下几个Metrics：\n并发数 Active_Transactions Questions 连接相关 Client_Connections_connected Server_Connections_connected Server_Connections_aborted 内存相关 Query_Cache_Entries Query_Cache_Memory_bytes SQLite3_memory_bytes ConnPool_memory_bytes 流量相关 mysql_backend_buffers_bytes mysql_frontend_buffers_bytes mysql_session_internal_bytes 其它 MySQL_Monitor_Workers MySQL_Thread_Workers 但是这些远远不够，还有以下更值得关心的指标： 表 stats_mysql_connection_pool:\n对后端DB请求的网络延时 Latency 对后端各个DB的请求数 Queries 后端各个DB的当前活跃连接数 ConnUsed 后端DB的状态 status 表 stats_mysql_processlist:",
+  "keywords": [
+    "mysql", "中间件", "proxysql"
+  ],
+  "articleBody": "ProxySQL能监控的信息不多，而且大部分是统计信息，不是性能数据。\nmysql\u003e show tables from stats; +--------------------------------+ | tables | +--------------------------------+ | global_variables | | stats_mysql_commands_counters | | stats_mysql_connection_pool | | stats_mysql_global | | stats_mysql_processlist | | stats_mysql_query_digest | | stats_mysql_query_digest_reset | | stats_mysql_query_rules | +--------------------------------+ 主要关心的指标都在表 stats_mysql_global 里面，源代码 diamond 目录下有个 proxysqlstat.py 脚本，是通过SHOW MYSQL STATUS命令，由diamond收集进程将指标上报到Graphite。有以下几个Metrics：\n并发数 Active_Transactions Questions 连接相关 Client_Connections_connected Server_Connections_connected Server_Connections_aborted 内存相关 Query_Cache_Entries Query_Cache_Memory_bytes SQLite3_memory_bytes ConnPool_memory_bytes 流量相关 mysql_backend_buffers_bytes mysql_frontend_buffers_bytes mysql_session_internal_bytes 其它 MySQL_Monitor_Workers MySQL_Thread_Workers 但是这些远远不够，还有以下更值得关心的指标： 表 stats_mysql_connection_pool:\n对后端DB请求的网络延时 Latency 对后端各个DB的请求数 Queries 后端各个DB的当前活跃连接数 ConnUsed 后端DB的状态 status 表 stats_mysql_processlist:\n每个用户的当前的连接数 表 stats_mysql_query_digest:\n各个类型的sql请求量比例、趋势 在我们的环境下使用的是 InfluxDB + Grafana，通过telegraf收集上报。上述所有的监控脚本见仓库 https://github.com/seanlook/proxysql_tools ：\nproxysql_stats.py:\n收集 stats_mysql_global 和 stats_mysql_connection_pool 中的信息，打印出 influxdb 数据上报格式 proxysql_stats_digest.py:\n收集 sql digest，收集的信息用于展示每类sql的执行趋势。 因为数据是累计值，所以这里做了增量计算，然后一方面上报给influxdb，一方面存入mysql，可以做更多用途。mysql的表结构 proxysql_stats_digest.sql 。 建议收集频率不要过高，比如10分钟一次。 grafana_proxysql_stats.json:\nGrafana Dashboard，直接导入可用 。 除此外，还需要对proxysql进程的监控，如内存占用、CPU使用，这部分通过telegraf的 procstat 插件去做：\n[[inputs.procstat]] exe = \"proxysql\" [[inputs.exec]] # the command to run command = \"/etc/telegraf/telegraf.d/proxysql_stats.py\" ## Timeout for each command to complete. timeout = \"10s\" data_format = \"influx\" 对后端DB status和proxysql端口存活，设置告警。这样就有一个相对完整的ProxySQL监控方案了。\n面板示例：\n原文连接地址：http://xgknight.com/2017/07/16/mysql-proxysql-monitor/\n",
+  "wordCount" : "140",
+  "inLanguage": "en",
+  "datePublished": "2017-07-16T21:32:49Z",
+  "dateModified": "2017-07-16T21:32:49Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2017/07/proxysql%E7%9B%91%E6%8E%A7%E6%96%B9%E6%A1%88/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      ProxySQL监控方案
+    </h1>
+    <div class="post-meta"><span title='2017-07-16 21:32:49 +0000 UTC'>July 16, 2017</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>ProxySQL能监控的信息不多，而且大部分是统计信息，不是性能数据。</p>
+<pre tabindex="0"><code>mysql&gt; show tables from stats;
++--------------------------------+
+| tables                         |
++--------------------------------+
+| global_variables               |
+| stats_mysql_commands_counters  |
+| stats_mysql_connection_pool    |
+| stats_mysql_global             |
+| stats_mysql_processlist        |
+| stats_mysql_query_digest       |
+| stats_mysql_query_digest_reset |
+| stats_mysql_query_rules        |
++--------------------------------+
+</code></pre><p>主要关心的指标都在表 <code>stats_mysql_global</code> 里面，源代码 diamond 目录下有个 <em>proxysqlstat.py</em> 脚本，是通过<code>SHOW MYSQL STATUS</code>命令，由diamond收集进程将指标上报到Graphite。有以下几个Metrics：</p>
+<ul>
+<li>并发数
+<ul>
+<li>Active_Transactions</li>
+<li>Questions</li>
+</ul>
+</li>
+<li>连接相关
+<ul>
+<li>Client_Connections_connected</li>
+<li>Server_Connections_connected</li>
+<li>Server_Connections_aborted</li>
+</ul>
+</li>
+<li>内存相关
+<ul>
+<li>Query_Cache_Entries</li>
+<li>Query_Cache_Memory_bytes</li>
+<li>SQLite3_memory_bytes</li>
+<li>ConnPool_memory_bytes</li>
+</ul>
+</li>
+<li>流量相关
+<ul>
+<li>mysql_backend_buffers_bytes</li>
+<li>mysql_frontend_buffers_bytes</li>
+<li>mysql_session_internal_bytes</li>
+</ul>
+</li>
+<li>其它
+<ul>
+<li>MySQL_Monitor_Workers</li>
+<li>MySQL_Thread_Workers</li>
+</ul>
+</li>
+</ul>
+<p>但是这些远远不够，还有以下更值得关心的指标：
+表 <code>stats_mysql_connection_pool</code>:</p>
+<ul>
+<li>对后端DB请求的网络延时 Latency</li>
+<li>对后端各个DB的请求数 Queries</li>
+<li>后端各个DB的当前活跃连接数 ConnUsed</li>
+<li>后端DB的状态 status</li>
+</ul>
+<p>表 <code>stats_mysql_processlist</code>:</p>
+<ul>
+<li>每个用户的当前的连接数</li>
+</ul>
+<p>表 <code>stats_mysql_query_digest</code>:</p>
+<ul>
+<li>各个类型的sql请求量比例、趋势</li>
+</ul>
+<p>在我们的环境下使用的是 InfluxDB + Grafana，通过telegraf收集上报。上述所有的监控脚本见仓库 <a href="https://github.com/seanlook/proxysql_tools">https://github.com/seanlook/proxysql_tools</a> ：</p>
+<ul>
+<li>
+<p><code>proxysql_stats.py</code>:</p>
+<ul>
+<li>收集 stats_mysql_global 和 stats_mysql_connection_pool 中的信息，打印出 influxdb 数据上报格式</li>
+</ul>
+</li>
+<li>
+<p><code>proxysql_stats_digest.py</code>:</p>
+<ul>
+<li>收集 sql digest，收集的信息用于展示每类sql的执行趋势。
+因为数据是累计值，所以这里做了增量计算，然后一方面上报给influxdb，一方面存入mysql，可以做更多用途。mysql的表结构 proxysql_stats_digest.sql 。
+建议收集频率不要过高，比如10分钟一次。</li>
+</ul>
+</li>
+<li>
+<p><code>grafana_proxysql_stats.json</code>:</p>
+<ul>
+<li>Grafana Dashboard，直接导入可用 。</li>
+</ul>
+</li>
+</ul>
+<p>除此外，还需要对proxysql进程的监控，如内存占用、CPU使用，这部分通过telegraf的 procstat 插件去做：</p>
+<pre tabindex="0"><code>[[inputs.procstat]]
+    exe = &#34;proxysql&#34;
+
+[[inputs.exec]]
+
+  # the command to run
+  command = &#34;/etc/telegraf/telegraf.d/proxysql_stats.py&#34;
+
+  ## Timeout for each command to complete.
+  timeout = &#34;10s&#34;
+
+  data_format = &#34;influx&#34;
+</code></pre><p>对后端DB status和proxysql端口存活，设置告警。这样就有一个相对完整的ProxySQL监控方案了。</p>
+<!-- raw HTML omitted -->
+<p>面板示例：</p>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/proxysql-monitor-1.png" alt="Geneal"  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/proxysql-monitor-2.png" alt="Queries"  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/proxysql-monitor-3.png" alt="Process"  />
+</p>
+<hr>
+<p>原文连接地址：http://xgknight.com/2017/07/16/mysql-proxysql-monitor/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/%E4%B8%AD%E9%97%B4%E4%BB%B6/">中间件</a></li>
+      <li><a href="http://xgknight.com/tags/proxysql/">proxysql</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>基于OpenSSL自建CA和颁发SSL证书 | Sean Note</title>
+<meta name="keywords" content="openssl, ssl, ca">
+<meta name="description" content="关于SSL/TLS介绍见文章 SSL/TLS原理详解。 关于证书授权中心CA以及数字证书等概念，请移步 OpenSSL 与 SSL 数字证书概念贴 。
+openssl是一个开源程序的套件、这个套件有三个部分组成：一是libcryto，这是一个具有通用功能的加密库，里面实现了众多的加密库；二是libssl，这个是实现ssl机制的，它是用于实现TLS/SSL的功能；三是openssl，是个多功能命令行工具，它可以实现加密解密，甚至还可以当CA来用，可以让你创建证书、吊销证书。
+默认情况ubuntu和CentOS上都已安装好openssl。CentOS 6.x 上有关ssl证书的目录结构：
+/etc/pki/CA/ newcerts 存放CA签署（颁发）过的数字证书（证书备份目录） private 用于存放CA的私钥 crl 吊销的证书 /etc/pki/tls/ cert.pem 软链接到certs/ca-bundle.crt certs/ 该服务器上的证书存放目录，可以房子自己的证书和内置证书 ca-bundle.crt 内置信任的证书 private 证书密钥存放目录 openssl.cnf openssl的CA主配置文件 1. 颁发证书 1.1 修改CA的一些配置文件 CA要给别人颁发证书，首先自己得有一个作为根证书，我们得在一切工作之前修改好CA的配置文件、序列号、索引等等。
+vi /etc/pki/tls/openssl.cnf：
+... [ CA_default ] dir = /etc/pki/CA # Where everything is kept certs = $dir/certs # Where the issued certs are kept crl_dir = $dir/crl # Where the issued crl are kept database = $dir/index.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2015/01/%E5%9F%BA%E4%BA%8Eopenssl%E8%87%AA%E5%BB%BAca%E5%92%8C%E9%A2%81%E5%8F%91ssl%E8%AF%81%E4%B9%A6/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="基于OpenSSL自建CA和颁发SSL证书" />
+<meta property="og:description" content="关于SSL/TLS介绍见文章 SSL/TLS原理详解。 关于证书授权中心CA以及数字证书等概念，请移步 OpenSSL 与 SSL 数字证书概念贴 。
+openssl是一个开源程序的套件、这个套件有三个部分组成：一是libcryto，这是一个具有通用功能的加密库，里面实现了众多的加密库；二是libssl，这个是实现ssl机制的，它是用于实现TLS/SSL的功能；三是openssl，是个多功能命令行工具，它可以实现加密解密，甚至还可以当CA来用，可以让你创建证书、吊销证书。
+默认情况ubuntu和CentOS上都已安装好openssl。CentOS 6.x 上有关ssl证书的目录结构：
+/etc/pki/CA/ newcerts 存放CA签署（颁发）过的数字证书（证书备份目录） private 用于存放CA的私钥 crl 吊销的证书 /etc/pki/tls/ cert.pem 软链接到certs/ca-bundle.crt certs/ 该服务器上的证书存放目录，可以房子自己的证书和内置证书 ca-bundle.crt 内置信任的证书 private 证书密钥存放目录 openssl.cnf openssl的CA主配置文件 1. 颁发证书 1.1 修改CA的一些配置文件 CA要给别人颁发证书，首先自己得有一个作为根证书，我们得在一切工作之前修改好CA的配置文件、序列号、索引等等。
+vi /etc/pki/tls/openssl.cnf：
+... [ CA_default ] dir = /etc/pki/CA # Where everything is kept certs = $dir/certs # Where the issued certs are kept crl_dir = $dir/crl # Where the issued crl are kept database = $dir/index." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2015/01/%E5%9F%BA%E4%BA%8Eopenssl%E8%87%AA%E5%BB%BAca%E5%92%8C%E9%A2%81%E5%8F%91ssl%E8%AF%81%E4%B9%A6/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2015-01-18T01:21:25+00:00" />
+<meta property="article:modified_time" content="2015-01-18T01:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="基于OpenSSL自建CA和颁发SSL证书"/>
+<meta name="twitter:description" content="关于SSL/TLS介绍见文章 SSL/TLS原理详解。 关于证书授权中心CA以及数字证书等概念，请移步 OpenSSL 与 SSL 数字证书概念贴 。
+openssl是一个开源程序的套件、这个套件有三个部分组成：一是libcryto，这是一个具有通用功能的加密库，里面实现了众多的加密库；二是libssl，这个是实现ssl机制的，它是用于实现TLS/SSL的功能；三是openssl，是个多功能命令行工具，它可以实现加密解密，甚至还可以当CA来用，可以让你创建证书、吊销证书。
+默认情况ubuntu和CentOS上都已安装好openssl。CentOS 6.x 上有关ssl证书的目录结构：
+/etc/pki/CA/ newcerts 存放CA签署（颁发）过的数字证书（证书备份目录） private 用于存放CA的私钥 crl 吊销的证书 /etc/pki/tls/ cert.pem 软链接到certs/ca-bundle.crt certs/ 该服务器上的证书存放目录，可以房子自己的证书和内置证书 ca-bundle.crt 内置信任的证书 private 证书密钥存放目录 openssl.cnf openssl的CA主配置文件 1. 颁发证书 1.1 修改CA的一些配置文件 CA要给别人颁发证书，首先自己得有一个作为根证书，我们得在一切工作之前修改好CA的配置文件、序列号、索引等等。
+vi /etc/pki/tls/openssl.cnf：
+... [ CA_default ] dir = /etc/pki/CA # Where everything is kept certs = $dir/certs # Where the issued certs are kept crl_dir = $dir/crl # Where the issued crl are kept database = $dir/index."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "基于OpenSSL自建CA和颁发SSL证书",
+      "item": "http://xgknight.com/posts/2015/01/%E5%9F%BA%E4%BA%8Eopenssl%E8%87%AA%E5%BB%BAca%E5%92%8C%E9%A2%81%E5%8F%91ssl%E8%AF%81%E4%B9%A6/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "基于OpenSSL自建CA和颁发SSL证书",
+  "name": "基于OpenSSL自建CA和颁发SSL证书",
+  "description": "关于SSL/TLS介绍见文章 SSL/TLS原理详解。 关于证书授权中心CA以及数字证书等概念，请移步 OpenSSL 与 SSL 数字证书概念贴 。\nopenssl是一个开源程序的套件、这个套件有三个部分组成：一是libcryto，这是一个具有通用功能的加密库，里面实现了众多的加密库；二是libssl，这个是实现ssl机制的，它是用于实现TLS/SSL的功能；三是openssl，是个多功能命令行工具，它可以实现加密解密，甚至还可以当CA来用，可以让你创建证书、吊销证书。\n默认情况ubuntu和CentOS上都已安装好openssl。CentOS 6.x 上有关ssl证书的目录结构：\n/etc/pki/CA/ newcerts 存放CA签署（颁发）过的数字证书（证书备份目录） private 用于存放CA的私钥 crl 吊销的证书 /etc/pki/tls/ cert.pem 软链接到certs/ca-bundle.crt certs/ 该服务器上的证书存放目录，可以房子自己的证书和内置证书 ca-bundle.crt 内置信任的证书 private 证书密钥存放目录 openssl.cnf openssl的CA主配置文件 1. 颁发证书 1.1 修改CA的一些配置文件 CA要给别人颁发证书，首先自己得有一个作为根证书，我们得在一切工作之前修改好CA的配置文件、序列号、索引等等。\nvi /etc/pki/tls/openssl.cnf：\n... [ CA_default ] dir = /etc/pki/CA # Where everything is kept certs = $dir/certs # Where the issued certs are kept crl_dir = $dir/crl # Where the issued crl are kept database = $dir/index.",
+  "keywords": [
+    "openssl", "ssl", "ca"
+  ],
+  "articleBody": "关于SSL/TLS介绍见文章 SSL/TLS原理详解。 关于证书授权中心CA以及数字证书等概念，请移步 OpenSSL 与 SSL 数字证书概念贴 。\nopenssl是一个开源程序的套件、这个套件有三个部分组成：一是libcryto，这是一个具有通用功能的加密库，里面实现了众多的加密库；二是libssl，这个是实现ssl机制的，它是用于实现TLS/SSL的功能；三是openssl，是个多功能命令行工具，它可以实现加密解密，甚至还可以当CA来用，可以让你创建证书、吊销证书。\n默认情况ubuntu和CentOS上都已安装好openssl。CentOS 6.x 上有关ssl证书的目录结构：\n/etc/pki/CA/ newcerts 存放CA签署（颁发）过的数字证书（证书备份目录） private 用于存放CA的私钥 crl 吊销的证书 /etc/pki/tls/ cert.pem 软链接到certs/ca-bundle.crt certs/ 该服务器上的证书存放目录，可以房子自己的证书和内置证书 ca-bundle.crt 内置信任的证书 private 证书密钥存放目录 openssl.cnf openssl的CA主配置文件 1. 颁发证书 1.1 修改CA的一些配置文件 CA要给别人颁发证书，首先自己得有一个作为根证书，我们得在一切工作之前修改好CA的配置文件、序列号、索引等等。\nvi /etc/pki/tls/openssl.cnf：\n... [ CA_default ] dir = /etc/pki/CA # Where everything is kept certs = $dir/certs # Where the issued certs are kept crl_dir = $dir/crl # Where the issued crl are kept database = $dir/index.txt # database index file. #unique_subject = no # Set to 'no' to allow creation of # several ctificates with same subject. new_certs_dir = $dir/newcerts # default place for new certs. certificate = $dir/cacert.pem # The CA certificate serial = $dir/serial # The current serial number crlnumber = $dir/crlnumber # the current crl number # must be commented out to leave a V1 CRL crl = $dir/crl.pem # The current CRL private_key = $dir/private/cakey.pem # The private key RANDFILE = $dir/private/.rand # private random number file ... default_days = 3650 # how long to certify for ... # For the CA policy [ policy_match ] countryName = match stateOrProvinceName = optional localityName = optional organizationName = optional organizationalUnitName = optional commonName = supplied emailAddress = optional ... [ req_distinguished_name ] countryName = Country Name (2 letter code) countryName_default = CN countryName_min = 2 countryName_max = 2 stateOrProvinceName = State or Province Name (full name) stateOrProvinceName_default = GD ... [ req_distinguished_name ] 部分主要是颁证时一些默认的值，可以不动 一定要注意[ policy_match ]中的设定的匹配规则，是有可能因为证书使用的工具不一样，导致即使设置了csr中看起来有相同的countryName,stateOrProvinceName等，但在最终生成证书时依然报错：\nUsing configuration from /usr/lib/ssl/openssl.cnf Check that the request matches the signature Signature ok The stateOrProvinceName field needed to be the same in the CA certificate (GuangDong) and the request (GuangDong) touch index.txt serial： 在CA目录下创建两个初始文件：\n# touch index.txt serial # echo 01 \u003e serial 1.2 生成根密钥 # cd /etc/pki/CA/ # openssl genrsa -out private/cakey.pem 2048 为了安全起见，修改cakey.pem私钥文件权限为600或400，也可以使用子shell生成( umask 077; openssl genrsa -out private/cakey.pem 2048 )，下面不再重复。\n1.3 生成根证书 使用req命令生成自签证书：\n# openssl req -new -x509 -key private/cakey.pem -out cacert.pem 会提示输入一些内容，因为是私有的，所以可以随便输入（之前修改的openssl.cnf会在这里呈现），最好记住能与后面保持一致。上面的自签证书cacert.pem应该生成在/etc/pki/CA下。\n1.4 为我们的nginx web服务器生成ssl密钥 以上都是在CA服务器上做的操作，而且只需进行一次，现在转到nginx服务器上执行：\n# cd /etc/nginx/ssl # openssl genrsa -out nginx.key 2048 这里测试的时候CA中心与要申请证书的服务器是同一个。\n1.5 为nginx生成证书签署请求 # openssl req -new -key nginx.key -out nginx.csr ... Country Name (2 letter code) [AU]:CN State or Province Name (full name) [Some-State]:GD Locality Name (eg, city) []:SZ Organization Name (eg, company) [Internet Widgits Pty Ltd]:COMPANY Organizational Unit Name (eg, section) []:IT_SECTION Common Name (e.g. server FQDN or YOUR name) []:your.domain.com Email Address []: Please enter the following 'extra' attributes to be sent with your certificate request A challenge password []: An optional company name []: ... 同样会提示输入一些内容，其它随便，除了Commone Name一定要是你要授予证书的服务器域名或主机名，challenge password不填。\n1.6 私有CA根据请求来签署证书 接下来要把上一步生成的证书请求csr文件，发到CA服务器上，在CA上执行：\n# openssl ca -in nginx.csr -out nginx.crt 另外在极少数情况下，上面的命令生成的证书不能识别，试试下面的命令： # openssl x509 -req -in server.csr -CA /etc/pki/CA/cacert.pem -CAkey /etc/pki/CA/private/cakey.pem -CAcreateserial -out server.crt 上面签发过程其实默认使用了-cert cacert.pem -keyfile cakey.pem，这两个文件就是前两步生成的位于/etc/pki/CA下的根密钥和根证书。将生成的crt证书发回nginx服务器使用。\n到此我们已经拥有了建立ssl安全连接所需要的所有文件，并且服务器的crt和key都位于配置的目录下，剩下的是如何使用证书的问题。\n2. 使用ssl证书 2.1 一般浏览器 浏览器作为客户端去访问https加密的服务器，一般不用去手动做其他设置，如https://www.google.com.hk，这是因为Chrome、FireFox、Safari、IE等浏览器已经内置了大部分常用的CA的根证书，但自建CA的根证书就不再浏览器的信任列表中，访问时会提示如下： IE浏览器 谷歌浏览器 安装网站证书后（同时也有信任的根证书），地址栏一般会显示绿色小锁 证书信息 导入证书到浏览器的方法：http://cnzhx.net/blog/self-signed-certificate-as-trusted-root-ca-in-windows/\n2.2 为linux系统添加根证书 这一步不是必须的，一般出现在开发测试环境中，而且具体的应用程序应该提供添加证书的方法。\ncurl工具可以在linux上模拟发送请求，但当它去访问https加密网站时就会提示如下信息：\n# curl https://sean:sean@registry.domain.com:8000/ curl: (60) Peer certificate cannot be authenticated with known CA certificates More details here: http://curl.haxx.se/docs/sslcerts.html curl performs SSL certificate verification by default, using a \"bundle\" of Certificate Authority (CA) public keys (CA certs). If the default bundle file isn't adequate, you can specify an alternate file using the --cacert option. If this HTTPS server uses a certificate signed by a CA represented in the bundle, the certificate verification probably failed due to a problem with the certificate (it might be expired, or the name might not match the domain name in the URL). If you'd like to turn off curl's verification of the certificate, use the -k (or --insecure) option. 提示上面的信息说明curl在linux的证书信任集里没有找到根证书，你可以使用curl --insecure来不验证证书的可靠性，这只能保证数据是加密传输的但无法保证对方是我们要访问的服务。使用curl --cacert cacert.pem可以手动指定根证书路径。我们也可以把根证书添加到系统（CentOS 5,6）默认的bundle：\n# cp /etc/pki/tls/certs/ca-bundle.crt{,.bak} 备份以防出错 # cat /etc/pki/CA/cacert.pem \u003e\u003e /etc/pki/tls/certs/ca-bundle.crt # curl https://sean:sean@registry.domain.com:8000 \"docker-registry server (dev) (v0.8.1)\" 2.3 nginx 在nginx配置文件（可能是/etc/nginx/sites-available/default）的server指令下添加：\nssl on; ssl_certificate /etc/nginx/ssl/nginx.crt; ssl_certificate_key /etc/nginx/ssl/nginx.key; 同时注意 server_name 与证书申请时的 Common Name 要相同，打开443端口。当然关于web服务器加密还有其他配置内容，如只对部分URL加密，对URL重定向实现强制https访问，请参考其他资料。\n3 关于证书申请 注意，如果对于一般的应用，管理员只需生成“证书请求”（后缀大多为.csr），它包含你的名字和公钥，然后把这份请求交给诸如verisign等有CA服务公司（当然，连同几百美金），你的证书请求经验证后，CA用它的私钥签名，形成正式的证书发还给你。管理员再在web server上导入这个证书就行了。如果你不想花那笔钱，或者想了解一下原理，可以自己做CA。从ca的角度讲，你需要CA的私钥和公钥。从想要证书的服务器角度将，需要把服务器的证书请求交给CA。\n如果你要自己做CA，别忘了客户端需要导入CA的证书（CA的证书是自签名的，导入它意味着你“信任”这个CA签署的证书）。而商业CA的一般不用，因为它们已经内置在你的浏览器中了。\n参考\nCentOS6.5下openssl加密解密及CA自签颁发证书详解\n基于 OpenSSL 的 CA 建立及证书签发\nopenssl建立证书，非常详细配置ssl+apache\nThe Secure Sockets Layer and Transport Layer Security\n",
+  "wordCount" : "620",
+  "inLanguage": "en",
+  "datePublished": "2015-01-18T01:21:25Z",
+  "dateModified": "2015-01-18T01:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2015/01/%E5%9F%BA%E4%BA%8Eopenssl%E8%87%AA%E5%BB%BAca%E5%92%8C%E9%A2%81%E5%8F%91ssl%E8%AF%81%E4%B9%A6/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      基于OpenSSL自建CA和颁发SSL证书
+    </h1>
+    <div class="post-meta"><span title='2015-01-18 01:21:25 +0000 UTC'>January 18, 2015</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>关于SSL/TLS介绍见文章 <a href="http://xgknight.com/2015/01/07/tls-ssl">SSL/TLS原理详解</a>。
+关于证书授权中心CA以及数字证书等概念，请移步 <a href="http://xgknight.com/2015/01/15/openssl-certificate-encryption">OpenSSL 与 SSL 数字证书概念贴</a> 。</p>
+<p>openssl是一个开源程序的套件、这个套件有三个部分组成：一是<code>libcryto</code>，这是一个具有通用功能的加密库，里面实现了众多的加密库；二是<code>libssl</code>，这个是实现ssl机制的，它是用于实现TLS/SSL的功能；三是openssl，是个多功能命令行工具，它可以实现加密解密，甚至还可以当CA来用，可以让你创建证书、吊销证书。</p>
+<p>默认情况ubuntu和CentOS上都已安装好openssl。CentOS 6.x 上有关ssl证书的目录结构：</p>
+<pre tabindex="0"><code>/etc/pki/CA/
+            newcerts    存放CA签署（颁发）过的数字证书（证书备份目录）
+            private     用于存放CA的私钥
+            crl         吊销的证书
+
+/etc/pki/tls/
+             cert.pem    软链接到certs/ca-bundle.crt
+             certs/      该服务器上的证书存放目录，可以房子自己的证书和内置证书
+                   ca-bundle.crt    内置信任的证书
+             private    证书密钥存放目录
+             openssl.cnf    openssl的CA主配置文件
+</code></pre><h1 id="1-颁发证书">1. 颁发证书<a hidden class="anchor" aria-hidden="true" href="#1-颁发证书">#</a></h1>
+<h2 id="11-修改ca的一些配置文件">1.1 修改CA的一些配置文件<a hidden class="anchor" aria-hidden="true" href="#11-修改ca的一些配置文件">#</a></h2>
+<p>CA要给别人颁发证书，首先自己得有一个作为根证书，我们得在一切工作之前修改好CA的配置文件、序列号、索引等等。</p>
+<!-- raw HTML omitted -->
+<p><strong><code>vi /etc/pki/tls/openssl.cnf</code></strong>：</p>
+<pre tabindex="0"><code>...
+[ CA_default ]
+
+dir             = /etc/pki/CA           # Where everything is kept
+certs           = $dir/certs            # Where the issued certs are kept
+crl_dir         = $dir/crl              # Where the issued crl are kept
+database        = $dir/index.txt        # database index file.
+#unique_subject = no                    # Set to &#39;no&#39; to allow creation of
+                                        # several ctificates with same subject.
+new_certs_dir   = $dir/newcerts         # default place for new certs.
+
+certificate     = $dir/cacert.pem       # The CA certificate
+serial          = $dir/serial           # The current serial number
+crlnumber       = $dir/crlnumber        # the current crl number
+                                        # must be commented out to leave a V1 CRL
+crl             = $dir/crl.pem          # The current CRL
+private_key     = $dir/private/cakey.pem # The private key
+RANDFILE        = $dir/private/.rand    # private random number file
+...
+default_days    = 3650                  # how long to certify for
+...
+# For the CA policy
+[ policy_match ]
+countryName             = match
+stateOrProvinceName     = optional
+localityName            = optional
+organizationName        = optional
+organizationalUnitName  = optional
+commonName              = supplied
+emailAddress            = optional
+...
+[ req_distinguished_name ]
+countryName                     = Country Name (2 letter code)
+countryName_default             = CN
+countryName_min                 = 2
+countryName_max                 = 2
+
+stateOrProvinceName             = State or Province Name (full name)
+stateOrProvinceName_default     = GD
+...
+[ req_distinguished_name ] 部分主要是颁证时一些默认的值，可以不动
+</code></pre><p>一定要注意<code>[ policy_match ]</code>中的设定的匹配规则，是有可能因为证书使用的工具不一样，导致即使设置了csr中看起来有相同的countryName,stateOrProvinceName等，但在最终生成证书时依然报错：</p>
+<pre tabindex="0"><code>Using configuration from /usr/lib/ssl/openssl.cnf
+Check that the request matches the signature
+Signature ok
+The stateOrProvinceName field needed to be the same in the
+CA certificate (GuangDong) and the request (GuangDong)
+</code></pre><p><strong><code>touch index.txt serial</code></strong>：
+在CA目录下创建两个初始文件：</p>
+<pre tabindex="0"><code># touch index.txt serial
+# echo 01 &gt; serial
+</code></pre><h2 id="12-生成根密钥">1.2 生成根密钥<a hidden class="anchor" aria-hidden="true" href="#12-生成根密钥">#</a></h2>
+<pre tabindex="0"><code># cd /etc/pki/CA/
+# openssl genrsa -out private/cakey.pem 2048
+</code></pre><p>为了安全起见，修改cakey.pem私钥文件权限为600或400，也可以使用子shell生成<code>( umask 077; openssl genrsa -out private/cakey.pem 2048 )</code>，下面不再重复。</p>
+<h2 id="13-生成根证书">1.3 生成根证书<a hidden class="anchor" aria-hidden="true" href="#13-生成根证书">#</a></h2>
+<p>使用req命令生成自签证书：</p>
+<pre tabindex="0"><code># openssl req -new -x509 -key private/cakey.pem -out cacert.pem
+</code></pre><p>会提示输入一些内容，因为是私有的，所以可以随便输入（之前修改的openssl.cnf会在这里呈现），最好记住能与后面保持一致。上面的自签证书<code>cacert.pem</code>应该生成在<code>/etc/pki/CA</code>下。</p>
+<h2 id="14-为我们的nginx-web服务器生成ssl密钥">1.4 为我们的nginx web服务器生成ssl密钥<a hidden class="anchor" aria-hidden="true" href="#14-为我们的nginx-web服务器生成ssl密钥">#</a></h2>
+<p>以上都是在CA服务器上做的操作，而且只需进行一次，现在转到nginx服务器上执行：</p>
+<pre tabindex="0"><code># cd /etc/nginx/ssl
+# openssl genrsa -out nginx.key 2048
+</code></pre><p>这里测试的时候CA中心与要申请证书的服务器是同一个。</p>
+<h2 id="15-为nginx生成证书签署请求">1.5 为nginx生成证书签署请求<a hidden class="anchor" aria-hidden="true" href="#15-为nginx生成证书签署请求">#</a></h2>
+<pre tabindex="0"><code># openssl req -new -key nginx.key -out nginx.csr
+...
+Country Name (2 letter code) [AU]:CN
+State or Province Name (full name) [Some-State]:GD
+Locality Name (eg, city) []:SZ
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:COMPANY
+Organizational Unit Name (eg, section) []:IT_SECTION
+Common Name (e.g. server FQDN or YOUR name) []:your.domain.com
+Email Address []:
+
+Please enter the following &#39;extra&#39; attributes
+to be sent with your certificate request
+A challenge password []:
+An optional company name []:
+...
+</code></pre><p>同样会提示输入一些内容，其它随便，除了<code>Commone Name</code>一定要是你要授予证书的服务器域名或主机名，challenge password不填。</p>
+<h2 id="16-私有ca根据请求来签署证书">1.6 私有CA根据请求来签署证书<a hidden class="anchor" aria-hidden="true" href="#16-私有ca根据请求来签署证书">#</a></h2>
+<p>接下来要把上一步生成的证书请求csr文件，发到CA服务器上，在CA上执行：</p>
+<pre tabindex="0"><code># openssl ca -in nginx.csr -out nginx.crt
+
+另外在极少数情况下，上面的命令生成的证书不能识别，试试下面的命令：
+# openssl x509 -req -in server.csr -CA /etc/pki/CA/cacert.pem -CAkey /etc/pki/CA/private/cakey.pem -CAcreateserial -out server.crt
+</code></pre><p>上面签发过程其实默认使用了<code>-cert cacert.pem -keyfile cakey.pem</code>，这两个文件就是前两步生成的位于<code>/etc/pki/CA</code>下的根密钥和根证书。将生成的crt证书发回nginx服务器使用。</p>
+<p>到此我们已经拥有了建立ssl安全连接所需要的所有文件，并且服务器的crt和key都位于配置的目录下，剩下的是如何使用证书的问题。</p>
+<h1 id="2-使用ssl证书">2. 使用ssl证书<a hidden class="anchor" aria-hidden="true" href="#2-使用ssl证书">#</a></h1>
+<h2 id="21-一般浏览器">2.1 一般浏览器<a hidden class="anchor" aria-hidden="true" href="#21-一般浏览器">#</a></h2>
+<p>浏览器作为客户端去访问https加密的服务器，一般不用去手动做其他设置，如<code>https://www.google.com.hk</code>，这是因为Chrome、FireFox、Safari、IE等浏览器已经内置了大部分常用的CA的根证书，但自建CA的根证书就不再浏览器的信任列表中，访问时会提示如下：
+IE浏览器
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/openssl-https-browser-ie.png" alt="openssl-https-browser-ie"  />
+</p>
+<p>谷歌浏览器
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/openssl-https-browser.png" alt="openssl-https-browser"  />
+</p>
+<p>安装网站证书后（同时也有信任的根证书），地址栏一般会显示绿色小锁
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/openssl-https-12306.png" alt="openssl-https-12306"  />
+</p>
+<p>证书信息
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/openssl-https-browser-cert.png" alt="openssl-https-browser-cert"  />
+</p>
+<p>导入证书到浏览器的方法：http://cnzhx.net/blog/self-signed-certificate-as-trusted-root-ca-in-windows/</p>
+<h2 id="22-为linux系统添加根证书">2.2 为linux系统添加根证书<a hidden class="anchor" aria-hidden="true" href="#22-为linux系统添加根证书">#</a></h2>
+<p>这一步不是必须的，一般出现在开发测试环境中，而且具体的应用程序应该提供添加证书的方法。</p>
+<p><code>curl</code>工具可以在linux上模拟发送请求，但当它去访问https加密网站时就会提示如下信息：</p>
+<pre tabindex="0"><code># curl https://sean:sean@registry.domain.com:8000/
+curl: (60) Peer certificate cannot be authenticated with known CA certificates
+More details here: http://curl.haxx.se/docs/sslcerts.html
+curl performs SSL certificate verification by default, using a &#34;bundle&#34;
+ of Certificate Authority (CA) public keys (CA certs). If the default
+ bundle file isn&#39;t adequate, you can specify an alternate file
+ using the --cacert option.
+If this HTTPS server uses a certificate signed by a CA represented in
+ the bundle, the certificate verification probably failed due to a
+ problem with the certificate (it might be expired, or the name might
+ not match the domain name in the URL).
+If you&#39;d like to turn off curl&#39;s verification of the certificate, use
+ the -k (or --insecure) option.
+</code></pre><p>提示上面的信息说明curl在linux的证书信任集里没有找到根证书，你可以使用<code>curl --insecure</code>来不验证证书的可靠性，这只能保证数据是加密传输的但无法保证对方是我们要访问的服务。使用<code>curl --cacert cacert.pem</code>可以手动指定根证书路径。我们也可以把根证书添加到系统（CentOS 5,6）默认的bundle：</p>
+<pre tabindex="0"><code># cp /etc/pki/tls/certs/ca-bundle.crt{,.bak}    备份以防出错
+# cat /etc/pki/CA/cacert.pem &gt;&gt; /etc/pki/tls/certs/ca-bundle.crt
+
+# curl https://sean:sean@registry.domain.com:8000
+&#34;docker-registry server (dev) (v0.8.1)&#34;
+</code></pre><h2 id="23-nginx">2.3 nginx<a hidden class="anchor" aria-hidden="true" href="#23-nginx">#</a></h2>
+<p>在nginx配置文件（可能是<code>/etc/nginx/sites-available/default</code>）的server指令下添加：</p>
+<pre tabindex="0"><code>  ssl on;
+  ssl_certificate /etc/nginx/ssl/nginx.crt;
+  ssl_certificate_key /etc/nginx/ssl/nginx.key;
+</code></pre><p>同时注意 server_name 与证书申请时的 Common Name 要相同，打开443端口。当然关于web服务器加密还有其他配置内容，如只对部分URL加密，对URL重定向实现强制https访问，请参考其他资料。</p>
+<h1 id="3-关于证书申请">3 关于证书申请<a hidden class="anchor" aria-hidden="true" href="#3-关于证书申请">#</a></h1>
+<p>注意，如果对于一般的应用，管理员只需生成“证书请求”（后缀大多为.csr），它包含你的名字和公钥，然后把这份请求交给诸如verisign等有CA服务公司（当然，连同几百美金），你的证书请求经验证后，CA用它的私钥签名，形成正式的证书发还给你。管理员再在web server上导入这个证书就行了。如果你不想花那笔钱，或者想了解一下原理，可以自己做CA。从ca的角度讲，你需要CA的私钥和公钥。从想要证书的服务器角度将，需要把服务器的证书请求交给CA。</p>
+<p>如果你要自己做CA，别忘了客户端需要导入CA的证书（CA的证书是自签名的，导入它意味着你“信任”这个CA签署的证书）。而商业CA的一般不用，因为它们已经内置在你的浏览器中了。</p>
+<p><strong>参考</strong></p>
+<ul>
+<li>
+<p><a href="http://blog.csdn.net/napolunyishi/article/details/42425827">CentOS6.5下openssl加密解密及CA自签颁发证书详解</a></p>
+</li>
+<li>
+<p><a href="http://www.cnblogs.com/popsuper1982/p/3843772.html">基于 OpenSSL 的 CA 建立及证书签发</a></p>
+</li>
+<li>
+<p><a href="http://blog.51yip.com/apachenginx/958.html">openssl建立证书，非常详细配置ssl+apache</a></p>
+</li>
+<li>
+<p><a href="http://www.ibm.com/developerworks/library/ws-ssl-security/">The Secure Sockets Layer and Transport Layer Security</a></p>
+</li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/openssl/">openssl</a></li>
+      <li><a href="http://xgknight.com/tags/ssl/">ssl</a></li>
+      <li><a href="http://xgknight.com/tags/ca/">ca</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

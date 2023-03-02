@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>iptables常用实例备查（更新中） | Sean Note</title>
+<meta name="keywords" content="iptables, 安全">
+<meta name="description" content="1. 普通规则 1.1 操作规则 iptables -nL 查看本机关于iptables的设置情况，默认查看的是-t filter，可以指定-t nat
+iptables-save &gt; iptables.rule 会保存当前的防火墙规则设置，命令行下通过iptables配置的规则在下次重启后会失效，当然这也是为了防止错误的配置防火墙。默认读取和保存的配置文件地址为/etc/sysconfig/iptables。
+设置chain默认策略
+iptables -P INPUT DROP iptables -P FORWARD ACCEPT iptables -P OUTPUT ACCEPT 将 INPUT 链默认处理策略设置为DROP，前提是已经存在一条可以访问22端口的规则。这里要说明的是，在添加这类拒绝访问的规则之前，一定要想好执行完，会不会把自己关在防火墙外面，不然就傻眼了。像下面这句。
+1.2 限制访问规则 iptables -I INPUT 1 -m state --state RELATED,ESTABLISHED -j ACCEPT 把这条语句插在input链的最前面（第一条），对状态为ESTABLISHED,RELATED的连接放行。 这条规则在某种情况下甚至比下面开放ssh服务都重要：① 如果INPUT连默认为DROP，② INPUT链默认为INPUT，但存在这条规则-A INPUT -j REJECT --reject-with icmp-host-prohibited，上面两种情况下都必须添加--state RELATED,ESTABLISHED为第一条，否则22端口无法通行，把自己锁在防火墙外面了。 有了这条规则，可保证只要当前ssh没有关闭，哪怕防火墙忘记开启22端口，也可以继续连接。
+iptables -A INPUT -m state --state NEW -m tcp -p tcp --dport 22 -j ACCEPT 允许所有，不安全，默认。
+iptables -A INPUT -s 172.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2014/02/iptables%E5%B8%B8%E7%94%A8%E5%AE%9E%E4%BE%8B%E5%A4%87%E6%9F%A5%E6%9B%B4%E6%96%B0%E4%B8%AD/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="iptables常用实例备查（更新中）" />
+<meta property="og:description" content="1. 普通规则 1.1 操作规则 iptables -nL 查看本机关于iptables的设置情况，默认查看的是-t filter，可以指定-t nat
+iptables-save &gt; iptables.rule 会保存当前的防火墙规则设置，命令行下通过iptables配置的规则在下次重启后会失效，当然这也是为了防止错误的配置防火墙。默认读取和保存的配置文件地址为/etc/sysconfig/iptables。
+设置chain默认策略
+iptables -P INPUT DROP iptables -P FORWARD ACCEPT iptables -P OUTPUT ACCEPT 将 INPUT 链默认处理策略设置为DROP，前提是已经存在一条可以访问22端口的规则。这里要说明的是，在添加这类拒绝访问的规则之前，一定要想好执行完，会不会把自己关在防火墙外面，不然就傻眼了。像下面这句。
+1.2 限制访问规则 iptables -I INPUT 1 -m state --state RELATED,ESTABLISHED -j ACCEPT 把这条语句插在input链的最前面（第一条），对状态为ESTABLISHED,RELATED的连接放行。 这条规则在某种情况下甚至比下面开放ssh服务都重要：① 如果INPUT连默认为DROP，② INPUT链默认为INPUT，但存在这条规则-A INPUT -j REJECT --reject-with icmp-host-prohibited，上面两种情况下都必须添加--state RELATED,ESTABLISHED为第一条，否则22端口无法通行，把自己锁在防火墙外面了。 有了这条规则，可保证只要当前ssh没有关闭，哪怕防火墙忘记开启22端口，也可以继续连接。
+iptables -A INPUT -m state --state NEW -m tcp -p tcp --dport 22 -j ACCEPT 允许所有，不安全，默认。
+iptables -A INPUT -s 172." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2014/02/iptables%E5%B8%B8%E7%94%A8%E5%AE%9E%E4%BE%8B%E5%A4%87%E6%9F%A5%E6%9B%B4%E6%96%B0%E4%B8%AD/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2014-02-26T01:21:25+00:00" />
+<meta property="article:modified_time" content="2014-02-26T01:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="iptables常用实例备查（更新中）"/>
+<meta name="twitter:description" content="1. 普通规则 1.1 操作规则 iptables -nL 查看本机关于iptables的设置情况，默认查看的是-t filter，可以指定-t nat
+iptables-save &gt; iptables.rule 会保存当前的防火墙规则设置，命令行下通过iptables配置的规则在下次重启后会失效，当然这也是为了防止错误的配置防火墙。默认读取和保存的配置文件地址为/etc/sysconfig/iptables。
+设置chain默认策略
+iptables -P INPUT DROP iptables -P FORWARD ACCEPT iptables -P OUTPUT ACCEPT 将 INPUT 链默认处理策略设置为DROP，前提是已经存在一条可以访问22端口的规则。这里要说明的是，在添加这类拒绝访问的规则之前，一定要想好执行完，会不会把自己关在防火墙外面，不然就傻眼了。像下面这句。
+1.2 限制访问规则 iptables -I INPUT 1 -m state --state RELATED,ESTABLISHED -j ACCEPT 把这条语句插在input链的最前面（第一条），对状态为ESTABLISHED,RELATED的连接放行。 这条规则在某种情况下甚至比下面开放ssh服务都重要：① 如果INPUT连默认为DROP，② INPUT链默认为INPUT，但存在这条规则-A INPUT -j REJECT --reject-with icmp-host-prohibited，上面两种情况下都必须添加--state RELATED,ESTABLISHED为第一条，否则22端口无法通行，把自己锁在防火墙外面了。 有了这条规则，可保证只要当前ssh没有关闭，哪怕防火墙忘记开启22端口，也可以继续连接。
+iptables -A INPUT -m state --state NEW -m tcp -p tcp --dport 22 -j ACCEPT 允许所有，不安全，默认。
+iptables -A INPUT -s 172."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "iptables常用实例备查（更新中）",
+      "item": "http://xgknight.com/posts/2014/02/iptables%E5%B8%B8%E7%94%A8%E5%AE%9E%E4%BE%8B%E5%A4%87%E6%9F%A5%E6%9B%B4%E6%96%B0%E4%B8%AD/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "iptables常用实例备查（更新中）",
+  "name": "iptables常用实例备查（更新中）",
+  "description": "1. 普通规则 1.1 操作规则 iptables -nL 查看本机关于iptables的设置情况，默认查看的是-t filter，可以指定-t nat\niptables-save \u0026gt; iptables.rule 会保存当前的防火墙规则设置，命令行下通过iptables配置的规则在下次重启后会失效，当然这也是为了防止错误的配置防火墙。默认读取和保存的配置文件地址为/etc/sysconfig/iptables。\n设置chain默认策略\niptables -P INPUT DROP iptables -P FORWARD ACCEPT iptables -P OUTPUT ACCEPT 将 INPUT 链默认处理策略设置为DROP，前提是已经存在一条可以访问22端口的规则。这里要说明的是，在添加这类拒绝访问的规则之前，一定要想好执行完，会不会把自己关在防火墙外面，不然就傻眼了。像下面这句。\n1.2 限制访问规则 iptables -I INPUT 1 -m state --state RELATED,ESTABLISHED -j ACCEPT 把这条语句插在input链的最前面（第一条），对状态为ESTABLISHED,RELATED的连接放行。 这条规则在某种情况下甚至比下面开放ssh服务都重要：① 如果INPUT连默认为DROP，② INPUT链默认为INPUT，但存在这条规则-A INPUT -j REJECT --reject-with icmp-host-prohibited，上面两种情况下都必须添加--state RELATED,ESTABLISHED为第一条，否则22端口无法通行，把自己锁在防火墙外面了。 有了这条规则，可保证只要当前ssh没有关闭，哪怕防火墙忘记开启22端口，也可以继续连接。\niptables -A INPUT -m state --state NEW -m tcp -p tcp --dport 22 -j ACCEPT 允许所有，不安全，默认。\niptables -A INPUT -s 172.",
+  "keywords": [
+    "iptables", "安全"
+  ],
+  "articleBody": "1. 普通规则 1.1 操作规则 iptables -nL 查看本机关于iptables的设置情况，默认查看的是-t filter，可以指定-t nat\niptables-save \u003e iptables.rule 会保存当前的防火墙规则设置，命令行下通过iptables配置的规则在下次重启后会失效，当然这也是为了防止错误的配置防火墙。默认读取和保存的配置文件地址为/etc/sysconfig/iptables。\n设置chain默认策略\niptables -P INPUT DROP iptables -P FORWARD ACCEPT iptables -P OUTPUT ACCEPT 将 INPUT 链默认处理策略设置为DROP，前提是已经存在一条可以访问22端口的规则。这里要说明的是，在添加这类拒绝访问的规则之前，一定要想好执行完，会不会把自己关在防火墙外面，不然就傻眼了。像下面这句。\n1.2 限制访问规则 iptables -I INPUT 1 -m state --state RELATED,ESTABLISHED -j ACCEPT 把这条语句插在input链的最前面（第一条），对状态为ESTABLISHED,RELATED的连接放行。 这条规则在某种情况下甚至比下面开放ssh服务都重要：① 如果INPUT连默认为DROP，② INPUT链默认为INPUT，但存在这条规则-A INPUT -j REJECT --reject-with icmp-host-prohibited，上面两种情况下都必须添加--state RELATED,ESTABLISHED为第一条，否则22端口无法通行，把自己锁在防火墙外面了。 有了这条规则，可保证只要当前ssh没有关闭，哪怕防火墙忘记开启22端口，也可以继续连接。\niptables -A INPUT -m state --state NEW -m tcp -p tcp --dport 22 -j ACCEPT 允许所有，不安全，默认。\niptables -A INPUT -s 172.29.73.0/24 -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT 限制指定IP范围能SSH，可取\niptables -A INPUT -s 10.30.0.0/16 -p tcp -m tcp -m multiport --dports 80,443 -j ACCEPT 允许一个IP段访问多个端口\niptables -A INPUT -s 10.30.26.0/24 -p tcp -m tcp --dport 80 -j DROP 禁止某IP段访问80端口，将-j DROP改成 -j REJECT --reject-with icmp-host-prohibited作用相同。\niptables -A INPUT -s 172.29.73.23 -j ACCEPT 完全信任某一主机，尽量不使用\niptables -I INPUT 2 -i lo -j ACCEPT 允许loopback。回环接口是一个主机内部发送和接收数据的虚拟设备接口，应该放行所有数据包。指定插入位置为 2 则之前该编号为 2 规则依次后移。\n-A INPUT -p icmp -j ACCEPT 接受icmp数据包，可以ping。也可以设置只允许某个特定的IP，见后文。 iptables -A INPUT -j REJECT --reject-with icmp-host-prohibited 这条规则用在INPUT链默没有DROP的情况，作用与-P DROP相同，当前面所有的规则都没匹配时，自然落到这个 REJECT 上。 类似的FORWARD链也可以这么用：iptables -A FORWARD -j REJECT --reject-with icmp-host-prohibited。\n当然，更强的规则是将OUPUT链也设置成DROP，这样一来情况就会复杂很多，如就是发送名解析请求，也要添加规则iptables -A OUTPUT -p udp --dport 53 -j ACCEPT。 正是因为这样的太过麻烦，所以一般OUTPUT策略默认为ACCEPT。（安全性比较高的系统除外）\n1.3 删除规则 iptables -nL --line-number 显示每条规则链的编号\niptables -D FORWARD 2 删除FORWARD链的第2条规则，编号由上一条得知。如果删除的是nat表中的链，记得带上-t nat\niptables -D INPUT -j REJECT --reject-with icmp-host-prohibited 删除规则的第二种方法，所有选项要与要删除的规则都相同才能删除，否则提示iptables: No chain/target/match by that name.\n丢弃非法连接\niptables -A INPUT -m state –state INVALID -j DROP iptables -A OUTPUT -m state –state INVALID -j DROP iptables-A FORWARD -m state –state INVALID -j DROP\n2. 几种情形 2.1 端口转发 首先要开启端口转发器必须先修改内核运行参数ip_forward,打开转发:\n# echo 1 \u003e /proc/sys/net/ipv4/ip_forward //此方法临时生效 或 # vi /ect/sysctl.conf //此方法永久生效 # sysctl -p 本机端口转发\n# iptables -t nat -A PREROUTING -p tcp -m tcp --dport 80 -j REDIRECT --to-ports 8080 根据 iptables防火墙原理详解 可知，实际上在数据包进入INPUT链之前，修改了目标地址（端口），于是不难理解在开放端口时需要设置的是放行8080端口，无需考虑80：\n# iptables -A INPUT -s 172.29.88.0/24 -p tcp -m state --state NEW -m tcp --dport 8080 -j ACCEPT 此时外部访问http的80端口便可自动转到8080（浏览器地址栏不会变），而且又具有很高的性能，但如果你通过服务器本地主机的curl或firfox浏览器访问http://localhost:80或http://doman.com:80都是不行（假如你有这样的奇葩需求），这是因为本地数据包产生的目标地址不对，你需要额外添加这条 OUTPUT 规则：\niptables -t nat -A OUTPUT -p tcp --dport 80 -j REDIRECT --to-ports 8080 下面的规则可以达到同样的效果：\niptables -t nat -A PREROUTING -p tcp -i eth0 -d $YOUR_HOST_IP --dport 80 -j DNAT --to $YOUR_HOST_IP:8080 iptables -t nat -A OUTPUT -p tcp -d $YOUR_HOST_IP --dport 80 -j DNAT --to 127.0.0.1:8080 iptables -t nat -A OUTPUT -p tcp -d 127.0.0.1 --dport 80 -j DNAT --to 127.0.0.1:8080 异机端口转发 有些情况下企业内部网络隔离比较严格，但有一个跨网段访问的情况，此时只要转发用的中转服务器能够与另外的两个IP(服务器或PC)通讯就可以使用iptables实现转发。（端口转发的还有其他方法，请参考 linux服务器下各种端口转发技巧 ）\n要实现的是所有访问 192.168.10.100:8000 的请求，转发到 172.29.88.56:80 上，在 192.168.10.100 是哪个添加规则:\niptables -t nat -A PREROUTING -i eth0 -p tcp -d 192.168.10.100 --dport 8000 -j DNAT --to-destination 172.29.88.56:80 iptables -t nat -A POSTROUTING -o eth0 -j SNAT --to-source 192.168.10.100 或者 iptables -t nat -A PREROUTING -d 192.168.10.100 -p tcp --dport 8000 -j DNAT --to 172.29.88.56:80 iptables -t nat -A POSTROUTING -d 172.29.88.56 -p tcp --dport 80 -j SNAT --to-source 192.168.10.100 需要注意的是，如果你的FORWARD链默认为DROP，上面所有端口转发都必须建立在FORWARD链允许通行的情况下：\niptables -A FORWARD -d 172.29.88.56 -p tcp --dport 80 -j ACCEPT iptables -A FORWARD -s 172.29.88.56 -p tcp -j ACCEPT 2.2 记录日志 为22端口的INPUT包增加日志功能，插在input的第1个规则前面，为避免日志信息塞满/var/log/message，用--limit限制：\niptables -R INPUT 1 -p tcp --dport 22 -m limit --limit 3/minute --limit-burst 8 -j LOG vi /etc/rsyslog.conf 编辑日志配置文件，添加kern.=notice /var/log/iptables.log，可以将日志记录到自定义的文件中。\nservice rsyslog restart #重启日志服务\n2.3 防止DoS攻击 SYN洪水是攻击者发送海量的SYN请求到目标服务器上的一种DoS攻击方法，下面的脚本用于预防轻量级的DoS攻击： ipt-tcp.sh：\niptables -N syn-flood (如果您的防火墙默认配置有“ :syn-flood - [0:0] ”则不许要该项，因为重复了) iptables -A INPUT -p tcp --syn -j syn-flood iptables -I syn-flood -p tcp -m limit --limit 2/s --limit-burst 5 -j RETURN iptables -A syn-flood -j REJECT # 防止DOS太多连接进来,可以允许外网网卡每个IP最多15个初始连接,超过的丢弃 # 需要iptables v1.4.19以上版本：iptables -V iptables -A INPUT -p tcp --syn -i eth0 --dport 80 -m connlimit --connlimit-above 20 --connlimit-mask 24 -j DROP #用Iptables抵御DDOS (参数与上相同) iptables -A INPUT -p tcp --syn -m limit --limit 5/s --limit-burst 10 -j ACCEPT iptables -A FORWARD -p tcp --syn -m limit --limit 1/s -j ACCEPT iptables -A FORWARD -p icmp -m limit --limit 2/s --limit-burst 10 -j ACCEPT iptables -A INPUT -p icmp --icmp-type 0 -s ! 172.29.73.0/24 -j DROP 请参考：Linux: 20 Iptables Examples For New SysAdmins、Iptables Limits Connections Per IP、iptables预防DDOS和CC攻击配置\n参考\nIPTables wiki iptables/netfilter详解中文手册 Linux的iptables常用配置范例 ",
+  "wordCount" : "599",
+  "inLanguage": "en",
+  "datePublished": "2014-02-26T01:21:25Z",
+  "dateModified": "2014-02-26T01:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2014/02/iptables%E5%B8%B8%E7%94%A8%E5%AE%9E%E4%BE%8B%E5%A4%87%E6%9F%A5%E6%9B%B4%E6%96%B0%E4%B8%AD/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      iptables常用实例备查（更新中）
+    </h1>
+    <div class="post-meta"><span title='2014-02-26 01:21:25 +0000 UTC'>February 26, 2014</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><h2 id="1-普通规则">1. 普通规则<a hidden class="anchor" aria-hidden="true" href="#1-普通规则">#</a></h2>
+<h3 id="11-操作规则">1.1 操作规则<a hidden class="anchor" aria-hidden="true" href="#11-操作规则">#</a></h3>
+<ul>
+<li>
+<p><code>iptables -nL</code>
+查看本机关于iptables的设置情况，默认查看的是<code>-t filter</code>，可以指定<code>-t nat</code></p>
+</li>
+<li>
+<p><code>iptables-save &gt; iptables.rule</code>
+会保存当前的防火墙规则设置，命令行下通过iptables配置的规则在下次重启后会失效，当然这也是为了防止错误的配置防火墙。默认读取和保存的配置文件地址为<code>/etc/sysconfig/iptables</code>。</p>
+</li>
+<li>
+<p>设置chain默认策略</p>
+</li>
+</ul>
+<pre tabindex="0"><code>    iptables -P INPUT DROP
+    iptables -P FORWARD ACCEPT
+    iptables -P OUTPUT ACCEPT
+</code></pre><p>将 INPUT 链默认处理策略设置为DROP，前提是已经存在一条可以访问22端口的规则。这里要说明的是，在添加这类拒绝访问的规则之前，一定要想好执行完，会不会把自己关在防火墙外面，不然就傻眼了。像下面这句。</p>
+<h3 id="12-限制访问规则">1.2 限制访问规则<a hidden class="anchor" aria-hidden="true" href="#12-限制访问规则">#</a></h3>
+<ul>
+<li>
+<p><code>iptables -I INPUT 1 -m state --state RELATED,ESTABLISHED -j ACCEPT</code>
+把这条语句插在input链的最前面（第一条），对状态为ESTABLISHED,RELATED的连接放行。
+这条规则在某种情况下甚至比下面开放ssh服务都重要：① 如果INPUT连默认为DROP，② INPUT链默认为INPUT，但存在这条规则<code>-A INPUT -j REJECT --reject-with icmp-host-prohibited</code>，上面两种情况下都必须添加<code>--state RELATED,ESTABLISHED</code>为第一条，否则22端口无法通行，把自己锁在防火墙外面了。
+有了这条规则，可保证只要当前ssh没有关闭，哪怕防火墙忘记开启22端口，也可以继续连接。</p>
+</li>
+<li>
+<p><code>iptables -A INPUT -m state --state NEW -m tcp -p tcp --dport 22 -j ACCEPT</code>
+允许所有，不安全，默认。</p>
+</li>
+<li>
+<p><code>iptables -A INPUT -s 172.29.73.0/24 -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT</code>
+限制指定IP范围能SSH，可取</p>
+</li>
+<li>
+<p><code>iptables -A INPUT -s 10.30.0.0/16 -p tcp -m tcp -m multiport --dports 80,443 -j ACCEPT</code>
+允许一个IP段访问多个端口</p>
+</li>
+<li>
+<p><code>iptables -A INPUT -s 10.30.26.0/24 -p tcp -m tcp --dport 80 -j DROP</code>
+禁止某IP段访问80端口，将<code>-j DROP</code>改成 <code>-j REJECT --reject-with icmp-host-prohibited</code>作用相同。</p>
+</li>
+</ul>
+<p><code>iptables -A INPUT -s 172.29.73.23 -j ACCEPT</code>
+完全信任某一主机，尽量不使用</p>
+<p><code>iptables -I INPUT 2 -i lo -j ACCEPT</code>
+允许loopback。回环接口是一个主机内部发送和接收数据的虚拟设备接口，应该放行所有数据包。指定插入位置为 2 则之前该编号为 2 规则依次后移。</p>
+<ul>
+<li><code>-A INPUT -p icmp -j ACCEPT</code>
+接受icmp数据包，可以ping。也可以设置只允许某个特定的IP，见后文。</li>
+</ul>
+<p><code>iptables -A INPUT -j REJECT --reject-with icmp-host-prohibited</code>
+这条规则用在INPUT链默没有DROP的情况，作用与<code>-P DROP</code>相同，当前面所有的规则都没匹配时，自然落到这个 REJECT 上。
+类似的FORWARD链也可以这么用：<code>iptables -A FORWARD -j REJECT --reject-with icmp-host-prohibited</code>。</p>
+<p>当然，更强的规则是将<code>OUPUT</code>链也设置成DROP，这样一来情况就会复杂很多，如就是发送名解析请求，也要添加规则<code>iptables -A OUTPUT -p udp --dport 53 -j ACCEPT</code>。
+正是因为这样的太过麻烦，所以一般OUTPUT策略默认为ACCEPT。（安全性比较高的系统除外）</p>
+<h3 id="13-删除规则">1.3 删除规则<a hidden class="anchor" aria-hidden="true" href="#13-删除规则">#</a></h3>
+<ul>
+<li>
+<p><code>iptables -nL --line-number</code>
+显示每条规则链的编号</p>
+</li>
+<li>
+<p><code>iptables -D FORWARD 2</code>
+删除FORWARD链的第2条规则，编号由上一条得知。如果删除的是nat表中的链，记得带上<code>-t nat</code></p>
+</li>
+<li>
+<p><code>iptables -D INPUT -j REJECT --reject-with icmp-host-prohibited</code>
+删除规则的第二种方法，所有选项要与要删除的规则都相同才能删除，否则提示<code>iptables: No chain/target/match by that name.</code></p>
+</li>
+<li>
+<p>丢弃非法连接</p>
+<p>iptables -A INPUT   -m state &ndash;state INVALID -j DROP
+iptables -A OUTPUT -m state &ndash;state INVALID -j DROP
+iptables-A FORWARD -m state &ndash;state INVALID -j DROP</p>
+</li>
+</ul>
+<h2 id="2-几种情形">2. 几种情形<a hidden class="anchor" aria-hidden="true" href="#2-几种情形">#</a></h2>
+<h3 id="21-端口转发">2.1 端口转发<a hidden class="anchor" aria-hidden="true" href="#21-端口转发">#</a></h3>
+<p>首先要开启端口转发器必须先修改内核运行参数ip_forward,打开转发:</p>
+<pre tabindex="0"><code># echo 1 &gt; /proc/sys/net/ipv4/ip_forward   //此方法临时生效
+或
+# vi /ect/sysctl.conf                      //此方法永久生效
+# sysctl -p 
+</code></pre><p><strong>本机端口转发</strong></p>
+<pre><code># iptables -t nat -A PREROUTING -p tcp -m tcp --dport 80 -j REDIRECT --to-ports 8080
+</code></pre>
+<p>根据 <a href="http://xgknight.com/2014/02/23/iptables-understand/">iptables防火墙原理详解</a> 可知，实际上在数据包进入INPUT链之前，修改了目标地址（端口），于是不难理解在开放端口时需要设置的是放行8080端口，无需考虑80：</p>
+<pre><code># iptables -A INPUT -s 172.29.88.0/24 -p tcp -m state --state NEW -m tcp --dport 8080 -j ACCEPT
+</code></pre>
+<p>此时外部访问http的80端口便可自动转到8080（浏览器地址栏不会变），而且又具有很高的性能，但如果你通过服务器<strong>本地</strong>主机的curl或firfox浏览器访问<code>http://localhost:80</code>或<code>http://doman.com:80</code>都是不行（假如你有这样的奇葩需求），这是因为本地数据包产生的目标地址不对，你需要额外添加这条 OUTPUT 规则：</p>
+<pre><code>iptables -t nat -A OUTPUT -p tcp --dport 80 -j REDIRECT --to-ports 8080
+</code></pre>
+<p>下面的规则可以达到同样的效果：</p>
+<pre><code>iptables -t nat -A PREROUTING -p tcp -i eth0 -d $YOUR_HOST_IP --dport 80 -j DNAT --to $YOUR_HOST_IP:8080
+iptables -t nat -A OUTPUT -p tcp -d $YOUR_HOST_IP --dport 80 -j DNAT --to 127.0.0.1:8080
+iptables -t nat -A OUTPUT -p tcp -d 127.0.0.1      --dport 80 -j DNAT --to 127.0.0.1:8080
+</code></pre>
+<p><strong>异机端口转发</strong>
+有些情况下企业内部网络隔离比较严格，但有一个跨网段访问的情况，此时只要转发用的中转服务器能够与另外的两个IP(服务器或PC)通讯就可以使用iptables实现转发。（端口转发的还有其他方法，<a href="http://">请参考 linux服务器下各种端口转发技巧</a> ）</p>
+<p>要实现的是所有访问 192.168.10.100:8000 的请求，转发到 172.29.88.56:80 上，在 192.168.10.100 是哪个添加规则:</p>
+<pre><code>iptables -t nat -A PREROUTING -i eth0 -p tcp -d 192.168.10.100 --dport 8000 -j DNAT --to-destination 172.29.88.56:80
+iptables -t nat -A POSTROUTING -o eth0 -j SNAT --to-source 192.168.10.100
+或者
+iptables -t nat -A PREROUTING -d 192.168.10.100 -p tcp --dport 8000 -j DNAT --to 172.29.88.56:80
+iptables -t nat -A POSTROUTING -d 172.29.88.56 -p tcp --dport 80 -j SNAT --to-source 192.168.10.100
+</code></pre>
+<p>需要注意的是，如果你的FORWARD链默认为DROP，上面所有端口转发都必须建立在FORWARD链允许通行的情况下：</p>
+<pre><code>iptables -A FORWARD -d 172.29.88.56 -p tcp --dport 80 -j ACCEPT
+iptables -A FORWARD -s 172.29.88.56 -p tcp -j ACCEPT
+</code></pre>
+<h3 id="22-记录日志">2.2 记录日志<a hidden class="anchor" aria-hidden="true" href="#22-记录日志">#</a></h3>
+<p>为22端口的INPUT包增加日志功能，插在input的第1个规则前面，为避免日志信息塞满<code>/var/log/message</code>，用<code>--limit</code>限制：</p>
+<pre><code>iptables -R INPUT 1 -p tcp --dport 22 -m limit --limit 3/minute --limit-burst 8 -j LOG
+</code></pre>
+<p><code>vi /etc/rsyslog.conf</code> 编辑日志配置文件，添加<code>kern.=notice   /var/log/iptables.log</code>，可以将日志记录到自定义的文件中。</p>
+<p><code>service rsyslog restart</code> #重启日志服务</p>
+<h3 id="23-防止dos攻击">2.3 防止DoS攻击<a hidden class="anchor" aria-hidden="true" href="#23-防止dos攻击">#</a></h3>
+<p>SYN洪水是攻击者发送海量的SYN请求到目标服务器上的一种DoS攻击方法，下面的脚本用于预防轻量级的DoS攻击：
+<code>ipt-tcp.sh</code>：</p>
+<pre tabindex="0"><code>iptables -N syn-flood   (如果您的防火墙默认配置有“ :syn-flood - [0:0] ”则不许要该项，因为重复了)
+iptables -A INPUT -p tcp --syn -j syn-flood   
+iptables -I syn-flood -p tcp -m limit --limit 2/s --limit-burst 5 -j RETURN   
+iptables -A syn-flood -j REJECT   
+# 防止DOS太多连接进来,可以允许外网网卡每个IP最多15个初始连接,超过的丢弃
+# 需要iptables v1.4.19以上版本：iptables -V 
+iptables -A INPUT -p tcp --syn -i eth0 --dport 80 -m connlimit --connlimit-above 20 --connlimit-mask 24 -j DROP   
+
+#用Iptables抵御DDOS (参数与上相同)   
+iptables -A INPUT -p tcp --syn -m limit --limit 5/s --limit-burst 10 -j ACCEPT  
+iptables -A FORWARD -p tcp --syn -m limit --limit 1/s -j ACCEPT 
+
+iptables -A FORWARD -p icmp -m limit --limit 2/s --limit-burst 10 -j ACCEPT
+iptables -A INPUT -p icmp --icmp-type 0 -s ! 172.29.73.0/24 -j DROP
+</code></pre><p>请参考：<a href="http://www.cyberciti.biz/tips/linux-iptables-examples.html">Linux: 20 Iptables Examples For New SysAdmins</a>、<a href="http://www.cyberciti.biz/faq/iptables-connection-limits-howto/">Iptables Limits Connections Per IP</a>、<a href="http://blog.csdn.net/zqtsx/article/details/9405515">iptables预防DDOS和CC攻击配置</a></p>
+<p><strong>参考</strong></p>
+<ul>
+<li><a href="http://wiki.centos.org/zh/HowTos/Network/IPTables">IPTables wiki</a></li>
+<li><a href="http://www.ha97.com/4095.html">iptables/netfilter详解中文手册</a></li>
+<li><a href="http://www.ha97.com/3928.html">Linux的iptables常用配置范例</a></li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/iptables/">iptables</a></li>
+      <li><a href="http://xgknight.com/tags/%E5%AE%89%E5%85%A8/">安全</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

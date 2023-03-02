@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>tar命令高级用法——备份数据 | Sean Note</title>
+<meta name="keywords" content="linux命令, tar, backup">
+<meta name="description" content="Linux上有功能强大的tar命令，tar最初是为了制作磁带备份（tape archive）而设计的，它的作用是把文件和目录备份到磁带中，然后从磁带中提取或恢复文件。现在我们可以使用tar来备份数据到任何存储介质上。它是文件级备份，不必考虑底层文件系统类别，并且支持增量备份。
+1. 部分常用选项 -z, --gzip：使用gzip工具（解）压缩，后缀一般为.gz -c, --create：tar打包，后缀一般为.tar -f, --file=：后面立刻接打包或压缩后得到的文件名 -x, --extract：解包命令，与-c对应 -p：保留备份数据的原本权限和属性 -g：后接增量备份的快照文件 -C：指定解压缩的目录 --exclude：排除不打包的目录或文件，支持正则匹配 其他
+-X, --exclude-from：在一个文件中列出要排除的目录或文件（在--exclude=较多时使用） -t, --list：列出备份档案中的文件列表，不与-c、-x同时出现 -j, --bzip2：使用bzip2工具（解）压缩，后缀一般为.bz2 -P：保留绝对路径，解压时同样会自动解压到绝对路径下 -v：（解）压缩过程显示文件处理过程，常用但不建议对大型文件使用 2. 增量备份（网站）数据 许多系统（应用或网站）每天都有静态文件产生，对于一些比较重要的静态文件如果有进行定期备份的需求，就可以通过tar打包压缩备份到指定的地方，特别是对一些总文件比较大比较多的情况，还可以利用-g选项来做增量备份。
+备份的目录最好使用相对路径，也就是进入到需要备份的根目录下
+具体示例方法如下。
+备份当前目录下的所有文件 # tar -g /tmp/snapshot_data.snap -zcpf /tmp/data01.tar.gz . 在需要恢复的目录下解压恢复 # tar -zxpf /tmp/data01.tar.gz -C . -g选项可以理解备份时给目录文件做一个快照，记录权限和属性等信息，第一次备份时/tmp/snapshot_data.snap不存在，会新建一个并做完全备份。当目录下的文件有修改后，再次执行第一条备份命令（记得修改后面的档案文件名），会自动根据-g指定的快照文件，增量备份修改过的文件，包括权限和属性，没有动过的文件不会重复备份。
+另外需要注意上面的恢复，是“保留恢复”，即存在相同文件名的文件会被覆盖，而原目录下已存在（但备份档案里没有）的，会依然保留。所以如果你想完全恢复到与备份文件一模一样，需要清空原目录。如果有增量备份档案，则还需要使用同样的方式分别解压这些档案，而且要注意顺序。
+下面演示一个比较综合的例子，要求：
+备份/tmp/data目录，但cache目录以及临时文件排除在外 由于目录比较大（&gt;4G），所以全备时分割备份的档案（如每个备份档案文件最大1G） 保留所有文件的权限和属性，如用户组和读写权限 # cd /tmp/data 做一次完全备份 # rm -f /tmp/snapshot_data.snap # tar -g /tmp/snapshot_data.snap -zcpf - --exclude=./cache ./ | split -b 1024M - /tmp/bak_data$(date -I).">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2014/12/tar%E5%91%BD%E4%BB%A4%E9%AB%98%E7%BA%A7%E7%94%A8%E6%B3%95%E5%A4%87%E4%BB%BD%E6%95%B0%E6%8D%AE/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="tar命令高级用法——备份数据" />
+<meta property="og:description" content="Linux上有功能强大的tar命令，tar最初是为了制作磁带备份（tape archive）而设计的，它的作用是把文件和目录备份到磁带中，然后从磁带中提取或恢复文件。现在我们可以使用tar来备份数据到任何存储介质上。它是文件级备份，不必考虑底层文件系统类别，并且支持增量备份。
+1. 部分常用选项 -z, --gzip：使用gzip工具（解）压缩，后缀一般为.gz -c, --create：tar打包，后缀一般为.tar -f, --file=：后面立刻接打包或压缩后得到的文件名 -x, --extract：解包命令，与-c对应 -p：保留备份数据的原本权限和属性 -g：后接增量备份的快照文件 -C：指定解压缩的目录 --exclude：排除不打包的目录或文件，支持正则匹配 其他
+-X, --exclude-from：在一个文件中列出要排除的目录或文件（在--exclude=较多时使用） -t, --list：列出备份档案中的文件列表，不与-c、-x同时出现 -j, --bzip2：使用bzip2工具（解）压缩，后缀一般为.bz2 -P：保留绝对路径，解压时同样会自动解压到绝对路径下 -v：（解）压缩过程显示文件处理过程，常用但不建议对大型文件使用 2. 增量备份（网站）数据 许多系统（应用或网站）每天都有静态文件产生，对于一些比较重要的静态文件如果有进行定期备份的需求，就可以通过tar打包压缩备份到指定的地方，特别是对一些总文件比较大比较多的情况，还可以利用-g选项来做增量备份。
+备份的目录最好使用相对路径，也就是进入到需要备份的根目录下
+具体示例方法如下。
+备份当前目录下的所有文件 # tar -g /tmp/snapshot_data.snap -zcpf /tmp/data01.tar.gz . 在需要恢复的目录下解压恢复 # tar -zxpf /tmp/data01.tar.gz -C . -g选项可以理解备份时给目录文件做一个快照，记录权限和属性等信息，第一次备份时/tmp/snapshot_data.snap不存在，会新建一个并做完全备份。当目录下的文件有修改后，再次执行第一条备份命令（记得修改后面的档案文件名），会自动根据-g指定的快照文件，增量备份修改过的文件，包括权限和属性，没有动过的文件不会重复备份。
+另外需要注意上面的恢复，是“保留恢复”，即存在相同文件名的文件会被覆盖，而原目录下已存在（但备份档案里没有）的，会依然保留。所以如果你想完全恢复到与备份文件一模一样，需要清空原目录。如果有增量备份档案，则还需要使用同样的方式分别解压这些档案，而且要注意顺序。
+下面演示一个比较综合的例子，要求：
+备份/tmp/data目录，但cache目录以及临时文件排除在外 由于目录比较大（&gt;4G），所以全备时分割备份的档案（如每个备份档案文件最大1G） 保留所有文件的权限和属性，如用户组和读写权限 # cd /tmp/data 做一次完全备份 # rm -f /tmp/snapshot_data.snap # tar -g /tmp/snapshot_data.snap -zcpf - --exclude=./cache ./ | split -b 1024M - /tmp/bak_data$(date -I)." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2014/12/tar%E5%91%BD%E4%BB%A4%E9%AB%98%E7%BA%A7%E7%94%A8%E6%B3%95%E5%A4%87%E4%BB%BD%E6%95%B0%E6%8D%AE/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2014-12-08T01:21:25+00:00" />
+<meta property="article:modified_time" content="2014-12-08T01:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="tar命令高级用法——备份数据"/>
+<meta name="twitter:description" content="Linux上有功能强大的tar命令，tar最初是为了制作磁带备份（tape archive）而设计的，它的作用是把文件和目录备份到磁带中，然后从磁带中提取或恢复文件。现在我们可以使用tar来备份数据到任何存储介质上。它是文件级备份，不必考虑底层文件系统类别，并且支持增量备份。
+1. 部分常用选项 -z, --gzip：使用gzip工具（解）压缩，后缀一般为.gz -c, --create：tar打包，后缀一般为.tar -f, --file=：后面立刻接打包或压缩后得到的文件名 -x, --extract：解包命令，与-c对应 -p：保留备份数据的原本权限和属性 -g：后接增量备份的快照文件 -C：指定解压缩的目录 --exclude：排除不打包的目录或文件，支持正则匹配 其他
+-X, --exclude-from：在一个文件中列出要排除的目录或文件（在--exclude=较多时使用） -t, --list：列出备份档案中的文件列表，不与-c、-x同时出现 -j, --bzip2：使用bzip2工具（解）压缩，后缀一般为.bz2 -P：保留绝对路径，解压时同样会自动解压到绝对路径下 -v：（解）压缩过程显示文件处理过程，常用但不建议对大型文件使用 2. 增量备份（网站）数据 许多系统（应用或网站）每天都有静态文件产生，对于一些比较重要的静态文件如果有进行定期备份的需求，就可以通过tar打包压缩备份到指定的地方，特别是对一些总文件比较大比较多的情况，还可以利用-g选项来做增量备份。
+备份的目录最好使用相对路径，也就是进入到需要备份的根目录下
+具体示例方法如下。
+备份当前目录下的所有文件 # tar -g /tmp/snapshot_data.snap -zcpf /tmp/data01.tar.gz . 在需要恢复的目录下解压恢复 # tar -zxpf /tmp/data01.tar.gz -C . -g选项可以理解备份时给目录文件做一个快照，记录权限和属性等信息，第一次备份时/tmp/snapshot_data.snap不存在，会新建一个并做完全备份。当目录下的文件有修改后，再次执行第一条备份命令（记得修改后面的档案文件名），会自动根据-g指定的快照文件，增量备份修改过的文件，包括权限和属性，没有动过的文件不会重复备份。
+另外需要注意上面的恢复，是“保留恢复”，即存在相同文件名的文件会被覆盖，而原目录下已存在（但备份档案里没有）的，会依然保留。所以如果你想完全恢复到与备份文件一模一样，需要清空原目录。如果有增量备份档案，则还需要使用同样的方式分别解压这些档案，而且要注意顺序。
+下面演示一个比较综合的例子，要求：
+备份/tmp/data目录，但cache目录以及临时文件排除在外 由于目录比较大（&gt;4G），所以全备时分割备份的档案（如每个备份档案文件最大1G） 保留所有文件的权限和属性，如用户组和读写权限 # cd /tmp/data 做一次完全备份 # rm -f /tmp/snapshot_data.snap # tar -g /tmp/snapshot_data.snap -zcpf - --exclude=./cache ./ | split -b 1024M - /tmp/bak_data$(date -I)."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "tar命令高级用法——备份数据",
+      "item": "http://xgknight.com/posts/2014/12/tar%E5%91%BD%E4%BB%A4%E9%AB%98%E7%BA%A7%E7%94%A8%E6%B3%95%E5%A4%87%E4%BB%BD%E6%95%B0%E6%8D%AE/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "tar命令高级用法——备份数据",
+  "name": "tar命令高级用法——备份数据",
+  "description": "Linux上有功能强大的tar命令，tar最初是为了制作磁带备份（tape archive）而设计的，它的作用是把文件和目录备份到磁带中，然后从磁带中提取或恢复文件。现在我们可以使用tar来备份数据到任何存储介质上。它是文件级备份，不必考虑底层文件系统类别，并且支持增量备份。\n1. 部分常用选项 -z, --gzip：使用gzip工具（解）压缩，后缀一般为.gz -c, --create：tar打包，后缀一般为.tar -f, --file=：后面立刻接打包或压缩后得到的文件名 -x, --extract：解包命令，与-c对应 -p：保留备份数据的原本权限和属性 -g：后接增量备份的快照文件 -C：指定解压缩的目录 --exclude：排除不打包的目录或文件，支持正则匹配 其他\n-X, --exclude-from：在一个文件中列出要排除的目录或文件（在--exclude=较多时使用） -t, --list：列出备份档案中的文件列表，不与-c、-x同时出现 -j, --bzip2：使用bzip2工具（解）压缩，后缀一般为.bz2 -P：保留绝对路径，解压时同样会自动解压到绝对路径下 -v：（解）压缩过程显示文件处理过程，常用但不建议对大型文件使用 2. 增量备份（网站）数据 许多系统（应用或网站）每天都有静态文件产生，对于一些比较重要的静态文件如果有进行定期备份的需求，就可以通过tar打包压缩备份到指定的地方，特别是对一些总文件比较大比较多的情况，还可以利用-g选项来做增量备份。\n备份的目录最好使用相对路径，也就是进入到需要备份的根目录下\n具体示例方法如下。\n备份当前目录下的所有文件 # tar -g /tmp/snapshot_data.snap -zcpf /tmp/data01.tar.gz . 在需要恢复的目录下解压恢复 # tar -zxpf /tmp/data01.tar.gz -C . -g选项可以理解备份时给目录文件做一个快照，记录权限和属性等信息，第一次备份时/tmp/snapshot_data.snap不存在，会新建一个并做完全备份。当目录下的文件有修改后，再次执行第一条备份命令（记得修改后面的档案文件名），会自动根据-g指定的快照文件，增量备份修改过的文件，包括权限和属性，没有动过的文件不会重复备份。\n另外需要注意上面的恢复，是“保留恢复”，即存在相同文件名的文件会被覆盖，而原目录下已存在（但备份档案里没有）的，会依然保留。所以如果你想完全恢复到与备份文件一模一样，需要清空原目录。如果有增量备份档案，则还需要使用同样的方式分别解压这些档案，而且要注意顺序。\n下面演示一个比较综合的例子，要求：\n备份/tmp/data目录，但cache目录以及临时文件排除在外 由于目录比较大（\u0026gt;4G），所以全备时分割备份的档案（如每个备份档案文件最大1G） 保留所有文件的权限和属性，如用户组和读写权限 # cd /tmp/data 做一次完全备份 # rm -f /tmp/snapshot_data.snap # tar -g /tmp/snapshot_data.snap -zcpf - --exclude=./cache ./ | split -b 1024M - /tmp/bak_data$(date -I).",
+  "keywords": [
+    "linux命令", "tar", "backup"
+  ],
+  "articleBody": "Linux上有功能强大的tar命令，tar最初是为了制作磁带备份（tape archive）而设计的，它的作用是把文件和目录备份到磁带中，然后从磁带中提取或恢复文件。现在我们可以使用tar来备份数据到任何存储介质上。它是文件级备份，不必考虑底层文件系统类别，并且支持增量备份。\n1. 部分常用选项 -z, --gzip：使用gzip工具（解）压缩，后缀一般为.gz -c, --create：tar打包，后缀一般为.tar -f, --file=：后面立刻接打包或压缩后得到的文件名 -x, --extract：解包命令，与-c对应 -p：保留备份数据的原本权限和属性 -g：后接增量备份的快照文件 -C：指定解压缩的目录 --exclude：排除不打包的目录或文件，支持正则匹配 其他\n-X, --exclude-from：在一个文件中列出要排除的目录或文件（在--exclude=较多时使用） -t, --list：列出备份档案中的文件列表，不与-c、-x同时出现 -j, --bzip2：使用bzip2工具（解）压缩，后缀一般为.bz2 -P：保留绝对路径，解压时同样会自动解压到绝对路径下 -v：（解）压缩过程显示文件处理过程，常用但不建议对大型文件使用 2. 增量备份（网站）数据 许多系统（应用或网站）每天都有静态文件产生，对于一些比较重要的静态文件如果有进行定期备份的需求，就可以通过tar打包压缩备份到指定的地方，特别是对一些总文件比较大比较多的情况，还可以利用-g选项来做增量备份。\n备份的目录最好使用相对路径，也就是进入到需要备份的根目录下\n具体示例方法如下。\n备份当前目录下的所有文件 # tar -g /tmp/snapshot_data.snap -zcpf /tmp/data01.tar.gz . 在需要恢复的目录下解压恢复 # tar -zxpf /tmp/data01.tar.gz -C . -g选项可以理解备份时给目录文件做一个快照，记录权限和属性等信息，第一次备份时/tmp/snapshot_data.snap不存在，会新建一个并做完全备份。当目录下的文件有修改后，再次执行第一条备份命令（记得修改后面的档案文件名），会自动根据-g指定的快照文件，增量备份修改过的文件，包括权限和属性，没有动过的文件不会重复备份。\n另外需要注意上面的恢复，是“保留恢复”，即存在相同文件名的文件会被覆盖，而原目录下已存在（但备份档案里没有）的，会依然保留。所以如果你想完全恢复到与备份文件一模一样，需要清空原目录。如果有增量备份档案，则还需要使用同样的方式分别解压这些档案，而且要注意顺序。\n下面演示一个比较综合的例子，要求：\n备份/tmp/data目录，但cache目录以及临时文件排除在外 由于目录比较大（\u003e4G），所以全备时分割备份的档案（如每个备份档案文件最大1G） 保留所有文件的权限和属性，如用户组和读写权限 # cd /tmp/data 做一次完全备份 # rm -f /tmp/snapshot_data.snap # tar -g /tmp/snapshot_data.snap -zcpf - --exclude=./cache ./ | split -b 1024M - /tmp/bak_data$(date -I).tar.gz_ 分割后文件名后会依次加上aa,ab,ac,...，上面最终的备份归档会保存成 bak_data2014-12-07.tar.gz_aa bak_data2014-12-07.tar.gz_ab bak_data2014-12-07.tar.gz_ac ... 增量备份 可以是与完全备份一模一样的命令，但需要注意的是假如你一天备份多次，可能导致档案文件名重复，那么就会导致 备份实现，因为split依然会从aa,ab开始命名，如果一天的文件产生（修改）量不是特别大，那么建议增量部分不 分割处理了：（ 一定要分割的话，文件名加入更细致的时间如$(date +%Y-%m-%d_%H) ） # tar -g /tmp/snapshot_data.snap -zcpf /tmp/bak_data2014-12-07.tar.gz --exclude=./cache ./ 第二天增备 # tar -g /tmp/snapshot_data.snap -zcpf /tmp/bak_data2014-12-08.tar.gz --exclude=./cache ./ 恢复过程\n恢复完全备份的档案文件 可以选择是否先清空/tmp/data/目录 # cat /tmp/bak_data2014-12-07.tar.gz_* | tar -zxpf - -C /tmp/data/ 恢复增量备份的档案文件 $ tar –zxpf /tmp/bak_data2014-12-07.tar.gz -C /tmp/data/ $ tar –zxpf /tmp/bak_data2014-12-08.tar.gz -C /tmp/data/ ... 一定要保证是按时间顺序恢复的，像下面文件名规则也可以使用上面通配符的形式 如果需要定期备份，如每周一次全备，每天一次增量备份，则可以结合crontab实现。\n3. 备份文件系统 备份文件系统方法有很多，例如cpio, rsync, dump, tar，这里演示一个通过tar备份整个Linux系统的例子，整个备份与恢复过程与上面类似。 首先Linux（这里是CentOS）有一部分目录是没必要备份的，如/proc、/lost+found、/sys、/mnt、/media、/dev、/proc、/tmp，如果是备份到磁带/dev/st0则不必关心那么多，因为我这里是备份到本地/backup目录，所以也需要排除，还有其它一些NFS或者网络存储挂载的目录。\n创建排除列表文件 # vi /backup/backup_tar_exclude.list /backup /proc /lost+found /sys /mnt /media /dev /tmp $ tar -zcpf /backup/backup_full.tar.gz -g /backup/tar_snapshot.snap --exclude-from=/backup/tar_exclude.list / 4. 注意 使用tar无论是备份数据还是文件系统，需要考虑是在原系统上恢复还是另一个新的系统上恢复。\ntar备份极度依赖于文件的atime属性， 文件所属用户是根据用户ID来确定的，异机恢复需要考虑相同用户拥有相同USERID 备份和恢复的过程尽量不要运行其他进程，可能会导致数据不一致 软硬连接文件可以正常恢复 参考 tar高级教程：增量备份、定时备份、网络备份 Linux服务器数据备份恢复的详细讲解 ",
+  "wordCount" : "168",
+  "inLanguage": "en",
+  "datePublished": "2014-12-08T01:21:25Z",
+  "dateModified": "2014-12-08T01:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2014/12/tar%E5%91%BD%E4%BB%A4%E9%AB%98%E7%BA%A7%E7%94%A8%E6%B3%95%E5%A4%87%E4%BB%BD%E6%95%B0%E6%8D%AE/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      tar命令高级用法——备份数据
+    </h1>
+    <div class="post-meta"><span title='2014-12-08 01:21:25 +0000 UTC'>December 8, 2014</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>Linux上有功能强大的tar命令，tar最初是为了制作磁带备份（tape archive）而设计的，它的作用是把文件和目录备份到磁带中，然后从磁带中提取或恢复文件。现在我们可以使用tar来备份数据到任何存储介质上。它是文件级备份，不必考虑底层文件系统类别，并且支持增量备份。</p>
+<h2 id="1-部分常用选项">1. 部分常用选项<a hidden class="anchor" aria-hidden="true" href="#1-部分常用选项">#</a></h2>
+<ul>
+<li><code>-z, --gzip</code>：使用gzip工具（解）压缩，后缀一般为<code>.gz</code></li>
+<li><code>-c, --create</code>：tar打包，后缀一般为<code>.tar</code></li>
+<li><code>-f, --file=</code>：后面立刻接打包或压缩后得到的文件名</li>
+<li><code>-x, --extract</code>：解包命令，与<code>-c</code>对应</li>
+<li><code>-p</code>：保留备份数据的原本权限和属性</li>
+<li><code>-g</code>：后接增量备份的快照文件</li>
+<li><code>-C</code>：指定解压缩的目录</li>
+<li><code>--exclude</code>：排除不打包的目录或文件，支持正则匹配</li>
+</ul>
+<p>其他</p>
+<ul>
+<li><code>-X, --exclude-from</code>：在一个文件中列出要排除的目录或文件（在<code>--exclude=</code>较多时使用）</li>
+<li><code>-t, --list</code>：列出备份档案中的文件列表，不与<code>-c</code>、<code>-x</code>同时出现</li>
+<li><code>-j, --bzip2</code>：使用bzip2工具（解）压缩，后缀一般为<code>.bz2</code></li>
+<li><code>-P</code>：保留绝对路径，解压时同样会自动解压到绝对路径下</li>
+<li><code>-v</code>：（解）压缩过程显示文件处理过程，常用但不建议对大型文件使用</li>
+</ul>
+<h2 id="2-增量备份网站数据">2. 增量备份（网站）数据<a hidden class="anchor" aria-hidden="true" href="#2-增量备份网站数据">#</a></h2>
+<p>许多系统（应用或网站）每天都有静态文件产生，对于一些比较重要的静态文件如果有进行定期备份的需求，就可以通过tar打包压缩备份到指定的地方，特别是对一些总文件比较大比较多的情况，还可以利用-g选项来做增量备份。</p>
+<p>备份的目录最好使用相对路径，也就是进入到需要备份的根目录下</p>
+<p>具体示例方法如下。</p>
+<pre tabindex="0"><code>备份当前目录下的所有文件
+# tar -g /tmp/snapshot_data.snap -zcpf /tmp/data01.tar.gz .
+
+在需要恢复的目录下解压恢复
+# tar -zxpf /tmp/data01.tar.gz -C .
+</code></pre><p><code>-g</code>选项可以理解备份时给目录文件做一个快照，记录权限和属性等信息，第一次备份时<code>/tmp/snapshot_data.snap</code>不存在，会新建一个并做完全备份。当目录下的文件有修改后，再次执行第一条备份命令（记得修改后面的档案文件名），会自动根据<code>-g</code>指定的快照文件，增量备份修改过的文件，包括权限和属性，没有动过的文件不会重复备份。</p>
+<!-- raw HTML omitted -->
+<p>另外需要注意上面的恢复，是“保留恢复”，即存在相同文件名的文件会被覆盖，而原目录下已存在（但备份档案里没有）的，会依然保留。所以如果你想完全恢复到与备份文件一模一样，需要清空原目录。如果有增量备份档案，则还需要使用同样的方式分别解压这些档案，而且要注意顺序。</p>
+<p>下面演示一个比较综合的例子，要求：</p>
+<ul>
+<li>备份<code>/tmp/data</code>目录，但<code>cache</code>目录以及临时文件排除在外</li>
+<li>由于目录比较大（&gt;4G），所以全备时分割备份的档案（如每个备份档案文件最大1G）</li>
+<li>保留所有文件的权限和属性，如用户组和读写权限</li>
+</ul>
+<pre tabindex="0"><code># cd /tmp/data
+
+做一次完全备份
+# rm -f /tmp/snapshot_data.snap
+# tar -g /tmp/snapshot_data.snap -zcpf - --exclude=./cache ./ | split -b 1024M - /tmp/bak_data$(date -I).tar.gz_
+分割后文件名后会依次加上aa,ab,ac,...，上面最终的备份归档会保存成
+bak_data2014-12-07.tar.gz_aa
+bak_data2014-12-07.tar.gz_ab
+bak_data2014-12-07.tar.gz_ac
+...
+
+增量备份
+可以是与完全备份一模一样的命令，但需要注意的是假如你一天备份多次，可能导致档案文件名重复，那么就会导致
+备份实现，因为split依然会从aa,ab开始命名，如果一天的文件产生（修改）量不是特别大，那么建议增量部分不
+分割处理了：（ 一定要分割的话，文件名加入更细致的时间如$(date +%Y-%m-%d_%H) ）
+# tar -g /tmp/snapshot_data.snap -zcpf /tmp/bak_data2014-12-07.tar.gz --exclude=./cache ./
+
+第二天增备
+# tar -g /tmp/snapshot_data.snap -zcpf /tmp/bak_data2014-12-08.tar.gz --exclude=./cache ./
+</code></pre><p>恢复过程</p>
+<pre tabindex="0"><code>恢复完全备份的档案文件
+可以选择是否先清空/tmp/data/目录
+# cat /tmp/bak_data2014-12-07.tar.gz_* | tar -zxpf - -C /tmp/data/
+
+恢复增量备份的档案文件
+$ tar –zxpf /tmp/bak_data2014-12-07.tar.gz -C /tmp/data/
+$ tar –zxpf /tmp/bak_data2014-12-08.tar.gz -C /tmp/data/
+...
+一定要保证是按时间顺序恢复的，像下面文件名规则也可以使用上面通配符的形式
+</code></pre><p>如果需要定期备份，如每周一次全备，每天一次增量备份，则可以结合crontab实现。</p>
+<h2 id="3-备份文件系统">3. 备份文件系统<a hidden class="anchor" aria-hidden="true" href="#3-备份文件系统">#</a></h2>
+<p>备份文件系统方法有很多，例如cpio, rsync, dump, tar，这里演示一个通过<code>tar</code>备份整个Linux系统的例子，整个备份与恢复过程与上面类似。
+首先Linux（这里是CentOS）有一部分目录是没必要备份的，如<code>/proc</code>、<code>/lost+found</code>、<code>/sys</code>、<code>/mnt</code>、<code>/media</code>、<code>/dev</code>、<code>/proc</code>、<code>/tmp</code>，如果是备份到磁带<code>/dev/st0</code>则不必关心那么多，因为我这里是备份到本地<code>/backup</code>目录，所以也需要排除，还有其它一些NFS或者网络存储挂载的目录。</p>
+<pre tabindex="0"><code>创建排除列表文件
+# vi /backup/backup_tar_exclude.list
+/backup
+/proc
+/lost+found
+/sys
+/mnt
+/media
+/dev
+/tmp
+
+$ tar -zcpf /backup/backup_full.tar.gz -g /backup/tar_snapshot.snap --exclude-from=/backup/tar_exclude.list /
+</code></pre><h2 id="4-注意">4. 注意<a hidden class="anchor" aria-hidden="true" href="#4-注意">#</a></h2>
+<p>使用tar无论是备份数据还是文件系统，需要考虑是在原系统上恢复还是另一个新的系统上恢复。</p>
+<ul>
+<li>tar备份极度依赖于文件的atime属性，</li>
+<li>文件所属用户是根据用户ID来确定的，异机恢复需要考虑相同用户拥有相同USERID</li>
+<li>备份和恢复的过程尽量不要运行其他进程，可能会导致数据不一致</li>
+<li>软硬连接文件可以正常恢复</li>
+</ul>
+<h2 id="参考">参考<a hidden class="anchor" aria-hidden="true" href="#参考">#</a></h2>
+<ul>
+<li><a href="https://lesca.me/archives/how-to-incrementally-backup-linux-with-gnu-tar.html">tar高级教程：增量备份、定时备份、网络备份</a></li>
+<li><a href="http://tech.watchstor.com/backup-and-archiving-115687.htm">Linux服务器数据备份恢复的详细讲解</a></li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/linux%E5%91%BD%E4%BB%A4/">linux命令</a></li>
+      <li><a href="http://xgknight.com/tags/tar/">tar</a></li>
+      <li><a href="http://xgknight.com/tags/backup/">backup</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

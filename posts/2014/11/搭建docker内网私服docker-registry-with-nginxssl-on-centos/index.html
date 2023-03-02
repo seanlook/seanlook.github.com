@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>搭建docker内网私服（docker-registry with nginx&amp;ssl on centos） | Sean Note</title>
+<meta name="keywords" content="docker, centos, docker-registry, nginx, ssl">
+<meta name="description" content="主要思路： 1. Docker Registry 说明 关于如何创建和使用本地仓库，其实已经有很多文章介绍了。因为docker技术正处于发展和完善阶段，所以有些文章要么内容已经过时，要么给出了错误的配置，导致无法正常创建仓库。本文记录的是个人完整的搭建过程，docker version为1.1.2。
+官方提供了Docker Hub网站来作为一个公开的集中仓库。然而，本地访问Docker Hub速度往往很慢，并且很多时候我们需要一个本地的私有仓库只供网内使用。
+Docker仓库实际上提供两方面的功能，一个是镜像管理，一个是认证。前者主要由docker-registry项目来实现，通过http服务来上传下载；后者可以通过docker-index（闭源）项目或者利用现成认证方案（如nginx）实现http请求管理。
+docker-registry既然也是软件应用，自然最简单的方法就是使用官方提供的已经部署好的镜像registry。官方文档中也给出了建议，直接运行sudo docker run -p 5000:5000 registry命令。这样确实能启动一个registry服务器，但是所有上传的镜像其实都是由docker容器管理，放在了/var/lib/docker/&hellip;.某个目录下。而且一旦删除容器，镜像也会被删除。因此，我们需要想办法告诉docker容器镜像应该存放在哪里。registry镜像中启动后镜像默认位置是/tmp/registry，因此直接映射这个位置即可，比如到本机的/opt/data/registry目录下。
+2. 在CentOS上搭建docker私服 2.1 安装docker-registry 方法有多种，直接运行下面的命令：
+# docker run -d -e SETTINGS_FLAVOR=dev -e STORAGE_PATH=/tmp/registry -v /opt/data/registry:/tmp/registry -p 5000:5000 registry 如果本地没有拉取过docker-registry，则首次运行会pull registry，运行时会映射路径和端口，以后就可以从/opt/data/registry下找到私有仓库都存在哪些镜像，通过主机的哪个端口可以访问。 你也可以把项目 https://github.com/docker/docker-registry.git 克隆到本地，然后使用Dockerfile来build镜像：
+# git clone https://github.com/docker/docker-registry.git # cd docker-registry &amp;&amp; mkdir -p /opt/data/registry # docker build -t &#34;local-sean&#34; . build完成后，就可以运行这个docker-registry 我们先配置自己的config.yml文件，第一种方法是直接在run的时候指定变量 # cp config/config_sample.yml /opt/data/registry/config.yml # vi /opt/data/registry/config.yml ##这里可以设置本地存储SETTINGS_FLAVOR=dev，local STORAGE_PATH:/tmp/registry等待 # docker run -d -v /opt/data/registry:/tmp/registry -p 5000:5000 -e DOCKER_REGISTRY_CONFIG=/tmp/registry/config.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2014/11/%E6%90%AD%E5%BB%BAdocker%E5%86%85%E7%BD%91%E7%A7%81%E6%9C%8Ddocker-registry-with-nginxssl-on-centos/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="搭建docker内网私服（docker-registry with nginx&amp;ssl on centos）" />
+<meta property="og:description" content="主要思路： 1. Docker Registry 说明 关于如何创建和使用本地仓库，其实已经有很多文章介绍了。因为docker技术正处于发展和完善阶段，所以有些文章要么内容已经过时，要么给出了错误的配置，导致无法正常创建仓库。本文记录的是个人完整的搭建过程，docker version为1.1.2。
+官方提供了Docker Hub网站来作为一个公开的集中仓库。然而，本地访问Docker Hub速度往往很慢，并且很多时候我们需要一个本地的私有仓库只供网内使用。
+Docker仓库实际上提供两方面的功能，一个是镜像管理，一个是认证。前者主要由docker-registry项目来实现，通过http服务来上传下载；后者可以通过docker-index（闭源）项目或者利用现成认证方案（如nginx）实现http请求管理。
+docker-registry既然也是软件应用，自然最简单的方法就是使用官方提供的已经部署好的镜像registry。官方文档中也给出了建议，直接运行sudo docker run -p 5000:5000 registry命令。这样确实能启动一个registry服务器，但是所有上传的镜像其实都是由docker容器管理，放在了/var/lib/docker/&hellip;.某个目录下。而且一旦删除容器，镜像也会被删除。因此，我们需要想办法告诉docker容器镜像应该存放在哪里。registry镜像中启动后镜像默认位置是/tmp/registry，因此直接映射这个位置即可，比如到本机的/opt/data/registry目录下。
+2. 在CentOS上搭建docker私服 2.1 安装docker-registry 方法有多种，直接运行下面的命令：
+# docker run -d -e SETTINGS_FLAVOR=dev -e STORAGE_PATH=/tmp/registry -v /opt/data/registry:/tmp/registry -p 5000:5000 registry 如果本地没有拉取过docker-registry，则首次运行会pull registry，运行时会映射路径和端口，以后就可以从/opt/data/registry下找到私有仓库都存在哪些镜像，通过主机的哪个端口可以访问。 你也可以把项目 https://github.com/docker/docker-registry.git 克隆到本地，然后使用Dockerfile来build镜像：
+# git clone https://github.com/docker/docker-registry.git # cd docker-registry &amp;&amp; mkdir -p /opt/data/registry # docker build -t &#34;local-sean&#34; . build完成后，就可以运行这个docker-registry 我们先配置自己的config.yml文件，第一种方法是直接在run的时候指定变量 # cp config/config_sample.yml /opt/data/registry/config.yml # vi /opt/data/registry/config.yml ##这里可以设置本地存储SETTINGS_FLAVOR=dev，local STORAGE_PATH:/tmp/registry等待 # docker run -d -v /opt/data/registry:/tmp/registry -p 5000:5000 -e DOCKER_REGISTRY_CONFIG=/tmp/registry/config." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2014/11/%E6%90%AD%E5%BB%BAdocker%E5%86%85%E7%BD%91%E7%A7%81%E6%9C%8Ddocker-registry-with-nginxssl-on-centos/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2014-11-13T20:21:25+00:00" />
+<meta property="article:modified_time" content="2014-11-13T20:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="搭建docker内网私服（docker-registry with nginx&amp;ssl on centos）"/>
+<meta name="twitter:description" content="主要思路： 1. Docker Registry 说明 关于如何创建和使用本地仓库，其实已经有很多文章介绍了。因为docker技术正处于发展和完善阶段，所以有些文章要么内容已经过时，要么给出了错误的配置，导致无法正常创建仓库。本文记录的是个人完整的搭建过程，docker version为1.1.2。
+官方提供了Docker Hub网站来作为一个公开的集中仓库。然而，本地访问Docker Hub速度往往很慢，并且很多时候我们需要一个本地的私有仓库只供网内使用。
+Docker仓库实际上提供两方面的功能，一个是镜像管理，一个是认证。前者主要由docker-registry项目来实现，通过http服务来上传下载；后者可以通过docker-index（闭源）项目或者利用现成认证方案（如nginx）实现http请求管理。
+docker-registry既然也是软件应用，自然最简单的方法就是使用官方提供的已经部署好的镜像registry。官方文档中也给出了建议，直接运行sudo docker run -p 5000:5000 registry命令。这样确实能启动一个registry服务器，但是所有上传的镜像其实都是由docker容器管理，放在了/var/lib/docker/&hellip;.某个目录下。而且一旦删除容器，镜像也会被删除。因此，我们需要想办法告诉docker容器镜像应该存放在哪里。registry镜像中启动后镜像默认位置是/tmp/registry，因此直接映射这个位置即可，比如到本机的/opt/data/registry目录下。
+2. 在CentOS上搭建docker私服 2.1 安装docker-registry 方法有多种，直接运行下面的命令：
+# docker run -d -e SETTINGS_FLAVOR=dev -e STORAGE_PATH=/tmp/registry -v /opt/data/registry:/tmp/registry -p 5000:5000 registry 如果本地没有拉取过docker-registry，则首次运行会pull registry，运行时会映射路径和端口，以后就可以从/opt/data/registry下找到私有仓库都存在哪些镜像，通过主机的哪个端口可以访问。 你也可以把项目 https://github.com/docker/docker-registry.git 克隆到本地，然后使用Dockerfile来build镜像：
+# git clone https://github.com/docker/docker-registry.git # cd docker-registry &amp;&amp; mkdir -p /opt/data/registry # docker build -t &#34;local-sean&#34; . build完成后，就可以运行这个docker-registry 我们先配置自己的config.yml文件，第一种方法是直接在run的时候指定变量 # cp config/config_sample.yml /opt/data/registry/config.yml # vi /opt/data/registry/config.yml ##这里可以设置本地存储SETTINGS_FLAVOR=dev，local STORAGE_PATH:/tmp/registry等待 # docker run -d -v /opt/data/registry:/tmp/registry -p 5000:5000 -e DOCKER_REGISTRY_CONFIG=/tmp/registry/config."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "搭建docker内网私服（docker-registry with nginx\u0026ssl on centos）",
+      "item": "http://xgknight.com/posts/2014/11/%E6%90%AD%E5%BB%BAdocker%E5%86%85%E7%BD%91%E7%A7%81%E6%9C%8Ddocker-registry-with-nginxssl-on-centos/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "搭建docker内网私服（docker-registry with nginx\u0026ssl on centos）",
+  "name": "搭建docker内网私服（docker-registry with nginx\u0026ssl on centos）",
+  "description": "主要思路： 1. Docker Registry 说明 关于如何创建和使用本地仓库，其实已经有很多文章介绍了。因为docker技术正处于发展和完善阶段，所以有些文章要么内容已经过时，要么给出了错误的配置，导致无法正常创建仓库。本文记录的是个人完整的搭建过程，docker version为1.1.2。\n官方提供了Docker Hub网站来作为一个公开的集中仓库。然而，本地访问Docker Hub速度往往很慢，并且很多时候我们需要一个本地的私有仓库只供网内使用。\nDocker仓库实际上提供两方面的功能，一个是镜像管理，一个是认证。前者主要由docker-registry项目来实现，通过http服务来上传下载；后者可以通过docker-index（闭源）项目或者利用现成认证方案（如nginx）实现http请求管理。\ndocker-registry既然也是软件应用，自然最简单的方法就是使用官方提供的已经部署好的镜像registry。官方文档中也给出了建议，直接运行sudo docker run -p 5000:5000 registry命令。这样确实能启动一个registry服务器，但是所有上传的镜像其实都是由docker容器管理，放在了/var/lib/docker/\u0026hellip;.某个目录下。而且一旦删除容器，镜像也会被删除。因此，我们需要想办法告诉docker容器镜像应该存放在哪里。registry镜像中启动后镜像默认位置是/tmp/registry，因此直接映射这个位置即可，比如到本机的/opt/data/registry目录下。\n2. 在CentOS上搭建docker私服 2.1 安装docker-registry 方法有多种，直接运行下面的命令：\n# docker run -d -e SETTINGS_FLAVOR=dev -e STORAGE_PATH=/tmp/registry -v /opt/data/registry:/tmp/registry -p 5000:5000 registry 如果本地没有拉取过docker-registry，则首次运行会pull registry，运行时会映射路径和端口，以后就可以从/opt/data/registry下找到私有仓库都存在哪些镜像，通过主机的哪个端口可以访问。 你也可以把项目 https://github.com/docker/docker-registry.git 克隆到本地，然后使用Dockerfile来build镜像：\n# git clone https://github.com/docker/docker-registry.git # cd docker-registry \u0026amp;\u0026amp; mkdir -p /opt/data/registry # docker build -t \u0026#34;local-sean\u0026#34; . build完成后，就可以运行这个docker-registry 我们先配置自己的config.yml文件，第一种方法是直接在run的时候指定变量 # cp config/config_sample.yml /opt/data/registry/config.yml # vi /opt/data/registry/config.yml ##这里可以设置本地存储SETTINGS_FLAVOR=dev，local STORAGE_PATH:/tmp/registry等待 # docker run -d -v /opt/data/registry:/tmp/registry -p 5000:5000 -e DOCKER_REGISTRY_CONFIG=/tmp/registry/config.",
+  "keywords": [
+    "docker", "centos", "docker-registry", "nginx", "ssl"
+  ],
+  "articleBody": "主要思路： 1. Docker Registry 说明 关于如何创建和使用本地仓库，其实已经有很多文章介绍了。因为docker技术正处于发展和完善阶段，所以有些文章要么内容已经过时，要么给出了错误的配置，导致无法正常创建仓库。本文记录的是个人完整的搭建过程，docker version为1.1.2。\n官方提供了Docker Hub网站来作为一个公开的集中仓库。然而，本地访问Docker Hub速度往往很慢，并且很多时候我们需要一个本地的私有仓库只供网内使用。\nDocker仓库实际上提供两方面的功能，一个是镜像管理，一个是认证。前者主要由docker-registry项目来实现，通过http服务来上传下载；后者可以通过docker-index（闭源）项目或者利用现成认证方案（如nginx）实现http请求管理。\ndocker-registry既然也是软件应用，自然最简单的方法就是使用官方提供的已经部署好的镜像registry。官方文档中也给出了建议，直接运行sudo docker run -p 5000:5000 registry命令。这样确实能启动一个registry服务器，但是所有上传的镜像其实都是由docker容器管理，放在了/var/lib/docker/….某个目录下。而且一旦删除容器，镜像也会被删除。因此，我们需要想办法告诉docker容器镜像应该存放在哪里。registry镜像中启动后镜像默认位置是/tmp/registry，因此直接映射这个位置即可，比如到本机的/opt/data/registry目录下。\n2. 在CentOS上搭建docker私服 2.1 安装docker-registry 方法有多种，直接运行下面的命令：\n# docker run -d -e SETTINGS_FLAVOR=dev -e STORAGE_PATH=/tmp/registry -v /opt/data/registry:/tmp/registry -p 5000:5000 registry 如果本地没有拉取过docker-registry，则首次运行会pull registry，运行时会映射路径和端口，以后就可以从/opt/data/registry下找到私有仓库都存在哪些镜像，通过主机的哪个端口可以访问。 你也可以把项目 https://github.com/docker/docker-registry.git 克隆到本地，然后使用Dockerfile来build镜像：\n# git clone https://github.com/docker/docker-registry.git # cd docker-registry \u0026\u0026 mkdir -p /opt/data/registry # docker build -t \"local-sean\" . build完成后，就可以运行这个docker-registry 我们先配置自己的config.yml文件，第一种方法是直接在run的时候指定变量 # cp config/config_sample.yml /opt/data/registry/config.yml # vi /opt/data/registry/config.yml ##这里可以设置本地存储SETTINGS_FLAVOR=dev，local STORAGE_PATH:/tmp/registry等待 # docker run -d -v /opt/data/registry:/tmp/registry -p 5000:5000 -e DOCKER_REGISTRY_CONFIG=/tmp/registry/config.yml registry 或 docker run -d -e SETTINGS_FLAVOR=dev -e STORAGE_PATH=/tmp/registry -v /db/docker-images:/tmp/registry -p 5000:5000 registry 2.2 客户端使用 要从私服上获取镜像或向私服提交镜像，现在变得非常简单，只需要在仓库前面加上私服的地址和端口，形如172.29.88.222:5000/centos6。注意，这里可以选择不使用IP，而是用hostname，如registry.domain.com:5000，但不能仅用不带.的主机名registry，docker会认为registry是用户名，建议使用带域名的hostname加port来表示。\n于是在另外一台要使用docker的主机上就可以通过这台私服拉取和推送镜像了：\n从私服上搜索存在哪些可用镜像 # curl -X GET http://sean.domain.com:5000/v1/search {\"num_results\": 2, \"query\": \"\", \"results\": [{\"description\": \"\", \"name\": \"library/centos6\"}, {\"description\": \"\", \"name\": \"library/nginx\"}]} 按条件搜索nginx # curl -X GET http://sean.domain.com:5000/v1/search?q=centos6 拉取image到本地 docker pull library/centos6 ## 本地对份镜像启动起来，形成container ## 给container去另外一个名字 # docker tag 68edf809afe7 registry.domain.com:5000/centos6-test ## 最后将新的docker images推送到私服上 docker push registry.domain.com:5000/centos6-test 第一次push到私服上时会提示用户名、密码和邮箱，创建即可。也可以在docker私服端加入认证机制。\n3. 加入nginx认证 （请在实际操作以前，先阅读完本节，再确定是否在前端加入nginx）\n3.1 安装及配置nginx 从上面的过程可以看到，除非防火墙限制，否则任何主机可以创建账号并想私服推送镜像，更安全的做法是在外层加入登录认证机制。\n最好安装1.4.x版本，不然下面的有些配置可能会不兼容 # yum install nginx 创建两个登录用户 # htpasswd -c /etc/nginx/docker-registry.htpasswd sean New password: Re-type new password: Adding password for user sean # htpasswd /etc/nginx/docker-registry.htpasswd itsection 为了让nginx使用这个密码文件，并且转发8080端口的请求到Docker Registry，新增nginx配置文件 vi /etc/nginx/sites-enabled/docker-registry：\n# For versions of Nginx \u003e 1.3.9 that include chunked transfer encoding support # Replace with appropriate values where necessary upstream docker-registry { server localhost:5000; } server { listen 8080; server_name sean.domain.com; -- your registry server_name # ssl on; # ssl_certificate /etc/ssl/certs/docker-registry; # ssl_certificate_key /etc/ssl/private/docker-registry; proxy_set_header Host $http_host; # required for Docker client sake proxy_set_header X-Real-IP $remote_addr; # pass on real client IP client_max_body_size 0; # disable any limits to avoid HTTP 413 for large image uploads # required to avoid HTTP 411: see Issue #1486 (https://github.com/dotcloud/docker/issues/1486) chunked_transfer_encoding on; location / { # let Nginx know about our auth file auth_basic \"Restricted\"; auth_basic_user_file docker-registry.htpasswd; proxy_pass http://docker-registry; } location /_ping { auth_basic off; proxy_pass http://docker-registry; } location /v1/_ping { auth_basic off; proxy_pass http://docker-registry; } } 让nginx来使用这个virtual-host # ln -s /etc/nginx/sites-enabled/docker-registry /etc/nginx/conf.d/docker-registry.conf 重启nginx来激活虚拟主机的配置 # service nginx restart 3.2 加入认证后使用docker-registry 此时主机的5000端口应该通过防火墙禁止访问（或者在docker run端口映射时只监听回环接口的IP -p 127.0.0.1:5000:5000）。\n# curl localhost:5000 \"docker-registry server (dev) (v0.8.1)\" 如果直接访问访问将得到未授权的信息：\n# curl localhost:8080 401 Authorization Required 401 Authorization Required nginx/1.4.7 带用户认证的docker-registry：\n# curl http://sean:sean@sean.domain.com:8080/v1/search {\"num_results\": 2, \"query\": \"\", \"results\": [{\"description\": \"\", \"name\": \"library/centos6\"}, {\"description\": \"\", \"name\": \"library/nginx\"}]} # docker login registry.domain.com:8080 Username: sean Password: Email: zhouxiao@domain.com Login Succeeded # docker pull registry.domain.com:8080/library/centos6 不出意外的话，上面的docker pull会失败：\n# docker pull registry.domain.com:8080/library/centos6 Pulling repository registry.domain.com:8080/library/centos6 2014/11/11 21:00:25 Could not reach any registry endpoint # docker push registry.domain.com:8080/ubuntu:sean The push refers to a repository [registry.domain.com:8080/ubuntu] (len: 1) Sending image list Pushing repository registry.domain.com:8080/ubuntu (1 tags) 2014/11/12 08:11:32 HTTP code 401, Docker will not send auth headers over HTTP. nginx日志 2014/11/12 07:03:49 [error] 14898#0: *193 no user/password was provided for basic authenticatGET /v1/repositories/library/centos6/tags HTTP/1.1\", host: \"registry.domain.com:8080\" 本文后的第1篇参考文档没有出现这个问题，但评论中有提及。 有人说是backend storage的问题，这里是本地存储镜像，不应该。经过查阅大量资料，并反复操作验证，是docker-registry版本的问题。从v0.10.0开始，docker login虽然Succeeded，但pull或push的时候，~/.dockercfg下的用户登录信息将不允许通过HTTP明文传输。（如果你愿意可以查看v0.10.0的源码 registry.go，在分支v0.9.1及以前是没有HTTP code 401, Docker will not send auth headers over HTTP的） 目前的办法三个：\n撤退，这就是为什么先说明在操作前线查看到这的原因了 换成v0.9.1及以下版本。现在都v1.3.1了，我猜你不会这么做 修改源码session.go，去掉相应的判断行，然后git下来重新安装。我猜你更不会这么做 安装SSL证书，使用HTTPS传输。这是明智的选择，新版本docker也推荐我们这么做，往下看。 3.3 为nginx安装ssl证书 首先打开nginx配置文件中ssl的三行注释\n# vi /etc/nginx/conf.d/docker-registry.conf ... server { listen 8000; server_name registry.domain.com; ssl on; ssl_certificate /etc/nginx/ssl/nginx.crt; ssl_certificate_key /etc/nginx/ssl/nginx.key; ... 保存之后，nginx会分别从/etc/nginx/ssl/nginx.crt和/etc/nginx/ssl/nginx.key读取ssl证书和私钥。如果你自己愿意花钱买一个ssl证书，那就会变得非常简单，把证书和私钥拷贝成上面一样即可。关于SSL以及签署ssl证书，请参考其他文章。 这里我们自签署一个ssl证书，把当前系统作为（私有）证书颁发中心（CA）。\n创建存放证书的目录\n# mkdir /etc/nginx/ssl 确认CA的一些配置文件\n# vi /etc/pki/tls/openssl.cnf ... [ CA_default ] dir = /etc/pki/CA # Where everything is kept certs = $dir/certs # Where the issued certs are kept crl_dir = $dir/crl # Where the issued crl are kept database = $dir/index.txt # database index file. #unique_subject = no # Set to 'no' to allow creation of # several ctificates with same subject. new_certs_dir = $dir/newcerts # default place for new certs. certificate = $dir/cacert.pem # The CA certificate serial = $dir/serial # The current serial number crlnumber = $dir/crlnumber # the current crl number # must be commented out to leave a V1 CRL crl = $dir/crl.pem # The current CRL private_key = $dir/private/cakey.pem # The private key RANDFILE = $dir/private/.rand # private random number file ... default_days = 3650 # how long to certify for ... [ req_distinguished_name ] countryName = Country Name (2 letter code) countryName_default = CN countryName_min = 2 countryName_max = 2 stateOrProvinceName = State or Province Name (full name) stateOrProvinceName_default = GD ...[ req_distinguished_name ]部分主要是颁证时一些默认的值，可以不动 (1) 生成根密钥\n# cd /etc/pki/CA/ # openssl genrsa -out private/cakey.pem 2048 为了安全起见，修改cakey.pem私钥文件权限为600或400，也可以使用子shell生成( umask 077; openssl genrsa -out private/cakey.pem 2048 )，下面不再重复。\n(2) 生成根证书\n# openssl req -new -x509 -key private/cakey.pem -out cacert.pem 会提示输入一些内容，因为是私有的，所以可以随便输入，最好记住能与后面保持一致。上面的自签证书cacert.pem应该生成在/etc/pki/CA下。\n(3) 为我们的nginx web服务器生成ssl密钥\n# cd /etc/nginx/ssl # openssl genrsa -out nginx.key 2048 我们的CA中心与要申请证书的服务器是同一个，否则应该是在另一台需要用到证书的服务器上生成。\n(4) 为nginx生成证书签署请求\n# openssl req -new -key nginx.key -out nginx.csr ... Country Name (2 letter code) [AU]:CN State or Province Name (full name) [Some-State]:GD Locality Name (eg, city) []:SZ Organization Name (eg, company) [Internet Widgits Pty Ltd]:COMPANY Organizational Unit Name (eg, section) []:IT_SECTION Common Name (e.g. server FQDN or YOUR name) []:your.domain.com Email Address []: Please enter the following 'extra' attributes to be sent with your certificate request A challenge password []: An optional company name []: ... 同样会提示输入一些内容，其它随便，除了Commone Name一定要是你要授予证书的服务器域名或主机名，challenge password不填。\n(5) 私有CA根据请求来签发证书\n# openssl ca -in nginx.csr -out nginx.crt 上面签发过程其实默认使用了-cert cacert.pem -keyfile cakey.pem，这两个文件就是前两步生成的位于/etc/pki/CA下的根密钥和根证书。\n到此我们已经拥有了建立ssl安全连接所需要的所有文件，并且服务器的crt和key都位于配置的目录下，唯有根证书cacert.pem位置不确定放在CentOS6下的哪个地方。 经验证以下几个位置不行：（Adding trusted root certificates to the server） /etc/pki/ca-trust/source/anchors、/etc/pki/ca-trust/source、/etc/pki/ca-trust/extracted、 /etc/pki/ca-trust/extracted/pem/、/etc/pki/tls/certs/cacert.crt 都会报错：\n# docker login https://registry.domain.com:8000 Username (sean): sean 2014/11/14 02:32:48 Error response from daemon: Invalid Registry endpoint: Get https://registry.domain.com:8000/v1/_ping: x509: certificate signed by unknown authority # curl https://sean:sean@registry.domain.com:8000/ curl: (60) Peer certificate cannot be authenticated with known CA certificates More details here: http://curl.haxx.se/docs/sslcerts.html curl performs SSL certificate verification by default, using a \"bundle\" of Certificate Authority (CA) public keys (CA certs). If the default bundle file isn't adequate, you can specify an alternate file using the --cacert option. If this HTTPS server uses a certificate signed by a CA represented in the bundle, the certificate verification probably failed due to a problem with the certificate (it might be expired, or the name might not match the domain name in the URL). If you'd like to turn off curl's verification of the certificate, use the -k (or --insecure) option. (6) 目前让根证书起作用的只发现一个办法：\n# cp /etc/pki/tls/certs/ca-bundle.crt{,.bak} 备份以防出错 # cat /etc/pki/CA/cacert.pem \u003e\u003e /etc/pki/tls/certs/ca-bundle.crt # curl https://sean:sean@registry.domain.com:8000 \"docker-registry server (dev) (v0.8.1)\" 将cacert.pem根证书追加到ca-bundle.crt后一定要重启docker后台进程才行。\n如果docker login依然报错certificate signed by unknown authority，参考Running Docker with https，启动docker后台进程时指定信任的CA根证书：\n# docker -d --tlsverify --tlscacert /etc/pki/CA/cacert.pem 或者将cacert.pem拷贝到~/.docker/ca.pem # mkdir ~/.docker \u0026\u0026 cp /etc/pki/CA/cacert.pem ~/.docker/ca.pem # docker -d 最好重启一下registry # docker restart 上面用“如果”是因为一开始总提示certificate signed by unknown authority，有人说将根证书放在/etc/docker/certs.d下，还有人说启动docker daemon收加入--insecure-registry .. 但终究是因为版本差异不成功。但后来又奇迹般的不需要--tlscacert就好了。 这个地方挣扎了很久，重点关注一下这个下面几个issue：\nhttps://github.com/docker/docker-registry/issues/82 https://github.com/docker/docker/pull/2687 https://github.com/docker/docker/pull/2339 (7) 最终搞定：\n# docker login https://registry.domain.com:8000 Username: sean Password: Email: zhouxiao@domain.com Login Succeeded # curl https://sean:sean@registry.domain.com:8000 \"docker-registry server (dev) (v0.8.1)\" # docker push registry.domain.com:8000/centos6:test_priv The push refers to a repository [registry.domain.com:8000/centos6] (len: 1) Sending image list Pushing repository registry.domain.com:8000/centos6 (1 tags) 511136ea3c5a: Image successfully pushed 5b12ef8fd570: Image successfully pushed 68edf809afe7: Image successfully pushed 40627956f44c: Image successfully pushed Pushing tag for rev [40627956f44c] on {https://registry.domain.com:8000/v1/repositories/centos6/tags/test_priv} 但还有一个小问题没解决，虽然已经可以正常使用，但每次请求在nginx的error.log中还是会有[error] 8299#0: *27 no user/password was provided for basic authentication，应该是这个版本docker暂未解决的bug。\n3.3 其它问题 (1) docker后台进程意外中断后，重新docker start 报错\n# docker start b36bd796bd3d Error: Cannot start container b36bd796bd3d: Error getting container b36bd796bd3d463c4fedb70d98621e7318ec3d5cd14b2f60b1d182ad3cbcc652 from driver devicemapper: Error mounting '/dev/mapper/docker-253:0-787676-b36bd796bd3d463c4fedb70d98621e7318ec3d5cd14b2f60b1d182ad3cbcc652' on '/var/lib/docker/devicemapper/mnt/b36bd796bd3d463c4fedb70d98621e7318ec3d5cd14b2f60b1d182ad3cbcc652': device or resource busy 2014/11/08 15:14:57 Error: failed to start one or more containers 经分析产生这个问题的原因是做了一个操作：在docker后台进程启动的终端，继续回车后会临时退出后台进程的日志输出，我就在这个shell下使用yum安装软件包，但由于网络原因yum卡住不动，于是我就另起了一个终端kill了这个yum进程，不知为何会影响到表面已经退出前台输出的docker。解决办法是umount容器的挂载点：（见这里）\n# umount /var/lib/docker/devicemapper/mnt/b36bd796bd3d463c4fedb70d98621e7318ec3d5cd14b2f60b1d182ad3cbcc652 # service docker start 正常 能想到的另外一个办法是，启动docker后台进程时，重定向输出docker -d \u003e /dev/null 2\u003e\u00261（/var/log/docker已自动记录了一份日志）。\n(2) 配置完nginx的docker-registry.conf后启动报错\n# service nginx start [emerg] 14714#0: unknown directive \"upstream\" in /etc/nginx/conf.d/docker-registry.conf:4 原因是nginx版本太低，一些配置指令不兼容，使用yum install nginx默认安装了1.0.x，卸载重新下载nginx-1.4.7-1.el6.ngx.x86_64.rpm安装解决。\n(3) 网络设置代理问题 pull, push官网的镜像时由于GFW的原因需要设置代理，但不是http_proxy而是HTTP_PROXY，对于docker来说同时设置这两个值就会出问题，有时出于安装软件包的需要设置http_proxy，就会导致冲突。在docker-registry中如果忘记了当前哪一个在起作用，找遍所有问题都发现不了原因，而docker返回给我们的错误也难以判断。切记~\nTO-DO 如何删除docker-registry的里的镜像\n4. 参考 部署自己的私有 Docker Registry [英文]\nOfficial docker-registry README\nHow To Set Up a Private Docker Registry on Ubuntu 14.04\nThe Docker Hub and the Registry spec\n",
+  "wordCount" : "1181",
+  "inLanguage": "en",
+  "datePublished": "2014-11-13T20:21:25Z",
+  "dateModified": "2014-11-13T20:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2014/11/%E6%90%AD%E5%BB%BAdocker%E5%86%85%E7%BD%91%E7%A7%81%E6%9C%8Ddocker-registry-with-nginxssl-on-centos/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      搭建docker内网私服（docker-registry with nginx&amp;ssl on centos）
+    </h1>
+    <div class="post-meta"><span title='2014-11-13 20:21:25 +0000 UTC'>November 13, 2014</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>主要思路：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-registry-deploy.png" alt="docker-registry-deploy"  />
+</p>
+<h2 id="1-docker-registry-说明">1. Docker Registry 说明<a hidden class="anchor" aria-hidden="true" href="#1-docker-registry-说明">#</a></h2>
+<p>关于如何创建和使用本地仓库，其实已经有很多文章介绍了。因为docker技术正处于发展和完善阶段，所以有些文章要么内容已经过时，要么给出了错误的配置，导致无法正常创建仓库。本文记录的是个人完整的搭建过程，<code>docker version</code>为1.1.2。</p>
+<p>官方提供了<a href="https://registry.hub.docker.com/">Docker Hub</a>网站来作为一个公开的集中仓库。然而，本地访问Docker Hub速度往往很慢，并且很多时候我们需要一个本地的私有仓库只供网内使用。</p>
+<p>Docker仓库实际上提供两方面的功能，一个是镜像管理，一个是认证。前者主要由<a href="https://github.com/docker/docker-registry">docker-registry</a>项目来实现，通过http服务来上传下载；后者可以通过docker-index（闭源）项目或者利用现成认证方案（如nginx）实现http请求管理。</p>
+<p>docker-registry既然也是软件应用，自然最简单的方法就是使用官方提供的已经部署好的镜像registry。官方文档中也给出了建议，直接运行<code>sudo docker run -p 5000:5000 registry</code>命令。这样确实能启动一个registry服务器，但是所有上传的镜像其实都是由docker容器管理，放在了/var/lib/docker/&hellip;.某个目录下。而且一旦删除容器，镜像也会被删除。因此，我们需要想办法告诉docker容器镜像应该存放在哪里。registry镜像中启动后镜像默认位置是<code>/tmp/registry</code>，因此直接映射这个位置即可，比如到本机的<code>/opt/data/registry</code>目录下。</p>
+<!-- raw HTML omitted -->
+<h2 id="2-在centos上搭建docker私服">2. 在CentOS上搭建docker私服<a hidden class="anchor" aria-hidden="true" href="#2-在centos上搭建docker私服">#</a></h2>
+<h3 id="21-安装docker-registry">2.1 安装<code>docker-registry</code><a hidden class="anchor" aria-hidden="true" href="#21-安装docker-registry">#</a></h3>
+<p>方法有多种，直接运行下面的命令：</p>
+<pre tabindex="0"><code># docker run -d -e SETTINGS_FLAVOR=dev -e STORAGE_PATH=/tmp/registry -v /opt/data/registry:/tmp/registry  -p 5000:5000 registry
+</code></pre><p>如果本地没有拉取过docker-registry，则首次运行会pull registry，运行时会映射路径和端口，以后就可以从<code>/opt/data/registry</code>下找到私有仓库都存在哪些镜像，通过主机的哪个端口可以访问。
+你也可以把项目 <a href="https://github.com/docker/docker-registry.git">https://github.com/docker/docker-registry.git</a> 克隆到本地，然后使用Dockerfile来build镜像：</p>
+<pre tabindex="0"><code># git clone https://github.com/docker/docker-registry.git
+# cd docker-registry &amp;&amp; mkdir -p /opt/data/registry
+# docker build -t &#34;local-sean&#34; .
+
+build完成后，就可以运行这个docker-registry
+我们先配置自己的config.yml文件，第一种方法是直接在run的时候指定变量
+# cp config/config_sample.yml /opt/data/registry/config.yml
+# vi /opt/data/registry/config.yml
+##这里可以设置本地存储SETTINGS_FLAVOR=dev，local STORAGE_PATH:/tmp/registry等待
+
+# docker run -d -v /opt/data/registry:/tmp/registry -p 5000:5000 -e  DOCKER_REGISTRY_CONFIG=/tmp/registry/config.yml registry
+或
+docker run -d -e SETTINGS_FLAVOR=dev -e STORAGE_PATH=/tmp/registry -v /db/docker-images:/tmp/registry -p 5000:5000 registry
+</code></pre><h3 id="22-客户端使用">2.2 客户端使用<a hidden class="anchor" aria-hidden="true" href="#22-客户端使用">#</a></h3>
+<p>要从私服上获取镜像或向私服提交镜像，现在变得非常简单，只需要在仓库前面加上私服的地址和端口，形如<code>172.29.88.222:5000/centos6</code>。注意，这里可以选择不使用IP，而是用hostname，如registry.domain.com:5000，但不能仅用不带<code>.</code>的主机名registry，docker会认为registry是用户名，建议使用带域名的hostname加port来表示。</p>
+<p>于是在另外一台要使用docker的主机上就可以通过这台私服拉取和推送镜像了：</p>
+<pre tabindex="0"><code>从私服上搜索存在哪些可用镜像
+# curl -X GET http://sean.domain.com:5000/v1/search
+{&#34;num_results&#34;: 2, &#34;query&#34;: &#34;&#34;, &#34;results&#34;: [{&#34;description&#34;: &#34;&#34;, &#34;name&#34;: &#34;library/centos6&#34;}, {&#34;description&#34;: &#34;&#34;, &#34;name&#34;: &#34;library/nginx&#34;}]}
+
+按条件搜索nginx
+# curl -X GET http://sean.domain.com:5000/v1/search?q=centos6
+
+拉取image到本地
+docker pull library/centos6
+
+## 本地对份镜像启动起来，形成container
+## 给container去另外一个名字
+# docker tag 68edf809afe7 registry.domain.com:5000/centos6-test
+
+## 最后将新的docker images推送到私服上
+docker push registry.domain.com:5000/centos6-test
+</code></pre><p>第一次push到私服上时会提示用户名、密码和邮箱，创建即可。也可以在docker私服端加入认证机制。</p>
+<h2 id="3-加入nginx认证">3. 加入nginx认证<a hidden class="anchor" aria-hidden="true" href="#3-加入nginx认证">#</a></h2>
+<p>（请在实际操作以前，先阅读完本节，再确定是否在前端加入nginx）</p>
+<h3 id="31-安装及配置nginx">3.1 安装及配置nginx<a hidden class="anchor" aria-hidden="true" href="#31-安装及配置nginx">#</a></h3>
+<p>从上面的过程可以看到，除非防火墙限制，否则任何主机可以创建账号并想私服推送镜像，更安全的做法是在外层加入登录认证机制。</p>
+<pre tabindex="0"><code>最好安装1.4.x版本，不然下面的有些配置可能会不兼容
+# yum install nginx
+
+创建两个登录用户
+# htpasswd -c /etc/nginx/docker-registry.htpasswd sean
+New password: 
+Re-type new password: 
+Adding password for user sean
+
+# htpasswd /etc/nginx/docker-registry.htpasswd itsection
+</code></pre><p>为了让nginx使用这个密码文件，并且转发8080端口的请求到Docker Registry，新增nginx配置文件
+<code>vi /etc/nginx/sites-enabled/docker-registry</code>：</p>
+<pre tabindex="0"><code># For versions of Nginx &gt; 1.3.9 that include chunked transfer encoding support
+# Replace with appropriate values where necessary
+
+upstream docker-registry {
+ server localhost:5000;
+}
+
+server {
+ listen 8080;
+ server_name sean.domain.com;  -- your registry server_name
+
+ # ssl on;
+ # ssl_certificate /etc/ssl/certs/docker-registry;
+ # ssl_certificate_key /etc/ssl/private/docker-registry;
+
+ proxy_set_header Host       $http_host;   # required for Docker client sake
+ proxy_set_header X-Real-IP  $remote_addr; # pass on real client IP
+
+ client_max_body_size 0; # disable any limits to avoid HTTP 413 for large image uploads
+
+ # required to avoid HTTP 411: see Issue #1486 (https://github.com/dotcloud/docker/issues/1486)
+ chunked_transfer_encoding on;
+
+ location / {
+     # let Nginx know about our auth file
+     auth_basic              &#34;Restricted&#34;;
+     auth_basic_user_file    docker-registry.htpasswd;
+
+     proxy_pass http://docker-registry;
+ }
+ location /_ping {
+     auth_basic off;
+     proxy_pass http://docker-registry;
+ }  
+ location /v1/_ping {
+     auth_basic off;
+     proxy_pass http://docker-registry;
+ }
+}
+</code></pre><pre tabindex="0"><code>让nginx来使用这个virtual-host
+# ln -s /etc/nginx/sites-enabled/docker-registry /etc/nginx/conf.d/docker-registry.conf
+重启nginx来激活虚拟主机的配置
+# service nginx restart
+</code></pre><h3 id="32-加入认证后使用docker-registry">3.2 加入认证后使用docker-registry<a hidden class="anchor" aria-hidden="true" href="#32-加入认证后使用docker-registry">#</a></h3>
+<p>此时主机的5000端口应该通过防火墙禁止访问（或者在<code>docker run</code>端口映射时只监听回环接口的IP <code>-p 127.0.0.1:5000:5000</code>）。</p>
+<pre tabindex="0"><code># curl localhost:5000
+&#34;docker-registry server (dev) (v0.8.1)&#34;
+</code></pre><p>如果直接访问访问将得到未授权的信息：</p>
+<pre tabindex="0"><code># curl localhost:8080
+&lt;html&gt;
+&lt;head&gt;&lt;title&gt;401 Authorization Required&lt;/title&gt;&lt;/head&gt;
+&lt;body bgcolor=&#34;white&#34;&gt;
+&lt;center&gt;&lt;h1&gt;401 Authorization Required&lt;/h1&gt;&lt;/center&gt;
+&lt;hr&gt;&lt;center&gt;nginx/1.4.7&lt;/center&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre><p>带用户认证的docker-registry：</p>
+<pre tabindex="0"><code># curl http://sean:sean@sean.domain.com:8080/v1/search
+{&#34;num_results&#34;: 2, &#34;query&#34;: &#34;&#34;, &#34;results&#34;: [{&#34;description&#34;: &#34;&#34;, &#34;name&#34;: &#34;library/centos6&#34;}, {&#34;description&#34;: &#34;&#34;, &#34;name&#34;: &#34;library/nginx&#34;}]}
+
+# docker login registry.domain.com:8080
+Username: sean
+Password: 
+Email: zhouxiao@domain.com
+Login Succeeded
+
+# docker pull registry.domain.com:8080/library/centos6
+</code></pre><p>不出意外的话，上面的<code>docker pull</code>会失败：</p>
+<pre tabindex="0"><code># docker pull registry.domain.com:8080/library/centos6
+Pulling repository registry.domain.com:8080/library/centos6
+2014/11/11 21:00:25 Could not reach any registry endpoint
+
+# docker push registry.domain.com:8080/ubuntu:sean
+The push refers to a repository [registry.domain.com:8080/ubuntu] (len: 1)
+Sending image list
+Pushing repository registry.domain.com:8080/ubuntu (1 tags)
+2014/11/12 08:11:32 HTTP code 401, Docker will not send auth headers over HTTP.
+
+nginx日志
+2014/11/12 07:03:49 [error] 14898#0: *193 no user/password was provided for basic 
+authenticatGET /v1/repositories/library/centos6/tags HTTP/1.1&#34;, host: &#34;registry.domain.com:8080&#34;
+</code></pre><p>本文后的第1篇参考文档没有出现这个问题，但评论中有提及。
+有人说是<code>backend storage</code>的问题，这里是本地存储镜像，不应该。经过查阅大量资料，并反复操作验证，是docker-registry版本的问题。从<code>v0.10.0</code>开始，<code>docker login</code>虽然Succeeded，但<code>pull</code>或<code>push</code>的时候，<code>~/.dockercfg</code>下的用户登录信息将不允许通过HTTP明文传输。（如果你愿意可以查看<code>v0.10.0</code>的源码 <a href="https://github.com/docker/docker/blob/v0.10.0/registry/registry.go">registry.go</a>，在分支<code>v0.9.1</code>及以前是没有<code>HTTP code 401, Docker will not send auth headers over HTTP的</code>）
+目前的办法三个：</p>
+<ul>
+<li>撤退，这就是为什么先说明在操作前线查看到这的原因了</li>
+<li>换成<code>v0.9.1</code>及以下版本。现在都<code>v1.3.1</code>了，我猜你不会这么做</li>
+<li>修改源码<a href="https://github.com/docker/docker/tree/master/registry">session.go</a>，去掉相应的判断行，然后git下来重新安装。我猜你更不会这么做</li>
+<li>安装SSL证书，使用HTTPS传输。这是明智的选择，新版本docker也推荐我们这么做，往下看。</li>
+</ul>
+<h3 id="33-为nginx安装ssl证书">3.3 为nginx安装ssl证书<a hidden class="anchor" aria-hidden="true" href="#33-为nginx安装ssl证书">#</a></h3>
+<p>首先打开nginx配置文件中ssl的三行注释</p>
+<pre tabindex="0"><code># vi /etc/nginx/conf.d/docker-registry.conf
+...
+server {
+ listen 8000;
+ server_name registry.domain.com;
+
+
+ ssl on;
+ ssl_certificate /etc/nginx/ssl/nginx.crt;
+ ssl_certificate_key /etc/nginx/ssl/nginx.key;
+...
+</code></pre><p>保存之后，nginx会分别从<code>/etc/nginx/ssl/nginx.crt</code>和<code>/etc/nginx/ssl/nginx.key</code>读取ssl证书和私钥。如果你自己愿意花钱买一个ssl证书，那就会变得非常简单，把证书和私钥拷贝成上面一样即可。关于SSL以及签署ssl证书，请参考其他文章。
+这里我们自签署一个ssl证书，把当前系统作为（私有）证书颁发中心（CA）。</p>
+<p>创建存放证书的目录</p>
+<pre tabindex="0"><code># mkdir /etc/nginx/ssl
+</code></pre><p>确认CA的一些配置文件</p>
+<pre tabindex="0"><code># vi /etc/pki/tls/openssl.cnf
+...
+[ CA_default ]
+
+dir             = /etc/pki/CA           # Where everything is kept
+certs           = $dir/certs            # Where the issued certs are kept
+crl_dir         = $dir/crl              # Where the issued crl are kept
+database        = $dir/index.txt        # database index file.
+#unique_subject = no                    # Set to &#39;no&#39; to allow creation of
+                                        # several ctificates with same subject.
+new_certs_dir   = $dir/newcerts         # default place for new certs.
+
+certificate     = $dir/cacert.pem       # The CA certificate
+serial          = $dir/serial           # The current serial number
+crlnumber       = $dir/crlnumber        # the current crl number
+                                        # must be commented out to leave a V1 CRL
+crl             = $dir/crl.pem          # The current CRL
+private_key     = $dir/private/cakey.pem # The private key
+RANDFILE        = $dir/private/.rand    # private random number file
+...
+default_days    = 3650                  # how long to certify for
+...
+[ req_distinguished_name ]
+countryName                     = Country Name (2 letter code)
+countryName_default             = CN
+countryName_min                 = 2
+countryName_max                 = 2
+
+stateOrProvinceName             = State or Province Name (full name)
+stateOrProvinceName_default     = GD
+...[ req_distinguished_name ]部分主要是颁证时一些默认的值，可以不动
+</code></pre><p>(1) 生成根密钥</p>
+<pre tabindex="0"><code># cd /etc/pki/CA/
+# openssl genrsa -out private/cakey.pem 2048
+</code></pre><p>为了安全起见，修改cakey.pem私钥文件权限为600或400，也可以使用子shell生成<code>( umask 077; openssl genrsa -out private/cakey.pem 2048 )</code>，下面不再重复。</p>
+<p>(2) 生成根证书</p>
+<pre tabindex="0"><code># openssl req -new -x509 -key private/cakey.pem -out cacert.pem
+</code></pre><p>会提示输入一些内容，因为是私有的，所以可以随便输入，最好记住能与后面保持一致。上面的自签证书<code>cacert.pem</code>应该生成在<code>/etc/pki/CA</code>下。</p>
+<p>(3) 为我们的nginx web服务器生成ssl密钥</p>
+<pre tabindex="0"><code># cd /etc/nginx/ssl
+# openssl genrsa -out nginx.key 2048
+</code></pre><p>我们的CA中心与要申请证书的服务器是同一个，否则应该是在另一台需要用到证书的服务器上生成。</p>
+<p>(4) 为nginx生成证书签署请求</p>
+<pre tabindex="0"><code># openssl req -new -key nginx.key -out nginx.csr
+...
+Country Name (2 letter code) [AU]:CN
+State or Province Name (full name) [Some-State]:GD
+Locality Name (eg, city) []:SZ
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:COMPANY
+Organizational Unit Name (eg, section) []:IT_SECTION
+Common Name (e.g. server FQDN or YOUR name) []:your.domain.com
+Email Address []:
+
+Please enter the following &#39;extra&#39; attributes
+to be sent with your certificate request
+A challenge password []:
+An optional company name []:
+...
+</code></pre><p>同样会提示输入一些内容，其它随便，除了<code>Commone Name</code>一定要是你要授予证书的服务器域名或主机名，challenge password不填。</p>
+<p>(5) 私有CA根据请求来签发证书</p>
+<pre tabindex="0"><code># openssl ca -in nginx.csr -out nginx.crt
+</code></pre><p>上面签发过程其实默认使用了<code>-cert cacert.pem -keyfile cakey.pem</code>，这两个文件就是前两步生成的位于<code>/etc/pki/CA</code>下的根密钥和根证书。</p>
+<p>到此我们已经拥有了建立ssl安全连接所需要的所有文件，并且服务器的crt和key都位于配置的目录下，唯有根证书<code>cacert.pem</code>位置不确定放在CentOS6下的哪个地方。
+经验证以下几个位置不行：（<a href="http://kb.kerio.com/product/kerio-connect/server-configuration/ssl-certificates/adding-trusted-root-certificates-to-the-server-1605.html">Adding trusted root certificates to the server</a>）
+<code>/etc/pki/ca-trust/source/anchors</code>、<code>/etc/pki/ca-trust/source</code>、<code>/etc/pki/ca-trust/extracted</code>、
+<code>/etc/pki/ca-trust/extracted/pem/</code>、<code>/etc/pki/tls/certs/cacert.crt</code>
+都会报错：</p>
+<pre tabindex="0"><code># docker login https://registry.domain.com:8000
+Username (sean): sean
+2014/11/14 02:32:48 Error response from daemon: Invalid Registry endpoint: Get https://registry.domain.com:8000/v1/_ping: x509: certificate signed by unknown authority
+
+# curl https://sean:sean@registry.domain.com:8000/
+curl: (60) Peer certificate cannot be authenticated with known CA certificates
+More details here: http://curl.haxx.se/docs/sslcerts.html
+curl performs SSL certificate verification by default, using a &#34;bundle&#34;
+ of Certificate Authority (CA) public keys (CA certs). If the default
+ bundle file isn&#39;t adequate, you can specify an alternate file
+ using the --cacert option.
+If this HTTPS server uses a certificate signed by a CA represented in
+ the bundle, the certificate verification probably failed due to a
+ problem with the certificate (it might be expired, or the name might
+ not match the domain name in the URL).
+If you&#39;d like to turn off curl&#39;s verification of the certificate, use
+ the -k (or --insecure) option.
+</code></pre><p>(6) 目前让根证书起作用的只发现一个办法：</p>
+<pre tabindex="0"><code># cp /etc/pki/tls/certs/ca-bundle.crt{,.bak}    备份以防出错
+# cat /etc/pki/CA/cacert.pem &gt;&gt; /etc/pki/tls/certs/ca-bundle.crt
+
+# curl https://sean:sean@registry.domain.com:8000
+&#34;docker-registry server (dev) (v0.8.1)&#34;
+</code></pre><p>将<code>cacert.pem</code>根证书追加到<code>ca-bundle.crt</code>后一定要重启docker后台进程才行。</p>
+<p>如果<code>docker login</code>依然报错<code>certificate signed by unknown authority</code>，参考<a href="https://docs.docker.com/articles/https/">Running Docker with https</a>，启动docker后台进程时指定信任的CA根证书：</p>
+<pre tabindex="0"><code># docker -d --tlsverify --tlscacert /etc/pki/CA/cacert.pem
+
+或者将cacert.pem拷贝到~/.docker/ca.pem
+# mkdir ~/.docker &amp;&amp; cp /etc/pki/CA/cacert.pem ~/.docker/ca.pem
+# docker -d
+最好重启一下registry
+# docker restart &lt;registry_container_id&gt; 
+</code></pre><p>上面用“如果”是因为一开始总提示<code>certificate signed by unknown authority</code>，<a href="https://github.com/docker/docker/blob/master/docs/sources/articles/certificates.md">有人说</a>将根证书放在<code>/etc/docker/certs.d</code>下，<a href="">还有人说</a>启动docker daemon收加入<code>--insecure-registry ..</code> 但终究是因为版本差异不成功。但后来又奇迹般的不需要<code>--tlscacert</code>就好了。
+这个地方挣扎了很久，重点关注一下这个下面几个issue：</p>
+<ul>
+<li><a href="https://github.com/docker/docker-registry/issues/82">https://github.com/docker/docker-registry/issues/82</a></li>
+<li><a href="https://github.com/docker/docker/pull/2687">https://github.com/docker/docker/pull/2687</a></li>
+<li><a href="https://github.com/docker/docker/pull/2339">https://github.com/docker/docker/pull/2339</a></li>
+</ul>
+<p>(7) 最终搞定：</p>
+<pre tabindex="0"><code># docker login https://registry.domain.com:8000
+Username: sean
+Password: 
+Email: zhouxiao@domain.com
+Login Succeeded
+
+# curl https://sean:sean@registry.domain.com:8000
+&#34;docker-registry server (dev) (v0.8.1)&#34;
+
+# docker push registry.domain.com:8000/centos6:test_priv
+The push refers to a repository [registry.domain.com:8000/centos6] (len: 1)
+Sending image list
+Pushing repository registry.domain.com:8000/centos6 (1 tags)
+511136ea3c5a: Image successfully pushed 
+5b12ef8fd570: Image successfully pushed 
+68edf809afe7: Image successfully pushed 
+40627956f44c: Image successfully pushed 
+Pushing tag for rev [40627956f44c] on {https://registry.domain.com:8000/v1/repositories/centos6/tags/test_priv}
+</code></pre><p>但还有一个小问题没解决，虽然已经可以正常使用，但每次请求在nginx的error.log中还是会有<code>[error] 8299#0: *27 no user/password was provided for basic authentication</code>，应该是这个版本docker暂未解决的bug。</p>
+<h3 id="33-其它问题">3.3 其它问题<a hidden class="anchor" aria-hidden="true" href="#33-其它问题">#</a></h3>
+<p>(1) docker后台进程意外中断后，重新<code>docker start &lt;container_id&gt;</code>报错</p>
+<pre tabindex="0"><code># docker start b36bd796bd3d
+Error: Cannot start container b36bd796bd3d: Error getting container b36bd796bd3d463c4fedb70d98621e7318ec3d5cd14b2f60b1d182ad3cbcc652 
+from driver devicemapper: Error mounting &#39;/dev/mapper/docker-253:0-787676-b36bd796bd3d463c4fedb70d98621e7318ec3d5cd14b2f60b1d182ad3cbcc652&#39; 
+on &#39;/var/lib/docker/devicemapper/mnt/b36bd796bd3d463c4fedb70d98621e7318ec3d5cd14b2f60b1d182ad3cbcc652&#39;: device or resource busy
+2014/11/08 15:14:57 Error: failed to start one or more containers
+</code></pre><p>经分析产生这个问题的原因是做了一个操作：在docker后台进程启动的终端，继续回车后会临时退出后台进程的日志输出，我就在这个shell下使用yum安装软件包，但由于网络原因yum卡住不动，于是我就另起了一个终端kill了这个yum进程，不知为何会影响到表面已经退出前台输出的docker。解决办法是umount容器的挂载点：（见<a href="https://github.com/docker/docker/issues/5684">这里</a>）</p>
+<pre tabindex="0"><code># umount /var/lib/docker/devicemapper/mnt/b36bd796bd3d463c4fedb70d98621e7318ec3d5cd14b2f60b1d182ad3cbcc652
+
+# service docker start   正常
+</code></pre><p>能想到的另外一个办法是，启动docker后台进程时，重定向输出<code>docker -d &gt; /dev/null 2&gt;&amp;1</code>（/var/log/docker已自动记录了一份日志）。</p>
+<p>(2) 配置完nginx的docker-registry.conf后启动报错</p>
+<pre tabindex="0"><code># service nginx start
+[emerg] 14714#0: unknown directive &#34;upstream&#34; in /etc/nginx/conf.d/docker-registry.conf:4
+</code></pre><p>原因是nginx版本太低，一些配置指令不兼容，使用<code>yum install nginx</code>默认安装了1.0.x，卸载重新下载<code>nginx-1.4.7-1.el6.ngx.x86_64.rpm</code>安装解决。</p>
+<p>(3) 网络设置代理问题
+<code>pull, push</code>官网的镜像时由于GFW的原因需要设置代理，但不是<code>http_proxy</code>而是<code>HTTP_PROXY</code>，对于docker来说同时设置这两个值就会出问题，有时出于安装软件包的需要设置<code>http_proxy</code>，就会导致冲突。在docker-registry中如果忘记了当前哪一个在起作用，找遍所有问题都发现不了原因，而docker返回给我们的错误也难以判断。切记~</p>
+<p>TO-DO
+如何删除docker-registry的里的镜像</p>
+<h2 id="4-参考">4. 参考<a hidden class="anchor" aria-hidden="true" href="#4-参考">#</a></h2>
+<ul>
+<li>
+<p><a href="https://docker.cn/p/deploy-your-own-private-docker-registry/">部署自己的私有 Docker Registry</a> [<a href="http://www.activestate.com/blog/2014/01/deploying-your-own-private-docker-registry">英文</a>]</p>
+</li>
+<li>
+<p><a href="https://github.com/docker/docker-registry">Official docker-registry README</a></p>
+</li>
+<li>
+<p><a href="https://www.digitalocean.com/community/tutorials/how-to-set-up-a-private-docker-registry-on-ubuntu-14-04">How To Set Up a Private Docker Registry on Ubuntu 14.04</a></p>
+</li>
+<li>
+<p><a href="http://beta-docs.docker.io/reference/api/hub_registry_spec/">The Docker Hub and the Registry spec</a></p>
+</li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/docker/">docker</a></li>
+      <li><a href="http://xgknight.com/tags/centos/">centos</a></li>
+      <li><a href="http://xgknight.com/tags/docker-registry/">docker-registry</a></li>
+      <li><a href="http://xgknight.com/tags/nginx/">nginx</a></li>
+      <li><a href="http://xgknight.com/tags/ssl/">ssl</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

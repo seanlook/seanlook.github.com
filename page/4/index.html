@@ -137,6 +137,61 @@
 
 <article class="post-entry"> 
   <header class="entry-header">
+    <h2>一种直观记录表结构变更历史的方法
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>1. Story 在没有形成自己的数据库管理平台以前，数据库实例一多（包括生产和测试环境），许多表要执行DDL会变得异常繁杂。
+说个自己的经历，需要改现网的一个索引来看优化的效果，因为存在风险，不会一次全改，先只改1个库，然后逐步放开。前后验证效果可能花上一两周的时间，除非实现完整的记录了当时的ddl语句和对应的库，否则根本难以记得。这就完全依赖于个人的习惯及能力。
+又比如现网出了个问题，开发追查到一个时间点，想确认那个时候有没有对库表进行过更改操作，如果没有记录表结构变更的历史，也就难以提供需要的信息。
+记录差异，很早就思考过能不能用git来做。终于花了一天时间来实现，并验证、修改达到预期的效果，还算满意。
+github项目地址在文后。
+2. Concept 思路很简单，就是利用 mydumper 导出表时会把各表（结构）单独导成一个文件的特性，每天低峰期导出所有对象元数据：表、视图、存储过程、事件、触发器。需要过滤掉 AUTO_INCREMENT 值。
+结构内容存放在一个git仓库下，通过shell脚本提交到 gitlab。所有DDL更改由原来依赖于DBA的主动记录，变成被动采集。
+测试环境和生产环境表结构总会有些差异，为了兼顾同时收集两个环境的数据，设置了 environment 选项，根据当前所在运行的机器，自动判断采集哪些实例信息。
+3. Usage 首先你需要能够存放表结构信息的git仓库，如gitlab，而且建议设置为私有。
+安装 git 和 mydumper mydumper 0.9.1 版本需要编译安装，可以参考这里 file-mydumper-install-ubuntu14-04-sh。当然 yum 或 apt-get 安装其他版本也是一样的。 脚本会尝试自动获取 mydumper 命令的路径。 注意配置git权限的时候，最好不允许其它用户手动提交修改仓库内容。
+配置db实例地址 settings.ini示例：
+[environment] production=puppetmaster test=puppettestmaster [production] production_auth=your_defaultuser:yourpassword db_name1=192.168.1.100:3306 db_name2=192.168.1.101:3306 db_name3=name3.dbhost.com:3306 db_name4=192.168.1.100:3306:myuser:mypassword [test] test_auth=user1:password1 db_name1=10.0.100.1:3306 db_name2=10.0.100.1:3307 db_name3=10.0.100.2:3306 db_name4=10.0.100.3:3306:myuser1:mypassword1 上面的配置采集 production和test两个环境的表结构，识别两个环境是根据 hostname 来决定的。这样做的好吃就是这个脚本在两个环境下运行不需要做任何修改。 [production]节的名字就是 [environment]节指定的名字 production=xx dbname1=就是配置各个db，地址&#43;端口的形式。用户名和密码可以继续用 : 跟上 production_auth=表示 production 环境下，如 dbname1没有配置用户名时，默认采用这个用户名和密码。这样设计主要是简化配置。
+该数据库用户需要 select,show view,event,trigger,procedure 权限。...</p>
+  </div>
+  <footer class="entry-footer"><span title='2016-11-28 16:32:49 +0000 UTC'>November 28, 2016</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 一种直观记录表结构变更历史的方法" href="http://xgknight.com/posts/2016/11/%E4%B8%80%E7%A7%8D%E7%9B%B4%E8%A7%82%E8%AE%B0%E5%BD%95%E8%A1%A8%E7%BB%93%E6%9E%84%E5%8F%98%E6%9B%B4%E5%8E%86%E5%8F%B2%E7%9A%84%E6%96%B9%E6%B3%95/"></a>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
+    <h2>MySQL非主从环境下数据一致性校验及修复程序
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>1. 简介 项目地址：https://github.com/seanlook/px-table-checksum
+主从环境下数据一致性校验经常会用 pt-table-checksum 工具，它的原理及实施过程之前写过一篇文章：生产环境使用 pt-table-checksum 检查MySQL数据一致性。但是DBA工作中还会有些针对两个表检查是否一致，而这两个表之间并没有主从关系，pt工具是基于binlog把在主库进行的检查动作，在从库重放一遍，此时就不适用了。
+总会有这样特殊的需求，比如从阿里云RDS实例迁移到自建mysql实例，它的数据传输服务实现方式是基于表的批量数据提取，加上binlog订阅，但强制row模式会导致pt-table-checksum没有权限把会话临时改成statement。另一种需求是，整库进行字符集转换：库表定义都是utf8，但应用连接使用了默认的 latin1，要将连接字符集和表字符集统一起来，只能以latin1导出数据，再以utf8导入，这种情况数据一致性校验，且不说binlog解析程序不支持statement（如canal），新旧库本身内容不同，pt-table-checksum 算出的校验值也会不一样，失效。
+所以才萌生了参考 pt-table-checksum 自己写了一个：px-table-checksum 。
+2. 实现方法 整体思路是借鉴pt-table-checksum，从源库批量（即chunk）取出一块数据如1000行，计算CRC32值，同样的语句在目标库运行一遍，结果都存入另一个库，最后检查对应编号的chunk crc值是否一致。知道不一致还不行，得能否快速方便的修复差异，所以继续根据那些不一致的chunk，去目标库和源库找到不一致的行，是缺失，还是多余，还是被修改了，然后生成修复sql，根据指示是否自动修复。
+那么问题就在于：
+如何确定批次，也就是下一个chunk该怎么取？ 我还没想做到pt-table-checksum那样，可以根据负载动态调整chunk大小，甚至活跃线程数超过阀值就暂停检查，上来工作量就太大了。目前每次计算的chunk的行数是固定的，可以配置1000或2000等。 所以就要用到分页查询，根据（自增或联合）主键、唯一索引，每次limit 1000后升序取最后一条，作为下一批的起始。所以要分析表上的键情况，组合查询条件。目前仅能检查有主键或唯一所以的表。
+如何保证源库和目标库，运行的sql一样？ 之前一版是目标库和源库，以多线程各自计算chunk，入库，后来才意识到严重的bug：比如同样是取1000行，如果目标库少数据，那么下一个chunk起始就不一样，比较的结果简直一塌糊涂。 所以必须保证相同编号的chunk，起点必须相同，所以想到用队列，存放在源库跑过的所有校验sql，模拟pt工具在目标库重放。考虑到要多线程同时比较多个表，队列可能吃内存过大，于是使用了redis队列。
+直接在数据库中计算crc32，还是取出数据在内存里计算？ 翻了pt-table-checksum的源码，它是在数据库里计算的。但是第一节里说过，如果目标库和源库要使用不同的字符集才能读出正确的数据，只能查询出来之后再比较。所以 px-table-checksum 两种都支持，只需指定一个配置项。
+同时检查多个表，源库sql挤在队列，目标库拿出来执行时过了1s，此时源库那条数据又被修改了一次同步到了目标库，会导致计算结果不一致，实则一致，怎么处理 无法处理，是px-table-checksum相比pt-table-checksum最大的缺陷。 但为了尽可能减少此类问题（比如主从延迟也可能会），特意设计了多个redis队列，目标库多个检查线程，即比如同时指定检查8个表，源库检查会有8个线程对应，但可以根据表的写入情况，配置4个redis队列（目前是随机入列），10个目标库检查线程，来减少不准确因素。 但站在我的角度往往来说，不一致的数据会被记录下来，如果不多，人工核对一下；如果较多，就再跑一遍检查，如果两次都有同一条数据不一致，那就有情况了。
+3. 限制 如果检查期间源表数据，变化频繁，有可能检查的结果不准确 也就是上面第4点的问题。很明显，这个程序每个检查的事务是分开的，不像pt工具能严格保证每条检查sql的事务顺序。但有不一致的数据再排查一下就ok了。实际在我线上使用过程中，99.9%是准确的。 表上必须有主键或唯一索引 程序会检查，如果没有会退出。
+varbinay,blob等二进制字段不支持修复 其实也不是完全不支持，要看怎么用的。开发如果有把字符先转成字节，再存入mysql，这种就不支持修复。是有办法可以处理，那就是从源库查时用 hex()函数，修复sql里面unhex()写回去。
+4. 使用说明 该python程序基于2.7开发，2.6、3.x上没有测试。使用前需要安装 MySQLdb和hotqueue：
+$ sudo pip install MySQL-python hotqueue 要比较的表和选项，使用全配置化，即不通过命令行的方式指定（原谅命令行参数使用方式会额外增加代码量）。
+4.1 px-table-checksum.py 主程序，运行python px-table-checksum.py 执行一致性检查，但一定了解下面的配置文件选项。
+4.2 settings_checksum.py 配置选项
+CHUNK_SIZE: 每次提取的chunk行数
+REDIS_INFO: 指定使用redis队列地址
+REDIS_QUEUE_CNT: redis队列数量，消费者（目标库）有一一对应的线程守着队列
+REDIS_POOL_CNT: 生产者（源库）redis客户端连接池。这个设计是为了缓解GIL带来的问题，把入列端与出列端分开，因为如果表多可能短时间有大量sql入队列，避免hotqueue争用...</p>
+  </div>
+  <footer class="entry-footer"><span title='2016-11-20 16:32:49 +0000 UTC'>November 20, 2016</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to MySQL非主从环境下数据一致性校验及修复程序" href="http://xgknight.com/posts/2016/11/mysql%E9%9D%9E%E4%B8%BB%E4%BB%8E%E7%8E%AF%E5%A2%83%E4%B8%8B%E6%95%B0%E6%8D%AE%E4%B8%80%E8%87%B4%E6%80%A7%E6%A0%A1%E9%AA%8C%E5%8F%8A%E4%BF%AE%E5%A4%8D%E7%A8%8B%E5%BA%8F/"></a>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
     <h2>让mysqldump变成并发导出导入的魔法
     </h2>
   </header>
@@ -274,43 +329,6 @@ alter命令原表就不支持给索引重命名，需要先drop再add，在pt-os
   </div>
   <footer class="entry-footer"><span title='2016-05-27 16:32:49 +0000 UTC'>May 27, 2016</span>&nbsp;·&nbsp;admin</footer>
   <a class="entry-link" aria-label="post link to pt-online-schema-change使用说明、限制与比较" href="http://xgknight.com/posts/2016/05/pt-online-schema-change%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E%E9%99%90%E5%88%B6%E4%B8%8E%E6%AF%94%E8%BE%83/"></a>
-</article>
-
-<article class="post-entry"> 
-  <header class="entry-header">
-    <h2>使用pt-osc修改主键时注意
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>使用 pt-online-schema-change 做在线ddl最添加普通索引、列，修改列类型、添加默认值等使用比较常规，但涉及到要修改的是主键时就有点棘手。在我修改线上实例过程中，有这样的需求，不妨先思考一下怎么做才好：
-原表上有个复合主键，现在要添加一个自增id作为主键，如何进行 会涉及到以下修改动作：
-删除复合主键定义 添加新的自增主键 原复合主键字段，修改成唯一索引 如果你够聪明，应该会把这三个操作放在同一个 alter table 命令执行。percona手册里有两个地方对修改主键进行了特殊注解：
-–alter A notable exception is when a PRIMARY KEY or UNIQUE INDEX is being created from existing columns as part of the ALTER clause; in that case it will use these column(s) for the DELETE trigger.
-–[no]check-alter
-DROP PRIMARY KEY If –alter contain DROP PRIMARY KEY (case- and space-insensitive), a warning is printed and the tool exits unless –dry-run is specified....</p>
-  </div>
-  <footer class="entry-footer"><span title='2016-05-27 16:32:49 +0000 UTC'>May 27, 2016</span>&nbsp;·&nbsp;admin</footer>
-  <a class="entry-link" aria-label="post link to 使用pt-osc修改主键时注意" href="http://xgknight.com/posts/2016/05/%E4%BD%BF%E7%94%A8pt-osc%E4%BF%AE%E6%94%B9%E4%B8%BB%E9%94%AE%E6%97%B6%E6%B3%A8%E6%84%8F/"></a>
-</article>
-
-<article class="post-entry"> 
-  <header class="entry-header">
-    <h2>mysql 5.6 原生Online DDL解析
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>做MySQL的都知道，数据库操作里面，DDL操作（比如CREATE,DROP,ALTER等）代价是非常高的，特别是在单表上千万的情况下，加个索引或改个列类型，就有可能堵塞整个表的读写。
-然后 mysql 5.6 开始，大家期待的Online DDL出现了，可以实现修改表结构的同时，依然允许DML操作(select,insert,update,delete)。在这个特性出现以前，用的比较多的工具是pt-online-schema-change，比较请参考pt-online-schema-change使用说明、限制与比较或 ONLINE DDL VS PT-ONLINE-SCHEMA-CHANGE 。
-1. Online DDL 在 MySQL 5.1 （带InnoDB Plugin）和5.5中，有个新特性叫 Fast Index Creation（下称 FIC），就是在添加或者删除二级索引的时候，可以不用复制原表。对于之前的版本对于索引的添加删除这类DDL操作，MySQL数据库的操作过程为如下：
-首先新建Temp table，表结构是 ALTAR TABLE 新定义的结构 然后把原表中数据导入到这个Temp table 删除原表 最后把临时表rename为原来的表名 为了保持数据的一致性，中间复制数据（Copy Table）全程锁表只读，如果有写请求进来将无法提供服务，连接数爆张。
-引入FIC之后，创建二级索引时会对原表加上一个S锁，创建过程不需要重建表（no-rebuild）；删除InnoDB二级索引只需要更新内部视图，并标记这个索引的空间可用，去掉数据库元数据上该索引的定义即可。这个过程也只允许读操作，不能写入，但大大加快了修改索引的速度（不含主键索引，InnoDB IOT的特性决定了修改主键依然需要 Copy Table ）。
-FIC只对索引的创建删除有效，MySQL 5.6 Online DDL把这种特性扩展到了添加列、删除列、修改列类型、列重命名、设置默认值等等，实际效果要看所使用的选项和操作类别来定。
-1.1 Online DDL选项 MySQL 在线DDL分为 INPLACE 和 COPY 两种方式，通过在ALTER语句的ALGORITHM参数指定。
-ALGORITHM=INPLACE，可以避免重建表带来的IO和CPU消耗，保证ddl期间依然有良好的性能和并发。 ALGORITHM=COPY，需要拷贝原始表，所以不允许并发DML写操作，可读。这种copy方式的效率还是不如 inplace ，因为前者需要记录undo和redo log，而且因为临时占用buffer pool引起短时间内性能受影响。 上面只是 Online DDL 内部的实现方式，此外还有 LOCK 选项控制是否锁表，根据不同的DDL操作类型有不同的表现：默认mysql尽可能不去锁表，但是像修改主键这样的昂贵操作不得不选择锁表。
-LOCK=NONE，即DDL期间允许并发读写涉及的表，比如为了保证 ALTER TABLE 时不影响用户注册或支付，可以明确指定，好处是如果不幸该 alter语句不支持对该表的继续写入，则会提示失败，而不会直接发到库上执行。ALGORITHM=COPY默认LOCK级别 LOCK=SHARED，即DDL期间表上的写操作会被阻塞，但不影响读取。 LOCK=DEFAULT，让mysql自己去判断lock的模式，原则是mysql尽可能不去锁表 LOCK=EXCLUSIVE，即DDL期间该表不可用，堵塞任何读写请求。如果你想alter操作在最短的时间内完成，或者表短时间内不可用能接受，可以手动指定。 但是有一点需要说明，无论任何模式下，online ddl开始之前都需要一个短时间排它锁(exclusive)来准备环境，所以alter命令发出后，会首先等待该表上的其它操作完成，在alter命令之后的请求会出现等待waiting meta data lock。同样在ddl结束之前，也要等待alter期间所有的事务完成，也会堵塞一小段时间。所以尽量在ALTER TABLE之前确保没有大事务在执行，否则一样出现连环锁表。...</p>
-  </div>
-  <footer class="entry-footer"><span title='2016-05-24 16:32:49 +0000 UTC'>May 24, 2016</span>&nbsp;·&nbsp;admin</footer>
-  <a class="entry-link" aria-label="post link to mysql 5.6 原生Online DDL解析" href="http://xgknight.com/posts/2016/05/mysql-5.6-%E5%8E%9F%E7%94%9Fonline-ddl%E8%A7%A3%E6%9E%90/"></a>
 </article>
 <footer class="page-footer">
   <nav class="pagination">

@@ -143,173 +143,166 @@
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>搭建docker内网私服（docker-registry with nginx&amp;ssl on centos）
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: LDIF修改ldap记录或配置示例 date: 2015-01-22 01:21:25 updated: 2015-01-22 10:46:23 tags: [LDAP, ldif] categories: [Linux, OpenLDAP] 可以说LDIF文件是OpenLDAP操作数据或修改配置的一切来源，下面是实际通过客户端工具操作的具体示例。（openldap安装及配置过程见这里）。
-1. 添加组织或条目 创建一个Marketing部门，添加一个dn记录：
-# cat add_entry.ldif dn: ou=Marketing, dc=example,dc=com changetype: add objectclass: top objectclass: organizationalUnit ou: Marketing dn: cn=Pete Minsky,ou=Marketing,dc=example,dc=com changetype: add objectclass: person objectclass: organizationalPerson objectclass: inetOrgPerson cn: Pete Minsky sn: Pete ou: Marketing description: sb, sx description: sx uid: pminsky # ldapmodify -xWD &#39;cn=admin,dc=example,dc=com&#39; -f add_entry.ldif 或去掉changetype后 # ldapmodify -a -xWD &#39;cn=admin,dc=example,dc=com&#39; -f add_entry....</p>
+    <p>主要思路： 1. Docker Registry 说明 关于如何创建和使用本地仓库，其实已经有很多文章介绍了。因为docker技术正处于发展和完善阶段，所以有些文章要么内容已经过时，要么给出了错误的配置，导致无法正常创建仓库。本文记录的是个人完整的搭建过程，docker version为1.1.2。
+官方提供了Docker Hub网站来作为一个公开的集中仓库。然而，本地访问Docker Hub速度往往很慢，并且很多时候我们需要一个本地的私有仓库只供网内使用。
+Docker仓库实际上提供两方面的功能，一个是镜像管理，一个是认证。前者主要由docker-registry项目来实现，通过http服务来上传下载；后者可以通过docker-index（闭源）项目或者利用现成认证方案（如nginx）实现http请求管理。
+docker-registry既然也是软件应用，自然最简单的方法就是使用官方提供的已经部署好的镜像registry。官方文档中也给出了建议，直接运行sudo docker run -p 5000:5000 registry命令。这样确实能启动一个registry服务器，但是所有上传的镜像其实都是由docker容器管理，放在了/var/lib/docker/….某个目录下。而且一旦删除容器，镜像也会被删除。因此，我们需要想办法告诉docker容器镜像应该存放在哪里。registry镜像中启动后镜像默认位置是/tmp/registry，因此直接映射这个位置即可，比如到本机的/opt/data/registry目录下。
+2. 在CentOS上搭建docker私服 2.1 安装docker-registry 方法有多种，直接运行下面的命令：
+# docker run -d -e SETTINGS_FLAVOR=dev -e STORAGE_PATH=/tmp/registry -v /opt/data/registry:/tmp/registry -p 5000:5000 registry 如果本地没有拉取过docker-registry，则首次运行会pull registry，运行时会映射路径和端口，以后就可以从/opt/data/registry下找到私有仓库都存在哪些镜像，通过主机的哪个端口可以访问。 你也可以把项目 https://github.com/docker/docker-registry.git 克隆到本地，然后使用Dockerfile来build镜像：
+# git clone https://github.com/docker/docker-registry.git # cd docker-registry &amp;&amp; mkdir -p /opt/data/registry # docker build -t &#34;local-sean&#34; . build完成后，就可以运行这个docker-registry 我们先配置自己的config.yml文件，第一种方法是直接在run的时候指定变量 # cp config/config_sample.yml /opt/data/registry/config.yml # vi /opt/data/registry/config.yml ##这里可以设置本地存储SETTINGS_FLAVOR=dev，local STORAGE_PATH:/tmp/registry等待 # docker run -d -v /opt/data/registry:/tmp/registry -p 5000:5000 -e DOCKER_REGISTRY_CONFIG=/tmp/registry/config....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-11-13 20:21:25 +0000 UTC'>November 13, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 搭建docker内网私服（docker-registry with nginx&amp;ssl on centos）" href="http://xgknight.com/posts/2014/11/%E6%90%AD%E5%BB%BAdocker%E5%86%85%E7%BD%91%E7%A7%81%E6%9C%8Ddocker-registry-with-nginxssl-on-centos/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>完全解决Github Pages邮件两次warning（DNS解析问题）
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: OpenSSL 与 SSL 数字证书概念贴 date: 2015-01-15 01:21:25 updated: 2015-01-15 10:46:23 tags: [openssl, ssl,加密] categories: 安全 SSL/TLS 介绍见文章 SSL/TLS原理详解。 如果你想快速自建CA然后签发数字证书，请移步 基于OpenSSL自建CA和颁发SSL证书 。
-首先简单区分一下HTTPS、SSL、OpenSSL三者的关系：
-SSL是在客户端和服务器之间建立一条SSL安全通道的安全协议，而OpenSSL是TLS/SSL协议的开源实现，提供开发库和命令行程序。常说的HTTPS是HTTP的加密版，底层使用的加密协议是SSL。
-1. PKI、CA与证书 PKI 就是 Public Key Infrastructure 的缩写，翻译过来就是公开密钥基础设施。它是利用公开密钥技术所构建的，解决网络安全问题的，普遍适用的一种基础设施;是一种遵循既定标准的密钥管理平台,它能够为所有网络应用提供加密和数字签名等密码服务及所必需的密钥和证书管理体系。
-PKI既不是一个协议，也不是一个软件，它是一个标准，在这个标准之下发展出的为了实现安全基础服务目的的技术统称为PKI。可以说CA(认证中心)是PKI的核心，而数字证书是PKI的最基本元素，还有如apache等服务器、浏览器等客户端、银行等应用，都是pki的组件。这篇文章可以帮助理解：PKI/CA 技术的介绍 。
-1.1 CA 为保证用户之间在网上传递信息的安全性、真实性、可靠性、完整性和不可抵赖性
-CA 机构，又称为证书认证中心 (Certificate Authority) 中心，是一个负责发放和管理数字证书的第三方权威机构，它负责管理PKI结构下的所有用户(包括各种应用程序)的证书，把用户的公钥和用户的其他信息捆绑在一起，在网上验证用户的身份。CA机构的数字签名使得攻击者不能伪造和篡改证书。
-认证中心主要有以下5个功能：
-证书的颁发：接收、验证用户(包括下级认证中心和最终用户)的数字证书的申请。可以受理或拒绝 证书的更新：认证中心可以定期更新所有用户的证书，或者根据用户的请求来更新用户的证书 证书的查询：查询当前用户证书申请处理过程；查询用户证书的颁发信息，这类查询由目录服务器ldap来完成 证书的作废：由于用户私钥泄密等原因，需要向认证中心提出证书作废的请求；证书已经过了有效期，认证中心自动将该证书作废。认证中心通过维护证书作废列表 (Certificate Revocation List,CRL) 来完成上述功能。 证书的归档：证书具有一定的有效期，证书过了有效期之后就将作废，但是我们不能将作废的证书简单地丢弃，因为有时我们可能需要验证以前的某个交易过程中产生的数字签名，这时我们就需要查询作废的证书。 1.2 Certificate 1.2.1 X.509标准 “SSL证书&#34;这个词是一个相对较大的概念，整个PKI体系中有很多SSL证书格式标准。PKI的标准规定了PKI的设计、实施和运营，规定了PKI各种角色的&#34;游戏规则”，提供数据语法和语义的共同约定。x.509是PKI中最重要的标准，它定义了公钥证书的基本结构，可以说PKI是在X.509标准基础上发展起来的：
-SSL公钥证书 证书废除列表CRL(Certificate revocation lists 证书黑名单) 参考 http://en.wikipedia.org/wiki/X.509 。
-另外一个常用的标准是PKCS#12，通常采用pfx,p12作为文件扩展名，openssl和java的keytool工具都可以用作生产此类格式的证书。
-1.2.2 ssl公钥证书格式 1. 证书版本号(Version) 版本号指明X....</p>
+    <p>之所以有本文是由于Github前后两次发了2封不同的警告邮件，都是关于DNS配置的。因为xgknight.com刚申请下来时我也是参考其他博客，在seanlook.github.com仓库下面建立了一个CNAME文件，内容：xgknight.com，然后去DNSPod绑定域名和IP（207.97.227.245）访问也就没事了。然而几天之后每次deploy博客的时候都会受到一封build warning邮件（见本文最后），后来参考下面的文章：
+解决GitHub Pages Warning邮件提醒 一步步在GitHub上创建博客主页-最新版 — 自定义域名的新玩法 Faster, More Awesome GitHub Pages 和 GitHub Pages Legacy IP Deprecation 但显然第一篇有点拆东墙补西墙，只是换了个离自己最近的服务器，CDN根本就没用上，也是因为我dig seanlook.github.io &#43;nostats &#43;nocomments &#43;nocmd之后把IP改成了103.245.222.133，才有了第二封邮件的warning（见本文最后）。第二篇倒是跟官方（第三条）是同一个意思，但是博主放弃了原本的顶级域名而是用www子域名。 首先根据邮件提示，明确一下最终目的：
+使用顶级域名xgknight.com来访问站点 子域名www.xgknight.com跳转到xgknight.com 充分Github Pages提供的cdn加速功能 两份邮件大概是同一个意思，说Github Pages正在进行重大的升级来提供更快的访问速度，所以我们指定的域名解析的IP在不就的将来将要废弃，需要指向一个合法的IP，第二封邮件说的更明确了，为了使用CDN加速功能，需要增加CNAME的子域名解析记录。
+如果你正在使用顶级域名（example.com）而不是子域名（如www.example.com），并且你的DNS解析服务提供商不支持ALIAS记录，那么唯一的选择就是使用A记录，但这种配置没有办法利用CDN加速了（依然可以应对DoS攻击）。如果切换成子域名或使用支持ALIAS的DNS解析上，都可以利用CDN和应对DoS。
+不料我现在的情形正是，使用顶级域名xgknight.com，DNSPod不支持ALIAS记录。虽然目前不使用CDN加速访问起来没感觉有多大问题，但对于我这种有轻微强迫症并追求完美的人来说，就是看不惯这个warnning。DNS解析服务不想换成付费的支持ALIAS的DNSimple，那么难道只能启用www子域名了吗？对于有些已经对你的网站做了链接的地方，随便修改域名可不是什么好事。于是我就尝试了下面的设置： 在DNSPod中去掉其它映射记录，添加CNAME记录的顶级域名映射到seanlook.github.com，github仓库下的CNAME文件也是顶级域名xgknight.com。经过这样设置后访问xgknight.com发现完全没有问题： 中国境内的ping值：
+$ ping xgknight.com 正在 Ping github.map.fastly.net [103.245.222.133] 具有 32 字节的数据: 来自 103.245.222.133 的回复: 字节=32 时间=215ms TTL=42 来自 103.245.222.133 的回复: 字节=32 时间=210ms TTL=42 来自 103.245.222.133 的回复: 字节=32 时间=205ms TTL=42 来自 103.245.222.133 的回复: 字节=32 时间=221ms TTL=42 美国的一个IP的ping值：...</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-11-08 01:21:25 +0000 UTC'>November 8, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 完全解决Github Pages邮件两次warning（DNS解析问题）" href="http://xgknight.com/posts/2014/11/%E5%AE%8C%E5%85%A8%E8%A7%A3%E5%86%B3github-pages%E9%82%AE%E4%BB%B6%E4%B8%A4%E6%AC%A1warningdns%E8%A7%A3%E6%9E%90%E9%97%AE%E9%A2%98/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>docker常用管理命令（下）
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: 基于OpenSSL自建CA和颁发SSL证书 date: 2015-01-18 01:21:25 updated: 2015-01-18 10:46:23 tags: [openssl, ssl,ca] categories: 安全 关于SSL/TLS介绍见文章 SSL/TLS原理详解。 关于证书授权中心CA以及数字证书等概念，请移步 OpenSSL 与 SSL 数字证书概念贴 。
-openssl是一个开源程序的套件、这个套件有三个部分组成：一是libcryto，这是一个具有通用功能的加密库，里面实现了众多的加密库；二是libssl，这个是实现ssl机制的，它是用于实现TLS/SSL的功能；三是openssl，是个多功能命令行工具，它可以实现加密解密，甚至还可以当CA来用，可以让你创建证书、吊销证书。
-默认情况ubuntu和CentOS上都已安装好openssl。CentOS 6.x 上有关ssl证书的目录结构：
-/etc/pki/CA/ newcerts 存放CA签署（颁发）过的数字证书（证书备份目录） private 用于存放CA的私钥 crl 吊销的证书 /etc/pki/tls/ cert.pem 软链接到certs/ca-bundle.crt certs/ 该服务器上的证书存放目录，可以房子自己的证书和内置证书 ca-bundle.crt 内置信任的证书 private 证书密钥存放目录 openssl.cnf openssl的CA主配置文件 1. 颁发证书 1.1 修改CA的一些配置文件 CA要给别人颁发证书，首先自己得有一个作为根证书，我们得在一切工作之前修改好CA的配置文件、序列号、索引等等。
-vi /etc/pki/tls/openssl.cnf：
-... [ CA_default ] dir = /etc/pki/CA # Where everything is kept certs = $dir/certs # Where the issued certs are kept crl_dir = $dir/crl # Where the issued crl are kept database = $dir/index....</p>
+    <p>本文承接docker专题(2)：docker常用管理命令（上）。
+1. 开启/停止/重启container（start/stop/restart） 容器可以通过run新建一个来运行，也可以重新start已经停止的container，但start不能够再指定容器启动时运行的指令，因为docker只能有一个前台进程。 容器stop（或Ctrl&#43;D）时，会在保存当前容器的状态之后退出，下次start时保有上次关闭时更改。而且每次进入attach进去的界面是一样的，与第一次run启动或commit提交的时刻相同。
+CONTAINER_ID=$(docker start &lt;containner_id&gt;) docker stop $CONTAINER_ID docker restart $CONTAINER_ID 关于这几个命令可以通过一个完整的实例使用：docker如何创建一个运行后台进程的容器并同时提供shell终端。
+2. 连接到正在运行中的container（attach） 要attach上去的容器必须正在运行，可以同时连接上同一个container来共享屏幕（与screen命令的attach类似）。 官方文档中说attach后可以通过CTRL-C来detach，但实际上经过我的测试，如果container当前在运行bash，CTRL-C自然是当前行的输入，没有退出；如果container当前正在前台运行进程，如输出nginx的access.log日志，CTRL-C不仅会导致退出容器，而且还stop了。这不是我们想要的，detach的意思按理应该是脱离容器终端，但容器依然运行。好在attach是可以带上 --sig-proxy=false来确保CTRL-D或CTRL-C不会关闭容器。
+# docker attach --sig-proxy=false $CONTAINER_ID 3. 查看image或container的底层信息（inspect） inspect的对象可以是image、运行中的container和停止的container。
+查看容器的内部IP # docker inspect --format=&#39;{\{.NetworkSettings.IPAddress}}&#39; $CONTAINER_ID 172.17.42.35 （注：由于代码块解析的问题，上面NetworkSettings前面的 \ 去掉） 4. 删除一个或多个container、image（rm、rmi） 你可能在使用过程中会build或commit许多镜像，无用的镜像需要删除。但删除这些镜像是有一些条件的：
+同一个IMAGE ID可能会有多个TAG（可能还在不同的仓库），首先你要根据这些 image names 来删除标签，当删除最后一个tag的时候就会自动删除镜像； 承上，如果要删除的多个IMAGE NAME在同一个REPOSITORY，可以通过docker rmi &lt;image_id&gt;来同时删除剩下的TAG；若在不同Repo则还是需要手动逐个删除TAG； 还存在由这个镜像启动的container时（即便已经停止），也无法删除镜像； TO-DO 如何查看镜像与容器的依存关系
+** 删除容器 ** docker rm &lt;container_id/contaner_name&gt;
+删除所有停止的容器 docker rm $(docker ps -a -q) ** 删除镜像 ** docker rmi &lt;image_id/image_name ....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-11-05 16:21:25 +0000 UTC'>November 5, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to docker常用管理命令（下）" href="http://xgknight.com/posts/2014/11/docker%E5%B8%B8%E7%94%A8%E7%AE%A1%E7%90%86%E5%91%BD%E4%BB%A4%E4%B8%8B/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>docker如何创建一个运行后台进程的容器并同时提供shell终端
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: Oracle单实例安装环境一键配置脚本（CentOS6 &#43; 11gR2 ） date: 2014-12-02 15:21:25 updated: 2014-12-03 00:46:23 tags: [oracle, centos, shell, installation] categories: Oracle 这是自己曾经写的一个oracle 11gR2在CentOS6 x86_64服务器上，一键配置安装环境的脚本，能快速完成安装前环境的配置。
-具体完成以下工作：
-备份系统配置文件，以防出错 添加oracle用户和用户组 创建安装目录 关闭selinux 在.bash_profile中修改环境变量 修改sysctl.conf文件 修改limits.conf文件 修改PAM的login文件 安装必要的依赖包 使用注意事项：
-root的用户执行，chmod &#43;x oraclePreInstCheck.sh ./oraclePreInstCheck.sh运行后，请仔细阅读说明，再决定是否使用该脚本 该脚本默认参数适用于2核4G内存的环境，你可以根据需要修改kernelset()部分 执行完后，你检查一下你的安装目录及权限（默认/db/oracle） 该脚本会有提示输入的地方，请不要挑战它的健壮性，比如输入安装根目录时，不要带入空格 脚本只需执行一次，修改系统参数如sysctl.conf之前，都有备份成xxx.ora_bak 请确保可以通过yum方式安装软件包（使用挂载DVD镜像或联网） 建议结合tee将执行过程记录在日志文件中，./oraclePreInstCheck.sh | tee oraclePreInstCheck.log oraclePreInstCheck.sh：
-#!/bin/bash # author zhouxiao # date 2014-03-07 # description oracle 11g R2 for linux 6.0&#43; x86_64 安装辅助脚本 #定义常量 SYSCTL=/etc/sysctl.conf LIMITS=/etc/security/limits.conf PAM=/etc/pam.d/login PROFILE=/etc/profile BASH_PROFILE=/home/oracle/.bash_profile #循环变量 i=1 #定义显示颜色 #颜色定义 信息(33黄色) 警示(31红色) 过程(36浅蓝) usage() { echo &#34;Scripts: initialize the required env settings for Oracle 11gR2 installation on Linux 6....</p>
+    <p>只看标题还不是很明显，本文实现docker的这样一种比较常用的功能：通过docker run启动一个容器后，容器中已经运行了一个后台进程（这里以监听80端口的nginx为例），同时进入一个shell终端可供操作，而不受限于只能在前台运行nginx与运行shell终端之间的一种。这个例子实现了，那么其他类似的运行多任务docker就可以以此类推。另外本文还提供了一种在docker容器内部安装软件（vim）的方法，对于定制自己需要的镜像大有帮助。 你可能需要先阅读docker专题(2)：docker常用管理命令（上）、docker专题(2)：docker常用管理命令（下）来理解更多。
+1. 已经pull了官方的nginx 1.7.6的镜像（也可以从私服获取）## # docker images|grep nginx nginx 1.7.6 561ed4952ef0 10 days ago 100 MB 2. 根据官方指示启动这个容器 先做好自己要显示的页面 # echo &#34;&lt;h2 &gt;This is nginx official container running &lt;/h2&gt; &lt;br /&gt; static files:/tmp/doccker/index.html&#34; &gt; /tmp/docker/index.html 使用官方image启动一个容器，名字nginx_dist，把host的目录（包含刚才的html）映射到容器中nginx server的root，绑定80端口：
+# docker run --name nginx_dist -v /tmp/docker:/usr/share/nginx/html:ro \ &gt; -p 80:80 -d nginx:1.7.6 1b10b08d7905517a26c72ce8b17b719aaea5e5eac0889263db8b017427e3c8f7 # docker ps CONTAINER ID IMAGE COMMAND CREATED STATUS PORTS NAMES 1b10b08d7905 nginx:1 nginx -g &#39;daemon off 51 seconds ago Up 48 seconds 443/tcp, 0....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-11-03 20:21:25 +0000 UTC'>November 3, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to docker如何创建一个运行后台进程的容器并同时提供shell终端" href="http://xgknight.com/posts/2014/11/docker%E5%A6%82%E4%BD%95%E5%88%9B%E5%BB%BA%E4%B8%80%E4%B8%AA%E8%BF%90%E8%A1%8C%E5%90%8E%E5%8F%B0%E8%BF%9B%E7%A8%8B%E7%9A%84%E5%AE%B9%E5%99%A8%E5%B9%B6%E5%90%8C%E6%97%B6%E6%8F%90%E4%BE%9Bshell%E7%BB%88%E7%AB%AF/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>记一次错误卸载软件包导致Linux系统崩溃的修复解决过程
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: 配置 Oracle 11gR2 在 CentOS6 上开机自启动 date: 2015-04-11 15:21:25 updated: 2015-04-11 15:21:25 tags: [oracle, linux] categories: Oracle 修改配置 要达到oracle随开机自启动，一般使用11g自带的dbstart脚本：$ORACLE_HOME/bin/dbstart，但要先修改/etc/oratab的内容，将N改成Y，表示允许实例自启动，假如有2个实例要启动，再写一行：
-$ vi /etc/oratab EXCRMPROD:/db/oracle/product/11.2.0/db_1:Y 然后在oracle用户下执行$ORACLE_HOME/bin/dbstart即可启动，日志被记录在$ORACLE_HOME/startup.log。但是，默认情况dbstart和dbshut脚本不能自动启动或关闭监听，所以也要加以修改：
-$ vi /db/oracle/product/11.2.0/db_1/bin/dbstart ## 找到下面的代码(约第80行)，在实际脚本代码的前面 # First argument is used to bring up Oracle Net Listener ORACLE_HOME_LISTNER=$1 ## 将此处的 ORACLE_HOME_LISTNER=$1 修改为 ORACLE_HOME_LISTNER=$ORACLE_HOME if [ ! $ORACLE_HOME_LISTNER ] ; then echo &#34;ORACLE_HOME_LISTNER is not SET, unable to auto-start Oracle Net Listener&#34; echo &#34;Usage: $0 ORACLE_HOME&#34; else LOG=$ORACLE_HOME_LISTNER/listener....</p>
+    <p>首先问题产生的缘由很简单，是我一同事在安装oracle一套软件时，按照要求需要binutils软件包的32位版本，然而在Oracle Linux已经装有64位，按理说是可以安装i686的，我猜应该是32位的版本低于这个已有的64位所以导致冲突而安装失败，因此同事就用yum remove binutils，这个命令也奇葩，由于是root权限导致依赖于它的200多个软件包也被卸载，最终导致网络断开，系统崩溃，在vSphere虚拟机上重新启动发现再也起不来。下面看问题：
+1. Kernel panic - not syncing: Attempted to kill init! 这个错误时在重新启动Oracle Linux一开始就出现，查阅的相关资料得知Kernel panic问题一般是由驱动模块终端处理终端问题导致的（不懂。。。），一开始我以为是驱动程序依赖于binutils导致被卸载，因此第一反应是想办法把缺失的软件装回去。实际上，是由于安全访问控制模块selinux的问题，参考类似问题。于是检查vi /etc/selinux/config时发现SELINUX=disables，拼写错误，应为disabled。 当再次启动没再出现该错误时，我高兴的认为原来这么简单就帮同事解决了，事实这根本还没到200多个软件包缺失而导致系统崩溃那一步。
+2. 系统启动加载条完成后，一直hang住不动 这无疑要使用LiveCD修复系统了，参考Ultimate method to install package from linux rescue mode或Using Rescue Mode to Fix..Problems。因为知道出问题前做过什么操作，下面直接上解决问题的过程。
+2.1 将系统DVD安装镜像加载到光驱 再次重启就自动进入安装界面，我们当然选择rescue mode： 一路按照提示确定（可以不配置network，这里就不贴图了，很简单），最终会提供给用户一个shell终端，对应的是从DVD光驱加载进来的系统，执行chroot /mnt/sysimage才会进入到原损坏的Linux系统，还好yum和rpm命令还可以使用，悲剧的是我并不知道yum remove命令卸载了哪些软件包。
+2.2 安装缺失的软件包 这里得谢天谢地yum命令的安装卸载日志/var/log/yum.log，这个日志里清楚的记录了installed和erased的所有软件包，用rpm是不可能了，因为270多个包的依赖关系难以解决，只能通过yum方式，而由于rescue模式没有配置网络，因此只能使用本地镜像源。
+在rescue系统下挂载光驱到待修复系统中的/media目录 bash-4.1# mount /dev/cdrom /mnt/sysimage/media chroot进入待修复系统 bash-4.1# chroot /mnt/sysimage 手动编辑一个仓库源（真实待修复的系统） sh-4.1# cd /etc/yum.repos.d/ &amp;&amp; vi Oracle-Media.repo [DVD-media] name=oracle-$releasever - Media baseurl=file:///media gpgcheck=0 enabled=1 建议只留Oracle-Media.repo文件，其他的.repo文件都mv成.bak，以防连接不了这些源而报错，虽然报错关系不大。 获取被依赖erased掉的软件列表
+你可以将yum.log中多余的部分去掉，筛选出应该重新安装的packages： sh-4....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-11-03 01:21:25 +0000 UTC'>November 3, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 记一次错误卸载软件包导致Linux系统崩溃的修复解决过程" href="http://xgknight.com/posts/2014/11/%E8%AE%B0%E4%B8%80%E6%AC%A1%E9%94%99%E8%AF%AF%E5%8D%B8%E8%BD%BD%E8%BD%AF%E4%BB%B6%E5%8C%85%E5%AF%BC%E8%87%B4linux%E7%B3%BB%E7%BB%9F%E5%B4%A9%E6%BA%83%E7%9A%84%E4%BF%AE%E5%A4%8D%E8%A7%A3%E5%86%B3%E8%BF%87%E7%A8%8B/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>docker常用管理命令（上）
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: 仿豆丁网文件在线浏览解决方案搭建 date: 2015-05-13 01:21:25 updated: 2015-05-13 00:46:23 tags: linux categories: Linux 在公司OA和CRM系统遇到要实现在线查看word/jpg等文件的功能，按照开发小组的要求搭建了一套解决方案：OpenOffice &#43; JodConvertor &#43; SWFTool&#43; FlexPaper，其中OpenOffice &#43; JodConvertor用于将文档转化为PDF格式文档，SwfTool用于将PDF转化为SWF文档，FlexPaper用于展示。使用这个解决方案的最大好处就是跨平台且较为简单。
-1.1 安装openoffice openoffice需要jdk的支持，而且默认已经安装，如果没有，手动下载Apache_OpenOffice_4.0.1_Linux_x86-64_install-rpm_zh-CN.tar.gz到/usr/local/src（CentOS 6.4 x86_64）：
-# tar -zxf Apache_OpenOffice_4.0.1_Linux_x86-64_install-rpm_zh-CN.tar.gz # cd zh-CN/RPMS # rpm –ivh *.rpm 拷贝字体 安装完成后把windows（c:\windows\fonts）下的一些常用字体拷贝到 /opt/openoffice4/share/fonts/truetype 目录下，如Arial, Calibri, Courier New, Consolas等，如果你想正确的保留原doc的中文字体，还需要把 黑体、微软雅黑、宋体 常规、新宋体 常规、幼圆、隶书、楷体 等中文字体拷贝进去（重启进程后生效）。
-启动后台进程 切换至普通用户，如wxcrm启动转换进程：
-$ /opt/openoffice4/program/soffice -headless -accept=&#34;socket,host=127.0.0.1,port=8100;urp;&#34; -nofirststartwizard &amp; # ps –ef | grep soffice 1.2 解压jodconverter JODConverter是一个java的OpenDucument文件转换器，可以进行许多文件格式的转换工具，它利用OpenOffice来进行转换工作，它能完成以下转换：
-Microsoft Office格式转换为OpenDucument，以及OpenDucument转换为Microsoft Office OpenDucument转换为PDF，Word、Excel、PowerPoint转换为PDF，RTF转换为PDF等。 从 http://sourceforge....</p>
+    <p>本文只记录docker命令在大部分情境下的使用，如果想了解每一个选项的细节，请参考官方文档，这里只作为自己以后的备忘记录下来。
+根据自己的理解，总的来说分为以下几种： 容器生命周期管理 — docker [run|start|stop|restart|kill|rm|pause|unpause] 容器操作运维 — docker [ps|inspect|top|attach|events|logs|wait|export|port] 容器rootfs命令 — docker [commit|cp|diff] 镜像仓库 — docker [login|pull|push|search] 本地镜像管理 — docker [images|rmi|tag|build|history|save|import] 其他命令 — docker [info|version]
+看一个变迁图 1. 列出机器上的镜像（images） # docker images REPOSITORY TAG IMAGE ID CREATED VIRTUAL SIZE ubuntu 14.10 2185fd50e2ca 13 days ago 236.9 MB … 其中我们可以根据REPOSITORY来判断这个镜像是来自哪个服务器，如果没有 / 则表示官方镜像，类似于username/repos_name表示Github的个人公共库，类似于regsistory.example.com:5000/repos_name则表示的是私服。 IMAGE ID列其实是缩写，要显示完整则带上--no-trunc选项
+2. 在docker index中搜索image（search） Usage: docker search TERM # docker search seanlo NAME DESCRIPTION STARS OFFICIAL AUTOMATED seanloook/centos6 sean&#39;s docker repos 0 搜索的范围是官方镜像和所有个人公共镜像。NAME列的 / 后面是仓库的名字。...</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-10-31 20:21:25 +0000 UTC'>October 31, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to docker常用管理命令（上）" href="http://xgknight.com/posts/2014/10/docker%E5%B8%B8%E7%94%A8%E7%AE%A1%E7%90%86%E5%91%BD%E4%BB%A4%E4%B8%8A/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>管理多tomcat服务shell脚本（CentOS）
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: 怎么用pfSense为你的web服务做负载均衡（翻译） date: 2015-04-24 15:21:25 updated: 2015-04-25 00:46:23 tags: [pfsense,vmware] categories: Linux 本文翻译自Howtoforge上的一篇文章 How To Use pfSense To Load Balance Your Web Servers。注意pfSense的负载均衡有两种：一是设置多个WAN做双线负载均衡，二是本文的为LAN内的web服务器做inbound-loadbalancer。
-这篇howto中展示了怎么使用pfSense 2.0 为你的多个web服务器配置负载均衡（load balancer）。这里假定在你的网络环境中已经拥有了一个pfSense服务器和2个以上的apache服务器，并且具有一定的pfSense知识。（参考图解pfSense软路由系统的使用（NAT功能）
-1. 前提 一个安装好的pfSense 2.0 机器（如果它是你的外围防火墙，建议安装在物理机上） 至少2个apache服务器（可以是虚拟机） 确保在apache服务器之间代码文件是同步的（rsync、cororsync或其它可以保持web服务器间文件更新） 2. 配置pfSense pfSense可以使用负载均衡的功能让特定的请求压力由多台服务器分担，这对于有多台应用的服务器很有帮助，因为你可以把负载压力分散到其它节点上而不是死磕一个节点。
-2.1 Monitor 我们正式开始。首先点击Services -&gt; Load Balancers，然后选择Monitor标签。
-点击右边的&#43;加号来添加一条记录，输入monitor的名字Name和描述Description（在这个示例名字和描述我都使用ApacheClusterMon），把类型Type设置成HTTP，主机地址Host设置一个还未使用的IP（后面我们将在这个IP上建立虚拟IP，这个虚拟IP会被分配到故障转移failover节点上，注：也有文章说把它设成WAN IP），HTTP Code保存默认的200 OK，然后点击Save保存并且使修改生效Apply Changes。 2.2 Pool 接着建立服务器池server pool。点击Pools标签的&#43;按钮来添加一个池。
-在该示例我指定ApacheSrvPool为服务池名称，设置Mode为Load Balance，端口80（。这个端口时你后端服务器的监听端口，你当然可以设定其它应用的其它端口，不一定非是web）。为这个池设定上一步创建的ApacheClusterMon，依次将你的所有web服务器IP添加到这个池中Add to pool，保存并应用。 2.3 Virtual Server 最后一步，选择Virtual Servers标签页，点击&#43;来添加一条记录。填写名称ApacheClusterVirtualServer、描述和IP地址，这个IP地址与第1步中说的未使用的IP相同，端口80，所有发送到这个WAN IP:port的连接都会被转发到服务器池中。虚拟服务器池Virtual Server Poll选择上一步创建的。提交并应用。 搞定！最后不要忘记为虚拟服务器IP和池添加防火墙规则。</p>
+    <p>该脚本改自csdn上的一个shell，忘记出处了，只记得它能够简单的通过service tomcat [stop|start|restart]来方便的管理Linux服务器上的tomcat，这可以满足大部分人的需求，然而并不适合我所管理的CentOS上的tomcat应用：通过端口区分的3台tomcat集群。如果每一次管理tomcat或查看日志，都cd /apps/test/tomcat0/log/然后切换到另外一个cd ../../或cd /apps/test/tomcat1/log/，麻烦至极。因此“懒人”创造了这个脚本tomcat：
+#!/bin/bash # author: Sean Chow (seanlook7@gmail.com) # # # chkconfig: 345 80 15 # description: Multiple tomcats service management script. # Source function library. . /etc/rc.d/init.d/functions # 第几个tomcat tcNo=$1 tcName=tomcat$1 basedir=/apps/test/$tcName tclog=${basedir}/logs/catalina.$(date &#43;%Y-%m-%d).out RETVAL=0 start(){ checkrun if [ $RETVAL -eq 0 ]; then echo &#34;-- Starting tomcat...&#34; $basedir/bin/startup.sh touch /var/lock/subsys/${tcNo} checklog status else echo &#34;-- tomcat already running&#34; fi } # 停止某一台tomcat，如果是重启则带re参数，表示不查看日志，等待启动时再提示查看 stop(){ checkrun if [ $RETVAL -eq 1 ]; then echo &#34;-- Shutting down tomcat....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-10-29 18:21:25 +0000 UTC'>October 29, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 管理多tomcat服务shell脚本（CentOS）" href="http://xgknight.com/posts/2014/10/%E7%AE%A1%E7%90%86%E5%A4%9Atomcat%E6%9C%8D%E5%8A%A1shell%E8%84%9A%E6%9C%ACcentos/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>apache&#43;3tomcat&#43;jk&#43;memcached集群环境搭建
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: 图解pfSense软路由系统的使用（NAT功能） date: 2015-04-23 15:21:25 updated: 2015-04-24 00:46:23 tags: [pfsense,vmware] categories: Linux pfsense是一款开源的路由和防火墙产品，它基于freebsd系统定制和开发。pfsene拥有友好的web的配置界面，且具有伸缩性强又不失强大性能，在众多开源网络防火墙中属于佼佼者。
-2004年，pfsense作为m0n0wall项目（基于freebsd内核的嵌入式软防火墙）的分支项目启动，增加了许多m0n0wall没有的功能(pfSense的官方网站称它为the better m0n0wall).pfSense除了包含宽带路由器的基本功能外,还有以下的特点:
-基于稳定可靠的FreeBSD操作系统,能适应全天候运行的要求 具有用户认证功能,使用Web网页的认证方式,配合RADIUS可以实现记费功能 完善的防火墙、流量控制和数据包功能,保证了网络的安全,稳定和高速运行 支持多条WAN线路和负载均衡功能,可大幅度提高网络出口带宽,在带宽拥塞时自动分配负载 内置了IPsec 和PPTP VPN功能,实现不同分支机构的远程互联或远程用户安全地访问内部网 支持802.1Q VLAN标准,可以通过软件模拟的方式使得普通网卡能识别802.1Q的标记,同时为多个VLAN的用户提供服务 支持使用额外的软件包来扩展pfSense功能,为用户提供更多的功能(如FTP和透明代理). 详细的日志功能,方便用户对网络出现的事件分析,统计和处理 使用Web管理界面进行配置(支持SSL),支持远程管理和软件版本自动在线升级 本文简单介绍pfSense的安装及配置过程，完成一个基本的路由器该有的功能，如访问局外网、设置防火墙规则、配置端口映射。这里演示在ESXi虚拟服务器上，解决IP不足的问题。
-创建虚拟机 首先去 https://www.pfsense.org/download/ 下载稳定版本的pfSense，如pfSense-LiveCD-2.2.2-RELEASE-amd64.iso.gz（网上看到有人提到这个版本不稳定，我在使用中偶尔也发现突然很慢，建议2.1.5）。在vSphere上创建虚拟机的过程省略，取名01_pfSense，创建虚拟机操作系统时选择“其他 -&gt; FreeBSD 64位”，单CPU,512Mb内存，4G硬盘。将下载的系统解压成iso后挂载到CD/DVD，并“打开电源时连接”。 下图是网卡情况： 为pfSense分配两个网卡，分别是可以连接公司内网的172.29.88.1/24网段的vSphere_Admin端口组，和IP范围是172.30.31.1/24的内部局域网端口组VM Local。 记录下Mac地址 外网接口：00:0c:29:36:b6:c2 内网接口：00:0c:29:36:b6:cc
-安装pfsense 启动电源后出现欢迎界面，选择1.Boot pfSense [default]，或等待几秒钟自动选择，进入如下界面： 输入I，回车，然后是一个蓝屏，开始安装。
-也可以什么都不用管，系统会一直启动从CD启动得到一个完整的pfSense系统，因为没有安装所以在屏幕下方会有一个选项99） Install pfSense to a hard drive, etc.，输入99同样会进入下面的安装操作系统的过程。 一路保存默认：&lt; Accept these Settings &gt; → &lt; Quick/Easy InStall &gt; → erase all content &lt; OK &gt; → &lt; Standard Kernel &gt; → &lt; Reboot &gt;。...</p>
+    <p>注意本文不讨论原理，只讲述具体的搭建过程，而且步骤都经过了整理，否则过程可能会出现其他异常，请自行google。apache与tomcat整合的方式除了jk之外，使用apache自带的mod_ajp_proxy模块也可以很方便的完成。 先来看一下架构图： 属于正式环境中原session复制方案的改进。
+1. 所需软件包 jrrt-3.1.2-1.6.0-linux-x64.bin（或jdk1.6.0_33） jvm httpd-2.2.26.tar.gz web服务器，处理静态资源 apache-tomcat-6.0.32.tar.gz 应用服务器，Servlet容器处理动态请求 tomcat-connectors-1.2.30-src.tar.gz apache与tomcat整合插件mod_jk.so tomcat-native.tar.gz APR加速tomcat，提高线程并发能力。使用tomcat自带版本。 memcached-session-manager 使用msm解决多tomcat集群时session同步问题所需jar包 asm-3.2.jar, couchbase-client-1.2.2.jar, kryo-1.04.jar, kryo-serializers-0.11.jar msm-kryo-serializer-1.6.5.jar memcached-session-manager-1.6.5.jar memcached-session-manager-tc6-1.6.5.jar minlog-1.2.jar, reflectasm-1.01.jar spymemcached-2.10.2.jar 2. 安装过程 2.1 JDK 下载将JRockit二进制安装文件，赋予可执行权限
+# pwd /apps/test/java # chmod o&#43;x jrrt*.bin # ./jrrt-3.1.2-1.6.0-linux-x64.bin 可不必为整个linux环境设置JAVA_HOME=&#34;/apps/test/java/jrrt-3.1.2-1.6.0&#34;，在tomcat中指定即可。
+2.2 编译安装apache 因为tomcat-native依赖于apr，所以这里先直接从 httpd-2.2.26/srclib 目录下安装apache自带的apr和apr-util。
+[root@cachets httpd-2.2.26]# pwd /apps/test/soft_src/httpd-2.2.26 [root@test httpd-2.2.26]# cd srclib/apr [root@test apr]# ./configure --prefix=/usr/local/apr [root@test apr]# make &amp;&amp; make install [root@test apr]# cd ../apr-util/ [root@test apr-util]# ....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-10-29 10:21:25 +0000 UTC'>October 29, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to apache&#43;3tomcat&#43;jk&#43;memcached集群环境搭建" href="http://xgknight.com/posts/2014/10/apache-3tomcat-jk-memcached%E9%9B%86%E7%BE%A4%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>误删vSphere虚拟机.vmdk文件的恢复
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD date: 2015-03-02 01:21:25 updated: 2015-03-02 00:46:23 tags: [linux, 软件包,troubleshooting] categories: Linux 问题 在 CentOS 6.4 x86_64 上无论通过yum或rpm安装软件时，出现以下错误：
-yum install glibc-devel ... error: rpmts_HdrFromFdno: Header V3 RSA/SHA1 Signature, key ID c105b9de: BAD ... Problem opening package *.el6.x86_64.rpm 分析 rpm -ivh单独去安装软件也提示上面的错误。rpm -qa 无法列出系统中安装过的软件包，但许多库文件和软件命令是存在的。也尝试过rpm --rebuilddb来重建数据库，但情况依然没有得到改善（centos官网说千万不要在系统broken的情况下rebuilddb，不然有可能变成destroy）
-由上面的推断可知问题出现在rpm这个软件包管理工具本身，但此时又无法通过rpm来重新安装自己，所以只能找到具体是什么因素导致的。好在官网的这篇较新的文章正好就是解决该BUG：WARNING: nss-softokn-3.14.3-19.el6_6 updates may be broken ：
-大致是说当你使用yum update去更新你的系统时，nss-softokn、nss-softokn-freebl和其它软件一起都得到更新，所以不会有问题。但如果单独去更新某一个软件，如yum update nss-softokn或yum install &lt;software&gt;引起它的依赖包也升级，使得nss-softokn和nss-softokn-freebl版本不匹配，就会导致 rpm/yum 全面停止工作，表现就是上面的key .. BAD。
-解决 解决起来也很方便，首先你可以通过cat /var/log/messages|grep nss看到nss-softokn-freebl的版本：
-# cat /var/log/messages|grep nss-softokn Mar 2 09:56:18 poprod yum[14920]: Updated: nss-softokn-3....</p>
+    <p>1. 错误描述 在vSphere上，一次重启虚拟服务器时出现启动不了，提示找不到vmdk虚拟磁盘文件： 2. 原因分析 查看这台虚拟服务器的摘要信息，对比datastore上其他可用的虚拟机，发现损坏的服务器上确实缺少一个vmdk磁盘文件，但是可以看见一个50G的xxx-flat.vmdk文件；而正常的服务器只有xxx.vmdk，没有xxx-flat.vmdk，关机之后两个文件都存在，而且真实的磁盘容量从vmdk转移到了xxx-flat.vmdk。 虚拟主机在运行的时候，实际在使用的是xxx-flat.vmdk，然而xxx.vmdk是可以同时被删除的，才导致了问题。
+这里需要说明，虚拟机的每个磁盘驱动器都包含了一对.vmdk文件。一个是文本文件，包含了关于虚拟硬盘的描述数据；另外一个是磁盘的实际内容。例如，一个名为examplevm的虚拟机连接有一个硬盘。这个磁盘由如下两个文件构成：一个小于 1KB 的examplevm.vmdk描述文件和一个10GB大小的examplevm- flat.vmdk平面（数据）文件，该文件包含虚拟机的实际数据，而这些数据又是以二进制的形式存放在物理磁盘上，examplevm.vmdk描述文件就是描述这种映射关系的。 另外：
+A note for ESX-users: Do not use Datastorebrowser to identify vmdks or download them for editiing. The Datastorebrowser does not display vmdks correctly. It usually hides *-flat.vmdks and *-delta.vmdks.
+TO-DO: 后续为 VMware ESXi 5 的磁盘专门记录一篇文章，说明“置备空间”以及vmfstools工具的使用。
+3. 解决办法 (1) 用ssh登录vsphere主机，查找xxx-flat.vmdk文件所在的位置以及目录，并记录文件的大小
+~ # find / -name &#34;新建虚拟机-flat.vmdk&#34; /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat.vmdk ~ # ls -l /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat.vmdk -rw------- 1 root root 53687091200 Apr 16 09:13 /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-10-28 15:21:25 +0000 UTC'>October 28, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 误删vSphere虚拟机.vmdk文件的恢复" href="http://xgknight.com/posts/2014/10/%E8%AF%AF%E5%88%A0vsphere%E8%99%9A%E6%8B%9F%E6%9C%BA.vmdk%E6%96%87%E4%BB%B6%E7%9A%84%E6%81%A2%E5%A4%8D/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>在 CentOS 6.x上安装 docker.io成功
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: Linux下同步工具inotify&#43;rsync使用详解 date: 2014-12-12 01:21:25 updated: 2015-05-05 12:46:23 tags: [rsync,inotify,backup，文件同步] categories: Linux 1. rsync 1.1 什么是rsync rsync是一个远程数据同步工具，可通过LAN/WAN快速同步多台主机间的文件。它使用所谓的“Rsync演算法”来使本地和远程两个主机之间的文件达到同步，这个算法只传送两个文件的不同部分，而不是每次都整份传送，因此速度相当快。所以通常可以作为备份工具来使用。
-运行Rsync server的机器也叫backup server，一个Rsync server可同时备份多个client的数据；也可以多个Rsync server备份一个client的数据。Rsync可以搭配ssh甚至使用daemon模式。Rsync server会打开一个873的服务通道(port)，等待对方rsync连接。连接时，Rsync server会检查口令是否相符，若通过口令查核，则可以开始进行文件传输。第一次连通完成时，会把整份文件传输一次，下一次就只传送二个文件之间不同的部份。
-基本特点：
-可以镜像保存整个目录树和文件系统； 可以很容易做到保持原来文件的权限、时间、软硬链接等； 无须特殊权限即可安装； 优化的流程，文件传输效率高； 可以使用rcp、ssh等方式来传输文件，当然也可以通过直接的socket连接； 支持匿名传输。 命令语法： rsync的命令格式可以为以下六种： rsync [OPTION]… SRC DEST rsync [OPTION]… SRC [USER@]HOST:DEST rsync [OPTION]… [USER@]HOST:SRC DEST rsync [OPTION]… [USER@]HOST::SRC DEST rsync [OPTION]… SRC [USER@]HOST::DEST rsync [OPTION]… rsync://[USER@]HOST[:PORT]/SRC [DEST]
-对应于以上六种命令格式，我们可以总结rsync有2种不同的工作模式：
-shell模式：使用远程shell程序（如ssh或rsh）进行连接。当源路径或目的路径的主机名后面包含一个冒号分隔符时使用这种模式，rsync安装完成后就可以直接使用了，无所谓启动。（目前没有尝试过这个方法） daemon模式：使用TCP直接连接rsync daemon。当源路径或目的路径的主机名后面包含两个冒号，或使用rsync://URL时使用这种模式，无需远程shell，但必须在一台机器上启动rsync daemon，默认端口873，这里可以通过rsync --daemon使用独立进程的方式，或者通过xinetd超级进程来管理rsync后台进程。 当rsync作为daemon运行时，它需要一个用户身份。如果你希望启用chroot，则必须以root的身份来运行daemon，监听端口，或设定文件属主；如果不启用chroot，也可以不使用root用户来运行daemon，但该用户必须对相应的模块拥有读写数据、日志和lock file的权限。当rsync以daemon模式运行时，它还需要一个配置文件——rsyncd.conf。修改这个配置后不必重启rsync daemon，因为每一次的client连接都会去重新读取该文件。
-我们一般把DEST远程服务器端成为rsync Server，运行rsync命令的一端SRC称为Client。
-安装： rsync在CentOS6上默认已经安装，如果没有则可以使用yum install rsync -y，服务端和客户端是同一个安装包。...</p>
+    <p>docker是什么就不多说了，见docker基础原理介绍。 docker容器最早受到RHEL完善的支持是从最近的CentOS 7.0开始的，官方说明是只能运行于64位架构平台，内核版本为2.6.32-431及以上（即&gt;=CentOS 6.5，运行docker时实际提示3.8.0及以上），升级内核请参考CentOS 6.x 内核升级（2.6.32 -&gt; 3.10.58）过程记录 需要注意的是CentOS 6.5与7.0的安装是有一点点不同的，CentOS-6上docker的安装包叫docker-io，并且来源于Fedora epel库，这个仓库维护了大量的没有包含在发行版中的软件，所以先要安装EPEL，而CentOS-7的docker直接包含在官方镜像源的Extras仓库（CentOS-Base.repo下的[extras]节enable=1启用）。前提是都需要联网，具体安装过程如下。 ###1. 禁用selinux###
+# getenforce enforcing # setenforce 0 permissive # vi /etc/selinux/config SELINUX=disabled ... ###2. 安装 Fedora EPEL### epel-release-6-8.noarch.rpm包在发行版的介质里面已经自带了，可以从rpm安装。
+# yum install epel-release-6-8.noarch.rpm //或 yum -y install http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm 如果出现GPG key retrieval failed: [Errno 14] Could not open/read file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-6问题，请在线安装epel，下载RPM-GPG-KEY-EPEL-6文件。 这一步执行之后，会在/etc/yum.repos.d/下生成epel.repo、epel-testing.repo两个文件，用于从Fedora官网下载rpm包。 ###3. 检查内核版本###
+# uname -r 2.6.32-431.el6.x86_64 # cat /etc/redhat-release CentOS release 6.5 (Final) 看到这个最低的内核版本，事实运行起来是没太大问题的，你也可以升级到3.10.x版本。 另外你也可以运行脚本check-config.sh，来检查内核模块符不符合（下面有些missing的，我的docker还是可以正常启动）：
+[root@sean ~]# ./check-config warning: /proc/config.gz does not exist, searching other paths for kernel config....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-10-26 19:45:25 +0000 UTC'>October 26, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 在 CentOS 6.x上安装 docker.io成功" href="http://xgknight.com/posts/2014/10/%E5%9C%A8-centos-6.x%E4%B8%8A%E5%AE%89%E8%A3%85-docker.io%E6%88%90%E5%8A%9F/"></a>
 </article>
 <footer class="page-footer">
   <nav class="pagination">

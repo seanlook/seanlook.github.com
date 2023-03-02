@@ -143,150 +143,107 @@
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>markdown语法备忘笔记
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: Linux下rar及zip压缩包中批量替换某文件脚本 date: 2015-01-29 18:21:25 updated: 2015-01-30 11:46:23 tags: [script, shell] categories: Linux 本需求是自己负责的一个生产系统上，有大量以zip和rar结尾的压缩文件散落在文件系统的各个文件夹，先在需要把压缩包里包含某一个特定文件（如tftpd32.exe或Tftpd32.exe，版本较旧），全都替换成比较新的tftpd32.exe版本。压缩文件总数约5000个，需要替换的数量约1500个。
-因为是生产环境，不敢轻易乱动，所以脚本考虑的因素就非常多，不允许中间执行过程出现异常，所以找到文件后实际执行替换操作之前做好备份，并且将操作过程记录日志。
-以下几点需要考虑：
-分别处理zip和rar文件，为减低脚本的复杂程度，分作两个shell脚本。 rar在Linux下默认是没有安装解压缩工具，下载rarlinux-x64-5.2.0.tar.gz zip包中文件含有中文文件名，unzip测试解压缩或列出内容时出现文件名乱码，原因是zip在压缩时不记录当时的编码格式。这个问题非常棘手，乱码打进压缩包是绝对不允许的，网上有几种解压办法有几种办法都不能很好的应对我的场景：并不需要实际解压zip文件，而只需使用 l ——列出文件列表、获取目录及文件名，d ——从压缩包中直接删除某个文件，a ——向压缩包添加一个文件。实际解压到文件系统上是不是乱码我们并不关心。 最后的解决办法是使用p7zip工具，配合LANG变量解决。 向压缩包里添加新文件时，要保持里面的目录结构，则必须在文件系统上存在同样的 相对目录/文件 。所以每次都要在脚本执行目录下创建临时目录tmp_dir，还要及时删除。但如果文件在压缩包的根目录下，这个临时目录就是当前脚本执行目录。 有可能会存在一个压缩包中多个文件夹中包含不止一个tftpd32.exe文件。 每个文件都有一个CRC值，处理文件名大小写不同但实质是同一个文件时有效。 以下脚本使用说明：
-变量说明 filelist 变量设定你所需要检查的压缩文件列表（绝对路径），可以通过find /your/dir/ -name *.rar | sort | uniq &gt; testfile。与脚本在相同目录下，并且为unix格式 existlist 变量是从filelist文件中得到的包含特定文件的列表，脚本执行完后可以查看 errorlist 变量是从filelist文件列表中得到的不包含特定文件的列表，当然也有可能这个压缩文件本身不完整 filebak 变量指定要替换的那个压缩文件备份的目录 oldfile 指定要替换的那个文件名 newfile 指定新文件的文件名，注意这个文件一定要在脚本当前目录下 binrar,bin7z 指定解压缩命令目录，因为7z和rar都不是CentOS自带的 fl 是filelist文件列表里的每一条记录 exist 压缩文件fl的内容列表里包含tftpd32.exe的记录，可能有多行 dirfiles 处理exist的结果，形如压缩包里的目录结构 your/dir/tftpd32.exe，可能有多行 df 是dirfiles中的单行记录，它的前面目录部分便是tmp_dir 是否有必要root用户执行看个人情况，执行后部分文件的属主可能会变，可用chown user1.user1 -R /your/dir/恢复 有部分zip文件无法使用7z，但文件本身正常，从日志可以看到error信息 tftpd32.exe区分大小写，如果要查找替换Tftpd32.exe请修改后在执行（确保grep没有-i选项） 可以处理的情况 压缩文件中无tftpd32....</p>
+    <p>##1. 什么是markdown##
+##2. 我选择的markdown编辑器## 首先选择适合自己的markdown编辑器需要考虑几个方面： 平台：Mac OS X, Windows, Online, 插件形式 预览：实时预览、html预览 语法：选定某一款后，适应自己的习惯，不必太复杂 其它：如主题，快捷键，同步等
+###首先来说一下以下几款为什么我没选用：（纯属个人喜好）###
+Sublime Text的插件markdown preview，编辑和预览是分离的，在浏览器里预览。 CuteMarkEd，独立编辑器，支持多平台，不知道为什么我的编辑和预览窗口字体都那么丑。 MarkdownPad，独立编辑器，windows下口碑比较好的，但我把曾经写好的md文章放进去，格式不太对，应该是语法上略有差别，其它都还好。它多标签页的形式可以加分。 社区活跃，新功能反馈及时，例如 toc replace vim或emacs的markdown插件，windows平台下我还是正常一点吧。 ###习惯采用的编辑器### Haroopad，不得不说韩国人开发的软件体验上超赞，与segmentfault的文章写作一样，左右实时预览，多种主题可选。如果能实现多标签页就更好了。各平台上都可以使用，还有vim编辑模式。 马克飞象，google浏览器插件，专为印象笔记开发的浏览器markdown扩展，用起来特别舒服，自动保存在本地缓存，没有导出html格式或浏览器在线预览的功能，但比MaDe好用多了。（现在有离线客户端版） 在线markdown编辑器（首先你得有网络） [github]：不用多说 MaHua：与Mac OS X上相传甚广的Mou风格类似 cmd markdown：大牛开发的 ##3. 常用markdown语法## 标题/粗斜体 文章内容较多时，可以用标题分段：
+# 一级标题 # ## 大标题 ## ### 小标题 ### sf只有三级标题
+粗体/斜体 *斜体文本*　或　_斜体文本_　显示成　斜体文本 **粗体文本**　或　__粗体文本__　显示成　粗体文本 ***粗斜体文本***　或　___粗斜体文本___　显示成　粗斜体文本
+代码段 行内代码：`code here`　显示成　code here 代码段落： （可为某种语言指定高亮效果如 ` ` `python，支持bash、javascript、java、sql、xml、html等，有的markdown不支持指定语言） ` ` ` $(document)....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-10-25 01:21:25 +0000 UTC'>October 25, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to markdown语法备忘笔记" href="http://xgknight.com/posts/2014/10/markdown%E8%AF%AD%E6%B3%95%E5%A4%87%E5%BF%98%E7%AC%94%E8%AE%B0/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>CentOS 6.x 内核升级（2.6.32 -&gt; 3.10.58）过程记录
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: 习惯晚睡 date: 2015-03-14 15:21:25 updated: 2015-03-15 16:46:23 tags: feelings categories: Feel 很久没有像今天这样坐下来写东西了，也不知道抽的什么风，大上午背着电脑跑到南山图书馆来了，可能是实在想不到大好的周末能做些什么吧。其实也倒不是心血来潮，过年回到深圳以后，很长一段时间都在思考过去，规划以后的方向，零零碎碎的记录了一些，但至今未能成文。但今天不是讲规划，而是——习惯，晚睡的习惯。
-作为刚24的满血青年，很多人可能会反驳晚一点睡算什么，此时不任性何时才任性。我倒不是说晚睡不行，问题是我因何而晚睡。最近一直在看池建强老师的《MacTalk-人生元编程》这本书，无论Apple的联合创始人沃茨，还是微软的艾伦，在初期哪一个不是没日没夜的工作。当然咱无法与这些传奇人物比拟，但至少说明熬夜，要值得，如果我是在熬夜积累自己，或能对改善以后的状况，我就觉得值得。
-可是现在我们大多数人熬夜在干嘛呢，包括我也有反思自己。
-这里先说说我的熬夜习惯从何而来吧。大学时候有电脑开始。那时候除了学业，还有部分学生工作，再有就是qq，往往深夜凌晨一两点还在挂着电脑qq，还记得太晚不睡免得有同学说，特意到了1点左右调成隐身，一边看电影，还一边刷微博。当时有个玩的较好的室友，他的原则是过点（0点）必睡，我还曾与他争论过“到点睡觉，规规矩矩”“大学时不疯狂一下没多大意义”，可是现在我回头想来我也并没有因为比他多熬几个夜而记起怎样怎样刻骨铭心的记忆。现在想来更难以理解的是，我大三大四好像竟然是因为学习任务而熬夜加班加点，甚至考研的时间里依旧毫无规律，噢不，有规律的熬夜，而且愈发厉害熬到3点。这样都能考上的话我就不用坐在这里一边埋怨一边writing了。当然还有部分属于我个人的故事……
-也就是这样习惯，毕业后延续到现在，不过较好的一点是没那么严重，平日晚一点到1点，因为考虑到第二天还要上班这样一个事实，一到周末，又毅然决然的熬到凌晨三四点，而大部分情况是在看电影电视，似乎周五的晚上是从11点开始，周六的白天从下午一点开始……
-写到这里，我倒不是谴责自己晚睡这样一个习惯，因为我相信肯定还是有很大一部分人跟我一样有着凌晨一点才睡的习惯，目前跟我一起合租的同事就是两个活生生的例子，更不是告诉自己“熬夜对身体有害”这样一个众所周知的烂道理。有些人熬夜是迫不得已，而我是因为三四年时间形成的习惯。我依然坚持大学里我对室友说的那个观点（前提是我是男的，身体也没什么旧疾），熬夜疯一下可以，问题是干什么。有多少人可以熬夜而不用考虑明天。
-最近上班没什么特别的工作，拿出不少时间去简书上看看文章，或搜到某个人博客，就闲来无事的点开Archive列表，随机点开看看。看到人家几年来做的点点滴滴，同龄人群里，我却丝毫想不起那时候我在做什么，依旧是同龄人我现在正在学的东西，人家两三年前就在用了。这也不难解释我现在的处境了。不止一次有过努力追赶别人的想法，可是晚上一回到家，不是迷上电视就是电脑手机。回家前我计划要做的事情实施了吗？这样是会有一点点累，可我24岁的年龄过着如此安逸的生活，这不是我应得的。来自家里的压力，我应该是努力在工作技能上积累，在生活情商上积累，而我没那么多时间，慢慢来…
-一个人的努力是孤独的，也是幸运的。毫无理由的晚睡，第二天迷迷糊糊起床，这不是我想要的状态。想要有所作为，可能就因为一个不经意的习惯而磨损了自己的动力。
-我想象这样一个场景：
-早上提前30分钟（七点）起来，轻轻松松的洗漱，打扮，然后从容的吃个早饭，车上看看知乎。
-上班时间，没事少刷朋友圈，早中晚看几次就行了。中午看看新闻，午休一觉，快速进入工作状态，不能再迷糊半个小时（这也成习惯了吧）。
-下午三四点上班累了，走动走动，聊聊天，打打水。眼睛酸了，滴滴眼药水（买了别浪费）
-晚上下班车上，听听歌。早的话，跟室友一起买买菜做做饭。
-10点以后是自己的时间，我可以舒舒服服的洗个澡，不开电脑，然后看一个半小时的书，或者看看新闻和喜欢的节目，再或者利用好Mac学点东西，写点东西。
-周末，九点钟起来。偶尔聚聚，逛逛，但至少拿出一天时间去图书馆，家里真不适合学习、阅读和写作。拿一个晚上去打打球，看看电影什么的。
-有人会说，不就是晚睡而已吗，至于这样吗，功利性太强了！
-就我目前各方面不稳定因素来说，我觉得有必要这样一个list。把平时和睡前那些零碎时间利用起来，安安静静的坚持多看几书，不再拘泥于自己知道的小圈子，才会发现更多机会。
-——闹钟真是一个伟大的发明，它让你放心的入睡，也无情的把你叫醒，为了减轻你的埋怨还允许你贪睡。</p>
-  </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
-</article>
-
-<article class="post-entry"> 
-  <header class="entry-header">
-    <h2>
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>title: tar命令高级用法——备份数据 date: 2014-12-08 01:21:25 updated: 2014-12-09 00:46:23 tags: [linux命令,tar,backup] categories: Linux Linux上有功能强大的tar命令，tar最初是为了制作磁带备份（tape archive）而设计的，它的作用是把文件和目录备份到磁带中，然后从磁带中提取或恢复文件。现在我们可以使用tar来备份数据到任何存储介质上。它是文件级备份，不必考虑底层文件系统类别，并且支持增量备份。
-1. 部分常用选项 -z, --gzip：使用gzip工具（解）压缩，后缀一般为.gz -c, --create：tar打包，后缀一般为.tar -f, --file=：后面立刻接打包或压缩后得到的文件名 -x, --extract：解包命令，与-c对应 -p：保留备份数据的原本权限和属性 -g：后接增量备份的快照文件 -C：指定解压缩的目录 --exclude：排除不打包的目录或文件，支持正则匹配 其他
--X, --exclude-from：在一个文件中列出要排除的目录或文件（在--exclude=较多时使用） -t, --list：列出备份档案中的文件列表，不与-c、-x同时出现 -j, --bzip2：使用bzip2工具（解）压缩，后缀一般为.bz2 -P：保留绝对路径，解压时同样会自动解压到绝对路径下 -v：（解）压缩过程显示文件处理过程，常用但不建议对大型文件使用 2. 增量备份（网站）数据 许多系统（应用或网站）每天都有静态文件产生，对于一些比较重要的静态文件如果有进行定期备份的需求，就可以通过tar打包压缩备份到指定的地方，特别是对一些总文件比较大比较多的情况，还可以利用-g选项来做增量备份。
-备份的目录最好使用相对路径，也就是进入到需要备份的根目录下
-具体示例方法如下。
-备份当前目录下的所有文件 # tar -g /tmp/snapshot_data.snap -zcpf /tmp/data01.tar.gz . 在需要恢复的目录下解压恢复 # tar -zxpf /tmp/data01.tar.gz -C . -g选项可以理解备份时给目录文件做一个快照，记录权限和属性等信息，第一次备份时/tmp/snapshot_data.snap不存在，会新建一个并做完全备份。当目录下的文件有修改后，再次执行第一条备份命令（记得修改后面的档案文件名），会自动根据-g指定的快照文件，增量备份修改过的文件，包括权限和属性，没有动过的文件不会重复备份。
-另外需要注意上面的恢复，是“保留恢复”，即存在相同文件名的文件会被覆盖，而原目录下已存在（但备份档案里没有）的，会依然保留。所以如果你想完全恢复到与备份文件一模一样，需要清空原目录。如果有增量备份档案，则还需要使用同样的方式分别解压这些档案，而且要注意顺序。
-下面演示一个比较综合的例子，要求：
-备份/tmp/data目录，但cache目录以及临时文件排除在外 由于目录比较大（&gt;4G），所以全备时分割备份的档案（如每个备份档案文件最大1G） 保留所有文件的权限和属性，如用户组和读写权限 # cd /tmp/data 做一次完全备份 # rm -f /tmp/snapshot_data....</p>
-  </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
-</article>
-
-<article class="post-entry"> 
-  <header class="entry-header">
-    <h2>
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>title: 关于研究生的一点担忧 date: 2014-11-30 18:21:25 updated: 2014-11-30 20:46:23 tags: [feelings, graduate] categories: Feel 最近有个在大学玩的比较好现在在读研的同学，来询问我一些如何给老师做精品课程在线测试系统的问题，从沟通中我忍不住从个人的角度来表达一下感想和担忧。
-首先从我接收到的信息来看，高校导师为了给自己擅长的课程评选上学校、市级或省级精品课程，急于完成一个展示成果的平台，只要能在最短的时间内提交所能看的见的成果，那就表明有效率和实力。所以这个在线测试系统只需要能够展示一个页面，页面上有单项、多选题，提交测试后直接显示对错和总分，无需记录测试者姓名等其他任何与试题无关的信息，也就是没有数据库。差不多就是一个静态页面了，对错的判断，包括答案都固定在代码里面了。我相信稍微了解IT软件开发的人都知道，这样的系统设计可以让人感到无语，当然还有很多不是计算机类专业的，可能看不懂这些，只关心最终实现的效果达到预期就行。偏偏导师和所交予任务的学生，都不懂设计和编程。所以当我说至少应该有个数据库时，“太麻烦，不懂，周期太长”。由于是出于帮忙的目的，也就没有说太多的话来打击他的积极性，说多了反而有点表现自己有多牛B的嫌疑，就硬着头皮做了个demo。
-由此可见大学老师为评上精品课程，那种急功近利的心理，只要对外宣传“我们有一个在线测评系统来检验学生学习效果，blablabla…”，然后评选小组比对评选规则里面有“在线测评”，加分！但请问像上面那样的系统意义何在？老师不知道有谁做过测试，不知道分数，只知道“当前浏览xxx次”，学生完全取决于是否主动。我想如果老师把这个测评当做一个硬性要求或作为所熟知却非常神秘的“平时成绩”的一部分，那只能是通过某种方式提交测试截图了。我心还想，在线测评系统一次性完成上线，是不是就再也不会修改了，加题减题，都要大动干戈的去修改后台代码，丝毫没有规划以后的扩展，当然也许我想多了，因为“这就是很简单的一个测试系统”，嗯，都说是测试而不是正式环境了，认真你就输了。
-这里做个小插曲。我们生活的环境，充斥着太多的指标、太多的名声。想起上周在我司门口早上卖炸酱面的摊贩被城管执法包围那件事。每天早上这位大叔家的炸酱面是附近最好吃的，每天都排着很长的队，如果不赶时间我和同事们都会优先选择这家。大家都生活不易，城管也是，起早贪黑，四处蹲点追赶流动摊贩，因为没有业绩没有完成指标，如何回去交差。又想起电视里报道过某地的交警每月要达到罚款20万的指标，这说多了其实就是社会问题了，我们这些小众市民除了旁观，祈祷不要发生在我们身上，还能做些什么呢。指标本应该是一个积极充满正能量的、督促机构上进的一个目标，但是如果是为了充数而不择手段去实现，急功近利，那就变质了。
-就在线测评问题来说，个人觉得比较合适的做法，应该是要具有一个长远的观念，为何学校不统一做一个在线测评系统，其他各个课程申请账号，获得出题的资格，自由的在后台添加题目，是否需要记录分数和姓名，老师还可以统计对比各班的情况，甚至在评上精品课程以后，作为进一步考核的数据来源，一次投入，无限产出。相比每门课程做重复低效的工作，一眼就可以看出利弊了。导师舍不得花钱请廉价的学生开发一个拿得出手的系统，只能让手下的研究生“自己看着办”。
-另外一方面是我对研究生所表现出来的担忧，是关于学习方法和学习能力。研究生最后毕业靠的是一纸论文，我相信会有高水平有独立见解的论文，但大部分论文“借鉴”的成分会不会太高呢？我们原创性的东西太少了，习惯捡现成的东西，包括我自己也是，写一份配置文档需要google许多文章，然后东抄西拆，拼接起来，但至少它都是实践有效了，对于我个人来说具有较大的参考价值。然而在大学里养成了这样的习惯，就会慢慢的丧失学习能力，遇见要解决一个全新的问题，第一反应不是自己去网上检索，而是找到会的直接问“这个怎么做？”。我该如何回答是好呢？
-提问也是有智慧的，问得太宽泛，需要与回答者反复沟通来确认具体的问题，才给出什么样的答案。依然是最初的例子，同学使用ASP.NET来做一个在线测试系统，但他完全不懂编程，于是就问了我“有哪些方法，要准备啥”（还好不是宽泛的问“要怎么做”），我告诉他一些流程性的东西，要基本会一些什么，但他说他是小白，编程基础几乎为零。还是为了快速拿出成果，于是我就违心的打开了2年没有点开竟然没有卸载的Visual Studio 2010，一边搜索，一边拖拉控件，许多基本知识都忘了，做了个及其简陋的demo，拙劣的后台代码自己都不忍直视。我一直不承认自己是个程序猿，实际上也不是，但依然偶尔会兼职一下。很难说我是不是把自己同学给害了，没害是这种可快速复制、完成任务的技能已经学会了，毕竟这一次之后他再也不必学习编程，害他是我把现成的东西给他了。其实任何一本书、任何一篇博客教程都可以自己琢磨快速搞定，而不是一出现问题“表格怎么做”、“图片怎么查”，我真就回了一句“ 搜索关键字 ‘html 表格’、‘asp.net 插入图片’ ”，当然一部分原因是当时忙，没有时间手把手教。
-遇到问题，自己查阅资料，自己去理解，练习独立的去面对、解决问题，琢磨不明白的再去问，这样也不会浪费对方太多时间。当然简单一句话的能搞定的问题，也没必要说让提问者去走冤枉路，大概就是这个“度”的问题区分了人与人之间的差距和性格吧，无所谓绝对的对错。
-写这么多，有点不自量力了，额，请看到的同学不要对号入座，没有任何针对性和攻击性。</p>
-  </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
-</article>
-
-<article class="post-entry"> 
-  <header class="entry-header">
-    <h2>
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>title: SSL/TLS原理详解 date: 2015-01-07 01:21:25 updated: 2015-01-07 10:46:23 tags: [ssl, tls, 安全] categories: Linux 本文大部分整理自网络，相关文章请见文后参考。
-关于证书授权中心CA以及数字证书等概念，请移步 OpenSSL 与 SSL 数字证书概念贴 ，如果你想快速自建CA然后签发数字证书，请移步 基于OpenSSL自建CA和颁发SSL证书 。
-SSL/TLS作为一种互联网安全加密技术，原理较为复杂，枯燥而无味，我也是试图理解之后重新整理，尽量做到层次清晰。正文开始。
-1. SSL/TLS概览 1.1 整体结构 SSL是一个介于HTTP协议与TCP之间的一个可选层，其位置大致如下: SSL：（Secure Socket Layer，安全套接字层），为Netscape所研发，用以保障在Internet上数据传输之安全，利用数据加密(Encryption)技术，可确保数据在网络上之传输过程中不会被截取。当前版本为3.0。它已被广泛地用于Web浏览器与服务器之间的身份认证和加密数据传输。 SSL协议位于TCP/IP协议与各种应用层协议之间，为数据通讯提供安全支持。SSL协议可分为两层： SSL记录协议（SSL Record Protocol）：它建立在可靠的传输协议（如TCP）之上，为高层协议提供数据封装、压缩、加密等基本功能的支持。 SSL握手协议（SSL Handshake Protocol）：它建立在SSL记录协议之上，用于在实际的数据传输开始前，通讯双方进行身份认证、协商加密算法、交换加密密钥等。
-TLS：(Transport Layer Security，传输层安全协议)，用于两个应用程序之间提供保密性和数据完整性。 TLS 1.0是IETF（Internet Engineering Task Force，Internet工程任务组）制定的一种新的协议，它建立在SSL 3.0协议规范之上，是SSL 3.0的后续版本，可以理解为SSL 3.1，它是写入了 RFC 的。该协议由两层组成： TLS 记录协议（TLS Record）和 TLS 握手协议（TLS Handshake）。较低的层为 TLS 记录协议，位于某个可靠的传输协议（例如 TCP）上面。
-SSL/TLS协议提供的服务主要有：
-认证用户和服务器，确保数据发送到正确的客户机和服务器； 加密数据以防止数据中途被窃取； 维护数据的完整性，确保数据在传输过程中不被改变。 1.2 TLS与SSL的差异 版本号：TLS记录格式与SSL记录格式相同，但版本号的值不同，TLS的版本1.0使用的版本号为SSLv3.1。 报文鉴别码：SSLv3.0和TLS的MAC算法及MAC计算的范围不同。TLS使用了RFC-2104定义的HMAC算法。SSLv3.0使用了相似的算法，两者差别在于SSLv3.0中，填充字节与密钥之间采用的是连接运算，而HMAC算法采用的是异或运算。但是两者的安全程度是相同的。 伪随机函数：TLS使用了称为PRF的伪随机函数来将密钥扩展成数据块，是更安全的方式。 报警代码：TLS支持几乎所有的SSLv3....</p>
-  </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
-</article>
-
-<article class="post-entry"> 
-  <header class="entry-header">
-    <h2>
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>title: CentOS 6.x 内核升级（2.6.32 -&gt; 3.10.58）过程记录 date: 2014-10-24 01:21:25 updated: 2014-10-27 10:46:23 tags: [docker, Linux内核, upgrade] categories: [Linux, CentOS] 本人升级的目的是想在CentOS6.2上运行docker，官方建议内核版本在3.8.0及以上，于是就自己从Linux内核官方网站上下载源码，自己编译。 ##1. 准备工作## ###1.1 确认内核及版本信息###
+    <p>本人升级的目的是想在CentOS6.2上运行docker，官方建议内核版本在3.8.0及以上，于是就自己从Linux内核官方网站上下载源码，自己编译。 ##1. 准备工作## ###1.1 确认内核及版本信息###
 [root@hostname ~]# uname -r 2.6.32-220.el6.x86_64 [root@hostname ~]# cat /etc/centos-release CentOS release 6.2 (Final) ###1.2 安装软件###
 编译安装新内核，依赖于开发环境和开发库
-# yum grouplist //查看已经安装的和未安装的软件包组，来判断我们是否安装了相应的开发环境和开发库； # yum groupinstall &#34;Development Tools&#34; //一般是安装这两个软件包组，这样做会确定你拥有编译时所需的一切工具 # yum install ncurses-devel //你必须这样才能让 make *config 这个指令正确地执行 # yum install qt-devel //如果你没有 X 环境，这一条可以不用 # yum install hmaccalc zlib-devel binutils-devel elfutils-libelf-devel //创建 CentOS-6 内核时需要它们 如果当初安装系统是选择了Software workstation，上面的安装包几乎都已包含。 ##2....</p>
+# yum grouplist //查看已经安装的和未安装的软件包组，来判断我们是否安装了相应的开发环境和开发库； # yum groupinstall &#34;Development Tools&#34; //一般是安装这两个软件包组，这样做会确定你拥有编译时所需的一切工具 # yum install ncurses-devel //你必须这样才能让 make *config 这个指令正确地执行 # yum install qt-devel //如果你没有 X 环境，这一条可以不用 # yum install hmaccalc zlib-devel binutils-devel elfutils-libelf-devel //创建 CentOS-6 内核时需要它们 如果当初安装系统是选择了Software workstation，上面的安装包几乎都已包含。 ##2. 编译内核## ###2.1 获取并解压内核源码，配置编译项### 去 http://www.kernel.org 首页，可以看到有stable, longterm等版本，longterm是比stable更稳定的版本，会长时间更新，因此我选择 3.10.58。
+[root@sean ~]# tar -xf linux-3....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-10-24 01:21:25 +0000 UTC'>October 24, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to CentOS 6.x 内核升级（2.6.32 -&gt; 3.10.58）过程记录" href="http://xgknight.com/posts/2014/10/centos-6.x-%E5%86%85%E6%A0%B8%E5%8D%87%E7%BA%A72.6.32-3.10.58%E8%BF%87%E7%A8%8B%E8%AE%B0%E5%BD%95/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>Linux进阶培训-tplink
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: 在Mac在Mac/win7下上使用Vagrant打造本地开发环境 date: 2015-03-25 11:21:25 updated: 2015-03-27 18:46:23 tags: [vagrant, virtualbox, 虚拟化,开发环境] categories: Virtualization 1. vagrant介绍 1.1 vagrant能做什么 做Web开发（java/php/python/ruby…）少不了要在本地搭建好开发环境，虽然说目前各种脚本/语言都有对应的Windows版，甚至是一键安装包，但很多时候和Windows环境的兼容性（如配置文件、编译的模块）并不是那么好，麻烦的问题是实际部署的环境通常是Linux，常常还要面临着开发和部署环境不一致，上线前还要大量的调试。而如果让每个开发人员都自己去搭建本地环境，安装虚拟机、下载ISO镜像、选择规格安装创建vm、安装OS、配置，会耗费非常多的时间，如果是团队开发应该要尽量保持每个人的运行环境一致。此时vagrant正式你所需要的。不适用正式环境部署。
-vagrant实际上一套虚拟机管理工具，基于Ruby开发，底层支持VirtualBox、VMware甚至AWS、docker等作为虚拟化系统。我们可以通过 Vagrant 封装一个 Linux 的开发环境，分发给团队成员。成员可以在自己喜欢的桌面系统（Mac/Windows/Linux）上开发程序，代码却能统一在封装好的环境里运行，“代码在我机子上运行没有问题”这种说辞将成为历史。
-通过上面的介绍如果你还在困惑有virtualbox或vmware为什么还要加入vagrant，纠结于要不要使用，可以参考这个问答 使用vagrant的意义在哪，另外docker作为后起之秀也可以做vagrant能完成的事情，stackoverflow有关于两位作者讨论各自应用场景的精彩&#34;互掐&#34;，传送门→ （中文）。
-1.2 几个概念 Provider：供应商，在这里指Vagrant调用的虚拟化工具。Vagrant本身并没有能力创建虚拟机，它是调用一些虚拟化工具来创建，如VirtualBox、VMWare、Xen、Docker，甚至AWS，这些虚拟化工具只要安装好了，vagrant会自动封装在底层通过统一的命令调用。也就是说使用vagrant时你电脑上还需要安装对应的Provider，默认是免费开源的virtualbox。 Box：可被Vagrant直接使用的虚拟机镜像文件，大小根据内容的不同从200M-2G不等。针对不同的Provider，Box文件的格式是不一样的，从 vagrantcloud.com 你可以找到社区维护的box。
-Vagrantfile：Vagrant根据Vagrantfile中的配置来创建虚拟机，是Vagrant的核心。在Vagrantfile文件中你需要指明使用哪个Box（可以下载好的或自己制作，或指定在线的URL地址），虚拟机使用的内存大小和CPU，需要预安装哪些软件，虚拟机的网络配置，与host的共享目录等。
-Provisioner：是Vagrant的插件的一种。大部分现成的box并不是你正好想要的，通过使用你熟悉的provisioner，比如Puppet，可以在你使用vagrant up启动虚拟机时自动的安装软件、修改配置等初始化操作。当然你也可以在最先启动虚拟机后，使用vagrant ssh进去然后手动安装软件，但毕竟不是所有人都是系统管理员，写好Vagrantfile后无需人工干预马上就可以使用vm。目前支持并实现的provisioning有Puppet、Salt、Ansible、Chef这些知名的自动化运维工具，当然需要一定的使用经验；也可以使用shell provisioner，故名思议这个插件就是通过执行shell命令完成统一的作用。
-Guest Additions：这个是常在下载 base box 介绍里有的，一般用来实现host到vm的端口转发、目录共享，在开发环境上都建议装上以便测试。
-2. 安装vagrant VirtualBox: 4.3.12，https://www.virtualbox.org/wiki/Download_Old_Builds_4_3 。我上手使用的是4.3.20，折腾出过几个问题，据说说4.3.12版本较稳定。 建议选择VirtualBox ，即使你电脑上已经安装VMware Workstation或Fushion，它的vagrant插件还是要收费的 Vagrant: 1.7.1，http://www.vagrantup.com/downloads-archive.html 选择适合你的平台（Windows、Mac、Linux），下载对应格式的安装包。如Mac下 vagrant_1.7.1.dmg、VirtualBox-4.3.20-96997-OSX.dmg 。
-3. 使用vagrant打造一个本地开发环境 本文将会演示从 nrel CentOS6.5 开始，安装必要的开发包、python、插件、Puppet，然后打包成一个box分发给团队的全过程。你也可以在别人box的基础上进一步通过Vagrantfile定制自己的环境。
-3.1 初始化 3.1.1 vagrant box add {box-name} {box-url} $ vagrant box add ct65_00 Downloads/centos65....</p>
+    <p>本文没啥实际内容，是给新人做linux培训的第二课进阶篇，主要着眼于体系，把一些工具混个眼熟。
+目录 Linux磁盘管理(进阶) Linux内存管理 Linux进程管理(进阶) Linux网络管理(进阶) Linux系统状态监控与调优 常见服务 Linux安全策略 其他 Linux磁盘管理（进阶） ext4文件系统格式 Inode、block、superblock、MBR VFS LVM pv、lv、vg lvdisplay、lvextend、vgdisplay、pvcreate… RAID raid0、raid1、raid5、raid10 r/w速度、磁盘利用率、安全性的权衡 磁盘IO性能 dd、iostat、iotop I/O等待 Linux内存管里（基础） 物理内存与虚拟内存 Swap space，分页存取 buffer与cache区分 内存监控命令 free、vmstat /proc文件系统 Linux进程管理（进阶） 进程与线程 进程优先级 进程监控命令 pidstat、lsof strace（系统调用跟踪） 后台进程 Ctrl&#43;z、jobs、bg、fg、&amp;、nohup screen Linux的网络管理 一些概念
+防火墙
+路由/网关
+子网掩码
+网络接口（参数）
+MAC
+TCP/IP协议
+应用层协议
+Linux网络管理 iptables
+Linux网络管理 主机网络流量监控 iftop、iptraf、sar tcpdump抓包 wireshark数据包分析工具 ##Linux网络管理
+iproute2 ip、ss Linux系统状态监控与调优 一些工具 sar、sysstat perf、logwatch 一些配置文件 sysctl.conf limits.conf Linux安全策略 禁止root直接登录 锁定不使用的账号 关闭ipv6 启用防火墙 定期检查日志 … Linux常见服务 tcp_wrappers SSH postfix FTP NFS/Samba DNS Apache/nginx … Linux其他 Linux开机过程分析 pam模块解读lsmod 编译make、ldd、ldconfig、gcc、gdb ACL Linux集群 内核模块 linux编程 … 本文链接地址：http://xgknight....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-10-06 16:32:49 +0000 UTC'>October 6, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to Linux进阶培训-tplink" href="http://xgknight.com/posts/2014/10/linux%E8%BF%9B%E9%98%B6%E5%9F%B9%E8%AE%AD-tplink/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>CentOS 6 服务器安全配置指南（通用）
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: vim编辑器技巧备忘（初级-中级） date: 2014-08-07 01:21:25 updated: 2014-08-07-12 00:46:23 tags: [vim,编辑器] categories: Linux “学习vim并且其会成为你最后一个使用的文本编辑器” 学习建议：
+    <p>Linux是一个开放式系统，可以在网络上找到许多现成的程序和工具，这既方便了用户，也方便了黑客，因为他们也能很容易地找到程序和工具来潜入Linux系统，或者盗取Linux系统上的重要信息。不过，只要我们仔细地设定Linux的各种系统功能，并且加上必要的安全措施，就能让黑客们无机可乘。一般来说，对Linux系统的安全设定包括取消不必要的服务、限制远程存取、隐藏重要资料、修补安全漏洞、采用安全工具以及经常性的安全检查等。
+本文是可参考的实际操作，不涉及如IP欺骗这样的原理，而且安全问题也不算几行命令就能预防的，这里只是linux系统上基本的安全加固方法，后续有新的内容再添加进来。
+注：所有文件在修改之前都要进行备份如 cp /etc/passwd{,.dist}
+1. 禁用不使用的用户 注意：不建议直接删除，当你需要某个用户时，自己重新添加会很麻烦。也可以usermod -L或passwd -l user锁定。
+cp /etc/passwd{,.bak} 修改之前先备份 vi /etc/passwd 编辑用户，在前面加上#注释掉此行
+注释的用户名：
+# cat /etc/passwd|grep ^# #adm:x:3:4:adm:/var/adm:/sbin/nologin #lp:x:4:7:lp:/var/spool/lpd:/sbin/nologin #shutdown:x:6:0:shutdown:/sbin:/sbin/shutdown #halt:x:7:0:halt:/sbin:/sbin/halt #uucp:x:10:14:uucp:/var/spool/uucp:/sbin/nologin #operator:x:11:0:operator:/root:/sbin/nologin #games:x:12:100:games:/usr/games:/sbin/nologin #gopher:x:13:30:gopher:/var/gopher:/sbin/nologin #ftp:x:14:50:FTP User:/var/ftp:/sbin/nologin #nfsnobody:x:65534:65534:Anonymous NFS User:/var/lib/nfs:/sbin/nologin #postfix:x:89:89::/var/spool/postfix:/sbin/nologin 注释的组：
+# cat /etc/group|grep ^# #adm:x:4:adm,daemon #lp:x:7:daemon #uucp:x:14: #games:x:20: #gopher:x:30: #video:x:39: #dip:x:40: #ftp:x:50: #audio:x:63: #floppy:x:19: #postfix:x:89: 2. 关闭不使用的服务 # chkconfig --list |grep &#39;3:on&#39; 邮件服务，使用公司邮件服务器：
+service postfix stop chkconfig postfix --level 2345 off 通用unix打印服务，对服务器无用：
+service cups stop chkconfig cups --level 2345 off 调节cpu速度用来省电，常用在Laptop上：...</p>
+  </div>
+  <footer class="entry-footer"><span title='2014-09-07 01:21:25 +0000 UTC'>September 7, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to CentOS 6 服务器安全配置指南（通用）" href="http://xgknight.com/posts/2014/09/centos-6-%E6%9C%8D%E5%8A%A1%E5%99%A8%E5%AE%89%E5%85%A8%E9%85%8D%E7%BD%AE%E6%8C%87%E5%8D%97%E9%80%9A%E7%94%A8/"></a>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
+    <h2>在Linux上使用logwatch分析监控日志文件
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>1. 介绍 在维护Linux服务器时，经常需要查看系统中各种服务的日志，以检查服务器的运行状态。 如登陆历史、邮件、软件安装等日志。系统管理员一个个去检查会十分不方便；且大多时候，这会是一种被动的检查，即只有在发现系统运行异常时才会想到去查看日志以获取异常的信息。那么如何主动、集中的分析这些日志，并产生报告，定时发送给管理员就会显得十分重要。
+logwatch 是一款用 Perl 语言编写的开源日志解析分析器。它能对原始的日志文件进行解析并转换成结构化格式的文档，也能根据您的使用情况和需求来定制报告。logwatch 的主要目的是生成更易于使用的日志摘要，并不是用来对日志进行实时的处理和监控的。正因为如此，logwatch 通常被设定好时间和频率的自动定时任务来调度运行或者是有需要日志处理的时候从命令行里手动运行。一旦日志报告生成，logwatch 可以通过电子邮件把这报告发送给您，您可以把它保存成文件或者直接显示在屏幕上。
+Logwatch 报告的详细程度和报告覆盖范围是完全可定制化的。Logwatch 的日志处理引擎也是可扩展的，从某种意义上来说，如果您想在一个新的应用程序中使用 logwatch 功能的话，只需要为这个应用程序的日志文件编写一个日志处理脚本（使用 Perl 语言），然后挂接到 logwatch 上就行。
+logwatch 有一点不好的就是，在它生成的报告中没有详细的时间戳信息，而原来的日志文件中是存在的。您只能知道被记录下来的一段时间之内的特定事件，如果想要知道精确的时间点的信息，就不得不去查看原日志文件了。
+2. 安装与配置说明 2.1 安装 无论在Debian系还是Redhat系上，安装logwatch都非常简单：
+# apt-get install logwatch //Debian、Ubuntu.etc # yum install logwatch -y //Redhat、Centos.etc 以下内容基于 CentOS 6.x，其余系统相差不大。
+2.2 配置 2.2.1 配置文件说明 安装后的目录文件说明： /usr/share/logwatch default.conf/ # 配置目录 logwatch.conf # 主配置文件，收件人，级别等 logfiles/ # 定义待分析服务的日志文件组路径，相对于/var/log(*.conf) services/ # 自定义需分析日志的Service目录(*.conf) scripts/ # 可执行脚本 logwatch.pl # 启动分析的perl脚本，/usr/sbin/logwatch的源链接 logfiles/ # 可包含多个logwatch日志文件组的子目录，对应的日志服务运行的时候，子目录下的脚本会自动被调用 services/ # logwatch日志服务的过滤脚本，一一对应 shared/ # 可被多个logwatch日志服务引用的脚本 dist....</p>
+  </div>
+  <footer class="entry-footer"><span title='2014-08-23 01:21:25 +0000 UTC'>August 23, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 在Linux上使用logwatch分析监控日志文件" href="http://xgknight.com/posts/2014/08/%E5%9C%A8linux%E4%B8%8A%E4%BD%BF%E7%94%A8logwatch%E5%88%86%E6%9E%90%E7%9B%91%E6%8E%A7%E6%97%A5%E5%BF%97%E6%96%87%E4%BB%B6/"></a>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
+    <h2>vim编辑器技巧备忘（初级-中级）
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>“学习vim并且其会成为你最后一个使用的文本编辑器” 学习建议：
 丢弃鼠标和小键盘 具有搭配使用各种按键的意识 首先来一张 mindmap :
 1. 初级 1.1 编辑模式（Insert Mode） 编辑模式包括以下动作：
 insert：i在光标所在字符前插入，I在当前行首第一个非空格字符前插入 append：a在光标所在字符后插入，A在行末尾开始插入 open：o在下一行插入新行，O在光标所在行的上一行插入新行 replace：r将光标处字符替换成r紧接的字符；R一直替换字符串，知道ESC键退出，同windows下的Insert键 Ctrl&#43;p：自动提示 [ESC]：回到普通模式 1.2 普通模式（Normal Mode） h, j, k, l ，分别对应 左← 下↓ 上↑ 右→
@@ -301,43 +258,106 @@ gg 转到文档第一行(1G)
 H 移动到屏幕的第一列
 M 移动到屏幕的中间列
 L 移动到屏幕的最后列
-w 移动到下一个单词的首字母，（标点符号认为是一个单词，W表示单词以空格分隔）...</p>
+w 移动到下一个单词的首字母，（标点符号认为是一个单词，W表示单词以空格分隔）
+e 移动到下一个单词的末尾，（E认为单词以空格分隔）
+b 移动到上一个单词的首字母，（B认为单词以空格分隔）
+fx 移动到下一个字母是x的位置。Fx向上移动。
+% 匹配括号移动，包括 (, {, [ ，你需要把光标先移到括号上...</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-08-07 01:21:25 +0000 UTC'>August 7, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to vim编辑器技巧备忘（初级-中级）" href="http://xgknight.com/posts/2014/08/vim%E7%BC%96%E8%BE%91%E5%99%A8%E6%8A%80%E5%B7%A7%E5%A4%87%E5%BF%98%E5%88%9D%E7%BA%A7-%E4%B8%AD%E7%BA%A7/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>高效Linux bash快捷键及alias总结
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: 使用vmware vconverter从物理机迁移系统到虚拟机P2V（多图） date: 2015-04-05 15:21:25 updated: 2015-04-06 00:46:23 tags: [vsphere, 虚拟化,vmware] categories: Virtualization 本文完整记录了如何从物理服务器，保持所有环境配置信息，纹丝不动的迁移到虚拟机上，俗称 P2V 。采用的工具是VMware公司的 VMware vcenter vconverter standalone，它支持将windows和linux操作系统用作源，可以执行若干转换任务：
-将正在运行的远程物理机和虚拟机作为虚拟机导入到vCenter Server管理的独立ESX/ESXi或ESX/ESXi主机 将由VMware Workstation或Microsoft Hyper-V Server托管的虚拟机导入到vCenter Server管理的ESX/ESXi主机 将第三方备份或磁盘映像导入到vCenterServer管理的ESX/ESXi主机中 将旧版服务器迁移到新硬件，而不重新安装操作系统或应用程序软件等 完整功能见《Converter Standalone 用户指南》 Converter Standalone的组件，只能安装在Windows操作系统上：
-Converter Standalone Server —— 启用并执行虚拟机的导入和导出 Converter Standalone agent —— Converter Standalone Server会在Windows物理机上安装代理，从而将这些物理机作为虚拟机导入，完成后可以选择自动删除 Converter Standalone client —— 与Converter服务端配合使用，包括看到的用户界面、创建和管理转换任务等 Vmware vCenter Converter引导CD：是单独的组件，可用于在物理机上执行冷克隆 冷克隆可以创建一致的源计算机的精确副本，而我们更多的是进行热克隆，也就是源服务器在迁移过程中会继续工作，这就可能会出现某些文件不一致，但Converter Standalone会在热克隆后将目标虚拟机与与主机同步，同步执行过程是将在初始克隆期间更改的块从源复制到目标。
-本文记录的过程是，源主机是 SUSE 11.x 物理机，运行华为的智能呼叫中心应用，因此安装有Oracle数据库，对于数据文件和控制文件的一致性和安全性较高，所以建议先把oracle数据库关闭再操作；目标虚拟服务器是 ESXi 5.1，但我使用的Converter是 5.5-en，操作过程类似。下面正式开始
-源主机：172.30.31.0/24 ESXi: 172.29.88.0/24，与源主机IP段无法通信 Helper VM: 172.29.41.0/24，与上面两个IP段都通...</p>
+    <p>bash快捷键 习惯使用编辑的快捷键可以大大提高效率，记忆学习过程要有意识的忽略功能键、方向键和数字小键盘。以下快捷键适用在bash处于默认的Emacs模式下，是由一个名为Readline的库实现的，用户可以通过命令bind添加新快捷键，或者修改系统中已经存在的快捷键。（如果你有set -o vi，就处于 vi 模式就不适用了）
+另外下面的内容并不包含所有快捷键，只是我个人适用频率最高的几种，但相信已经可以大大提高工作效率了。以下所有 Alt 键可以以 Esc 键代替。
+Ctrl &#43; l ：清除屏幕，同clear
+Ctrl &#43; a ：将光标定位到命令的开头
+Ctrl &#43; e ：与上一个快捷键相反，将光标定位到命令的结尾
+Ctrl &#43; u ：剪切光标之前的内容，在输错命令或密码
+Ctrl &#43; k ：与上一个快捷键相反，剪切光标之后的内容
+Ctrl &#43; y ：粘贴以上两个快捷键所剪切的内容。Alt&#43;y粘贴更早的内容
+Ctrl &#43; w ：删除光标左边的参数（选项）或内容（实际是以空格为单位向前剪切一个word）
+Ctrl &#43; / ：撤销，同Ctrl&#43;x &#43; Ctrl&#43;u
+Ctrl &#43; f ：按字符前移（右向），同→
+Ctrl &#43; b ：按字符后移（左向），同←
+Alt &#43; f ：按单词前移，标点等特殊字符与空格一样分隔单词（右向），同Ctrl&#43;→
+Alt &#43; b ：按单词后移（左向），同Ctrl&#43;←
+Alt &#43; d ：从光标处删除至字尾。可以Ctrl&#43;y粘贴回来
+Alt &#43; \ ：删除当前光标前面所有的空白字符
+Ctrl &#43; d ：删除光标处的字符，同Del键。没有命令是表示注销用户...</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-03-09 01:21:25 +0000 UTC'>March 9, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 高效Linux bash快捷键及alias总结" href="http://xgknight.com/posts/2014/03/%E9%AB%98%E6%95%88linux-bash%E5%BF%AB%E6%8D%B7%E9%94%AE%E5%8F%8Aalias%E6%80%BB%E7%BB%93/"></a>
 </article>
 
 <article class="post-entry"> 
   <header class="entry-header">
-    <h2>
+    <h2>iptables常用实例备查（更新中）
     </h2>
   </header>
   <div class="entry-content">
-    <p>title: 误删vSphere虚拟机.vmdk文件的恢复 date: 2014-10-28 15:21:25 updated: 2014-10-28 00:46:23 tags: [vsphere, 虚拟化,troubleshooting] categories: Virtualization 1. 错误描述 在vSphere上，一次重启虚拟服务器时出现启动不了，提示找不到vmdk虚拟磁盘文件： 2. 原因分析 查看这台虚拟服务器的摘要信息，对比datastore上其他可用的虚拟机，发现损坏的服务器上确实缺少一个vmdk磁盘文件，但是可以看见一个50G的xxx-flat.vmdk文件；而正常的服务器只有xxx.vmdk，没有xxx-flat.vmdk，关机之后两个文件都存在，而且真实的磁盘容量从vmdk转移到了xxx-flat.vmdk。 虚拟主机在运行的时候，实际在使用的是xxx-flat.vmdk，然而xxx.vmdk是可以同时被删除的，才导致了问题。
-这里需要说明，虚拟机的每个磁盘驱动器都包含了一对.vmdk文件。一个是文本文件，包含了关于虚拟硬盘的描述数据；另外一个是磁盘的实际内容。例如，一个名为examplevm的虚拟机连接有一个硬盘。这个磁盘由如下两个文件构成：一个小于 1KB 的examplevm.vmdk描述文件和一个10GB大小的examplevm- flat.vmdk平面（数据）文件，该文件包含虚拟机的实际数据，而这些数据又是以二进制的形式存放在物理磁盘上，examplevm.vmdk描述文件就是描述这种映射关系的。 另外：
-A note for ESX-users: Do not use Datastorebrowser to identify vmdks or download them for editiing. The Datastorebrowser does not display vmdks correctly. It usually hides *-flat.vmdks and *-delta.vmdks.
-TO-DO: 后续为 VMware ESXi 5 的磁盘专门记录一篇文章，说明“置备空间”以及vmfstools工具的使用。
-3. 解决办法 (1) 用ssh登录vsphere主机，查找xxx-flat.vmdk文件所在的位置以及目录，并记录文件的大小
-~ # find / -name &#34;新建虚拟机-flat.vmdk&#34; /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat....</p>
+    <p>1. 普通规则 1.1 操作规则 iptables -nL 查看本机关于iptables的设置情况，默认查看的是-t filter，可以指定-t nat
+iptables-save &gt; iptables.rule 会保存当前的防火墙规则设置，命令行下通过iptables配置的规则在下次重启后会失效，当然这也是为了防止错误的配置防火墙。默认读取和保存的配置文件地址为/etc/sysconfig/iptables。
+设置chain默认策略
+iptables -P INPUT DROP iptables -P FORWARD ACCEPT iptables -P OUTPUT ACCEPT 将 INPUT 链默认处理策略设置为DROP，前提是已经存在一条可以访问22端口的规则。这里要说明的是，在添加这类拒绝访问的规则之前，一定要想好执行完，会不会把自己关在防火墙外面，不然就傻眼了。像下面这句。
+1.2 限制访问规则 iptables -I INPUT 1 -m state --state RELATED,ESTABLISHED -j ACCEPT 把这条语句插在input链的最前面（第一条），对状态为ESTABLISHED,RELATED的连接放行。 这条规则在某种情况下甚至比下面开放ssh服务都重要：① 如果INPUT连默认为DROP，② INPUT链默认为INPUT，但存在这条规则-A INPUT -j REJECT --reject-with icmp-host-prohibited，上面两种情况下都必须添加--state RELATED,ESTABLISHED为第一条，否则22端口无法通行，把自己锁在防火墙外面了。 有了这条规则，可保证只要当前ssh没有关闭，哪怕防火墙忘记开启22端口，也可以继续连接。
+iptables -A INPUT -m state --state NEW -m tcp -p tcp --dport 22 -j ACCEPT 允许所有，不安全，默认。
+iptables -A INPUT -s 172....</p>
   </div>
-  <footer class="entry-footer">admin</footer>
-  <a class="entry-link" aria-label="post link to " href="http://xgknight.com/posts/1/01/"></a>
+  <footer class="entry-footer"><span title='2014-02-26 01:21:25 +0000 UTC'>February 26, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to iptables常用实例备查（更新中）" href="http://xgknight.com/posts/2014/02/iptables%E5%B8%B8%E7%94%A8%E5%AE%9E%E4%BE%8B%E5%A4%87%E6%9F%A5%E6%9B%B4%E6%96%B0%E4%B8%AD/"></a>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
+    <h2>iptables防火墙原理详解
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>1. netfilter与iptables Netfilter是由Rusty Russell提出的Linux 2.4内核防火墙框架，该框架既简洁又灵活，可实现安全策略应用中的许多功能，如数据包过滤、数据包处理、地址伪装、透明代理、动态网络地址转换(Network Address Translation，NAT)，以及基于用户及媒体访问控制(Media Access Control，MAC)地址的过滤和基于状态的过滤、包速率限制等。Iptables/Netfilter的这些规则可以通过灵活组合，形成非常多的功能、涵盖各个方面，这一切都得益于它的优秀设计思想。
+Netfilter是Linux操作系统核心层内部的一个数据包处理模块，它具有如下功能：
+网络地址转换(Network Address Translate) 数据包内容修改 以及数据包过滤的防火墙功能 Netfilter 平台中制定了数据包的五个挂载点（Hook Point，我们可以理解为回调函数点，数据包到达这些位置的时候会主动调用我们的函数，使我们有机会能在数据包路由的时候改变它们的方向、内容），这5个挂载点分别是PRE_ROUTING、INPUT、OUTPUT、FORWARD、POST_ROUTING。
+Netfilter 所设置的规则是存放在内核内存中的，而 iptables 是一个应用层的应用程序，它通过 Netfilter 放出的接口来对存放在内核内存中的 XXtables（Netfilter的配置表）进行修改。这个XXtables由表tables、链chains、规则rules组成，iptables在应用层负责修改这个规则文件。类似的应用程序还有 firewalld 。
+1.1 filter、nat、mangle等规则表 filter表
+主要用于对数据包进行过滤，根据具体的规则决定是否放行该数据包（如DROP、ACCEPT、REJECT、LOG）。filter 表对应的内核模块为iptable_filter，包含三个规则链：
+INPUT链：INPUT针对那些目的地是本地的包 FORWARD链：FORWARD过滤所有不是本地产生的并且目的地不是本地(即本机只是负责转发)的包 OUTPUT链：OUTPUT是用来过滤所有本地生成的包 nat表
+主要用于修改数据包的IP地址、端口号等信息（网络地址转换，如SNAT、DNAT、MASQUERADE、REDIRECT）。属于一个流的包(因为包 的大小限制导致数据可能会被分成多个数据包)只会经过这个表一次。如果第一个包被允许做NAT或Masqueraded，那么余下的包都会自动地被做相同的操作，也就是说，余下的包不会再通过这个表。表对应的内核模块为 iptable_nat，包含三个链：
+PREROUTING链：作用是在包刚刚到达防火墙时改变它的目的地址 OUTPUT链：改变本地产生的包的目的地址 POSTROUTING链：在包就要离开防火墙之前改变其源地址 mangle表
+主要用于修改数据包的TOS（Type Of Service，服务类型）、TTL（Time To Live，生存周期）指以及为数据包设置Mark标记，以实现Qos(Quality Of Service，服务质量)调整以及策略路由等应用，由于需要相应的路由设备支持，因此应用并不广泛。包含五个规则链——PREROUTING，POSTROUTING，INPUT，OUTPUT，FORWARD。
+raw表
+是自1.2.9以后版本的iptables新增的表，主要用于决定数据包是否被状态跟踪机制处理。在匹配数据包时，raw表的规则要优先于其他表。包含两条规则链——OUTPUT、PREROUTING
+iptables中数据包和4种被跟踪连接的4种不同状态：
+NEW：该包想要开始一个连接（重新连接或将连接重定向） RELATED：该包是属于某个已经建立的连接所建立的新连接。例如：FTP的数据传输连接就是控制连接所 RELATED出来的连接。--icmp-type 0 ( ping 应答) 就是--icmp-type 8 (ping 请求)所RELATED出来的。 ESTABLISHED ：只要发送并接到应答，一个数据连接从NEW变为ESTABLISHED,而且该状态会继续匹配这个连接的后续数据包。 INVALID：数据包不能被识别属于哪个连接或没有任何状态比如内存溢出，收到不知属于哪个连接的ICMP错误信息，一般应该DROP这个状态的任何数据。 1.2 INPUT、FORWARD等规则链和规则 在处理各种数据包时，根据防火墙规则的不同介入时机，iptables供涉及5种默认规则链，从应用时间点的角度理解这些链：...</p>
+  </div>
+  <footer class="entry-footer"><span title='2014-02-23 01:21:25 +0000 UTC'>February 23, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to iptables防火墙原理详解" href="http://xgknight.com/posts/2014/02/iptables%E9%98%B2%E7%81%AB%E5%A2%99%E5%8E%9F%E7%90%86%E8%AF%A6%E8%A7%A3/"></a>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
+    <h2>linux进程后台运行的几种方式
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>Ctrl&#43;z/bg/nohup/setsid/&amp; 在Linux中，如果要让进程在后台运行，一般情况下，我们在命令后面加上&amp;即可，实际上，这样是将命令放入到一个作业队列中了：
+# ./rsync.sh &amp; # jobs 对于已经在前台执行的命令，也可以重新放到后台执行，首先按ctrl&#43;z暂停已经运行的进程，然后使用bg命令将停止的作业放到后台运行：bg %1，放回前台运行：%1。
+但是如上方到后台执行的进程，其父进程还是当前终端shell的进程，而一旦父进程退出，则会发送hangup信号给所有子进程，子进程收到hangup以后也会退出。如果我们要在退出shell的时候继续运行进程，则需要使用nohup忽略hangup信号，或者setsid将将父进程设为init进程(进程号为1)：
+# nohup ./rsync.sh &amp; # setsid ./rsync.sh &amp; 或 # (./rsync.sh &amp;) ////在一个subshell中执行 # ps -ef|grep rsync nohup 的用途就是让提交的命令忽略 hangup 信号，标准输出和标准错误缺省会被重定向到 nohup.out 文件中。。一般我们可在结尾加上&#34;&amp;“来将命令同时放入后台运行，也可用” &gt; log.out 2&gt;&amp;1&#34;来更改缺省的重定向文件名。
+上面的试验演示了使用nohup/setsid加上&amp;使进程在后台运行，同时不受当前shell退出的影响。那么对于已经在后台运行的进程，该怎么办呢？可以使用disown命令：
+# jobs # disown -h %1 # ps -ef|grep rsync 效果与setid相同，但是disown后无法通过jobs命令查看了。
+screen 还有一种更加强大的方式是使用screen，首先创建一个断开模式的虚拟终端，然后用-r选项重新连接这个虚拟终端，在其中执行的任何命令，都能达到nohup的效果，这在有多个命令需要在后台连续执行的时候比较方便。
+GNU Screen是一款由GNU计划开发的用于命令行终端切换的自由软件。用户可以通过该软件同时连接多个本地或远程的命令行会话，并在其间自由切换，可以看作是窗口管理器的命令行界面版本。它提供了统一的管理多个会话的界面和相应的功能。
+# yum install screen -y 常用screen参数：
+# screen -S docker-d 新建一个名叫docker-d的session，并马上进入 # screen -dmS docker-d 新建一个名叫docker-d的session，但暂不进入，可用于系统启动脚本里 # screen -ls 列出当前所有session # screen -r docker-d 恢复到zhouxiao这个session，前提是已经是断开状态（-d可以远程断开会话） # screen -x docker-d 连接到离线模式的会话（多窗口同步演示） # screen ....</p>
+  </div>
+  <footer class="entry-footer"><span title='2014-02-20 11:21:25 +0000 UTC'>February 20, 2014</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to linux进程后台运行的几种方式" href="http://xgknight.com/posts/2014/02/linux%E8%BF%9B%E7%A8%8B%E5%90%8E%E5%8F%B0%E8%BF%90%E8%A1%8C%E7%9A%84%E5%87%A0%E7%A7%8D%E6%96%B9%E5%BC%8F/"></a>
 </article>
 <footer class="page-footer">
   <nav class="pagination">

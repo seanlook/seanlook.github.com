@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>误删vSphere虚拟机.vmdk文件的恢复 | Sean Note</title>
+<meta name="keywords" content="vsphere, 虚拟化, troubleshooting">
+<meta name="description" content="1. 错误描述 在vSphere上，一次重启虚拟服务器时出现启动不了，提示找不到vmdk虚拟磁盘文件： 2. 原因分析 查看这台虚拟服务器的摘要信息，对比datastore上其他可用的虚拟机，发现损坏的服务器上确实缺少一个vmdk磁盘文件，但是可以看见一个50G的xxx-flat.vmdk文件；而正常的服务器只有xxx.vmdk，没有xxx-flat.vmdk，关机之后两个文件都存在，而且真实的磁盘容量从vmdk转移到了xxx-flat.vmdk。 虚拟主机在运行的时候，实际在使用的是xxx-flat.vmdk，然而xxx.vmdk是可以同时被删除的，才导致了问题。
+这里需要说明，虚拟机的每个磁盘驱动器都包含了一对.vmdk文件。一个是文本文件，包含了关于虚拟硬盘的描述数据；另外一个是磁盘的实际内容。例如，一个名为examplevm的虚拟机连接有一个硬盘。这个磁盘由如下两个文件构成：一个小于 1KB 的examplevm.vmdk描述文件和一个10GB大小的examplevm- flat.vmdk平面（数据）文件，该文件包含虚拟机的实际数据，而这些数据又是以二进制的形式存放在物理磁盘上，examplevm.vmdk描述文件就是描述这种映射关系的。 另外：
+A note for ESX-users: Do not use Datastorebrowser to identify vmdks or download them for editiing. The Datastorebrowser does not display vmdks correctly. It usually hides *-flat.vmdks and *-delta.vmdks.
+TO-DO: 后续为 VMware ESXi 5 的磁盘专门记录一篇文章，说明“置备空间”以及vmfstools工具的使用。
+3. 解决办法 (1) 用ssh登录vsphere主机，查找xxx-flat.vmdk文件所在的位置以及目录，并记录文件的大小
+~ # find / -name &#34;新建虚拟机-flat.vmdk&#34; /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat.vmdk ~ # ls -l /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat.vmdk -rw------- 1 root root 53687091200 Apr 16 09:13 /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2014/10/%E8%AF%AF%E5%88%A0vsphere%E8%99%9A%E6%8B%9F%E6%9C%BA.vmdk%E6%96%87%E4%BB%B6%E7%9A%84%E6%81%A2%E5%A4%8D/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="误删vSphere虚拟机.vmdk文件的恢复" />
+<meta property="og:description" content="1. 错误描述 在vSphere上，一次重启虚拟服务器时出现启动不了，提示找不到vmdk虚拟磁盘文件： 2. 原因分析 查看这台虚拟服务器的摘要信息，对比datastore上其他可用的虚拟机，发现损坏的服务器上确实缺少一个vmdk磁盘文件，但是可以看见一个50G的xxx-flat.vmdk文件；而正常的服务器只有xxx.vmdk，没有xxx-flat.vmdk，关机之后两个文件都存在，而且真实的磁盘容量从vmdk转移到了xxx-flat.vmdk。 虚拟主机在运行的时候，实际在使用的是xxx-flat.vmdk，然而xxx.vmdk是可以同时被删除的，才导致了问题。
+这里需要说明，虚拟机的每个磁盘驱动器都包含了一对.vmdk文件。一个是文本文件，包含了关于虚拟硬盘的描述数据；另外一个是磁盘的实际内容。例如，一个名为examplevm的虚拟机连接有一个硬盘。这个磁盘由如下两个文件构成：一个小于 1KB 的examplevm.vmdk描述文件和一个10GB大小的examplevm- flat.vmdk平面（数据）文件，该文件包含虚拟机的实际数据，而这些数据又是以二进制的形式存放在物理磁盘上，examplevm.vmdk描述文件就是描述这种映射关系的。 另外：
+A note for ESX-users: Do not use Datastorebrowser to identify vmdks or download them for editiing. The Datastorebrowser does not display vmdks correctly. It usually hides *-flat.vmdks and *-delta.vmdks.
+TO-DO: 后续为 VMware ESXi 5 的磁盘专门记录一篇文章，说明“置备空间”以及vmfstools工具的使用。
+3. 解决办法 (1) 用ssh登录vsphere主机，查找xxx-flat.vmdk文件所在的位置以及目录，并记录文件的大小
+~ # find / -name &#34;新建虚拟机-flat.vmdk&#34; /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat.vmdk ~ # ls -l /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat.vmdk -rw------- 1 root root 53687091200 Apr 16 09:13 /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2014/10/%E8%AF%AF%E5%88%A0vsphere%E8%99%9A%E6%8B%9F%E6%9C%BA.vmdk%E6%96%87%E4%BB%B6%E7%9A%84%E6%81%A2%E5%A4%8D/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2014-10-28T15:21:25+00:00" />
+<meta property="article:modified_time" content="2014-10-28T15:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="误删vSphere虚拟机.vmdk文件的恢复"/>
+<meta name="twitter:description" content="1. 错误描述 在vSphere上，一次重启虚拟服务器时出现启动不了，提示找不到vmdk虚拟磁盘文件： 2. 原因分析 查看这台虚拟服务器的摘要信息，对比datastore上其他可用的虚拟机，发现损坏的服务器上确实缺少一个vmdk磁盘文件，但是可以看见一个50G的xxx-flat.vmdk文件；而正常的服务器只有xxx.vmdk，没有xxx-flat.vmdk，关机之后两个文件都存在，而且真实的磁盘容量从vmdk转移到了xxx-flat.vmdk。 虚拟主机在运行的时候，实际在使用的是xxx-flat.vmdk，然而xxx.vmdk是可以同时被删除的，才导致了问题。
+这里需要说明，虚拟机的每个磁盘驱动器都包含了一对.vmdk文件。一个是文本文件，包含了关于虚拟硬盘的描述数据；另外一个是磁盘的实际内容。例如，一个名为examplevm的虚拟机连接有一个硬盘。这个磁盘由如下两个文件构成：一个小于 1KB 的examplevm.vmdk描述文件和一个10GB大小的examplevm- flat.vmdk平面（数据）文件，该文件包含虚拟机的实际数据，而这些数据又是以二进制的形式存放在物理磁盘上，examplevm.vmdk描述文件就是描述这种映射关系的。 另外：
+A note for ESX-users: Do not use Datastorebrowser to identify vmdks or download them for editiing. The Datastorebrowser does not display vmdks correctly. It usually hides *-flat.vmdks and *-delta.vmdks.
+TO-DO: 后续为 VMware ESXi 5 的磁盘专门记录一篇文章，说明“置备空间”以及vmfstools工具的使用。
+3. 解决办法 (1) 用ssh登录vsphere主机，查找xxx-flat.vmdk文件所在的位置以及目录，并记录文件的大小
+~ # find / -name &#34;新建虚拟机-flat.vmdk&#34; /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat.vmdk ~ # ls -l /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat.vmdk -rw------- 1 root root 53687091200 Apr 16 09:13 /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "误删vSphere虚拟机.vmdk文件的恢复",
+      "item": "http://xgknight.com/posts/2014/10/%E8%AF%AF%E5%88%A0vsphere%E8%99%9A%E6%8B%9F%E6%9C%BA.vmdk%E6%96%87%E4%BB%B6%E7%9A%84%E6%81%A2%E5%A4%8D/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "误删vSphere虚拟机.vmdk文件的恢复",
+  "name": "误删vSphere虚拟机.vmdk文件的恢复",
+  "description": "1. 错误描述 在vSphere上，一次重启虚拟服务器时出现启动不了，提示找不到vmdk虚拟磁盘文件： 2. 原因分析 查看这台虚拟服务器的摘要信息，对比datastore上其他可用的虚拟机，发现损坏的服务器上确实缺少一个vmdk磁盘文件，但是可以看见一个50G的xxx-flat.vmdk文件；而正常的服务器只有xxx.vmdk，没有xxx-flat.vmdk，关机之后两个文件都存在，而且真实的磁盘容量从vmdk转移到了xxx-flat.vmdk。 虚拟主机在运行的时候，实际在使用的是xxx-flat.vmdk，然而xxx.vmdk是可以同时被删除的，才导致了问题。\n这里需要说明，虚拟机的每个磁盘驱动器都包含了一对.vmdk文件。一个是文本文件，包含了关于虚拟硬盘的描述数据；另外一个是磁盘的实际内容。例如，一个名为examplevm的虚拟机连接有一个硬盘。这个磁盘由如下两个文件构成：一个小于 1KB 的examplevm.vmdk描述文件和一个10GB大小的examplevm- flat.vmdk平面（数据）文件，该文件包含虚拟机的实际数据，而这些数据又是以二进制的形式存放在物理磁盘上，examplevm.vmdk描述文件就是描述这种映射关系的。 另外：\nA note for ESX-users: Do not use Datastorebrowser to identify vmdks or download them for editiing. The Datastorebrowser does not display vmdks correctly. It usually hides *-flat.vmdks and *-delta.vmdks.\nTO-DO: 后续为 VMware ESXi 5 的磁盘专门记录一篇文章，说明“置备空间”以及vmfstools工具的使用。\n3. 解决办法 (1) 用ssh登录vsphere主机，查找xxx-flat.vmdk文件所在的位置以及目录，并记录文件的大小\n~ # find / -name \u0026#34;新建虚拟机-flat.vmdk\u0026#34; /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat.vmdk ~ # ls -l /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat.vmdk -rw------- 1 root root 53687091200 Apr 16 09:13 /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat.",
+  "keywords": [
+    "vsphere", "虚拟化", "troubleshooting"
+  ],
+  "articleBody": "1. 错误描述 在vSphere上，一次重启虚拟服务器时出现启动不了，提示找不到vmdk虚拟磁盘文件： 2. 原因分析 查看这台虚拟服务器的摘要信息，对比datastore上其他可用的虚拟机，发现损坏的服务器上确实缺少一个vmdk磁盘文件，但是可以看见一个50G的xxx-flat.vmdk文件；而正常的服务器只有xxx.vmdk，没有xxx-flat.vmdk，关机之后两个文件都存在，而且真实的磁盘容量从vmdk转移到了xxx-flat.vmdk。 虚拟主机在运行的时候，实际在使用的是xxx-flat.vmdk，然而xxx.vmdk是可以同时被删除的，才导致了问题。\n这里需要说明，虚拟机的每个磁盘驱动器都包含了一对.vmdk文件。一个是文本文件，包含了关于虚拟硬盘的描述数据；另外一个是磁盘的实际内容。例如，一个名为examplevm的虚拟机连接有一个硬盘。这个磁盘由如下两个文件构成：一个小于 1KB 的examplevm.vmdk描述文件和一个10GB大小的examplevm- flat.vmdk平面（数据）文件，该文件包含虚拟机的实际数据，而这些数据又是以二进制的形式存放在物理磁盘上，examplevm.vmdk描述文件就是描述这种映射关系的。 另外：\nA note for ESX-users: Do not use Datastorebrowser to identify vmdks or download them for editiing. The Datastorebrowser does not display vmdks correctly. It usually hides *-flat.vmdks and *-delta.vmdks.\nTO-DO: 后续为 VMware ESXi 5 的磁盘专门记录一篇文章，说明“置备空间”以及vmfstools工具的使用。\n3. 解决办法 (1) 用ssh登录vsphere主机，查找xxx-flat.vmdk文件所在的位置以及目录，并记录文件的大小\n~ # find / -name \"新建虚拟机-flat.vmdk\" /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat.vmdk ~ # ls -l /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat.vmdk -rw------- 1 root root 53687091200 Apr 16 09:13 /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat.vmdk 注意，ESXi5默认没有开启ssh，需要通过vsphere client登录服务器，【配置】【安全配置文件】【服务-属性】手动开启。\n(2) 重命名xxx-flat.vmdk文件\n~ # cd /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/ /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机_1 # mv 新建虚拟机-flat.vmdk tmp_新建虚拟机-flat.vmdk /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机 # ls -la drwxr-xr-x 1 root root 1680 Apr 21 05:47 . drwxr-xr-t 1 root root 2660 Apr 18 03:16 .. -rw-r--r-- 1 root root 102076 Apr 18 10:05 vmware.log -rw------- 1 root root 96468992 Apr 18 05:43 vmx-新建虚拟机-578288005-1.vswp -rw------- 1 root root 2147483648 Apr 18 05:43 新建虚拟机-2277f985.vswp -rw------- 1 root root 53687091200 Apr 21 05:47 新建虚拟机-flat.vmdk -rw------- 1 root root 8684 Apr 21 05:47 新建虚拟机.nvram -rw------- 1 root root 503 Apr 18 05:44 新建虚拟机.vmdk -rw-r--r-- 1 root root 0 Apr 16 09:13 新建虚拟机.vmsd -rwxr-xr-- 1 root root 3690 Apr 18 05:43 新建虚拟机.vmx -rw------- 1 root root 0 Apr 18 05:43 新建虚拟机.vmx.lck -rwxr-xr-- 1 root root 3690 Apr 18 05:43 新建虚拟机.vmx~ (3) 在虚拟机目录下创建xxx.vmdk文件，大小要和xxx-flat.vmdk一样大\n/vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机 # vmkfstools -c 53687091200 -a lsilogic 新建虚拟机.vmdk Create: 100% done. /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机 # ls -la *vmdk -rw------- 1 root root 53687091200 Apr 21 05:49 新建虚拟机-flat.vmdk -rw------- 1 root root 503 Apr 18 05:44 新建虚拟机.vmdk (4) 将原来的(tmp_)xxx-flat.vmdk覆盖掉刚创建的同样大小的xxx-flat.vmdk\n/vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机 # mv tmp_新建虚拟机-flat.vmdk 新建虚拟机-flat.vmdk 重命名操作很快完成，启动虚拟机既可以恢复。\n5. 总结 相比重新创建一个同名虚拟机，然后mv原来的xxx-flat.vmdk硬盘文件到新的虚拟机，更节省时间；此外也无需再次配置网卡地址。 xxx.vmdk本身是一个不到1k的文本文件，通过vi编辑查看可知真正存放数据的是xxx-flat.vmdk磁盘文件，所以只要这个文件还存在，就可以恢复。 5. 参考 重建丢失的虚拟机磁盘(VMDK)描述文件(2030127) （英文）\nRecreating A Missing VMDK Descriptor File\nVirtual Machine files and settings explained ",
+  "wordCount" : "261",
+  "inLanguage": "en",
+  "datePublished": "2014-10-28T15:21:25Z",
+  "dateModified": "2014-10-28T15:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2014/10/%E8%AF%AF%E5%88%A0vsphere%E8%99%9A%E6%8B%9F%E6%9C%BA.vmdk%E6%96%87%E4%BB%B6%E7%9A%84%E6%81%A2%E5%A4%8D/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      误删vSphere虚拟机.vmdk文件的恢复
+    </h1>
+    <div class="post-meta"><span title='2014-10-28 15:21:25 +0000 UTC'>October 28, 2014</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><h2 id="1-错误描述">1. 错误描述<a hidden class="anchor" aria-hidden="true" href="#1-错误描述">#</a></h2>
+<p>在vSphere上，一次重启虚拟服务器时出现启动不了，提示找不到vmdk虚拟磁盘文件：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/vmdk_not_found.png" alt="vmdk_not_found"  />
+</p>
+<h2 id="2-原因分析">2. 原因分析<a hidden class="anchor" aria-hidden="true" href="#2-原因分析">#</a></h2>
+<p>查看这台虚拟服务器的摘要信息，对比datastore上其他可用的虚拟机，发现损坏的服务器上确实缺少一个vmdk磁盘文件，但是可以看见一个50G的<code>xxx-flat.vmdk</code>文件；而正常的服务器只有<code>xxx.vmdk</code>，没有<code>xxx-flat.vmdk</code>，关机之后两个文件都存在，而且真实的磁盘容量从vmdk转移到了<code>xxx-flat.vmdk</code>。
+虚拟主机在运行的时候，实际在使用的是<code>xxx-flat.vmdk</code>，然而<code>xxx.vmdk</code>是可以同时被删除的，才导致了问题。</p>
+<!-- raw HTML omitted -->
+<p>这里需要说明，虚拟机的每个磁盘驱动器都包含了一对<code>.vmdk</code>文件。一个是文本文件，包含了关于虚拟硬盘的描述数据；另外一个是磁盘的实际内容。例如，一个名为<code>examplevm</code>的虚拟机连接有一个硬盘。这个磁盘由如下两个文件构成：一个小于 1KB 的<code>examplevm.vmdk</code>描述文件和一个10GB大小的<code>examplevm- flat.vmdk</code>平面（数据）文件，该文件包含虚拟机的实际数据，而这些数据又是以二进制的形式存放在物理磁盘上，<code>examplevm.vmdk</code>描述文件就是描述这种映射关系的。
+另外：</p>
+<blockquote>
+<p>A note for ESX-users:
+Do not use Datastorebrowser to identify vmdks or download them for editiing.
+The Datastorebrowser does not display vmdks correctly.
+It usually hides *-flat.vmdks and *-delta.vmdks.</p>
+</blockquote>
+<p>TO-DO:
+后续为 VMware ESXi 5 的磁盘专门记录一篇文章，说明“置备空间”以及vmfstools工具的使用。</p>
+<h2 id="3-解决办法">3. 解决办法<a hidden class="anchor" aria-hidden="true" href="#3-解决办法">#</a></h2>
+<p><strong>(1) 用ssh登录vsphere主机，查找xxx-flat.vmdk文件所在的位置以及目录，并记录文件的大小</strong></p>
+<pre tabindex="0"><code>~ # find / -name &#34;新建虚拟机-flat.vmdk&#34;
+/vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat.vmdk
+~ # ls -l /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat.vmdk
+-rw-------    1 root     root     53687091200 Apr 16 09:13 /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/新建虚拟机-flat.vmdk
+</code></pre><p>注意，ESXi5默认没有开启ssh，需要通过vsphere client登录服务器，【配置】【安全配置文件】【服务-属性】手动开启。</p>
+<p><strong>(2) 重命名xxx-flat.vmdk文件</strong></p>
+<pre tabindex="0"><code>~ # cd  /vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机/
+/vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机_1 # mv 新建虚拟机-flat.vmdk tmp_新建虚拟机-flat.vmdk
+/vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机 # ls -la
+drwxr-xr-x    1 root     root          1680 Apr 21 05:47 .
+drwxr-xr-t    1 root     root          2660 Apr 18 03:16 ..
+-rw-r--r--    1 root     root        102076 Apr 18 10:05 vmware.log
+-rw-------    1 root     root      96468992 Apr 18 05:43 vmx-新建虚拟机-578288005-1.vswp
+-rw-------    1 root     root     2147483648 Apr 18 05:43 新建虚拟机-2277f985.vswp
+-rw-------    1 root     root     53687091200 Apr 21 05:47 新建虚拟机-flat.vmdk
+-rw-------    1 root     root          8684 Apr 21 05:47 新建虚拟机.nvram
+-rw-------    1 root     root           503 Apr 18 05:44 新建虚拟机.vmdk
+-rw-r--r--    1 root     root             0 Apr 16 09:13 新建虚拟机.vmsd
+-rwxr-xr--    1 root     root          3690 Apr 18 05:43 新建虚拟机.vmx
+-rw-------    1 root     root             0 Apr 18 05:43 新建虚拟机.vmx.lck
+-rwxr-xr--    1 root     root          3690 Apr 18 05:43 新建虚拟机.vmx~
+</code></pre><p><strong>(3) 在虚拟机目录下创建xxx.vmdk文件，大小要和xxx-flat.vmdk一样大</strong></p>
+<pre tabindex="0"><code>/vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机 # vmkfstools -c 53687091200 -a lsilogic 新建虚拟机.vmdk
+Create: 100% done.
+/vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机 # ls -la *vmdk
+-rw-------    1 root     root     53687091200 Apr 21 05:49 新建虚拟机-flat.vmdk
+-rw-------    1 root     root           503 Apr 18 05:44 新建虚拟机.vmdk
+</code></pre><p><strong>(4) 将原来的(tmp_)xxx-flat.vmdk覆盖掉刚创建的同样大小的xxx-flat.vmdk</strong></p>
+<pre tabindex="0"><code>/vmfs/volumes/50a98441-ab02c8b7-e60a-001517712dce/新建虚拟机 # mv tmp_新建虚拟机-flat.vmdk 新建虚拟机-flat.vmdk
+</code></pre><p>重命名操作很快完成，启动虚拟机既可以恢复。</p>
+<h2 id="5-总结">5. 总结<a hidden class="anchor" aria-hidden="true" href="#5-总结">#</a></h2>
+<ul>
+<li>相比重新创建一个同名虚拟机，然后mv原来的xxx-flat.vmdk硬盘文件到新的虚拟机，更节省时间；此外也无需再次配置网卡地址。</li>
+<li>xxx.vmdk本身是一个不到1k的文本文件，通过vi编辑查看可知真正存放数据的是xxx-flat.vmdk磁盘文件，所以只要这个文件还存在，就可以恢复。</li>
+</ul>
+<h1 id="5-参考">5. 参考<a hidden class="anchor" aria-hidden="true" href="#5-参考">#</a></h1>
+<ul>
+<li>
+<p><a href="http://kb.vmware.com/selfservice/search.do?cmd=displayKC&amp;docType=kc&amp;docTypeID=DT_KB_1_1&amp;externalId=2030127">重建丢失的虚拟机磁盘(VMDK)描述文件(2030127)</a> （<a href="http://kb.vmware.com/selfservice/microsites/search.do?language=en_US&amp;cmd=displayKC&amp;externalId=1002511">英文</a>）</p>
+</li>
+<li>
+<p><a href="http://buildvirtual.net/recreating-a-missing-vmdk-descriptor-file/">Recreating A Missing VMDK Descriptor File</a></p>
+</li>
+<li>
+<p><a href="https://anthbro.wordpress.com/2012/01/16/virtual_machine_files_explained/">Virtual Machine files and settings explained </a></p>
+</li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/vsphere/">vsphere</a></li>
+      <li><a href="http://xgknight.com/tags/%E8%99%9A%E6%8B%9F%E5%8C%96/">虚拟化</a></li>
+      <li><a href="http://xgknight.com/tags/troubleshooting/">troubleshooting</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

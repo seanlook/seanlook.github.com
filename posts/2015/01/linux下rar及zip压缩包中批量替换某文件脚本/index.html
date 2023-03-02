@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>Linux下rar及zip压缩包中批量替换某文件脚本 | Sean Note</title>
+<meta name="keywords" content="script, shell">
+<meta name="description" content="本需求是自己负责的一个生产系统上，有大量以zip和rar结尾的压缩文件散落在文件系统的各个文件夹，先在需要把压缩包里包含某一个特定文件（如tftpd32.exe或Tftpd32.exe，版本较旧），全都替换成比较新的tftpd32.exe版本。压缩文件总数约5000个，需要替换的数量约1500个。
+因为是生产环境，不敢轻易乱动，所以脚本考虑的因素就非常多，不允许中间执行过程出现异常，所以找到文件后实际执行替换操作之前做好备份，并且将操作过程记录日志。
+以下几点需要考虑：
+分别处理zip和rar文件，为减低脚本的复杂程度，分作两个shell脚本。 rar在Linux下默认是没有安装解压缩工具，下载rarlinux-x64-5.2.0.tar.gz zip包中文件含有中文文件名，unzip测试解压缩或列出内容时出现文件名乱码，原因是zip在压缩时不记录当时的编码格式。这个问题非常棘手，乱码打进压缩包是绝对不允许的，网上有几种解压办法有几种办法都不能很好的应对我的场景：并不需要实际解压zip文件，而只需使用 l ——列出文件列表、获取目录及文件名，d ——从压缩包中直接删除某个文件，a ——向压缩包添加一个文件。实际解压到文件系统上是不是乱码我们并不关心。 最后的解决办法是使用p7zip工具，配合LANG变量解决。 向压缩包里添加新文件时，要保持里面的目录结构，则必须在文件系统上存在同样的 相对目录/文件 。所以每次都要在脚本执行目录下创建临时目录tmp_dir，还要及时删除。但如果文件在压缩包的根目录下，这个临时目录就是当前脚本执行目录。 有可能会存在一个压缩包中多个文件夹中包含不止一个tftpd32.exe文件。 每个文件都有一个CRC值，处理文件名大小写不同但实质是同一个文件时有效。 以下脚本使用说明：
+变量说明 filelist 变量设定你所需要检查的压缩文件列表（绝对路径），可以通过find /your/dir/ -name *.rar | sort | uniq &gt; testfile。与脚本在相同目录下，并且为unix格式 existlist 变量是从filelist文件中得到的包含特定文件的列表，脚本执行完后可以查看 errorlist 变量是从filelist文件列表中得到的不包含特定文件的列表，当然也有可能这个压缩文件本身不完整 filebak 变量指定要替换的那个压缩文件备份的目录 oldfile 指定要替换的那个文件名 newfile 指定新文件的文件名，注意这个文件一定要在脚本当前目录下 binrar,bin7z 指定解压缩命令目录，因为7z和rar都不是CentOS自带的 fl 是filelist文件列表里的每一条记录 exist 压缩文件fl的内容列表里包含tftpd32.exe的记录，可能有多行 dirfiles 处理exist的结果，形如压缩包里的目录结构 your/dir/tftpd32.exe，可能有多行 df 是dirfiles中的单行记录，它的前面目录部分便是tmp_dir 是否有必要root用户执行看个人情况，执行后部分文件的属主可能会变，可用chown user1.user1 -R /your/dir/恢复 有部分zip文件无法使用7z，但文件本身正常，从日志可以看到error信息 tftpd32.exe区分大小写，如果要查找替换Tftpd32.exe请修改后在执行（确保grep没有-i选项） 可以处理的情况 压缩文件中无tftpd32.exe 要替换的tftpd32.exe文件在压缩文件根目录下 要替换的tftpd32.exe在嵌套子目录中 压缩文件中存在多个tftpd32.exe 压缩文件本身存在问题 该脚本有一定的危险性（虽然已备份），在正式环境中运行之前一定要多做测试。并且运行一次之后，谨慎运行第二次，因为可能会导致备份被覆盖（可换备份目录） 假如出现异常，要从备份文件恢复所有修改的文件，可以根据$existlist和filebak下的目录列表拼凑cp语句 建议执行方法./rar_new.sh | tee your.log，事后可从your.log中查看日志 处理rar的脚本rar_new.sh:
+#!/bin/bash filelist=&#34;testfile&#34; # filelist=&#34;crm_rar.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2015/01/linux%E4%B8%8Brar%E5%8F%8Azip%E5%8E%8B%E7%BC%A9%E5%8C%85%E4%B8%AD%E6%89%B9%E9%87%8F%E6%9B%BF%E6%8D%A2%E6%9F%90%E6%96%87%E4%BB%B6%E8%84%9A%E6%9C%AC/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="Linux下rar及zip压缩包中批量替换某文件脚本" />
+<meta property="og:description" content="本需求是自己负责的一个生产系统上，有大量以zip和rar结尾的压缩文件散落在文件系统的各个文件夹，先在需要把压缩包里包含某一个特定文件（如tftpd32.exe或Tftpd32.exe，版本较旧），全都替换成比较新的tftpd32.exe版本。压缩文件总数约5000个，需要替换的数量约1500个。
+因为是生产环境，不敢轻易乱动，所以脚本考虑的因素就非常多，不允许中间执行过程出现异常，所以找到文件后实际执行替换操作之前做好备份，并且将操作过程记录日志。
+以下几点需要考虑：
+分别处理zip和rar文件，为减低脚本的复杂程度，分作两个shell脚本。 rar在Linux下默认是没有安装解压缩工具，下载rarlinux-x64-5.2.0.tar.gz zip包中文件含有中文文件名，unzip测试解压缩或列出内容时出现文件名乱码，原因是zip在压缩时不记录当时的编码格式。这个问题非常棘手，乱码打进压缩包是绝对不允许的，网上有几种解压办法有几种办法都不能很好的应对我的场景：并不需要实际解压zip文件，而只需使用 l ——列出文件列表、获取目录及文件名，d ——从压缩包中直接删除某个文件，a ——向压缩包添加一个文件。实际解压到文件系统上是不是乱码我们并不关心。 最后的解决办法是使用p7zip工具，配合LANG变量解决。 向压缩包里添加新文件时，要保持里面的目录结构，则必须在文件系统上存在同样的 相对目录/文件 。所以每次都要在脚本执行目录下创建临时目录tmp_dir，还要及时删除。但如果文件在压缩包的根目录下，这个临时目录就是当前脚本执行目录。 有可能会存在一个压缩包中多个文件夹中包含不止一个tftpd32.exe文件。 每个文件都有一个CRC值，处理文件名大小写不同但实质是同一个文件时有效。 以下脚本使用说明：
+变量说明 filelist 变量设定你所需要检查的压缩文件列表（绝对路径），可以通过find /your/dir/ -name *.rar | sort | uniq &gt; testfile。与脚本在相同目录下，并且为unix格式 existlist 变量是从filelist文件中得到的包含特定文件的列表，脚本执行完后可以查看 errorlist 变量是从filelist文件列表中得到的不包含特定文件的列表，当然也有可能这个压缩文件本身不完整 filebak 变量指定要替换的那个压缩文件备份的目录 oldfile 指定要替换的那个文件名 newfile 指定新文件的文件名，注意这个文件一定要在脚本当前目录下 binrar,bin7z 指定解压缩命令目录，因为7z和rar都不是CentOS自带的 fl 是filelist文件列表里的每一条记录 exist 压缩文件fl的内容列表里包含tftpd32.exe的记录，可能有多行 dirfiles 处理exist的结果，形如压缩包里的目录结构 your/dir/tftpd32.exe，可能有多行 df 是dirfiles中的单行记录，它的前面目录部分便是tmp_dir 是否有必要root用户执行看个人情况，执行后部分文件的属主可能会变，可用chown user1.user1 -R /your/dir/恢复 有部分zip文件无法使用7z，但文件本身正常，从日志可以看到error信息 tftpd32.exe区分大小写，如果要查找替换Tftpd32.exe请修改后在执行（确保grep没有-i选项） 可以处理的情况 压缩文件中无tftpd32.exe 要替换的tftpd32.exe文件在压缩文件根目录下 要替换的tftpd32.exe在嵌套子目录中 压缩文件中存在多个tftpd32.exe 压缩文件本身存在问题 该脚本有一定的危险性（虽然已备份），在正式环境中运行之前一定要多做测试。并且运行一次之后，谨慎运行第二次，因为可能会导致备份被覆盖（可换备份目录） 假如出现异常，要从备份文件恢复所有修改的文件，可以根据$existlist和filebak下的目录列表拼凑cp语句 建议执行方法./rar_new.sh | tee your.log，事后可从your.log中查看日志 处理rar的脚本rar_new.sh:
+#!/bin/bash filelist=&#34;testfile&#34; # filelist=&#34;crm_rar." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2015/01/linux%E4%B8%8Brar%E5%8F%8Azip%E5%8E%8B%E7%BC%A9%E5%8C%85%E4%B8%AD%E6%89%B9%E9%87%8F%E6%9B%BF%E6%8D%A2%E6%9F%90%E6%96%87%E4%BB%B6%E8%84%9A%E6%9C%AC/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2015-01-29T18:21:25+00:00" />
+<meta property="article:modified_time" content="2015-01-29T18:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Linux下rar及zip压缩包中批量替换某文件脚本"/>
+<meta name="twitter:description" content="本需求是自己负责的一个生产系统上，有大量以zip和rar结尾的压缩文件散落在文件系统的各个文件夹，先在需要把压缩包里包含某一个特定文件（如tftpd32.exe或Tftpd32.exe，版本较旧），全都替换成比较新的tftpd32.exe版本。压缩文件总数约5000个，需要替换的数量约1500个。
+因为是生产环境，不敢轻易乱动，所以脚本考虑的因素就非常多，不允许中间执行过程出现异常，所以找到文件后实际执行替换操作之前做好备份，并且将操作过程记录日志。
+以下几点需要考虑：
+分别处理zip和rar文件，为减低脚本的复杂程度，分作两个shell脚本。 rar在Linux下默认是没有安装解压缩工具，下载rarlinux-x64-5.2.0.tar.gz zip包中文件含有中文文件名，unzip测试解压缩或列出内容时出现文件名乱码，原因是zip在压缩时不记录当时的编码格式。这个问题非常棘手，乱码打进压缩包是绝对不允许的，网上有几种解压办法有几种办法都不能很好的应对我的场景：并不需要实际解压zip文件，而只需使用 l ——列出文件列表、获取目录及文件名，d ——从压缩包中直接删除某个文件，a ——向压缩包添加一个文件。实际解压到文件系统上是不是乱码我们并不关心。 最后的解决办法是使用p7zip工具，配合LANG变量解决。 向压缩包里添加新文件时，要保持里面的目录结构，则必须在文件系统上存在同样的 相对目录/文件 。所以每次都要在脚本执行目录下创建临时目录tmp_dir，还要及时删除。但如果文件在压缩包的根目录下，这个临时目录就是当前脚本执行目录。 有可能会存在一个压缩包中多个文件夹中包含不止一个tftpd32.exe文件。 每个文件都有一个CRC值，处理文件名大小写不同但实质是同一个文件时有效。 以下脚本使用说明：
+变量说明 filelist 变量设定你所需要检查的压缩文件列表（绝对路径），可以通过find /your/dir/ -name *.rar | sort | uniq &gt; testfile。与脚本在相同目录下，并且为unix格式 existlist 变量是从filelist文件中得到的包含特定文件的列表，脚本执行完后可以查看 errorlist 变量是从filelist文件列表中得到的不包含特定文件的列表，当然也有可能这个压缩文件本身不完整 filebak 变量指定要替换的那个压缩文件备份的目录 oldfile 指定要替换的那个文件名 newfile 指定新文件的文件名，注意这个文件一定要在脚本当前目录下 binrar,bin7z 指定解压缩命令目录，因为7z和rar都不是CentOS自带的 fl 是filelist文件列表里的每一条记录 exist 压缩文件fl的内容列表里包含tftpd32.exe的记录，可能有多行 dirfiles 处理exist的结果，形如压缩包里的目录结构 your/dir/tftpd32.exe，可能有多行 df 是dirfiles中的单行记录，它的前面目录部分便是tmp_dir 是否有必要root用户执行看个人情况，执行后部分文件的属主可能会变，可用chown user1.user1 -R /your/dir/恢复 有部分zip文件无法使用7z，但文件本身正常，从日志可以看到error信息 tftpd32.exe区分大小写，如果要查找替换Tftpd32.exe请修改后在执行（确保grep没有-i选项） 可以处理的情况 压缩文件中无tftpd32.exe 要替换的tftpd32.exe文件在压缩文件根目录下 要替换的tftpd32.exe在嵌套子目录中 压缩文件中存在多个tftpd32.exe 压缩文件本身存在问题 该脚本有一定的危险性（虽然已备份），在正式环境中运行之前一定要多做测试。并且运行一次之后，谨慎运行第二次，因为可能会导致备份被覆盖（可换备份目录） 假如出现异常，要从备份文件恢复所有修改的文件，可以根据$existlist和filebak下的目录列表拼凑cp语句 建议执行方法./rar_new.sh | tee your.log，事后可从your.log中查看日志 处理rar的脚本rar_new.sh:
+#!/bin/bash filelist=&#34;testfile&#34; # filelist=&#34;crm_rar."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "Linux下rar及zip压缩包中批量替换某文件脚本",
+      "item": "http://xgknight.com/posts/2015/01/linux%E4%B8%8Brar%E5%8F%8Azip%E5%8E%8B%E7%BC%A9%E5%8C%85%E4%B8%AD%E6%89%B9%E9%87%8F%E6%9B%BF%E6%8D%A2%E6%9F%90%E6%96%87%E4%BB%B6%E8%84%9A%E6%9C%AC/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Linux下rar及zip压缩包中批量替换某文件脚本",
+  "name": "Linux下rar及zip压缩包中批量替换某文件脚本",
+  "description": "本需求是自己负责的一个生产系统上，有大量以zip和rar结尾的压缩文件散落在文件系统的各个文件夹，先在需要把压缩包里包含某一个特定文件（如tftpd32.exe或Tftpd32.exe，版本较旧），全都替换成比较新的tftpd32.exe版本。压缩文件总数约5000个，需要替换的数量约1500个。\n因为是生产环境，不敢轻易乱动，所以脚本考虑的因素就非常多，不允许中间执行过程出现异常，所以找到文件后实际执行替换操作之前做好备份，并且将操作过程记录日志。\n以下几点需要考虑：\n分别处理zip和rar文件，为减低脚本的复杂程度，分作两个shell脚本。 rar在Linux下默认是没有安装解压缩工具，下载rarlinux-x64-5.2.0.tar.gz zip包中文件含有中文文件名，unzip测试解压缩或列出内容时出现文件名乱码，原因是zip在压缩时不记录当时的编码格式。这个问题非常棘手，乱码打进压缩包是绝对不允许的，网上有几种解压办法有几种办法都不能很好的应对我的场景：并不需要实际解压zip文件，而只需使用 l ——列出文件列表、获取目录及文件名，d ——从压缩包中直接删除某个文件，a ——向压缩包添加一个文件。实际解压到文件系统上是不是乱码我们并不关心。 最后的解决办法是使用p7zip工具，配合LANG变量解决。 向压缩包里添加新文件时，要保持里面的目录结构，则必须在文件系统上存在同样的 相对目录/文件 。所以每次都要在脚本执行目录下创建临时目录tmp_dir，还要及时删除。但如果文件在压缩包的根目录下，这个临时目录就是当前脚本执行目录。 有可能会存在一个压缩包中多个文件夹中包含不止一个tftpd32.exe文件。 每个文件都有一个CRC值，处理文件名大小写不同但实质是同一个文件时有效。 以下脚本使用说明：\n变量说明 filelist 变量设定你所需要检查的压缩文件列表（绝对路径），可以通过find /your/dir/ -name *.rar | sort | uniq \u0026gt; testfile。与脚本在相同目录下，并且为unix格式 existlist 变量是从filelist文件中得到的包含特定文件的列表，脚本执行完后可以查看 errorlist 变量是从filelist文件列表中得到的不包含特定文件的列表，当然也有可能这个压缩文件本身不完整 filebak 变量指定要替换的那个压缩文件备份的目录 oldfile 指定要替换的那个文件名 newfile 指定新文件的文件名，注意这个文件一定要在脚本当前目录下 binrar,bin7z 指定解压缩命令目录，因为7z和rar都不是CentOS自带的 fl 是filelist文件列表里的每一条记录 exist 压缩文件fl的内容列表里包含tftpd32.exe的记录，可能有多行 dirfiles 处理exist的结果，形如压缩包里的目录结构 your/dir/tftpd32.exe，可能有多行 df 是dirfiles中的单行记录，它的前面目录部分便是tmp_dir 是否有必要root用户执行看个人情况，执行后部分文件的属主可能会变，可用chown user1.user1 -R /your/dir/恢复 有部分zip文件无法使用7z，但文件本身正常，从日志可以看到error信息 tftpd32.exe区分大小写，如果要查找替换Tftpd32.exe请修改后在执行（确保grep没有-i选项） 可以处理的情况 压缩文件中无tftpd32.exe 要替换的tftpd32.exe文件在压缩文件根目录下 要替换的tftpd32.exe在嵌套子目录中 压缩文件中存在多个tftpd32.exe 压缩文件本身存在问题 该脚本有一定的危险性（虽然已备份），在正式环境中运行之前一定要多做测试。并且运行一次之后，谨慎运行第二次，因为可能会导致备份被覆盖（可换备份目录） 假如出现异常，要从备份文件恢复所有修改的文件，可以根据$existlist和filebak下的目录列表拼凑cp语句 建议执行方法./rar_new.sh | tee your.log，事后可从your.log中查看日志 处理rar的脚本rar_new.sh:\n#!/bin/bash filelist=\u0026#34;testfile\u0026#34; # filelist=\u0026#34;crm_rar.",
+  "keywords": [
+    "script", "shell"
+  ],
+  "articleBody": "本需求是自己负责的一个生产系统上，有大量以zip和rar结尾的压缩文件散落在文件系统的各个文件夹，先在需要把压缩包里包含某一个特定文件（如tftpd32.exe或Tftpd32.exe，版本较旧），全都替换成比较新的tftpd32.exe版本。压缩文件总数约5000个，需要替换的数量约1500个。\n因为是生产环境，不敢轻易乱动，所以脚本考虑的因素就非常多，不允许中间执行过程出现异常，所以找到文件后实际执行替换操作之前做好备份，并且将操作过程记录日志。\n以下几点需要考虑：\n分别处理zip和rar文件，为减低脚本的复杂程度，分作两个shell脚本。 rar在Linux下默认是没有安装解压缩工具，下载rarlinux-x64-5.2.0.tar.gz zip包中文件含有中文文件名，unzip测试解压缩或列出内容时出现文件名乱码，原因是zip在压缩时不记录当时的编码格式。这个问题非常棘手，乱码打进压缩包是绝对不允许的，网上有几种解压办法有几种办法都不能很好的应对我的场景：并不需要实际解压zip文件，而只需使用 l ——列出文件列表、获取目录及文件名，d ——从压缩包中直接删除某个文件，a ——向压缩包添加一个文件。实际解压到文件系统上是不是乱码我们并不关心。 最后的解决办法是使用p7zip工具，配合LANG变量解决。 向压缩包里添加新文件时，要保持里面的目录结构，则必须在文件系统上存在同样的 相对目录/文件 。所以每次都要在脚本执行目录下创建临时目录tmp_dir，还要及时删除。但如果文件在压缩包的根目录下，这个临时目录就是当前脚本执行目录。 有可能会存在一个压缩包中多个文件夹中包含不止一个tftpd32.exe文件。 每个文件都有一个CRC值，处理文件名大小写不同但实质是同一个文件时有效。 以下脚本使用说明：\n变量说明 filelist 变量设定你所需要检查的压缩文件列表（绝对路径），可以通过find /your/dir/ -name *.rar | sort | uniq \u003e testfile。与脚本在相同目录下，并且为unix格式 existlist 变量是从filelist文件中得到的包含特定文件的列表，脚本执行完后可以查看 errorlist 变量是从filelist文件列表中得到的不包含特定文件的列表，当然也有可能这个压缩文件本身不完整 filebak 变量指定要替换的那个压缩文件备份的目录 oldfile 指定要替换的那个文件名 newfile 指定新文件的文件名，注意这个文件一定要在脚本当前目录下 binrar,bin7z 指定解压缩命令目录，因为7z和rar都不是CentOS自带的 fl 是filelist文件列表里的每一条记录 exist 压缩文件fl的内容列表里包含tftpd32.exe的记录，可能有多行 dirfiles 处理exist的结果，形如压缩包里的目录结构 your/dir/tftpd32.exe，可能有多行 df 是dirfiles中的单行记录，它的前面目录部分便是tmp_dir 是否有必要root用户执行看个人情况，执行后部分文件的属主可能会变，可用chown user1.user1 -R /your/dir/恢复 有部分zip文件无法使用7z，但文件本身正常，从日志可以看到error信息 tftpd32.exe区分大小写，如果要查找替换Tftpd32.exe请修改后在执行（确保grep没有-i选项） 可以处理的情况 压缩文件中无tftpd32.exe 要替换的tftpd32.exe文件在压缩文件根目录下 要替换的tftpd32.exe在嵌套子目录中 压缩文件中存在多个tftpd32.exe 压缩文件本身存在问题 该脚本有一定的危险性（虽然已备份），在正式环境中运行之前一定要多做测试。并且运行一次之后，谨慎运行第二次，因为可能会导致备份被覆盖（可换备份目录） 假如出现异常，要从备份文件恢复所有修改的文件，可以根据$existlist和filebak下的目录列表拼凑cp语句 建议执行方法./rar_new.sh | tee your.log，事后可从your.log中查看日志 处理rar的脚本rar_new.sh:\n#!/bin/bash filelist=\"testfile\" # filelist=\"crm_rar.txt\" existlist=\"${filelist}.exist\" errorlist=\"${filelist}.not\" filebak=\"/crmbak/rarbak\" oldfile=tftpd32.exe newfile=tftpd32.exe binrar=\"/usr/bin/rar\" IFS=$'\\n' echo \"files list bellow have ${oldfile}:\" \u003e $existlist echo \"files list bellow do not have ${oldfile} or may have error:\" \u003e $errorlist for fl in `cat $filelist` do # ${oldfile} exist or not, file error or not exist=`$binrar l $fl |grep ${oldfile}` if [ $? -ne 0 ];then echo \"$fl\" \u003e\u003e $errorlist continue else # get extracting dir and filename, could be more than one file dirfiles=`echo \"$exist\" | awk '{for (i=5;i\u003c=NF;i++) printf $i\" \" ; print \"\"}'` fi # echo \"$exist\" if [ \"$dirfiles\" != \"\" ];then echo \"$fl\" | tee -a $existlist # backup original file /bin/cp -af \"$fl\" \"$filebak/\" echo \"--- $fl is backed up in $filebak\" echo \" $dirfiles\" for df in `echo \"$dirfiles\"` do # create temp directory to put new ${newfile} for compress tmp_dir=$( echo \"$df\" | awk -F '/' '{for(i=1;i",
+  "wordCount" : "553",
+  "inLanguage": "en",
+  "datePublished": "2015-01-29T18:21:25Z",
+  "dateModified": "2015-01-29T18:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2015/01/linux%E4%B8%8Brar%E5%8F%8Azip%E5%8E%8B%E7%BC%A9%E5%8C%85%E4%B8%AD%E6%89%B9%E9%87%8F%E6%9B%BF%E6%8D%A2%E6%9F%90%E6%96%87%E4%BB%B6%E8%84%9A%E6%9C%AC/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      Linux下rar及zip压缩包中批量替换某文件脚本
+    </h1>
+    <div class="post-meta"><span title='2015-01-29 18:21:25 +0000 UTC'>January 29, 2015</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>本需求是自己负责的一个生产系统上，有大量以zip和rar结尾的压缩文件散落在文件系统的各个文件夹，先在需要把压缩包里包含某一个特定文件（如tftpd32.exe或Tftpd32.exe，版本较旧），全都替换成比较新的tftpd32.exe版本。压缩文件总数约5000个，需要替换的数量约1500个。</p>
+<p>因为是生产环境，不敢轻易乱动，所以脚本考虑的因素就非常多，不允许中间执行过程出现异常，所以找到文件后实际执行替换操作之前做好备份，并且将操作过程记录日志。</p>
+<p>以下几点需要考虑：</p>
+<ul>
+<li>分别处理zip和rar文件，为减低脚本的复杂程度，分作两个shell脚本。</li>
+<li>rar在Linux下默认是没有安装解压缩工具，下载rarlinux-x64-5.2.0.tar.gz</li>
+<li>zip包中文件含有中文文件名，unzip测试解压缩或列出内容时出现文件名乱码，原因是zip在压缩时不记录当时的编码格式。这个问题非常棘手，乱码打进压缩包是绝对不允许的，网上<a href="http://www.zhihu.com/question/20523036">有几种解压办法</a>有几种办法都不能很好的应对我的场景：并不需要实际解压zip文件，而只需使用 <code>l</code> ——列出文件列表、获取目录及文件名，<code>d</code> ——从压缩包中直接删除某个文件，<code>a</code> ——向压缩包添加一个文件。实际解压到文件系统上是不是乱码我们并不关心。
+最后的解决办法是使用<code>p7zip</code>工具，配合<code>LANG</code>变量解决。</li>
+<li>向压缩包里添加新文件时，要保持里面的目录结构，则必须在文件系统上存在同样的 相对目录/文件 。所以每次都要在脚本执行目录下创建临时目录tmp_dir，还要及时删除。但如果文件在压缩包的根目录下，这个临时目录就是当前脚本执行目录。</li>
+<li>有可能会存在一个压缩包中多个文件夹中包含不止一个tftpd32.exe文件。</li>
+<li>每个文件都有一个CRC值，处理文件名大小写不同但实质是同一个文件时有效。</li>
+</ul>
+<!-- raw HTML omitted -->
+<p>以下脚本使用说明：</p>
+<ul>
+<li>变量说明
+<ul>
+<li><code>filelist</code> 变量设定你所需要检查的压缩文件列表（绝对路径），可以通过<code>find /your/dir/ -name *.rar | sort | uniq  &gt; testfile</code>。与脚本在相同目录下，并且为unix格式</li>
+<li><code>existlist</code> 变量是从<code>filelist</code>文件中得到的包含特定文件的列表，脚本执行完后可以查看</li>
+<li><code>errorlist</code> 变量是从<code>filelist</code>文件列表中得到的不包含特定文件的列表，当然也有可能这个压缩文件本身不完整</li>
+<li><code>filebak</code> 变量指定要替换的那个压缩文件备份的目录</li>
+<li><code>oldfile</code> 指定要替换的那个文件名</li>
+<li><code>newfile</code> 指定新文件的文件名，注意这个文件一定要在脚本当前目录下</li>
+<li><code>binrar</code>,<code>bin7z</code> 指定解压缩命令目录，因为<code>7z</code>和<code>rar</code>都不是CentOS自带的</li>
+<li><code>fl</code> 是<code>filelist</code>文件列表里的每一条记录</li>
+<li><code>exist</code> 压缩文件<code>fl</code>的内容列表里包含tftpd32.exe的记录，可能有多行</li>
+<li><code>dirfiles</code> 处理<code>exist</code>的结果，形如压缩包里的目录结构 <code>your/dir/tftpd32.exe</code>，可能有多行</li>
+<li><code>df</code> 是<code>dirfiles</code>中的单行记录，它的前面目录部分便是<code>tmp_dir</code></li>
+</ul>
+</li>
+<li>是否有必要root用户执行看个人情况，执行后部分文件的属主可能会变，可用<code>chown user1.user1 -R /your/dir/</code>恢复</li>
+<li>有部分zip文件无法使用7z，但文件本身正常，从日志可以看到error信息</li>
+<li>tftpd32.exe区分大小写，如果要查找替换Tftpd32.exe请修改后在执行（确保grep没有<code>-i</code>选项）</li>
+<li>可以处理的情况
+<ul>
+<li>压缩文件中无tftpd32.exe</li>
+<li>要替换的tftpd32.exe文件在压缩文件根目录下</li>
+<li>要替换的tftpd32.exe在嵌套子目录中</li>
+<li>压缩文件中存在多个tftpd32.exe</li>
+<li>压缩文件本身存在问题</li>
+</ul>
+</li>
+<li>该脚本有一定的危险性（虽然已备份），在正式环境中运行之前一定要多做测试。并且运行一次之后，谨慎运行第二次，因为可能会导致备份被覆盖（可换备份目录）</li>
+<li>假如出现异常，要从备份文件恢复所有修改的文件，可以根据<code>$existlist</code>和<code>filebak</code>下的目录列表拼凑<code>cp</code>语句</li>
+<li>建议执行方法<code>./rar_new.sh | tee your.log</code>，事后可从<code>your.log</code>中查看日志</li>
+</ul>
+<p>处理rar的脚本<code>rar_new.sh</code>:</p>
+<pre tabindex="0"><code>#!/bin/bash
+
+filelist=&#34;testfile&#34;
+# filelist=&#34;crm_rar.txt&#34;
+existlist=&#34;${filelist}.exist&#34;
+errorlist=&#34;${filelist}.not&#34;
+filebak=&#34;/crmbak/rarbak&#34;
+oldfile=tftpd32.exe                                                                                                                                          
+newfile=tftpd32.exe
+binrar=&#34;/usr/bin/rar&#34;
+
+IFS=$&#39;\n&#39;
+
+echo &#34;files list bellow have ${oldfile}:&#34; &gt; $existlist
+echo &#34;files list bellow do not have ${oldfile} or may have error:&#34; &gt; $errorlist
+
+for fl in `cat $filelist`
+  do 
+    # ${oldfile} exist or not, file error or not
+    exist=`$binrar l $fl |grep ${oldfile}`
+    if [ $? -ne 0 ];then
+       echo &#34;$fl&#34; &gt;&gt; $errorlist
+       continue
+    else
+        # get extracting dir and filename, could be more than one file
+       dirfiles=`echo &#34;$exist&#34; | awk &#39;{for (i=5;i&lt;=NF;i++) printf $i&#34; &#34; ; print &#34;&#34;}&#39;`
+    fi
+
+#    echo &#34;$exist&#34;
+
+    if [ &#34;$dirfiles&#34; != &#34;&#34; ];then
+      echo &#34;$fl&#34; | tee -a $existlist
+      # backup original file
+      /bin/cp -af &#34;$fl&#34; &#34;$filebak/&#34;
+      echo &#34;--- $fl is backed up in $filebak&#34;
+      echo &#34;    $dirfiles&#34;
+
+      for df in `echo &#34;$dirfiles&#34;`
+        do
+          # create temp directory to put new ${newfile} for compress
+          tmp_dir=$( echo &#34;$df&#34; | awk -F &#39;/&#39; &#39;{for(i=1;i&lt;NF;i++) printf&#34;%s/&#34;,$i} {print &#34;&#34;}&#39; )
+          if [ ${#tmp_dir} -ne 0 ];then
+            mkdir -p &#34;$tmp_dir&#34; &amp;&amp; cp -af ${newfile} &#34;$tmp_dir&#34;
+          fi 
+          # start delete old file and add new one
+          $binrar d &#34;$fl&#34; &#34;$tmp_dir&#34;${oldfile} &amp;&amp; $binrar a &#34;$fl&#34; &#34;$tmp_dir&#34;${newfile}
+          if [ $? -ne 0 ];then                                                                                                                             
+            echo &#34;--- rar file $fl may have error, you SHOULD check it&#34;
+          fi
+
+          if [ ${#tmp_dir} -ne 0 ];then
+            rm -f &#34;$tmp_dir&#34;${newfile} &amp;&amp; rmdir -p &#34;$tmp_dir&#34;
+            if [ $? -ne 0 ];then
+              echo &#34;--- tmp_dir $tmp_dir delete fail&#34;
+            fi
+          fi
+        done
+
+      echo &#34;--- old deleted, new added&#34;
+    fi
+
+  done
+</code></pre><p>处理zip的脚本<code>zip_new.sh</code>:(两脚本相差很小，主要是为了谨慎起见减低脚本的复杂度)</p>
+<pre tabindex="0"><code>#!/bin/bash
+
+# filelist=&#34;test_filelist&#34;
+filelist=&#34;crm_zip.txt&#34;
+existlist=&#34;${filelist}.exist&#34;
+errorlist=&#34;${filelist}.not&#34;
+filebak=&#34;/crmbak/zipbak&#34;
+oldfile=tftpd32.exe
+newfile=tftpd32.exe
+bin7z=&#34;/usr/bin/7z&#34;
+
+export LANG=&#34;zh_CN.GB18030&#34;
+IFS=$&#39;\n&#39;
+
+echo &#34;files list bellow have ${oldfile}:&#34; &gt; $existlist
+echo &#34;files list bellow do not have ${oldfile} or may have error:&#34; &gt; $errorlist
+
+for fl in `cat $filelist`
+  do 
+    # ${oldfile} exist or not, file error or not
+    exist=`$bin7z l $fl |grep ${oldfile}`
+    if [ $? -ne 0 ];then
+       echo &#34;$fl&#34; &gt;&gt; $errorlist
+       continue
+    else
+        # get extracting dir and filename, could be more than one file
+       dirfiles=`echo &#34;$exist&#34; | awk &#39;{for (i=6;i&lt;=NF;i++) printf $i&#34; &#34; ; print &#34;&#34;}&#39;`
+    fi
+
+# echo ===== &#34;$dirfiles&#34;
+
+    if [ &#34;$dirfiles&#34; != &#34;&#34; ];then
+      echo &#34;$fl&#34; | tee -a $existlist
+      # backup original file
+      /bin/cp -af &#34;$fl&#34; &#34;$filebak/&#34;
+      echo &#34;--- $fl is backed up in $filebak&#34;
+      echo &#34;    $dirfiles&#34;
+
+      for df in `echo &#34;$dirfiles&#34;`
+        do
+          # create temp directory to put new ${newfile} for compress
+          tmp_dir=$( echo &#34;$df&#34; | awk -F &#39;/&#39; &#39;{for(i=1;i&lt;NF;i++) printf&#34;%s/&#34;,$i} {print &#34;&#34;}&#39; )
+          if [ ${#tmp_dir} -ne 0 ];then
+            mkdir -p &#34;$tmp_dir&#34; &amp;&amp; cp -af ${newfile} &#34;$tmp_dir&#34;
+          fi 
+          # start delete old file and add new one
+          $bin7z d &#34;$fl&#34; &#34;$tmp_dir&#34;${oldfile} &amp;&amp; $bin7z a &#34;$fl&#34; &#34;$tmp_dir&#34;${newfile}
+          if [ $? -ne 0 ];then                                                                                                                             
+            echo &#34;--- zip file $fl may have error, you SHOULD check it&#34;
+          fi
+ 
+          if [ ${#tmp_dir} -ne 0 ];then
+            rm -f &#34;$tmp_dir&#34;${newfile} &amp;&amp; rmdir -p &#34;$tmp_dir&#34;
+            if [ $? -ne 0 ];then
+              echo &#34;--- tmp_dir $tmp_dir delete fail&#34;
+            fi
+          fi
+        done
+
+      echo &#34;--- old deleted, new added&#34;
+    fi
+
+  done
+</code></pre>
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/script/">script</a></li>
+      <li><a href="http://xgknight.com/tags/shell/">shell</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

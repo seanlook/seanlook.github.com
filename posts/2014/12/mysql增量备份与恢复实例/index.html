@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>MySQL增量备份与恢复实例 | Sean Note</title>
+<meta name="keywords" content="mysql, database, binlog, backup">
+<meta name="description" content="小量的数据库可以每天进行完整备份，因为这也用不了多少时间，但当数据库很大时，就不太可能每天进行一次完整备份了，这时候就可以使用增量备份。增量备份的原理就是使用了mysql的binlog日志。 本次操作的MySQL版本为5.5.40 for Linux (x86_64)。
+增量备份要确保打开了二进制日志，参考mysql的日志系统：
+mysql&gt; show variables like &#39;%log_bin%&#39;; 首先对pak数据库做一个完整备份：
+$ mysqldump -h localhost -upak -ppwd -P3306 --master-data=2 --single-transaction --opt pak &gt; pak_bak_full.sql 这时候就会得到一个全备文件pak_bak_full.sql。mysqldump操作会导致滚动一次log，假设新的binlog文件是mysql-bin.000002。
+1. 模拟插入数据和误操作 a. 在pak库的某个表插入一些数据，然后执行flush logs命令。这时将会产生一个新的二进制日志文件mysql-bin.000003，mysql-bin.000002则保存了全备过后的所有更改，既增加记录的操作也保存在了mysql-bin.00002中。
+b. 再在pak库中的t_user表中增加两条记录，然后误删除t_user表。t_user中增加记录的操作和删除表的操作都记录在mysql-bin.000003中。
+2. 开始恢复 恢复过程不要记录日志：
+mysql &gt; set global sql_log_bin=0; 3. 首先导入全备数据 $ mysql -h localhost -upak -ppwd &lt; pak_bak_full.sql 或 mysql&gt; source /path/backup/pak_bak_full.sql 我们也可以看到全备时的binlog位置：
+head -50 backup-file.sql |grep &#39;CHANGE MASTER&#39; -- CHANGE MASTER TO MASTER_LOG_FILE=&#39;mysql-bin.000001&#39;, MASTER_LOG_POS=4321; 查看当前所在二进制日志中的位置：
+mysql&gt; show master status; 根据上面两个position能大概确定需要完整恢复哪几个binlog文件。">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2014/12/mysql%E5%A2%9E%E9%87%8F%E5%A4%87%E4%BB%BD%E4%B8%8E%E6%81%A2%E5%A4%8D%E5%AE%9E%E4%BE%8B/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="MySQL增量备份与恢复实例" />
+<meta property="og:description" content="小量的数据库可以每天进行完整备份，因为这也用不了多少时间，但当数据库很大时，就不太可能每天进行一次完整备份了，这时候就可以使用增量备份。增量备份的原理就是使用了mysql的binlog日志。 本次操作的MySQL版本为5.5.40 for Linux (x86_64)。
+增量备份要确保打开了二进制日志，参考mysql的日志系统：
+mysql&gt; show variables like &#39;%log_bin%&#39;; 首先对pak数据库做一个完整备份：
+$ mysqldump -h localhost -upak -ppwd -P3306 --master-data=2 --single-transaction --opt pak &gt; pak_bak_full.sql 这时候就会得到一个全备文件pak_bak_full.sql。mysqldump操作会导致滚动一次log，假设新的binlog文件是mysql-bin.000002。
+1. 模拟插入数据和误操作 a. 在pak库的某个表插入一些数据，然后执行flush logs命令。这时将会产生一个新的二进制日志文件mysql-bin.000003，mysql-bin.000002则保存了全备过后的所有更改，既增加记录的操作也保存在了mysql-bin.00002中。
+b. 再在pak库中的t_user表中增加两条记录，然后误删除t_user表。t_user中增加记录的操作和删除表的操作都记录在mysql-bin.000003中。
+2. 开始恢复 恢复过程不要记录日志：
+mysql &gt; set global sql_log_bin=0; 3. 首先导入全备数据 $ mysql -h localhost -upak -ppwd &lt; pak_bak_full.sql 或 mysql&gt; source /path/backup/pak_bak_full.sql 我们也可以看到全备时的binlog位置：
+head -50 backup-file.sql |grep &#39;CHANGE MASTER&#39; -- CHANGE MASTER TO MASTER_LOG_FILE=&#39;mysql-bin.000001&#39;, MASTER_LOG_POS=4321; 查看当前所在二进制日志中的位置：
+mysql&gt; show master status; 根据上面两个position能大概确定需要完整恢复哪几个binlog文件。" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2014/12/mysql%E5%A2%9E%E9%87%8F%E5%A4%87%E4%BB%BD%E4%B8%8E%E6%81%A2%E5%A4%8D%E5%AE%9E%E4%BE%8B/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2014-12-05T09:21:25+00:00" />
+<meta property="article:modified_time" content="2014-12-05T09:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="MySQL增量备份与恢复实例"/>
+<meta name="twitter:description" content="小量的数据库可以每天进行完整备份，因为这也用不了多少时间，但当数据库很大时，就不太可能每天进行一次完整备份了，这时候就可以使用增量备份。增量备份的原理就是使用了mysql的binlog日志。 本次操作的MySQL版本为5.5.40 for Linux (x86_64)。
+增量备份要确保打开了二进制日志，参考mysql的日志系统：
+mysql&gt; show variables like &#39;%log_bin%&#39;; 首先对pak数据库做一个完整备份：
+$ mysqldump -h localhost -upak -ppwd -P3306 --master-data=2 --single-transaction --opt pak &gt; pak_bak_full.sql 这时候就会得到一个全备文件pak_bak_full.sql。mysqldump操作会导致滚动一次log，假设新的binlog文件是mysql-bin.000002。
+1. 模拟插入数据和误操作 a. 在pak库的某个表插入一些数据，然后执行flush logs命令。这时将会产生一个新的二进制日志文件mysql-bin.000003，mysql-bin.000002则保存了全备过后的所有更改，既增加记录的操作也保存在了mysql-bin.00002中。
+b. 再在pak库中的t_user表中增加两条记录，然后误删除t_user表。t_user中增加记录的操作和删除表的操作都记录在mysql-bin.000003中。
+2. 开始恢复 恢复过程不要记录日志：
+mysql &gt; set global sql_log_bin=0; 3. 首先导入全备数据 $ mysql -h localhost -upak -ppwd &lt; pak_bak_full.sql 或 mysql&gt; source /path/backup/pak_bak_full.sql 我们也可以看到全备时的binlog位置：
+head -50 backup-file.sql |grep &#39;CHANGE MASTER&#39; -- CHANGE MASTER TO MASTER_LOG_FILE=&#39;mysql-bin.000001&#39;, MASTER_LOG_POS=4321; 查看当前所在二进制日志中的位置：
+mysql&gt; show master status; 根据上面两个position能大概确定需要完整恢复哪几个binlog文件。"/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "MySQL增量备份与恢复实例",
+      "item": "http://xgknight.com/posts/2014/12/mysql%E5%A2%9E%E9%87%8F%E5%A4%87%E4%BB%BD%E4%B8%8E%E6%81%A2%E5%A4%8D%E5%AE%9E%E4%BE%8B/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "MySQL增量备份与恢复实例",
+  "name": "MySQL增量备份与恢复实例",
+  "description": "小量的数据库可以每天进行完整备份，因为这也用不了多少时间，但当数据库很大时，就不太可能每天进行一次完整备份了，这时候就可以使用增量备份。增量备份的原理就是使用了mysql的binlog日志。 本次操作的MySQL版本为5.5.40 for Linux (x86_64)。\n增量备份要确保打开了二进制日志，参考mysql的日志系统：\nmysql\u0026gt; show variables like \u0026#39;%log_bin%\u0026#39;; 首先对pak数据库做一个完整备份：\n$ mysqldump -h localhost -upak -ppwd -P3306 --master-data=2 --single-transaction --opt pak \u0026gt; pak_bak_full.sql 这时候就会得到一个全备文件pak_bak_full.sql。mysqldump操作会导致滚动一次log，假设新的binlog文件是mysql-bin.000002。\n1. 模拟插入数据和误操作 a. 在pak库的某个表插入一些数据，然后执行flush logs命令。这时将会产生一个新的二进制日志文件mysql-bin.000003，mysql-bin.000002则保存了全备过后的所有更改，既增加记录的操作也保存在了mysql-bin.00002中。\nb. 再在pak库中的t_user表中增加两条记录，然后误删除t_user表。t_user中增加记录的操作和删除表的操作都记录在mysql-bin.000003中。\n2. 开始恢复 恢复过程不要记录日志：\nmysql \u0026gt; set global sql_log_bin=0; 3. 首先导入全备数据 $ mysql -h localhost -upak -ppwd \u0026lt; pak_bak_full.sql 或 mysql\u0026gt; source /path/backup/pak_bak_full.sql 我们也可以看到全备时的binlog位置：\nhead -50 backup-file.sql |grep \u0026#39;CHANGE MASTER\u0026#39; -- CHANGE MASTER TO MASTER_LOG_FILE=\u0026#39;mysql-bin.000001\u0026#39;, MASTER_LOG_POS=4321; 查看当前所在二进制日志中的位置：\nmysql\u0026gt; show master status; 根据上面两个position能大概确定需要完整恢复哪几个binlog文件。",
+  "keywords": [
+    "mysql", "database", "binlog", "backup"
+  ],
+  "articleBody": "小量的数据库可以每天进行完整备份，因为这也用不了多少时间，但当数据库很大时，就不太可能每天进行一次完整备份了，这时候就可以使用增量备份。增量备份的原理就是使用了mysql的binlog日志。 本次操作的MySQL版本为5.5.40 for Linux (x86_64)。\n增量备份要确保打开了二进制日志，参考mysql的日志系统：\nmysql\u003e show variables like '%log_bin%'; 首先对pak数据库做一个完整备份：\n$ mysqldump -h localhost -upak -ppwd -P3306 --master-data=2 --single-transaction --opt pak \u003e pak_bak_full.sql 这时候就会得到一个全备文件pak_bak_full.sql。mysqldump操作会导致滚动一次log，假设新的binlog文件是mysql-bin.000002。\n1. 模拟插入数据和误操作 a. 在pak库的某个表插入一些数据，然后执行flush logs命令。这时将会产生一个新的二进制日志文件mysql-bin.000003，mysql-bin.000002则保存了全备过后的所有更改，既增加记录的操作也保存在了mysql-bin.00002中。\nb. 再在pak库中的t_user表中增加两条记录，然后误删除t_user表。t_user中增加记录的操作和删除表的操作都记录在mysql-bin.000003中。\n2. 开始恢复 恢复过程不要记录日志：\nmysql \u003e set global sql_log_bin=0; 3. 首先导入全备数据 $ mysql -h localhost -upak -ppwd \u003c pak_bak_full.sql 或 mysql\u003e source /path/backup/pak_bak_full.sql 我们也可以看到全备时的binlog位置：\nhead -50 backup-file.sql |grep 'CHANGE MASTER' -- CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000001', MASTER_LOG_POS=4321; 查看当前所在二进制日志中的位置：\nmysql\u003e show master status; 根据上面两个position能大概确定需要完整恢复哪几个binlog文件。\n4. 恢复mysql-bin.000002 在待恢复的position或时间点以前、全备以后的binlog需要全部恢复，多个文件以空格隔开\n$ mysqlbinlog /var/lib/mysql/mysql-bin.000002 | mysql -uroot -p 此时查询可以得到前两条数据。\n5. 恢复部分mysql-bin.000003 这个日志中包括了新增记录和误删表两个部分，我们需要恢复到新增记录之后、误删操作以前的位置。\n如果知道误操作的命令如DROP TABLE，则可以通过下面的方法在binlog文件中找到误操作之前的那个position： （如下面的信息显示，误操作DROP TABLE之前的pos是775，在datetime 141204 15:08:04或pos 882时完成DROP TABLE操作）\n$ mysqlbinlog /var/lib/mysql/mysql-bin.000003 |grep -C 5 'DROP TABLE' #141204 15:07:05 server id 1 end_log_pos 775 Xid = 376 COMMIT/*!*/; # at 775 #141204 15:08:04 server id 1 end_log_pos 882 Query\tthread_id=10\texec_time=0\terror_code=0 SET TIMESTAMP=1417676884/*!*/; DROP TABLE `t_user` /* generated by server */ /*!*/; # at 882 恢复命令：\n$ mysqlbinlog /var/lib/mysql/mysql-bin.000003 --stop-position=775 | mysql -h localhost -uroot -p 如果position难以确定，但知道需要恢复到的确切（服务器）时间，也可以使用datetime：\n$ mysqlbinlog /var/lib/mysql/mysql-bin.000003 --stop-datetime=\"2014-12-04 15:08:00\" | mysql -uroot -p 如果不是误操作导致的，而是迁移数据库，那么不需要position或datetime，使用所有binlog文件增量恢复即可。\n确定恢复成功后记得打开日志记录：\nmysql \u003e set global sql_log_bin=1; 报错 unknown variable ‘default-character-set=utf8’ 在使用mysqlbinlog查看二进制日志的时候，提示下面的错误： /usr/local/mysql/bin/mysqlbinlog: unknown variable ‘default-character-set=utf8’\n原因是在我为了统一mysql客户端到服务端的的字符编码，在/etc/my.cnf文件的[client]、[mysqld]等节加入了default-character-set = utf8，mysqlbinlog会从my.cnf中的[client]读取配置，但奈何mysqlbinlog并不认识这个选项（据说是个bug）导致的。\n应对这个bug的方法有两个： 第一，自然是注释到[client]中的这个字符集配置； 第二，改用loose-default-character-set = utf8。在选项前加了loose-，表示当程序不认识此选项时会略过此选项，并给出一个警告。\n",
+  "wordCount" : "188",
+  "inLanguage": "en",
+  "datePublished": "2014-12-05T09:21:25Z",
+  "dateModified": "2014-12-05T09:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2014/12/mysql%E5%A2%9E%E9%87%8F%E5%A4%87%E4%BB%BD%E4%B8%8E%E6%81%A2%E5%A4%8D%E5%AE%9E%E4%BE%8B/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      MySQL增量备份与恢复实例
+    </h1>
+    <div class="post-meta"><span title='2014-12-05 09:21:25 +0000 UTC'>December 5, 2014</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>小量的数据库可以每天进行完整备份，因为这也用不了多少时间，但当数据库很大时，就不太可能每天进行一次完整备份了，这时候就可以使用增量备份。增量备份的原理就是使用了mysql的binlog日志。
+本次操作的MySQL版本为<code>5.5.40 for Linux (x86_64)</code>。</p>
+<p>增量备份要确保打开了二进制日志，参考<a href="http://xgknight.com/2014/12/04/mysql_log_binlog/">mysql的日志系统</a>：</p>
+<pre tabindex="0"><code>mysql&gt; show variables like &#39;%log_bin%&#39;;
+</code></pre><p>首先对pak数据库做一个完整备份：</p>
+<pre tabindex="0"><code>$ mysqldump -h localhost -upak -ppwd -P3306 --master-data=2 --single-transaction --opt pak &gt; pak_bak_full.sql
+</code></pre><p>这时候就会得到一个全备文件pak_bak_full.sql。mysqldump操作会导致滚动一次log，假设新的binlog文件是mysql-bin.000002。</p>
+<h3 id="1-模拟插入数据和误操作">1. 模拟插入数据和误操作<a hidden class="anchor" aria-hidden="true" href="#1-模拟插入数据和误操作">#</a></h3>
+<p>a. 在pak库的某个表插入一些数据，然后执行<code>flush logs</code>命令。这时将会产生一个新的二进制日志文件mysql-bin.000003，mysql-bin.000002则保存了全备过后的所有更改，既增加记录的操作也保存在了mysql-bin.00002中。</p>
+<p>b. 再在pak库中的t_user表中增加两条记录，然后误删除t_user表。t_user中增加记录的操作和删除表的操作都记录在mysql-bin.000003中。</p>
+<h3 id="2-开始恢复">2. 开始恢复<a hidden class="anchor" aria-hidden="true" href="#2-开始恢复">#</a></h3>
+<p>恢复过程不要记录日志：</p>
+<pre tabindex="0"><code>mysql &gt; set global sql_log_bin=0; 
+</code></pre><h3 id="3-首先导入全备数据">3. 首先导入全备数据<a hidden class="anchor" aria-hidden="true" href="#3-首先导入全备数据">#</a></h3>
+<pre tabindex="0"><code>$ mysql -h localhost -upak -ppwd &lt; pak_bak_full.sql
+或
+mysql&gt; source /path/backup/pak_bak_full.sql
+</code></pre><p>我们也可以看到全备时的binlog位置：</p>
+<pre tabindex="0"><code>head -50 backup-file.sql |grep &#39;CHANGE MASTER&#39;
+-- CHANGE MASTER TO MASTER_LOG_FILE=&#39;mysql-bin.000001&#39;, MASTER_LOG_POS=4321;
+</code></pre><p>查看当前所在二进制日志中的位置：</p>
+<pre tabindex="0"><code>mysql&gt; show master status;
+</code></pre><p>根据上面两个position能大概确定需要完整恢复哪几个binlog文件。</p>
+<!-- raw HTML omitted -->
+<h3 id="4-恢复mysql-bin000002">4. 恢复mysql-bin.000002<a hidden class="anchor" aria-hidden="true" href="#4-恢复mysql-bin000002">#</a></h3>
+<p>在待恢复的position或时间点以前、全备以后的binlog需要全部恢复，多个文件以空格隔开</p>
+<pre tabindex="0"><code>$ mysqlbinlog /var/lib/mysql/mysql-bin.000002 | mysql -uroot -p
+</code></pre><p>此时查询可以得到前两条数据。</p>
+<h3 id="5-恢复部分mysql-bin000003">5. 恢复部分mysql-bin.000003<a hidden class="anchor" aria-hidden="true" href="#5-恢复部分mysql-bin000003">#</a></h3>
+<p>这个日志中包括了新增记录和误删表两个部分，我们需要恢复到新增记录之后、误删操作以前的位置。</p>
+<p>如果知道误操作的命令如<code>DROP TABLE</code>，则可以通过下面的方法在binlog文件中找到误操作之前的那个position：
+（如下面的信息显示，误操作<code>DROP TABLE</code>之前的pos是775，在datetime 141204 15:08:04或pos 882时完成<code>DROP TABLE</code>操作）</p>
+<pre tabindex="0"><code>$ mysqlbinlog /var/lib/mysql/mysql-bin.000003 |grep -C 5 &#39;DROP TABLE&#39;
+#141204 15:07:05 server id 1  end_log_pos 775 	Xid = 376
+COMMIT/*!*/;
+# at 775
+#141204 15:08:04 server id 1  end_log_pos 882 	Query	thread_id=10	exec_time=0	error_code=0
+SET TIMESTAMP=1417676884/*!*/;
+DROP TABLE `t_user` /* generated by server */
+/*!*/;
+# at 882
+</code></pre><p>恢复命令：</p>
+<pre tabindex="0"><code>$ mysqlbinlog /var/lib/mysql/mysql-bin.000003 --stop-position=775 | mysql -h localhost -uroot -p
+</code></pre><p>如果position难以确定，但知道需要恢复到的确切（服务器）时间，也可以使用datetime：</p>
+<pre tabindex="0"><code>$ mysqlbinlog /var/lib/mysql/mysql-bin.000003 --stop-datetime=&#34;2014-12-04 15:08:00&#34; | mysql -uroot -p
+</code></pre><p>如果不是误操作导致的，而是迁移数据库，那么不需要position或datetime，使用所有binlog文件增量恢复即可。</p>
+<p>确定恢复成功后记得打开日志记录：</p>
+<pre tabindex="0"><code>mysql &gt; set global sql_log_bin=1;
+</code></pre><h3 id="报错">报错<a hidden class="anchor" aria-hidden="true" href="#报错">#</a></h3>
+<ol>
+<li>unknown variable &lsquo;default-character-set=utf8&rsquo;
+在使用<code>mysqlbinlog</code>查看二进制日志的时候，提示下面的错误：</li>
+</ol>
+<blockquote>
+<p>/usr/local/mysql/bin/mysqlbinlog: unknown variable &lsquo;default-character-set=utf8&rsquo;</p>
+</blockquote>
+<p>原因是在我为了统一mysql客户端到服务端的的字符编码，在<code>/etc/my.cnf</code>文件的<code>[client]</code>、<code>[mysqld]</code>等节加入了<code>default-character-set = utf8</code>，<code>mysqlbinlog</code>会从<code>my.cnf</code>中的<code>[client]</code>读取配置，但奈何mysqlbinlog并不认识这个选项（据说是个bug）导致的。</p>
+<p>应对这个bug的方法有两个：
+第一，自然是注释到<code>[client]</code>中的这个字符集配置；
+第二，改用<code>loose-default-character-set = utf8</code>。在选项前加了<code>loose-</code>，表示当程序不认识此选项时会略过此选项，并给出一个警告。</p>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/mysql/">mysql</a></li>
+      <li><a href="http://xgknight.com/tags/database/">database</a></li>
+      <li><a href="http://xgknight.com/tags/binlog/">binlog</a></li>
+      <li><a href="http://xgknight.com/tags/backup/">backup</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

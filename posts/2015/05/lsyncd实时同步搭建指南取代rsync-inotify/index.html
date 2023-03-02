@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>lsyncd实时同步搭建指南——取代rsync&#43;inotify | Sean Note</title>
+<meta name="keywords" content="rsync, inotify, lsyncd，文件同步">
+<meta name="description" content="1. 几大实时同步工具比较 1.1 inotify &#43; rsync 最近一直在寻求生产服务服务器上的同步替代方案，原先使用的是inotify &#43; rsync，但随着文件数量的增大到100W&#43;，目录下的文件列表就达20M，在网络状况不佳或者限速的情况下，变更的文件可能10来个才几M，却因此要发送的文件列表就达20M，严重减低的带宽的使用效率以及同步效率；更为要紧的是，加入inotifywait在5s内监控到10个小文件发生变化，便会触发10个rsync同步操作，结果就是真正需要传输的才2-3M的文件，比对的文件列表就达200M。使用这两个组合的好处在于，它们都是最基本的软件，可以通过不同选项做到很精确的控制，比如排除同步的目录，同步多个模块或同步到多个主机。
+搭建过程参考 Linux下同步工具inotify&#43;rsync使用详解 。
+1.2 sersync 后来听同事说 sersync 这么个工具可以提高同步的性能，也解决了同步大文件时出现异常的问题，所以就尝试了一下。sersync是国内的一个开发者开源出来的，使用c&#43;&#43;编写，采用多线程的方式进行同步，失败后还有重传机制，对临时文件过滤，自带crontab定时同步功能。网上看到有人说性能还不错，说一下我的观点：
+国产开源，文档不是很全，在2011年之后就没更新了（googlecode都要快关闭了，其实可以转交其他人维护），网上关于它的使用和讨论都止于10年了 采用xml配置文件的方式，可读性比较好，但是有些原生的有些功能没有实现就没法使用了 无法实现多目录同步，只能通过多个配置文件启动多个进程 文件排除功能太弱。这个要看需求，不是每个人都需要排除子目录。而对于我的环境中，这个功能很重要，而且排除的规则较多 虽然提供插件的功能，但很鸡肋，因为软件本身没有持续更新，也没有看到贡献有其它插件出现（可能是我知识面不够，还用不到里面的refreshCDN plugin）。 虽然不懂c&#43;&#43;，但大致看了下源码 FileSynchronize，拼接rsync命令大概在273行左右，最后一个函数就是排除选项，简单一点可以将--exclude=改成--eclude-from来灵活控制。有机会再改吧。
+另外，在作者的文章 Sersync服务器同步程序 项目简介与设计框架 评论中，说能解决上面 rsync &#43; inotify中所描述的问题。阅读了下源码，这个应该是没有解决，因为在拼接rsync命令时，后面的目的地址始终是针对module的，只要执行rsync命令，就会对整个目录进行遍历，发送要比对的文件列表，然后再发送变化的文件。sersync只是减少了监听的事件，减少了rsync的次数——这已经是很大的改进，但每次rsync没办法改变。（如有其它看法可与我讨论）
+其实我们也不能要求每一个软件功能都十分健全，关键是看能否满足我们当下的特定的需求。所谓好的架构不是设计出来的，而是进化来的。目前使用sersync2没什么问题，而且看了它的设计思路应该是比较科学的，特别是过滤队列的设计。双向同步看起来也是可以实现。
+1.3 lsyncd 废话说这么多，本文就是介绍它了。有些博客说lsyncd是谷歌开源的，实际不是了，只是托管在了googlecode上而已，幸运的是已经迁移到github了：https://github.com/axkibe/lsyncd 。
+Lysncd 实际上是lua语言封装了 inotify 和 rsync 工具，采用了 Linux 内核（2.6.13 及以后）里的 inotify 触发机制，然后通过rsync去差异同步，达到实时的效果。我认为它最令人称道的特性是，完美解决了 inotify &#43; rsync海量文件同步带来的文件频繁发送文件列表的问题 —— 通过时间延迟或累计触发事件次数实现。另外，它的配置方式很简单，lua本身就是一种配置语言，可读性非常强。lsyncd也有多种工作模式可以选择，本地目录cp，本地目录rsync，远程目录rsyncssh。
+实现简单高效的本地目录同步备份（网络存储挂载也当作本地目录），一个命令搞定。
+2. 使用 lsyncd 本地目录实时备份 这一节实现的功能是，本地目录source实时同步到另一个目录target，而在source下有大量的文件，并且有部分目录和临时文件不需要同步。
+2.1 安装lsyncd 安装lsyncd极为简单，已经收录在ubuntu的官方镜像源里，直接通过apt-get install lsyncd就可以。 在Redhat系（我的环境是CentOS 6.2 x86_64 ），可以手动去下载 lsyncd-2.1.5-6.fc21.x86_64.rpm，但首先你得安装两个依赖yum install lua lua-devel。也可以通过在线安装，需要epel-release扩展包：">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2015/05/lsyncd%E5%AE%9E%E6%97%B6%E5%90%8C%E6%AD%A5%E6%90%AD%E5%BB%BA%E6%8C%87%E5%8D%97%E5%8F%96%E4%BB%A3rsync-inotify/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="lsyncd实时同步搭建指南——取代rsync&#43;inotify" />
+<meta property="og:description" content="1. 几大实时同步工具比较 1.1 inotify &#43; rsync 最近一直在寻求生产服务服务器上的同步替代方案，原先使用的是inotify &#43; rsync，但随着文件数量的增大到100W&#43;，目录下的文件列表就达20M，在网络状况不佳或者限速的情况下，变更的文件可能10来个才几M，却因此要发送的文件列表就达20M，严重减低的带宽的使用效率以及同步效率；更为要紧的是，加入inotifywait在5s内监控到10个小文件发生变化，便会触发10个rsync同步操作，结果就是真正需要传输的才2-3M的文件，比对的文件列表就达200M。使用这两个组合的好处在于，它们都是最基本的软件，可以通过不同选项做到很精确的控制，比如排除同步的目录，同步多个模块或同步到多个主机。
+搭建过程参考 Linux下同步工具inotify&#43;rsync使用详解 。
+1.2 sersync 后来听同事说 sersync 这么个工具可以提高同步的性能，也解决了同步大文件时出现异常的问题，所以就尝试了一下。sersync是国内的一个开发者开源出来的，使用c&#43;&#43;编写，采用多线程的方式进行同步，失败后还有重传机制，对临时文件过滤，自带crontab定时同步功能。网上看到有人说性能还不错，说一下我的观点：
+国产开源，文档不是很全，在2011年之后就没更新了（googlecode都要快关闭了，其实可以转交其他人维护），网上关于它的使用和讨论都止于10年了 采用xml配置文件的方式，可读性比较好，但是有些原生的有些功能没有实现就没法使用了 无法实现多目录同步，只能通过多个配置文件启动多个进程 文件排除功能太弱。这个要看需求，不是每个人都需要排除子目录。而对于我的环境中，这个功能很重要，而且排除的规则较多 虽然提供插件的功能，但很鸡肋，因为软件本身没有持续更新，也没有看到贡献有其它插件出现（可能是我知识面不够，还用不到里面的refreshCDN plugin）。 虽然不懂c&#43;&#43;，但大致看了下源码 FileSynchronize，拼接rsync命令大概在273行左右，最后一个函数就是排除选项，简单一点可以将--exclude=改成--eclude-from来灵活控制。有机会再改吧。
+另外，在作者的文章 Sersync服务器同步程序 项目简介与设计框架 评论中，说能解决上面 rsync &#43; inotify中所描述的问题。阅读了下源码，这个应该是没有解决，因为在拼接rsync命令时，后面的目的地址始终是针对module的，只要执行rsync命令，就会对整个目录进行遍历，发送要比对的文件列表，然后再发送变化的文件。sersync只是减少了监听的事件，减少了rsync的次数——这已经是很大的改进，但每次rsync没办法改变。（如有其它看法可与我讨论）
+其实我们也不能要求每一个软件功能都十分健全，关键是看能否满足我们当下的特定的需求。所谓好的架构不是设计出来的，而是进化来的。目前使用sersync2没什么问题，而且看了它的设计思路应该是比较科学的，特别是过滤队列的设计。双向同步看起来也是可以实现。
+1.3 lsyncd 废话说这么多，本文就是介绍它了。有些博客说lsyncd是谷歌开源的，实际不是了，只是托管在了googlecode上而已，幸运的是已经迁移到github了：https://github.com/axkibe/lsyncd 。
+Lysncd 实际上是lua语言封装了 inotify 和 rsync 工具，采用了 Linux 内核（2.6.13 及以后）里的 inotify 触发机制，然后通过rsync去差异同步，达到实时的效果。我认为它最令人称道的特性是，完美解决了 inotify &#43; rsync海量文件同步带来的文件频繁发送文件列表的问题 —— 通过时间延迟或累计触发事件次数实现。另外，它的配置方式很简单，lua本身就是一种配置语言，可读性非常强。lsyncd也有多种工作模式可以选择，本地目录cp，本地目录rsync，远程目录rsyncssh。
+实现简单高效的本地目录同步备份（网络存储挂载也当作本地目录），一个命令搞定。
+2. 使用 lsyncd 本地目录实时备份 这一节实现的功能是，本地目录source实时同步到另一个目录target，而在source下有大量的文件，并且有部分目录和临时文件不需要同步。
+2.1 安装lsyncd 安装lsyncd极为简单，已经收录在ubuntu的官方镜像源里，直接通过apt-get install lsyncd就可以。 在Redhat系（我的环境是CentOS 6.2 x86_64 ），可以手动去下载 lsyncd-2.1.5-6.fc21.x86_64.rpm，但首先你得安装两个依赖yum install lua lua-devel。也可以通过在线安装，需要epel-release扩展包：" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2015/05/lsyncd%E5%AE%9E%E6%97%B6%E5%90%8C%E6%AD%A5%E6%90%AD%E5%BB%BA%E6%8C%87%E5%8D%97%E5%8F%96%E4%BB%A3rsync-inotify/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2015-05-06T01:21:25+00:00" />
+<meta property="article:modified_time" content="2015-05-06T01:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="lsyncd实时同步搭建指南——取代rsync&#43;inotify"/>
+<meta name="twitter:description" content="1. 几大实时同步工具比较 1.1 inotify &#43; rsync 最近一直在寻求生产服务服务器上的同步替代方案，原先使用的是inotify &#43; rsync，但随着文件数量的增大到100W&#43;，目录下的文件列表就达20M，在网络状况不佳或者限速的情况下，变更的文件可能10来个才几M，却因此要发送的文件列表就达20M，严重减低的带宽的使用效率以及同步效率；更为要紧的是，加入inotifywait在5s内监控到10个小文件发生变化，便会触发10个rsync同步操作，结果就是真正需要传输的才2-3M的文件，比对的文件列表就达200M。使用这两个组合的好处在于，它们都是最基本的软件，可以通过不同选项做到很精确的控制，比如排除同步的目录，同步多个模块或同步到多个主机。
+搭建过程参考 Linux下同步工具inotify&#43;rsync使用详解 。
+1.2 sersync 后来听同事说 sersync 这么个工具可以提高同步的性能，也解决了同步大文件时出现异常的问题，所以就尝试了一下。sersync是国内的一个开发者开源出来的，使用c&#43;&#43;编写，采用多线程的方式进行同步，失败后还有重传机制，对临时文件过滤，自带crontab定时同步功能。网上看到有人说性能还不错，说一下我的观点：
+国产开源，文档不是很全，在2011年之后就没更新了（googlecode都要快关闭了，其实可以转交其他人维护），网上关于它的使用和讨论都止于10年了 采用xml配置文件的方式，可读性比较好，但是有些原生的有些功能没有实现就没法使用了 无法实现多目录同步，只能通过多个配置文件启动多个进程 文件排除功能太弱。这个要看需求，不是每个人都需要排除子目录。而对于我的环境中，这个功能很重要，而且排除的规则较多 虽然提供插件的功能，但很鸡肋，因为软件本身没有持续更新，也没有看到贡献有其它插件出现（可能是我知识面不够，还用不到里面的refreshCDN plugin）。 虽然不懂c&#43;&#43;，但大致看了下源码 FileSynchronize，拼接rsync命令大概在273行左右，最后一个函数就是排除选项，简单一点可以将--exclude=改成--eclude-from来灵活控制。有机会再改吧。
+另外，在作者的文章 Sersync服务器同步程序 项目简介与设计框架 评论中，说能解决上面 rsync &#43; inotify中所描述的问题。阅读了下源码，这个应该是没有解决，因为在拼接rsync命令时，后面的目的地址始终是针对module的，只要执行rsync命令，就会对整个目录进行遍历，发送要比对的文件列表，然后再发送变化的文件。sersync只是减少了监听的事件，减少了rsync的次数——这已经是很大的改进，但每次rsync没办法改变。（如有其它看法可与我讨论）
+其实我们也不能要求每一个软件功能都十分健全，关键是看能否满足我们当下的特定的需求。所谓好的架构不是设计出来的，而是进化来的。目前使用sersync2没什么问题，而且看了它的设计思路应该是比较科学的，特别是过滤队列的设计。双向同步看起来也是可以实现。
+1.3 lsyncd 废话说这么多，本文就是介绍它了。有些博客说lsyncd是谷歌开源的，实际不是了，只是托管在了googlecode上而已，幸运的是已经迁移到github了：https://github.com/axkibe/lsyncd 。
+Lysncd 实际上是lua语言封装了 inotify 和 rsync 工具，采用了 Linux 内核（2.6.13 及以后）里的 inotify 触发机制，然后通过rsync去差异同步，达到实时的效果。我认为它最令人称道的特性是，完美解决了 inotify &#43; rsync海量文件同步带来的文件频繁发送文件列表的问题 —— 通过时间延迟或累计触发事件次数实现。另外，它的配置方式很简单，lua本身就是一种配置语言，可读性非常强。lsyncd也有多种工作模式可以选择，本地目录cp，本地目录rsync，远程目录rsyncssh。
+实现简单高效的本地目录同步备份（网络存储挂载也当作本地目录），一个命令搞定。
+2. 使用 lsyncd 本地目录实时备份 这一节实现的功能是，本地目录source实时同步到另一个目录target，而在source下有大量的文件，并且有部分目录和临时文件不需要同步。
+2.1 安装lsyncd 安装lsyncd极为简单，已经收录在ubuntu的官方镜像源里，直接通过apt-get install lsyncd就可以。 在Redhat系（我的环境是CentOS 6.2 x86_64 ），可以手动去下载 lsyncd-2.1.5-6.fc21.x86_64.rpm，但首先你得安装两个依赖yum install lua lua-devel。也可以通过在线安装，需要epel-release扩展包："/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "lsyncd实时同步搭建指南——取代rsync+inotify",
+      "item": "http://xgknight.com/posts/2015/05/lsyncd%E5%AE%9E%E6%97%B6%E5%90%8C%E6%AD%A5%E6%90%AD%E5%BB%BA%E6%8C%87%E5%8D%97%E5%8F%96%E4%BB%A3rsync-inotify/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "lsyncd实时同步搭建指南——取代rsync+inotify",
+  "name": "lsyncd实时同步搭建指南——取代rsync\u002binotify",
+  "description": "1. 几大实时同步工具比较 1.1 inotify + rsync 最近一直在寻求生产服务服务器上的同步替代方案，原先使用的是inotify + rsync，但随着文件数量的增大到100W+，目录下的文件列表就达20M，在网络状况不佳或者限速的情况下，变更的文件可能10来个才几M，却因此要发送的文件列表就达20M，严重减低的带宽的使用效率以及同步效率；更为要紧的是，加入inotifywait在5s内监控到10个小文件发生变化，便会触发10个rsync同步操作，结果就是真正需要传输的才2-3M的文件，比对的文件列表就达200M。使用这两个组合的好处在于，它们都是最基本的软件，可以通过不同选项做到很精确的控制，比如排除同步的目录，同步多个模块或同步到多个主机。\n搭建过程参考 Linux下同步工具inotify+rsync使用详解 。\n1.2 sersync 后来听同事说 sersync 这么个工具可以提高同步的性能，也解决了同步大文件时出现异常的问题，所以就尝试了一下。sersync是国内的一个开发者开源出来的，使用c++编写，采用多线程的方式进行同步，失败后还有重传机制，对临时文件过滤，自带crontab定时同步功能。网上看到有人说性能还不错，说一下我的观点：\n国产开源，文档不是很全，在2011年之后就没更新了（googlecode都要快关闭了，其实可以转交其他人维护），网上关于它的使用和讨论都止于10年了 采用xml配置文件的方式，可读性比较好，但是有些原生的有些功能没有实现就没法使用了 无法实现多目录同步，只能通过多个配置文件启动多个进程 文件排除功能太弱。这个要看需求，不是每个人都需要排除子目录。而对于我的环境中，这个功能很重要，而且排除的规则较多 虽然提供插件的功能，但很鸡肋，因为软件本身没有持续更新，也没有看到贡献有其它插件出现（可能是我知识面不够，还用不到里面的refreshCDN plugin）。 虽然不懂c++，但大致看了下源码 FileSynchronize，拼接rsync命令大概在273行左右，最后一个函数就是排除选项，简单一点可以将--exclude=改成--eclude-from来灵活控制。有机会再改吧。\n另外，在作者的文章 Sersync服务器同步程序 项目简介与设计框架 评论中，说能解决上面 rsync + inotify中所描述的问题。阅读了下源码，这个应该是没有解决，因为在拼接rsync命令时，后面的目的地址始终是针对module的，只要执行rsync命令，就会对整个目录进行遍历，发送要比对的文件列表，然后再发送变化的文件。sersync只是减少了监听的事件，减少了rsync的次数——这已经是很大的改进，但每次rsync没办法改变。（如有其它看法可与我讨论）\n其实我们也不能要求每一个软件功能都十分健全，关键是看能否满足我们当下的特定的需求。所谓好的架构不是设计出来的，而是进化来的。目前使用sersync2没什么问题，而且看了它的设计思路应该是比较科学的，特别是过滤队列的设计。双向同步看起来也是可以实现。\n1.3 lsyncd 废话说这么多，本文就是介绍它了。有些博客说lsyncd是谷歌开源的，实际不是了，只是托管在了googlecode上而已，幸运的是已经迁移到github了：https://github.com/axkibe/lsyncd 。\nLysncd 实际上是lua语言封装了 inotify 和 rsync 工具，采用了 Linux 内核（2.6.13 及以后）里的 inotify 触发机制，然后通过rsync去差异同步，达到实时的效果。我认为它最令人称道的特性是，完美解决了 inotify + rsync海量文件同步带来的文件频繁发送文件列表的问题 —— 通过时间延迟或累计触发事件次数实现。另外，它的配置方式很简单，lua本身就是一种配置语言，可读性非常强。lsyncd也有多种工作模式可以选择，本地目录cp，本地目录rsync，远程目录rsyncssh。\n实现简单高效的本地目录同步备份（网络存储挂载也当作本地目录），一个命令搞定。\n2. 使用 lsyncd 本地目录实时备份 这一节实现的功能是，本地目录source实时同步到另一个目录target，而在source下有大量的文件，并且有部分目录和临时文件不需要同步。\n2.1 安装lsyncd 安装lsyncd极为简单，已经收录在ubuntu的官方镜像源里，直接通过apt-get install lsyncd就可以。 在Redhat系（我的环境是CentOS 6.2 x86_64 ），可以手动去下载 lsyncd-2.1.5-6.fc21.x86_64.rpm，但首先你得安装两个依赖yum install lua lua-devel。也可以通过在线安装，需要epel-release扩展包：",
+  "keywords": [
+    "rsync", "inotify", "lsyncd，文件同步"
+  ],
+  "articleBody": "1. 几大实时同步工具比较 1.1 inotify + rsync 最近一直在寻求生产服务服务器上的同步替代方案，原先使用的是inotify + rsync，但随着文件数量的增大到100W+，目录下的文件列表就达20M，在网络状况不佳或者限速的情况下，变更的文件可能10来个才几M，却因此要发送的文件列表就达20M，严重减低的带宽的使用效率以及同步效率；更为要紧的是，加入inotifywait在5s内监控到10个小文件发生变化，便会触发10个rsync同步操作，结果就是真正需要传输的才2-3M的文件，比对的文件列表就达200M。使用这两个组合的好处在于，它们都是最基本的软件，可以通过不同选项做到很精确的控制，比如排除同步的目录，同步多个模块或同步到多个主机。\n搭建过程参考 Linux下同步工具inotify+rsync使用详解 。\n1.2 sersync 后来听同事说 sersync 这么个工具可以提高同步的性能，也解决了同步大文件时出现异常的问题，所以就尝试了一下。sersync是国内的一个开发者开源出来的，使用c++编写，采用多线程的方式进行同步，失败后还有重传机制，对临时文件过滤，自带crontab定时同步功能。网上看到有人说性能还不错，说一下我的观点：\n国产开源，文档不是很全，在2011年之后就没更新了（googlecode都要快关闭了，其实可以转交其他人维护），网上关于它的使用和讨论都止于10年了 采用xml配置文件的方式，可读性比较好，但是有些原生的有些功能没有实现就没法使用了 无法实现多目录同步，只能通过多个配置文件启动多个进程 文件排除功能太弱。这个要看需求，不是每个人都需要排除子目录。而对于我的环境中，这个功能很重要，而且排除的规则较多 虽然提供插件的功能，但很鸡肋，因为软件本身没有持续更新，也没有看到贡献有其它插件出现（可能是我知识面不够，还用不到里面的refreshCDN plugin）。 虽然不懂c++，但大致看了下源码 FileSynchronize，拼接rsync命令大概在273行左右，最后一个函数就是排除选项，简单一点可以将--exclude=改成--eclude-from来灵活控制。有机会再改吧。\n另外，在作者的文章 Sersync服务器同步程序 项目简介与设计框架 评论中，说能解决上面 rsync + inotify中所描述的问题。阅读了下源码，这个应该是没有解决，因为在拼接rsync命令时，后面的目的地址始终是针对module的，只要执行rsync命令，就会对整个目录进行遍历，发送要比对的文件列表，然后再发送变化的文件。sersync只是减少了监听的事件，减少了rsync的次数——这已经是很大的改进，但每次rsync没办法改变。（如有其它看法可与我讨论）\n其实我们也不能要求每一个软件功能都十分健全，关键是看能否满足我们当下的特定的需求。所谓好的架构不是设计出来的，而是进化来的。目前使用sersync2没什么问题，而且看了它的设计思路应该是比较科学的，特别是过滤队列的设计。双向同步看起来也是可以实现。\n1.3 lsyncd 废话说这么多，本文就是介绍它了。有些博客说lsyncd是谷歌开源的，实际不是了，只是托管在了googlecode上而已，幸运的是已经迁移到github了：https://github.com/axkibe/lsyncd 。\nLysncd 实际上是lua语言封装了 inotify 和 rsync 工具，采用了 Linux 内核（2.6.13 及以后）里的 inotify 触发机制，然后通过rsync去差异同步，达到实时的效果。我认为它最令人称道的特性是，完美解决了 inotify + rsync海量文件同步带来的文件频繁发送文件列表的问题 —— 通过时间延迟或累计触发事件次数实现。另外，它的配置方式很简单，lua本身就是一种配置语言，可读性非常强。lsyncd也有多种工作模式可以选择，本地目录cp，本地目录rsync，远程目录rsyncssh。\n实现简单高效的本地目录同步备份（网络存储挂载也当作本地目录），一个命令搞定。\n2. 使用 lsyncd 本地目录实时备份 这一节实现的功能是，本地目录source实时同步到另一个目录target，而在source下有大量的文件，并且有部分目录和临时文件不需要同步。\n2.1 安装lsyncd 安装lsyncd极为简单，已经收录在ubuntu的官方镜像源里，直接通过apt-get install lsyncd就可以。 在Redhat系（我的环境是CentOS 6.2 x86_64 ），可以手动去下载 lsyncd-2.1.5-6.fc21.x86_64.rpm，但首先你得安装两个依赖yum install lua lua-devel。也可以通过在线安装，需要epel-release扩展包：\n# rpm -ivh http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm # yum install lsyncd 源码编译安装 从源码编译安装可以使用最新版的lsyncd程序，但必须要相应的依赖库文件和编译工具：yum install lua lua-devel asciidoc cmake 。\n从 googlecode lsyncd 上下载的lsyncd-2.1.5.tar.gz，直接./configure、make \u0026\u0026 make install就可以了。\n从github上下载lsyncd-master.zip 的2.1.5版本使用的是 cmake 编译工具，无法./configure：\n# uzip lsyncd-master.zip # cd lsyncd-master # cmake -DCMAKE_INSTALL_PREFIX=/usr/local/lsyncd-2.1.5 # make \u0026\u0026 make install 我这个版本编译时有个小bug，如果按照INSTALL在build目录中make，会提示：\n[100%] Generating doc/lsyncd.1 Updating the manpage a2x: failed: source file not found: doc/lsyncd.1.txt make[2]: *** [doc/lsyncd.1] Error 1 make[1]: *** [CMakeFiles/manpage.dir/all] Error 2 make: *** [all] Error 2 解决办法是要么直接在解压目录下cmake，不要mkdir build，要么在CMakeList.txt中搜索doc字符串，在前面加上${PROJECT_SOURCE_DIR}。\n2.2 lsyncd.conf 下面都是在编译安装的情况下操作。\n2.2.1 lsyncd同步配置 # cd /usr/local/lsyncd-2.1.5 # mkdir etc var # vi etc/lsyncd.conf settings { logfile =\"/usr/local/lsyncd-2.1.5/var/lsyncd.log\", statusFile =\"/usr/local/lsyncd-2.1.5/var/lsyncd.status\", inotifyMode = \"CloseWrite\", maxProcesses = 7, -- nodaemon =true, } sync { default.rsync, source = \"/tmp/src\", target = \"/tmp/dest\", -- excludeFrom = \"/etc/rsyncd.d/rsync_exclude.lst\", rsync = { binary = \"/usr/bin/rsync\", archive = true, compress = true, verbose = true } } 到这启动 lsycnd 就可以完成实时同步了，默认的许多参数可以满足绝大部分需求，非常简单。\n2.2.2 lsyncd.conf配置选项说明 settings 里面是全局设置，--开头表示注释，下面是几个常用选项说明：\nlogfile 定义日志文件 stausFile 定义状态文件 nodaemon=true 表示不启用守护模式，默认 statusInterval 将lsyncd的状态写入上面的statusFile的间隔，默认10秒 inotifyMode 指定inotify监控的事件，默认是CloseWrite，还可以是Modify或CloseWrite or Modify maxProcesses 同步进程的最大个数。假如同时有20个文件需要同步，而maxProcesses = 8，则最大能看到有8个rysnc进程 maxDelays 累计到多少所监控的事件激活一次同步，即使后面的delay延迟时间还未到 sync 里面是定义同步参数，可以继续使用maxDelays来重写settings的全局变量。一般第一个参数指定lsyncd以什么模式运行：rsync、rsyncssh、direct三种模式：\ndefault.rsync ：本地目录间同步，使用rsync，也可以达到使用ssh形式的远程rsync效果，或daemon方式连接远程rsyncd进程； default.direct ：本地目录间同步，使用cp、rm等命令完成差异文件备份； default.rsyncssh ：同步到远程主机目录，rsync的ssh模式，需要使用key来认证\nsource 同步的源目录，使用绝对路径。\ntarget 定义目的地址.对应不同的模式有几种写法： /tmp/dest ：本地目录同步，可用于direct和rsync模式 172.29.88.223:/tmp/dest ：同步到远程服务器目录，可用于rsync和rsyncssh模式，拼接的命令类似于/usr/bin/rsync -ltsd --delete --include-from=- --exclude=* SOURCE TARGET，剩下的就是rsync的内容了，比如指定username，免密码同步 172.29.88.223::module ：同步到远程服务器目录，用于rsync模式 三种模式的示例会在后面给出。\ninit 这是一个优化选项，当init = false，只同步进程启动以后发生改动事件的文件，原有的目录即使有差异也不会同步。默认是true\ndelay 累计事件，等待rsync同步延时时间，默认15秒（最大累计到1000个不可合并的事件）。也就是15s内监控目录下发生的改动，会累积到一次rsync同步，避免过于频繁的同步。（可合并的意思是，15s内两次修改了同一文件，最后只同步最新的文件）\nexcludeFrom 排除选项，后面指定排除的列表文件，如excludeFrom = \"/etc/lsyncd.exclude\"，如果是简单的排除，可以使用exclude = LIST。 这里的排除规则写法与原生rsync有点不同，更为简单：\n监控路径里的任何部分匹配到一个文本，都会被排除，例如/bin/foo/bar可以匹配规则foo 如果规则以斜线/开头，则从头开始要匹配全部 如果规则以/结尾，则要匹配监控路径的末尾 ?匹配任何字符，但不包括/ *匹配0或多个字符，但不包括/ **匹配0或多个字符，可以是/ delete 为了保持target与souce完全同步，Lsyncd默认会delete = true来允许同步删除。它除了false，还有startup、running值，请参考 Lsyncd 2.1.x ‖ Layer 4 Config ‖ Default Behavior。\nrsync （提示一下，delete和exclude本来都是rsync的选项，上面是配置在sync中的，我想这样做的原因是为了减少rsync的开销）\nbwlimit 限速，单位kb/s，与rsync相同（这么重要的选项在文档里竟然没有标出） compress 压缩传输默认为true。在带宽与cpu负载之间权衡，本地目录同步可以考虑把它设为false perms 默认保留文件权限。 其它rsync的选项 其它还有rsyncssh模式独有的配置项，如host、targetdir、rsync_path、password_file，见后文示例。rsyncOps={\"-avz\",\"--delete\"}这样的写法在2.1.*版本已经不支持。\nlsyncd.conf可以有多个sync，各自的source，各自的target，各自的模式，互不影响。\n2.3 启动lsyncd 使用命令加载配置文件，启动守护进程，自动同步目录操作。\nlsyncd -log Exec /usr/local/lsyncd-2.1.5/etc/lsyncd.conf 2.4 lsyncd.conf其它模式示例 以下配置本人都已经过验证可行，必须根据实际需要裁剪配置：\nsettings { logfile =\"/usr/local/lsyncd-2.1.5/var/lsyncd.log\", statusFile =\"/usr/local/lsyncd-2.1.5/var/lsyncd.status\", inotifyMode = \"CloseWrite\", maxProcesses = 8, } -- I. 本地目录同步，direct：cp/rm/mv。 适用：500+万文件，变动不大 sync { default.direct, source = \"/tmp/src\", target = \"/tmp/dest\", delay = 1 maxProcesses = 1 } -- II. 本地目录同步，rsync模式：rsync sync { default.rsync, source = \"/tmp/src\", target = \"/tmp/dest1\", excludeFrom = \"/etc/rsyncd.d/rsync_exclude.lst\", rsync = { binary = \"/usr/bin/rsync\", archive = true, compress = true, bwlimit = 2000 } } -- III. 远程目录同步，rsync模式 + rsyncd daemon sync { default.rsync, source = \"/tmp/src\", target = \"syncuser@172.29.88.223::module1\", delete=\"running\", exclude = { \".*\", \".tmp\" }, delay = 30, init = false, rsync = { binary = \"/usr/bin/rsync\", archive = true, compress = true, verbose = true, password_file = \"/etc/rsyncd.d/rsync.pwd\", _extra = {\"--bwlimit=200\"} } } -- IV. 远程目录同步，rsync模式 + ssh shell sync { default.rsync, source = \"/tmp/src\", target = \"172.29.88.223:/tmp/dest\", -- target = \"root@172.29.88.223:/remote/dest\", -- 上面target，注意如果是普通用户，必须拥有写权限 maxDelays = 5, delay = 30, -- init = true, rsync = { binary = \"/usr/bin/rsync\", archive = true, compress = true, bwlimit = 2000 -- rsh = \"/usr/bin/ssh -p 22 -o StrictHostKeyChecking=no\" -- 如果要指定其它端口，请用上面的rsh } } -- V. 远程目录同步，rsync模式 + rsyncssh，效果与上面相同 sync { default.rsyncssh, source = \"/tmp/src2\", host = \"172.29.88.223\", targetdir = \"/remote/dir\", excludeFrom = \"/etc/rsyncd.d/rsync_exclude.lst\", -- maxDelays = 5, delay = 0, -- init = false, rsync = { binary = \"/usr/bin/rsync\", archive = true, compress = true, verbose = true, _extra = {\"--bwlimit=2000\"}, }, ssh = { port = 1234 } } 上面的内容几乎涵盖了所有同步的模式，其中第III个要求像rsync一样配置rsyncd服务端，见本文开头。第IV、V配置ssh方式同步，达到的效果相同，但实际同步时你会发现每次同步都会提示输入ssh的密码，可以通过以下方法解决：\n在远端被同步的服务器上开启ssh无密码登录，请注意用户身份：\nuser$ ssh-keygen -t rsa 一路回车... user$ cd ~/.ssh user$ cat id_rsa.pub \u003e\u003e authorized_keys 把id_rsa私钥拷贝到执行lsyncd的机器上\nuser$ chmod 600 ~/.ssh/id_rsa 测试能否无密码登录 user$ ssh user@172.29.88.223 3. lsyncd的其它功能 lsyncd的功能不仅仅是同步，官方手册 Lsyncd 2.1.x ‖ Layer 2 Config ‖ Advanced onAction 高级功能提到，还可以监控某个目录下的文件，根据触发的事件自己定义要执行的命令，example是监控某个某个目录，只要是有jpg、gif、png格式的文件参数，就把它们转成pdf，然后同步到另一个目录。正好在我运维的一个项目中有这个需求，现在都是在java代码里转换，还容易出现异常，通过lsyncd可以代替这样的功能。但，门槛在于要会一点点lua语言（根据官方example还是可以写出来）。\n另外偶然想到个问题，同时设置了maxDelays和delay，当监控目录一直没有文件变化了，也会发生同步操作，虽然没有可rsync的文件。\nTO-DO：\n其它同步工具：csync2，clsync，btsync，drdb 。 lsyncd双向同步：GlusterFS 参考\nLsyncd21Manual （本文很大一部分翻译自官网手册） 使用lsyncd配置数据库备份多异地同步 如何实时同步大量小文件 Lsyncd 测试远程、本地目录自动同步 ",
+  "wordCount" : "589",
+  "inLanguage": "en",
+  "datePublished": "2015-05-06T01:21:25Z",
+  "dateModified": "2015-05-06T01:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2015/05/lsyncd%E5%AE%9E%E6%97%B6%E5%90%8C%E6%AD%A5%E6%90%AD%E5%BB%BA%E6%8C%87%E5%8D%97%E5%8F%96%E4%BB%A3rsync-inotify/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      lsyncd实时同步搭建指南——取代rsync&#43;inotify
+    </h1>
+    <div class="post-meta"><span title='2015-05-06 01:21:25 +0000 UTC'>May 6, 2015</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><h1 id="1-几大实时同步工具比较">1. 几大实时同步工具比较<a hidden class="anchor" aria-hidden="true" href="#1-几大实时同步工具比较">#</a></h1>
+<h2 id="11-inotify--rsync">1.1 inotify + rsync<a hidden class="anchor" aria-hidden="true" href="#11-inotify--rsync">#</a></h2>
+<p>最近一直在寻求生产服务服务器上的同步替代方案，原先使用的是<code>inotify +  rsync</code>，但随着文件数量的增大到100W+，目录下的文件列表就达20M，在网络状况不佳或者限速的情况下，变更的文件可能10来个才几M，却因此要发送的文件列表就达20M，严重减低的带宽的使用效率以及同步效率；更为要紧的是，加入inotifywait在5s内监控到10个小文件发生变化，便会触发10个rsync同步操作，结果就是真正需要传输的才2-3M的文件，比对的文件列表就达200M。使用这两个组合的好处在于，它们都是最基本的软件，可以通过不同选项做到很精确的控制，比如排除同步的目录，同步多个模块或同步到多个主机。</p>
+<p>搭建过程参考 <a href="http://xgknight.com/2014/12/12/rsync_inotify_setup/">Linux下同步工具inotify+rsync使用详解</a> 。</p>
+<h2 id="12-sersync">1.2 sersync<a hidden class="anchor" aria-hidden="true" href="#12-sersync">#</a></h2>
+<p>后来听同事说 <a href="http://www.ccvita.com/422.html">sersync</a> 这么个工具可以提高同步的性能，也解决了同步大文件时出现异常的问题，所以就尝试了一下。sersync是国内的一个开发者开源出来的，使用c++编写，采用多线程的方式进行同步，失败后还有重传机制，对临时文件过滤，自带crontab定时同步功能。网上看到有人说性能还不错，说一下我的观点：</p>
+<ul>
+<li>国产开源，文档不是很全，在2011年之后就没更新了（googlecode都要快关闭了，其实可以转交其他人维护），网上关于它的使用和讨论都止于10年了</li>
+<li>采用xml配置文件的方式，可读性比较好，但是有些原生的有些功能没有实现就没法使用了</li>
+<li>无法实现多目录同步，只能通过多个配置文件启动多个进程</li>
+<li>文件排除功能太弱。这个要看需求，不是每个人都需要排除子目录。而对于我的环境中，这个功能很重要，而且排除的规则较多</li>
+<li>虽然提供插件的功能，但很鸡肋，因为软件本身没有持续更新，也没有看到贡献有其它插件出现（可能是我知识面不够，还用不到里面的refreshCDN plugin）。</li>
+</ul>
+<p>虽然不懂c++，但大致看了下源码 <a href="http://code.google.com/p/sersync/source/browse/FileSynchronize.cpp">FileSynchronize</a>，拼接rsync命令大概在273行左右，最后一个函数就是排除选项，简单一点可以将<code>--exclude=</code>改成<code>--eclude-from</code>来灵活控制。有机会再改吧。</p>
+<p>另外，在作者的文章 <a href="http://hi.baidu.com/johntech/item/a4a2060ecf3053c6905718e1">Sersync服务器同步程序 项目简介与设计框架</a> 评论中，说能解决上面 <code>rsync + inotify</code>中所描述的问题。阅读了下源码，这个应该是没有解决，因为在拼接rsync命令时，后面的目的地址始终是针对module的，只要执行rsync命令，就会对整个目录进行遍历，发送要比对的文件列表，然后再发送变化的文件。sersync只是减少了监听的事件，减少了rsync的次数——这已经是很大的改进，但每次rsync没办法改变。（如有其它看法可与我讨论）</p>
+<p>其实我们也不能要求每一个软件功能都十分健全，关键是看能否满足我们当下的特定的需求。所谓好的架构不是设计出来的，而是进化来的。目前使用<code>sersync2</code>没什么问题，而且看了它的设计思路应该是比较科学的，特别是过滤队列的设计。双向同步看起来也是可以实现。</p>
+<h2 id="13-lsyncd">1.3 lsyncd<a hidden class="anchor" aria-hidden="true" href="#13-lsyncd">#</a></h2>
+<p>废话说这么多，本文就是介绍它了。有些博客说lsyncd是谷歌开源的，实际不是了，只是托管在了googlecode上而已，幸运的是已经迁移到github了：https://github.com/axkibe/lsyncd 。</p>
+<!-- raw HTML omitted -->
+<p>Lysncd 实际上是lua语言封装了 inotify 和 rsync 工具，采用了 Linux 内核（2.6.13 及以后）里的 inotify 触发机制，然后通过rsync去差异同步，达到实时的效果。我认为它最令人称道的特性是，完美解决了 <code>inotify + rsync</code>海量文件同步带来的文件频繁发送文件列表的问题 —— 通过时间延迟或累计触发事件次数实现。另外，它的配置方式很简单，lua本身就是一种配置语言，可读性非常强。lsyncd也有多种工作模式可以选择，本地目录cp，本地目录rsync，远程目录rsyncssh。</p>
+<p>实现简单高效的本地目录同步备份（网络存储挂载也当作本地目录），一个命令搞定。</p>
+<h1 id="2-使用-lsyncd-本地目录实时备份">2. 使用 lsyncd 本地目录实时备份<a hidden class="anchor" aria-hidden="true" href="#2-使用-lsyncd-本地目录实时备份">#</a></h1>
+<p>这一节实现的功能是，本地目录source实时同步到另一个目录target，而在source下有大量的文件，并且有部分目录和临时文件不需要同步。</p>
+<h2 id="21-安装lsyncd">2.1 安装lsyncd<a hidden class="anchor" aria-hidden="true" href="#21-安装lsyncd">#</a></h2>
+<p>安装<code>lsyncd</code>极为简单，已经收录在ubuntu的官方镜像源里，直接通过<code>apt-get install lsyncd</code>就可以。
+在Redhat系（我的环境是CentOS 6.2 x86_64 ），可以手动去下载 <a href="ftp://195.220.108.108/linux/fedora/linux/updates/21/x86_64/l/lsyncd-2.1.5-6.fc21.x86_64.rpm">lsyncd-2.1.5-6.fc21.x86_64.rpm</a>，但首先你得安装两个依赖<code>yum install lua lua-devel</code>。也可以通过在线安装，需要<code>epel-release</code>扩展包：</p>
+<pre tabindex="0"><code># rpm -ivh http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
+# yum install lsyncd
+</code></pre><p><strong>源码编译安装</strong>
+从源码编译安装可以使用最新版的lsyncd程序，但必须要相应的依赖库文件和编译工具：<code>yum install lua lua-devel asciidoc cmake </code>。</p>
+<p>从 <a href="http://code.google.com/p/lsyncd/downloads/list">googlecode lsyncd</a> 上下载的<code>lsyncd-2.1.5.tar.gz</code>，直接<code>./configure</code>、<code>make &amp;&amp; make install</code>就可以了。</p>
+<p>从github上下载<a href="https://github.com/axkibe/lsyncd/archive/master.zip">lsyncd-master.zip</a> 的2.1.5版本使用的是 cmake 编译工具，无法<code>./configure</code>：</p>
+<pre tabindex="0"><code># uzip lsyncd-master.zip
+# cd lsyncd-master
+# cmake -DCMAKE_INSTALL_PREFIX=/usr/local/lsyncd-2.1.5
+# make &amp;&amp; make install
+</code></pre><p>我这个版本编译时有个小bug，如果按照<code>INSTALL</code>在<code>build</code>目录中make，会提示：</p>
+<pre tabindex="0"><code>[100%] Generating doc/lsyncd.1
+Updating the manpage
+a2x: failed: source file not found: doc/lsyncd.1.txt
+make[2]: *** [doc/lsyncd.1] Error 1
+make[1]: *** [CMakeFiles/manpage.dir/all] Error 2
+make: *** [all] Error 2
+</code></pre><p>解决办法是要么直接在解压目录下cmake，不要<code>mkdir build</code>，要么在<code>CMakeList.txt</code>中搜索<code>doc</code>字符串，在前面加上<code>${PROJECT_SOURCE_DIR}</code>。</p>
+<h2 id="22-lsyncdconf">2.2 lsyncd.conf<a hidden class="anchor" aria-hidden="true" href="#22-lsyncdconf">#</a></h2>
+<p>下面都是在编译安装的情况下操作。</p>
+<h3 id="221-lsyncd同步配置">2.2.1 lsyncd同步配置<a hidden class="anchor" aria-hidden="true" href="#221-lsyncd同步配置">#</a></h3>
+<pre tabindex="0"><code># cd /usr/local/lsyncd-2.1.5
+# mkdir etc var
+# vi etc/lsyncd.conf
+settings {
+    logfile      =&#34;/usr/local/lsyncd-2.1.5/var/lsyncd.log&#34;,
+    statusFile   =&#34;/usr/local/lsyncd-2.1.5/var/lsyncd.status&#34;,
+    inotifyMode  = &#34;CloseWrite&#34;,
+    maxProcesses = 7,
+    -- nodaemon =true,
+    }
+
+sync {
+    default.rsync,
+    source    = &#34;/tmp/src&#34;,
+    target    = &#34;/tmp/dest&#34;,
+    -- excludeFrom = &#34;/etc/rsyncd.d/rsync_exclude.lst&#34;,
+    rsync     = {
+        binary    = &#34;/usr/bin/rsync&#34;,
+        archive   = true,
+        compress  = true,
+        verbose   = true
+        }
+    }
+</code></pre><p>到这启动 lsycnd 就可以完成实时同步了，默认的许多参数可以满足绝大部分需求，非常简单。</p>
+<h3 id="222-lsyncdconf配置选项说明">2.2.2 lsyncd.conf配置选项说明<a hidden class="anchor" aria-hidden="true" href="#222-lsyncdconf配置选项说明">#</a></h3>
+<p><strong>settings</strong>
+里面是全局设置，<code>--</code>开头表示注释，下面是几个常用选项说明：</p>
+<ul>
+<li><code>logfile</code> 定义日志文件</li>
+<li><code>stausFile</code> 定义状态文件</li>
+<li><code>nodaemon=true</code> 表示不启用守护模式，默认</li>
+<li><code>statusInterval</code> 将lsyncd的状态写入上面的statusFile的间隔，默认10秒</li>
+<li><code>inotifyMode</code> 指定inotify监控的事件，默认是<code>CloseWrite</code>，还可以是<code>Modify</code>或<code>CloseWrite or Modify</code></li>
+<li><code>maxProcesses</code> 同步进程的最大个数。假如同时有20个文件需要同步，而<code>maxProcesses = 8</code>，则最大能看到有8个rysnc进程</li>
+<li><code>maxDelays</code> 累计到多少所监控的事件激活一次同步，即使后面的<code>delay</code>延迟时间还未到</li>
+</ul>
+<p><strong>sync</strong>
+里面是定义同步参数，可以继续使用<code>maxDelays</code>来重写settings的全局变量。一般第一个参数指定<code>lsyncd</code>以什么模式运行：<code>rsync</code>、<code>rsyncssh</code>、<code>direct</code>三种模式：</p>
+<ul>
+<li>
+<p><code>default.rsync</code> ：本地目录间同步，使用rsync，也可以达到使用ssh形式的远程rsync效果，或daemon方式连接远程rsyncd进程；
+<code>default.direct</code> ：本地目录间同步，使用<code>cp</code>、<code>rm</code>等命令完成差异文件备份；
+<code>default.rsyncssh</code> ：同步到远程主机目录，rsync的ssh模式，需要使用key来认证</p>
+</li>
+<li>
+<p><code>source</code> 同步的源目录，使用绝对路径。</p>
+</li>
+<li>
+<p><code>target</code> 定义目的地址.对应不同的模式有几种写法：
+<code>/tmp/dest</code> ：本地目录同步，可用于<code>direct</code>和<code>rsync</code>模式
+<code>172.29.88.223:/tmp/dest</code> ：同步到远程服务器目录，可用于<code>rsync</code>和<code>rsyncssh</code>模式，拼接的命令类似于<code>/usr/bin/rsync -ltsd --delete --include-from=- --exclude=* SOURCE TARGET</code>，剩下的就是rsync的内容了，比如指定username，免密码同步
+<code>172.29.88.223::module</code> ：同步到远程服务器目录，用于<code>rsync</code>模式
+三种模式的示例会在后面给出。</p>
+</li>
+<li>
+<p><code>init</code> 这是一个优化选项，当<code>init = false</code>，只同步进程启动以后发生改动事件的文件，原有的目录即使有差异也不会同步。默认是<code>true</code></p>
+</li>
+<li>
+<p><code>delay</code> 累计事件，等待rsync同步延时时间，默认15秒（最大累计到1000个不可合并的事件）。也就是15s内监控目录下发生的改动，会累积到一次rsync同步，避免过于频繁的同步。（可合并的意思是，15s内两次修改了同一文件，最后只同步最新的文件）</p>
+</li>
+<li>
+<p><code>excludeFrom</code> 排除选项，后面指定排除的列表文件，如<code>excludeFrom = &quot;/etc/lsyncd.exclude&quot;</code>，如果是简单的排除，可以使用<code>exclude = LIST</code>。
+这里的排除规则写法与原生rsync有点不同，更为简单：</p>
+<ul>
+<li>监控路径里的任何部分匹配到一个文本，都会被排除，例如<code>/bin/foo/bar</code>可以匹配规则<code>foo</code></li>
+<li>如果规则以斜线<code>/</code>开头，则从头开始要匹配全部</li>
+<li>如果规则以<code>/</code>结尾，则要匹配监控路径的末尾</li>
+<li><code>?</code>匹配任何字符，但不包括<code>/</code></li>
+<li><code>*</code>匹配0或多个字符，但不包括<code>/</code></li>
+<li><code>**</code>匹配0或多个字符，可以是<code>/</code></li>
+</ul>
+</li>
+<li>
+<p><code>delete</code> 为了保持target与souce完全同步，Lsyncd默认会<code>delete = true</code>来允许同步删除。它除了<code>false</code>，还有<code>startup</code>、<code>running</code>值，请参考 <a href="https://github.com/axkibe/lsyncd/wiki/Lsyncd%202.1.x%20%E2%80%96%20Layer%204%20Config%20%E2%80%96%20Default%20Behavior">Lsyncd 2.1.x ‖ Layer 4 Config ‖ Default Behavior</a>。</p>
+</li>
+</ul>
+<p><strong>rsync</strong>
+（提示一下，<code>delete</code>和<code>exclude</code>本来都是<strong>rsync</strong>的选项，上面是配置在<strong>sync</strong>中的，我想这样做的原因是为了减少rsync的开销）</p>
+<ul>
+<li><code>bwlimit</code> 限速，单位kb/s，与rsync相同（这么重要的选项在文档里竟然没有标出）</li>
+<li><code>compress</code> 压缩传输默认为<code>true</code>。在带宽与cpu负载之间权衡，本地目录同步可以考虑把它设为<code>false</code></li>
+<li><code>perms</code> 默认保留文件权限。</li>
+<li>其它rsync的选项</li>
+</ul>
+<p>其它还有rsyncssh模式独有的配置项，如<code>host</code>、<code>targetdir</code>、<code>rsync_path</code>、<code>password_file</code>，见后文示例。<code>rsyncOps={&quot;-avz&quot;,&quot;--delete&quot;}</code>这样的写法在2.1.*版本已经不支持。</p>
+<p><code>lsyncd.conf</code>可以有多个<code>sync</code>，各自的source，各自的target，各自的模式，互不影响。</p>
+<h2 id="23-启动lsyncd">2.3 启动lsyncd<a hidden class="anchor" aria-hidden="true" href="#23-启动lsyncd">#</a></h2>
+<p>使用命令加载配置文件，启动守护进程，自动同步目录操作。</p>
+<pre><code>lsyncd -log Exec /usr/local/lsyncd-2.1.5/etc/lsyncd.conf
+</code></pre>
+<h2 id="24-lsyncdconf其它模式示例">2.4 lsyncd.conf其它模式示例<a hidden class="anchor" aria-hidden="true" href="#24-lsyncdconf其它模式示例">#</a></h2>
+<p>以下配置本人都已经过验证可行，必须根据实际需要裁剪配置：</p>
+<pre tabindex="0"><code>settings {
+    logfile =&#34;/usr/local/lsyncd-2.1.5/var/lsyncd.log&#34;,
+    statusFile =&#34;/usr/local/lsyncd-2.1.5/var/lsyncd.status&#34;,
+    inotifyMode = &#34;CloseWrite&#34;,
+    maxProcesses = 8,
+    }
+
+
+-- I. 本地目录同步，direct：cp/rm/mv。 适用：500+万文件，变动不大
+sync {
+    default.direct,
+    source    = &#34;/tmp/src&#34;,
+    target    = &#34;/tmp/dest&#34;,
+    delay = 1
+    maxProcesses = 1
+    }
+
+-- II. 本地目录同步，rsync模式：rsync
+sync {
+    default.rsync,
+    source    = &#34;/tmp/src&#34;,
+    target    = &#34;/tmp/dest1&#34;,
+    excludeFrom = &#34;/etc/rsyncd.d/rsync_exclude.lst&#34;,
+    rsync     = {
+        binary = &#34;/usr/bin/rsync&#34;,
+        archive = true,
+        compress = true,
+        bwlimit   = 2000
+        } 
+    }
+
+-- III. 远程目录同步，rsync模式 + rsyncd daemon
+sync {
+    default.rsync,
+    source    = &#34;/tmp/src&#34;,
+    target    = &#34;syncuser@172.29.88.223::module1&#34;,
+    delete=&#34;running&#34;,
+    exclude = { &#34;.*&#34;, &#34;.tmp&#34; },
+    delay = 30,
+    init = false,
+    rsync     = {
+        binary = &#34;/usr/bin/rsync&#34;,
+        archive = true,
+        compress = true,
+        verbose   = true,
+        password_file = &#34;/etc/rsyncd.d/rsync.pwd&#34;,
+        _extra    = {&#34;--bwlimit=200&#34;}
+        }
+    }
+
+-- IV. 远程目录同步，rsync模式 + ssh shell
+sync {
+    default.rsync,
+    source    = &#34;/tmp/src&#34;,
+    target    = &#34;172.29.88.223:/tmp/dest&#34;,
+    -- target    = &#34;root@172.29.88.223:/remote/dest&#34;,
+    -- 上面target，注意如果是普通用户，必须拥有写权限
+    maxDelays = 5,
+    delay = 30,
+    -- init = true,
+    rsync     = {
+        binary = &#34;/usr/bin/rsync&#34;,
+        archive = true,
+        compress = true,
+        bwlimit   = 2000
+        -- rsh = &#34;/usr/bin/ssh -p 22 -o StrictHostKeyChecking=no&#34;
+        -- 如果要指定其它端口，请用上面的rsh
+        }
+    }
+
+-- V. 远程目录同步，rsync模式 + rsyncssh，效果与上面相同
+sync {
+    default.rsyncssh,
+    source    = &#34;/tmp/src2&#34;,
+    host      = &#34;172.29.88.223&#34;,
+    targetdir = &#34;/remote/dir&#34;,
+    excludeFrom = &#34;/etc/rsyncd.d/rsync_exclude.lst&#34;,
+    -- maxDelays = 5,
+    delay = 0,
+    -- init = false,
+    rsync    = {
+        binary = &#34;/usr/bin/rsync&#34;,
+        archive = true,
+        compress = true,
+        verbose   = true,
+        _extra = {&#34;--bwlimit=2000&#34;},
+        },
+    ssh      = {
+        port  =  1234
+        }
+    }
+</code></pre><p>上面的内容几乎涵盖了所有同步的模式，其中第<code>III</code>个要求像rsync一样配置rsyncd服务端，见本文开头。第<code>IV</code>、<code>V</code>配置ssh方式同步，达到的效果相同，但实际同步时你会发现每次同步都会提示输入ssh的密码，可以通过以下方法解决：</p>
+<p>在远端被同步的服务器上开启ssh无密码登录，请注意用户身份：</p>
+<pre tabindex="0"><code>user$ ssh-keygen -t rsa
+一路回车...
+user$ cd ~/.ssh
+user$ cat id_rsa.pub &gt;&gt; authorized_keys
+</code></pre><p>把<code>id_rsa</code>私钥拷贝到执行lsyncd的机器上</p>
+<pre tabindex="0"><code>user$ chmod 600 ~/.ssh/id_rsa
+测试能否无密码登录
+user$ ssh user@172.29.88.223
+</code></pre><h1 id="3-lsyncd的其它功能">3. lsyncd的其它功能<a hidden class="anchor" aria-hidden="true" href="#3-lsyncd的其它功能">#</a></h1>
+<p><code>lsyncd</code>的功能不仅仅是同步，官方手册 <a href="https://github.com/axkibe/lsyncd/wiki/Lsyncd%202.1.x%20%E2%80%96%20Layer%202%20Config%20%E2%80%96%20Advanced%20onAction">Lsyncd 2.1.x ‖ Layer 2 Config ‖ Advanced onAction</a> 高级功能提到，还可以监控某个目录下的文件，根据触发的事件自己定义要执行的命令，example是监控某个某个目录，只要是有jpg、gif、png格式的文件参数，就把它们转成pdf，然后同步到另一个目录。正好在我运维的一个项目中有这个需求，现在都是在java代码里转换，还容易出现异常，通过lsyncd可以代替这样的功能。但，门槛在于要会一点点lua语言（根据官方example还是可以写出来）。</p>
+<p>另外偶然想到个问题，同时设置了<code>maxDelays</code>和<code>delay</code>，当监控目录一直没有文件变化了，也会发生同步操作，虽然没有可rsync的文件。</p>
+<p>TO-DO：</p>
+<ul>
+<li>其它同步工具：<a href="http://www.chinaxing.org/articles/linux/2013/04/18/2013-04-18-incrond-and-csync2.html">csync2</a>，clsync，btsync，drdb 。</li>
+<li>lsyncd双向同步：<a href="https://github.com/axkibe/lsyncd/wiki/Faq">GlusterFS</a></li>
+</ul>
+<p><strong>参考</strong></p>
+<ul>
+<li><a href="https://github.com/axkibe/lsyncd/wiki/Manual-to-Lsyncd-2.1.x">Lsyncd21Manual</a> （本文很大一部分翻译自官网手册）</li>
+<li><a href="http://www.cnblogs.com/ivistn/p/3906897.html">使用lsyncd配置数据库备份多异地同步</a></li>
+<li><a href="http://ju.outofmemory.cn/entry/87237">如何实时同步大量小文件</a></li>
+<li><a href="http://weekyuan.blog.51cto.com/2389856/1334324">Lsyncd 测试远程、本地目录自动同步</a></li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/rsync/">rsync</a></li>
+      <li><a href="http://xgknight.com/tags/inotify/">inotify</a></li>
+      <li><a href="http://xgknight.com/tags/lsyncd%E6%96%87%E4%BB%B6%E5%90%8C%E6%AD%A5/">lsyncd，文件同步</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

@@ -151,26 +151,180 @@ log日志采集 log存储 log展示 alarm报警(附加) 1 确定日志流向/架
 
 <article class="post-entry tag-entry"> 
   <header class="entry-header">
-    <h2>Linux进阶培训-tplink
+    <h2>nginx做负载均衡器以及proxy缓存配置
     </h2>
   </header>
   <div class="entry-content">
-    <p>本文没啥实际内容，是给新人做linux培训的第二课进阶篇，主要着眼于体系，把一些工具混个眼熟。
-目录 Linux磁盘管理(进阶) Linux内存管理 Linux进程管理(进阶) Linux网络管理(进阶) Linux系统状态监控与调优 常见服务 Linux安全策略 其他 Linux磁盘管理（进阶） ext4文件系统格式 Inode、block、superblock、MBR VFS LVM pv、lv、vg lvdisplay、lvextend、vgdisplay、pvcreate… RAID raid0、raid1、raid5、raid10 r/w速度、磁盘利用率、安全性的权衡 磁盘IO性能 dd、iostat、iotop I/O等待 Linux内存管里（基础） 物理内存与虚拟内存 Swap space，分页存取 buffer与cache区分 内存监控命令 free、vmstat /proc文件系统 Linux进程管理（进阶） 进程与线程 进程优先级 进程监控命令 pidstat、lsof strace（系统调用跟踪） 后台进程 Ctrl&#43;z、jobs、bg、fg、&amp;、nohup screen Linux的网络管理 一些概念
-防火墙
-路由/网关
-子网掩码
-网络接口（参数）
-MAC
-TCP/IP协议
-应用层协议
-Linux网络管理 iptables
-Linux网络管理 主机网络流量监控 iftop、iptraf、sar tcpdump抓包 wireshark数据包分析工具 ##Linux网络管理
-iproute2 ip、ss Linux系统状态监控与调优 一些工具 sar、sysstat perf、logwatch 一些配置文件 sysctl.conf limits.conf Linux安全策略 禁止root直接登录 锁定不使用的账号 关闭ipv6 启用防火墙 定期检查日志 … Linux常见服务 tcp_wrappers SSH postfix FTP NFS/Samba DNS Apache/nginx … Linux其他 Linux开机过程分析 pam模块解读lsmod 编译make、ldd、ldconfig、gcc、gdb ACL Linux集群 内核模块 linux编程 … 本文链接地址：http://xgknight....</p>
+    <p>关于nginx的安装和基本配置请参考nginx，本文在原基础上完成以下几个功能：
+结合proxy和upstream模块实现nginx负载均衡 结合nginx_upstream_check_module模块实现后端服务器的健康检查 使用nginx-sticky-module扩展模块实现Cookie会话黏贴（session-sticky效果） 使用proxy模块实现静态文件缓存 使用ngx_cache_purge实现更强大的缓存清除功能 1. 安装及模块说明 上面提到的3个模块都属于第三方扩展模块，需要提前下好源码，然后编译时通过--add-moudle=src_path一起安装。
+注意：
+使用 nginx_upstream_check_module(简记为m1) 时要先为nginx打上相应版本的patch，我的nginx版本为 1.6.3，所以patch对应 m1 解压后目录下的check_1.5.12&#43;.patch，所以进入nginx源码目录，执行 patch -p1 …（见下方示例） nginx-sticky-module-ng(简记为m2) 模块可以单独使用，但是因为m1监控检查的方式是依赖于m2的，所以要使用m2，还要对m1打上patch，进入m2源码目录，执行 patch -p0… 编译示例：（CentOS 6.5 x86_64, nginx 1.6.3）
+# yum -y install gcc gcc-c&#43;&#43; make libtool zlib zlib-devel openssl openssl--devel pcre pcre-devel # cd nginx-1.6.3 # patch -p1 &lt; ../nginx_upstream_check_module-0.3.0/check_1.5.12&#43;.patch # cd ../nginx-sticky-module-ng-1.2.5 # patch -p0 &lt; ../nginx_upstream_check_module-0.3.0/nginx-sticky-module.patch # ./configure --prefix=/usr/local/nginx-1.6 --with-pcre --with-http_stub_status_module --with-http_ssl_module --with-http_gzip_static_module --with-http_realip_module --add-module=../nginx_upstream_check_module-0.3.0 --add-module=../nginx-sticky-module-ng-1.2.5 --add-module=../ngx_cache_purge-2.3 # make &amp;&amp; make install 如果你想在已安装好的nginx上添加第三方模块，依然需要重新编译，但为了不覆盖你原有的配置，请不要make install，而是直接拷贝可执行文件：...</p>
   </div>
-  <footer class="entry-footer"><span title='2014-10-06 16:32:49 +0000 UTC'>October 6, 2014</span>&nbsp;·&nbsp;admin</footer>
-  <a class="entry-link" aria-label="post link to Linux进阶培训-tplink" href="http://xgknight.com/posts/2014/10/linux%E8%BF%9B%E9%98%B6%E5%9F%B9%E8%AE%AD-tplink/"></a>
+  <footer class="entry-footer"><span title='2015-06-02 01:21:25 +0000 UTC'>June 2, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to nginx做负载均衡器以及proxy缓存配置" href="http://xgknight.com/posts/2015/06/nginx%E5%81%9A%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1%E5%99%A8%E4%BB%A5%E5%8F%8Aproxy%E7%BC%93%E5%AD%98%E9%85%8D%E7%BD%AE/"></a>
 </article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>nginx配置ssl加密（单双向认证、部分https）
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>nginx下配置ssl本来是很简单的，无论是去认证中心买SSL安全证书还是自签署证书，但最近公司OA的一个需求，得以有个机会实际折腾一番。一开始采用的是全站加密，所有访问http:80的请求强制转换（rewrite）到https，后来自动化测试结果说响应速度太慢，https比http慢慢30倍，心想怎么可能，鬼知道他们怎么测的。所以就试了一下部分页面https（不能只针对某类动态请求才加密）和双向认证。下面分节介绍。
+默认nginx是没有安装ssl模块的，需要编译安装nginx时加入--with-http_ssl_module选项。
+关于SSL/TLS原理请参考 这里，如果你只是想测试或者自签发ssl证书，参考 这里 。
+提示：nignx到后端服务器由于一般是内网，所以不加密。
+1. 全站ssl 全站做ssl是最常见的一个使用场景，默认端口443，而且一般是单向认证。
+server { listen 443; server_name example.com; root /apps/www; index index.html index.htm; ssl on; ssl_certificate ../SSL/ittest.pem; ssl_certificate_key ../SSL/ittest.key; # ssl_protocols SSLv3 TLSv1 TLSv1.1 TLSv1.2; # ssl_ciphers ALL:!ADH:!EXPORT56:RC4&#43;RSA:&#43;HIGH:&#43;MEDIUM:&#43;LOW:&#43;SSLv2:&#43;EXP; # ssl_prefer_server_ciphers on; } 如果想把http的请求强制转到https的话：
+server { listen 80; server_name example.me; rewrite ^ https://$server_name$request_uri? permanent; ### 使用return的效率会更高 # return 301 https://$server_name$request_uri; } ssl_certificate证书其实是个公钥，它会被发送到连接服务器的每个客户端，ssl_certificate_key私钥是用来解密的，所以它的权限要得到保护但nginx的主进程能够读取。当然私钥和证书可以放在一个证书文件中，这种方式也只有公钥证书才发送到client。
+ssl_protocols指令用于启动特定的加密协议，nginx在1.1.13和1.0.12版本后默认是ssl_protocols SSLv3 TLSv1 TLSv1.1 TLSv1.2，TLSv1.1与TLSv1.2要确保OpenSSL &gt;= 1.0.1 ，SSLv3 现在还有很多地方在用但有不少被攻击的漏洞。
+ssl_ciphers选择加密套件，不同的浏览器所支持的套件（和顺序）可能会不同。这里指定的是OpenSSL库能够识别的写法，你可以通过 openssl -v cipher &#39;RC4:HIGH:!...</p>
+  </div>
+  <footer class="entry-footer"><span title='2015-05-28 15:21:25 +0000 UTC'>May 28, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to nginx配置ssl加密（单双向认证、部分https）" href="http://xgknight.com/posts/2015/05/nginx%E9%85%8D%E7%BD%AEssl%E5%8A%A0%E5%AF%86%E5%8D%95%E5%8F%8C%E5%90%91%E8%AE%A4%E8%AF%81%E9%83%A8%E5%88%86https/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>Nginx&#43;Keepalived实现站点高可用
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>公司内部 OA 系统要做线上高可用，避免单点故障，所以计划使用2台虚拟机通过 Keepalived 工具来实现 nginx 的高可用（High Avaiability），达到一台nginx入口服务器宕机，另一台备机自动接管服务的效果。（nginx做反向代理，实现后端应用服务器的负载均衡）快速搭建请直接跳至 第2节。
+1. Keepalived介绍 Keepalived是一个基于VRRP协议来实现的服务高可用方案，可以利用其来避免IP单点故障，类似的工具还有heartbeat、corosync、pacemaker。但是它一般不会单独出现，而是与其它负载均衡技术（如lvs、haproxy、nginx）一起工作来达到集群的高可用。
+1.1 VRRP协议 VRRP全称 Virtual Router Redundancy Protocol，即 虚拟路由冗余协议。可以认为它是实现路由器高可用的容错协议，即将N台提供相同功能的路由器组成一个路由器组(Router Group)，这个组里面有一个master和多个backup，但在外界看来就像一台一样，构成虚拟路由器，拥有一个虚拟IP（vip，也就是路由器所在局域网内其他机器的默认路由），占有这个IP的master实际负责ARP相应和转发IP数据包，组中的其它路由器作为备份的角色处于待命状态。master会发组播消息，当backup在超时时间内收不到vrrp包时就认为master宕掉了，这时就需要根据VRRP的优先级来选举一个backup当master，保证路由器的高可用。
+在VRRP协议实现里，虚拟路由器使用 00-00-5E-00-01-XX 作为虚拟MAC地址，XX就是唯一的 VRID （Virtual Router IDentifier），这个地址同一时间只有一个物理路由器占用。在虚拟路由器里面的物理路由器组里面通过多播IP地址 224.0.0.18 来定时发送通告消息。每个Router都有一个 1-255 之间的优先级别，级别最高的（highest priority）将成为主控（master）路由器。通过降低master的优先权可以让处于backup状态的路由器抢占（pro-empt）主路由器的状态，两个backup优先级相同的IP地址较大者为master，接管虚拟IP。
+与heartbeat/corosync等比较 直接摘抄自 http://www.linuxidc.com/Linux/2013-08/89227.htm ：
+Heartbeat、Corosync、Keepalived这三个集群组件我们到底选哪个好，首先我想说明的是，Heartbeat、Corosync是属于同一类型，Keepalived与Heartbeat、Corosync，根本不是同一类型的。Keepalived使用的vrrp协议方式，虚拟路由冗余协议 (Virtual Router Redundancy Protocol，简称VRRP)；Heartbeat或Corosync是基于主机或网络服务的高可用方式；简单的说就是，Keepalived的目的是模拟路由器的高可用，Heartbeat或Corosync的目的是实现Service的高可用。
+所以一般Keepalived是实现前端高可用，常用的前端高可用的组合有，就是我们常见的LVS&#43;Keepalived、Nginx&#43;Keepalived、HAproxy&#43;Keepalived。而Heartbeat或Corosync是实现服务的高可用，常见的组合有Heartbeat v3(Corosync)&#43;Pacemaker&#43;NFS&#43;Httpd 实现Web服务器的高可用、Heartbeat v3(Corosync)&#43;Pacemaker&#43;NFS&#43;MySQL 实现MySQL服务器的高可用。总结一下，Keepalived中实现轻量级的高可用，一般用于前端高可用，且不需要共享存储，一般常用于两个节点的高可用。而Heartbeat(或Corosync)一般用于服务的高可用，且需要共享存储，一般用于多节点的高可用。这个问题我们说明白了。
+又有博友会问了，那heartbaet与corosync我们又应该选择哪个好啊，我想说我们一般用corosync，因为corosync的运行机制更优于heartbeat，就连从heartbeat分离出来的pacemaker都说在以后的开发当中更倾向于corosync，所以现在corosync&#43;pacemaker是最佳组合。
+1.2 Keepalived &#43; nginx keepalived可以认为是VRRP协议在Linux上的实现，主要有三个模块，分别是core、check和vrrp。core模块为keepalived的核心，负责主进程的启动、维护以及全局配置文件的加载和解析。check负责健康检查，包括常见的各种检查方式。vrrp模块是来实现VRRP协议的。本文基于如下的拓扑图：
+&#43;-------------&#43; | uplink | &#43;-------------&#43; | &#43; MASTER keep|alived BACKUP 172.29.88.224 172.29.88.222 172.29.88.225 &#43;-------------&#43; &#43;-------------&#43; &#43;-------------&#43; | nginx01 |----| virtualIP |----| nginx02 | &#43;-------------&#43; &#43;-------------&#43; &#43;-------------&#43; | &#43;------------------&#43;------------------&#43; | | | &#43;-------------&#43; &#43;-------------&#43; &#43;-------------&#43; | web01 | | web02 | | web03 | &#43;-------------&#43; &#43;-------------&#43; &#43;-------------&#43; 2....</p>
+  </div>
+  <footer class="entry-footer"><span title='2015-05-18 01:21:25 +0000 UTC'>May 18, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to Nginx&#43;Keepalived实现站点高可用" href="http://xgknight.com/posts/2015/05/nginx-keepalived%E5%AE%9E%E7%8E%B0%E7%AB%99%E7%82%B9%E9%AB%98%E5%8F%AF%E7%94%A8/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>nginx配置location总结及rewrite规则写法
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>1. location正则写法 一个示例：
+location = / { # 精确匹配 / ，主机名后面不能带任何字符串 [ configuration A ] } location / { # 因为所有的地址都以 / 开头，所以这条规则将匹配到所有请求 # 但是正则和最长字符串会优先匹配 [ configuration B ] } location /documents/ { # 匹配任何以 /documents/ 开头的地址，匹配符合以后，还要继续往下搜索 # 只有后面的正则表达式没有匹配到时，这一条才会采用这一条 [ configuration C ] } location ~ /documents/Abc { # 匹配任何以 /documents/Abc 开头的地址，匹配符合以后，还要继续往下搜索 # 只有后面的正则表达式没有匹配到时，这一条才会采用这一条 [ configuration CC ] } location ^~ /images/ { # 匹配任何以 /images/ 开头的地址，匹配符合以后，停止往下搜索正则，采用这一条。 [ configuration D ] } location ~* \....</p>
+  </div>
+  <footer class="entry-footer"><span title='2015-05-17 15:21:25 +0000 UTC'>May 17, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to nginx配置location总结及rewrite规则写法" href="http://xgknight.com/posts/2015/05/nginx%E9%85%8D%E7%BD%AElocation%E6%80%BB%E7%BB%93%E5%8F%8Arewrite%E8%A7%84%E5%88%99%E5%86%99%E6%B3%95/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>nginx服务器安装及配置文件详解
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>nginx在工作中已经有好几个环境在使用了，每次都是重新去网上扒博客，各种编译配置，今天自己也整理一份安装文档和nginx.conf配置选项的说明，留作以后参考。像负载均衡配置（包括健康检查）、缓存（包括清空缓存）配置实例，请参考 http://xgknight.com/2015/05/17/nginx-install-and-config ，ssl加密请参考 http://xgknight.com/2015/05/28/nginx-ssl/ 。
+1. 安装nginx 1.1 选择稳定版本 我们编译安装nginx来定制自己的模块，机器CentOS 6.2 x86_64。首先安装缺少的依赖包：
+# yum -y install gcc gcc-c&#43;&#43; make libtool zlib zlib-devel openssl openssl-devel pcre pcre-devel 这些软件包如果yum上没有的话可以下载源码来编译安装，只是要注意编译时默认安装的目录，确保下面在安装nginx时能够找到这些动态库文件（ldconfig）。
+从 http://nginx.org/en/download.html 下载稳定版nginx-1.6.3.tar.gz到/usr/local/src下解压。
+为了后续准备我们另外下载2个插件模块：nginx_upstream_check_module-0.3.0.tar.gz —— 检查后端服务器的状态，nginx-goodies-nginx-sticky-module-ng-bd312d586752.tar.gz（建议在/usr/local/src下解压后将目录重命名为nginx-sticky-module-ng-1.2.5） —— 后端做负载均衡解决session sticky问题（与upstream_check模块结合使用需要另外打补丁，请参考nginx负载均衡配置实战）。
+请注意插件与nginx的版本兼容问题，一般插件越新越好，nginx不用追新，稳定第一。nginx-1.4.7，nginx-sticky-module-1.1，nginx_upstream_check_module-0.2.0，这个搭配也没问题。sticky-1.1与nginx-1.6版本由于更新没跟上编译出错。（可以直接使用Tengine，默认就包括了这些模块）
+[root@cachets nginx-1.6.3]# pwd /usr/local/src/nginx-1.6.3 [root@cachets nginx-1.6.3]# ./configure --prefix=/usr/local/nginx-1.6 --with-pcre \ &gt; --with-http_stub_status_module --with-http_ssl_module \ &gt; --with-http_gzip_static_module --with-http_realip_module \ &gt; --add-module=../nginx_upstream_check_module-0.3.0 [root@cachets nginx-1.6.3]# make &amp;&amp; make install 1.2 常用编译选项说明 nginx大部分常用模块，编译时./configure --help以--without开头的都默认安装。
+--prefix=PATH ： 指定nginx的安装目录。默认 /usr/local/nginx --conf-path=PATH ： 设置nginx....</p>
+  </div>
+  <footer class="entry-footer"><span title='2015-05-17 01:21:25 +0000 UTC'>May 17, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to nginx服务器安装及配置文件详解" href="http://xgknight.com/posts/2015/05/nginx%E6%9C%8D%E5%8A%A1%E5%99%A8%E5%AE%89%E8%A3%85%E5%8F%8A%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6%E8%AF%A6%E8%A7%A3/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>仿豆丁网文件在线浏览解决方案搭建
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>在公司OA和CRM系统遇到要实现在线查看word/jpg等文件的功能，按照开发小组的要求搭建了一套解决方案：OpenOffice &#43; JodConvertor &#43; SWFTool&#43; FlexPaper，其中OpenOffice &#43; JodConvertor用于将文档转化为PDF格式文档，SwfTool用于将PDF转化为SWF文档，FlexPaper用于展示。使用这个解决方案的最大好处就是跨平台且较为简单。
+1.1 安装openoffice openoffice需要jdk的支持，而且默认已经安装，如果没有，手动下载Apache_OpenOffice_4.0.1_Linux_x86-64_install-rpm_zh-CN.tar.gz到/usr/local/src（CentOS 6.4 x86_64）：
+# tar -zxf Apache_OpenOffice_4.0.1_Linux_x86-64_install-rpm_zh-CN.tar.gz # cd zh-CN/RPMS # rpm –ivh *.rpm 拷贝字体 安装完成后把windows（c:\windows\fonts）下的一些常用字体拷贝到 /opt/openoffice4/share/fonts/truetype 目录下，如Arial, Calibri, Courier New, Consolas等，如果你想正确的保留原doc的中文字体，还需要把 黑体、微软雅黑、宋体 常规、新宋体 常规、幼圆、隶书、楷体 等中文字体拷贝进去（重启进程后生效）。
+启动后台进程 切换至普通用户，如wxcrm启动转换进程：
+$ /opt/openoffice4/program/soffice -headless -accept=&#34;socket,host=127.0.0.1,port=8100;urp;&#34; -nofirststartwizard &amp; # ps –ef | grep soffice 1.2 解压jodconverter JODConverter是一个java的OpenDucument文件转换器，可以进行许多文件格式的转换工具，它利用OpenOffice来进行转换工作，它能完成以下转换：
+Microsoft Office格式转换为OpenDucument，以及OpenDucument转换为Microsoft Office OpenDucument转换为PDF，Word、Excel、PowerPoint转换为PDF，RTF转换为PDF等。 从 http://sourceforge.net/projects/jodconverter/files/JODConverter/2.2.2/ 下载jodconverter-2.2.2.zip解压到 /opt 目录下/opt/jodconverter-2.2.2/。手动转换测试，使用到的文件是安装包内的lib/jodconverter-cli-2.2.2.jar：
+java -jar /opt/jodconverter-2.2.2/lib/jodconverter-cli-2.2.2.jar /home/oa/docker.docx /home/oa/docker.pdf 至此doc等文件格式可以成功转换成pdf。
+2.1 swftool swftool可以将pdf/jpg等转换成swf格式。搜索下载swftools-0....</p>
+  </div>
+  <footer class="entry-footer"><span title='2015-05-13 01:21:25 +0000 UTC'>May 13, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 仿豆丁网文件在线浏览解决方案搭建" href="http://xgknight.com/posts/2015/05/%E4%BB%BF%E8%B1%86%E4%B8%81%E7%BD%91%E6%96%87%E4%BB%B6%E5%9C%A8%E7%BA%BF%E6%B5%8F%E8%A7%88%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88%E6%90%AD%E5%BB%BA/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>lsyncd实时同步搭建指南——取代rsync&#43;inotify
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>1. 几大实时同步工具比较 1.1 inotify &#43; rsync 最近一直在寻求生产服务服务器上的同步替代方案，原先使用的是inotify &#43; rsync，但随着文件数量的增大到100W&#43;，目录下的文件列表就达20M，在网络状况不佳或者限速的情况下，变更的文件可能10来个才几M，却因此要发送的文件列表就达20M，严重减低的带宽的使用效率以及同步效率；更为要紧的是，加入inotifywait在5s内监控到10个小文件发生变化，便会触发10个rsync同步操作，结果就是真正需要传输的才2-3M的文件，比对的文件列表就达200M。使用这两个组合的好处在于，它们都是最基本的软件，可以通过不同选项做到很精确的控制，比如排除同步的目录，同步多个模块或同步到多个主机。
+搭建过程参考 Linux下同步工具inotify&#43;rsync使用详解 。
+1.2 sersync 后来听同事说 sersync 这么个工具可以提高同步的性能，也解决了同步大文件时出现异常的问题，所以就尝试了一下。sersync是国内的一个开发者开源出来的，使用c&#43;&#43;编写，采用多线程的方式进行同步，失败后还有重传机制，对临时文件过滤，自带crontab定时同步功能。网上看到有人说性能还不错，说一下我的观点：
+国产开源，文档不是很全，在2011年之后就没更新了（googlecode都要快关闭了，其实可以转交其他人维护），网上关于它的使用和讨论都止于10年了 采用xml配置文件的方式，可读性比较好，但是有些原生的有些功能没有实现就没法使用了 无法实现多目录同步，只能通过多个配置文件启动多个进程 文件排除功能太弱。这个要看需求，不是每个人都需要排除子目录。而对于我的环境中，这个功能很重要，而且排除的规则较多 虽然提供插件的功能，但很鸡肋，因为软件本身没有持续更新，也没有看到贡献有其它插件出现（可能是我知识面不够，还用不到里面的refreshCDN plugin）。 虽然不懂c&#43;&#43;，但大致看了下源码 FileSynchronize，拼接rsync命令大概在273行左右，最后一个函数就是排除选项，简单一点可以将--exclude=改成--eclude-from来灵活控制。有机会再改吧。
+另外，在作者的文章 Sersync服务器同步程序 项目简介与设计框架 评论中，说能解决上面 rsync &#43; inotify中所描述的问题。阅读了下源码，这个应该是没有解决，因为在拼接rsync命令时，后面的目的地址始终是针对module的，只要执行rsync命令，就会对整个目录进行遍历，发送要比对的文件列表，然后再发送变化的文件。sersync只是减少了监听的事件，减少了rsync的次数——这已经是很大的改进，但每次rsync没办法改变。（如有其它看法可与我讨论）
+其实我们也不能要求每一个软件功能都十分健全，关键是看能否满足我们当下的特定的需求。所谓好的架构不是设计出来的，而是进化来的。目前使用sersync2没什么问题，而且看了它的设计思路应该是比较科学的，特别是过滤队列的设计。双向同步看起来也是可以实现。
+1.3 lsyncd 废话说这么多，本文就是介绍它了。有些博客说lsyncd是谷歌开源的，实际不是了，只是托管在了googlecode上而已，幸运的是已经迁移到github了：https://github.com/axkibe/lsyncd 。
+Lysncd 实际上是lua语言封装了 inotify 和 rsync 工具，采用了 Linux 内核（2.6.13 及以后）里的 inotify 触发机制，然后通过rsync去差异同步，达到实时的效果。我认为它最令人称道的特性是，完美解决了 inotify &#43; rsync海量文件同步带来的文件频繁发送文件列表的问题 —— 通过时间延迟或累计触发事件次数实现。另外，它的配置方式很简单，lua本身就是一种配置语言，可读性非常强。lsyncd也有多种工作模式可以选择，本地目录cp，本地目录rsync，远程目录rsyncssh。
+实现简单高效的本地目录同步备份（网络存储挂载也当作本地目录），一个命令搞定。
+2. 使用 lsyncd 本地目录实时备份 这一节实现的功能是，本地目录source实时同步到另一个目录target，而在source下有大量的文件，并且有部分目录和临时文件不需要同步。
+2.1 安装lsyncd 安装lsyncd极为简单，已经收录在ubuntu的官方镜像源里，直接通过apt-get install lsyncd就可以。 在Redhat系（我的环境是CentOS 6.2 x86_64 ），可以手动去下载 lsyncd-2.1.5-6.fc21.x86_64.rpm，但首先你得安装两个依赖yum install lua lua-devel。也可以通过在线安装，需要epel-release扩展包：...</p>
+  </div>
+  <footer class="entry-footer"><span title='2015-05-06 01:21:25 +0000 UTC'>May 6, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to lsyncd实时同步搭建指南——取代rsync&#43;inotify" href="http://xgknight.com/posts/2015/05/lsyncd%E5%AE%9E%E6%97%B6%E5%90%8C%E6%AD%A5%E6%90%AD%E5%BB%BA%E6%8C%87%E5%8D%97%E5%8F%96%E4%BB%A3rsync-inotify/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>iscsi网络存储介绍及客户端配置操作
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>本文不介绍iSCSI服务端的搭建过程，不然就会很累赘。主题就是怎么去完成iscsi网络存储的挂载过程，并顺带介绍一些必要的概念。
+1. iscsi介绍与initiator安装 1.1 iSCSI介绍 iSCSI简单来说，就是把SCSI指令通过TCP/IP协议封装起来，在以太网中传输。iSCSI 可以实现在IP网络上传递和运行SCSI协议，使其能够在诸如高速千兆以太网上进行数据存取，实现了数据的网际传递和管理。基于iSCSI建立的存储区域网（SAN）与基于光纤的FC-SAN相比，具有很好的性价比。
+iSCSI属于端到端的会话层协议，它定义的是SCSI到TCP/IP的映射（如下图），即Initiator将SCSI指令和数据封装成iSCSI协议数据单元，向下提交给TCP层，最后封装成IP数据包在IP网络上传输，到达Target后通过解封装还原成SCSI指令和数据，再由存储控制器发送到指定的驱动器，从而实现SCSI命令和数据在IP网络上的透明传输。它整合了现有的存储协议SCSI和网络协议TCP/IP，实现了存储与TCP/IP网络的无缝融合。在本文中，将把发起器Initiator称为客户端，将目标器Target称为服务端以方便理解。
+iSCSI 服务端和客户端的通讯就是一个在网络上封包和解包的过程，在网络的一端，数据包被封装成包括TCP/IP头、iSCSI 识别包和SCSI 数据三部分内容，传输到网络另一端时，这三部分内容分别被顺序地解开。为了保证安全，iSCSI 有约定操作顺序。在首次运行时，客户端（initiator）设备需要登录到服务端（target）中。任何一个接收到没有执行登录过程的客户端的iSCSI PDU （iSCSI rotocol Data Units，iSCSI 协议数据单元）服务端都将生成一个协议错误，并且关闭连接。在关闭会话之前，服务端可能发送回一个被驳回的iSCSI PDU。
+在工作时，iSCSI使SCSI数据块由原来的SCSI总线连接扩展到internet上，这一过程有些产品通过硬件来实现，这种硬件产品被简称为TOE（TCP Offload Engine），随着近年来服务器芯片技术的不断发展，服务器处理能力日益强劲，目前更为普遍的是通过软件来实现SCSI数据块的封装过程。这种软件通常被称为iSCSI Initiator软件/驱动。Initiator软件可以将以太网卡虚拟为iSCSI卡，接受和发送iSCSI数据报文，通过普通以太网卡来进行网络连接，但是需要占用CPU资源。另外的TOE和HBA连接转换方式都需要专门的硬件设备来完成，虽然相对昂贵但执行效率高，也可以减轻主机CPU的负载。本文客户端采用Initiator驱动的连接方式。
+1.2 Initiator安装 在Linux 2.6内核中提供了iscsi驱动，iSCSI 驱动（driver）使主机拥有了通过IP网络访问存储的能力，但还需要一个具体的客户端工具（Linux用户空间组件）初始化iSCSI驱动，即iscsi-initiator-utils，也是大家常说的open-iscsi。
+# rpm -qa|grep iscsi iscsi-initiator-utils-6.2.0.873-10.el6.x86_64 iscsi-initiator-utils-devel-6.2.0.873-10.el6.x86_64 # rpm -qi iscsi-initiator-utils （yum install iscsi-initiator-utils iscsi-initiator-utils-devel） 这个安装将iscsid、iscsiadm安装到 /sbin 目录下，它还将把默认的配置文件安装到/etc/iscsi/目录下：
+/etc/iscsi/iscsid.conf：所有刚发起的iSCSI session默认都将使用这个文件中的参数设定。 /etc/iscsi/initiatorname.iscsi：软件iSCSI initiator的intiator名称配置文件。 确保iscsid和iscsi两个服务器开机自启动，chkconfig --list |grep iscsi，在iscsi启动的时候，iscsid和iscsiadm会读取这两个配置文件。
+service iscsid [status|start] service iscsi status 查看iscisi的信息，只有在连接成功后才输出 这里可能遇到start始终没有启动成功的信息输出，请继续往下执行discovery，一般会启动iscsid。
+1.3 open-iscsi initiator说明 open-iscsi包括两个守护进程iscsid和iscsi，其中iscsid是主进程，iscsi进程则主要负责根据配置在系统启动时进行发起端（Initiator）到服务端（target）的登录，建立发起端与服务端的会话，使主机在启动后即可使用通过iSCSI提供服务的存储设备。
+iscsid进程实现iSCSI协议的控制路径以及相关管理功能。例如守护进程（指iscsid）可配置为在系统启动时基于持久化的iSCSI数据库内容，自动重新开始发现（discovery）目标设备。
+Open-iSCSI是通过以下iSCSI数据库文件来实现永久配置的：
+Discovery (/var/lib/iscsi/send_targets) 在 /var/lib/iscsi/send_targets 目录下包含iSCSI portals的配置信息，每个portal对应一个文件，文件名为“iSCSI portal IP，端口号”（例如172....</p>
+  </div>
+  <footer class="entry-footer"><span title='2015-04-28 01:21:25 +0000 UTC'>April 28, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to iscsi网络存储介绍及客户端配置操作" href="http://xgknight.com/posts/2015/04/iscsi%E7%BD%91%E7%BB%9C%E5%AD%98%E5%82%A8%E4%BB%8B%E7%BB%8D%E5%8F%8A%E5%AE%A2%E6%88%B7%E7%AB%AF%E9%85%8D%E7%BD%AE%E6%93%8D%E4%BD%9C/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>怎么用pfSense为你的web服务做负载均衡（翻译）
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>本文翻译自Howtoforge上的一篇文章 How To Use pfSense To Load Balance Your Web Servers。注意pfSense的负载均衡有两种：一是设置多个WAN做双线负载均衡，二是本文的为LAN内的web服务器做inbound-loadbalancer。
+这篇howto中展示了怎么使用pfSense 2.0 为你的多个web服务器配置负载均衡（load balancer）。这里假定在你的网络环境中已经拥有了一个pfSense服务器和2个以上的apache服务器，并且具有一定的pfSense知识。（参考图解pfSense软路由系统的使用（NAT功能）
+1. 前提 一个安装好的pfSense 2.0 机器（如果它是你的外围防火墙，建议安装在物理机上） 至少2个apache服务器（可以是虚拟机） 确保在apache服务器之间代码文件是同步的（rsync、cororsync或其它可以保持web服务器间文件更新） 2. 配置pfSense pfSense可以使用负载均衡的功能让特定的请求压力由多台服务器分担，这对于有多台应用的服务器很有帮助，因为你可以把负载压力分散到其它节点上而不是死磕一个节点。
+2.1 Monitor 我们正式开始。首先点击Services -&gt; Load Balancers，然后选择Monitor标签。
+点击右边的&#43;加号来添加一条记录，输入monitor的名字Name和描述Description（在这个示例名字和描述我都使用ApacheClusterMon），把类型Type设置成HTTP，主机地址Host设置一个还未使用的IP（后面我们将在这个IP上建立虚拟IP，这个虚拟IP会被分配到故障转移failover节点上，注：也有文章说把它设成WAN IP），HTTP Code保存默认的200 OK，然后点击Save保存并且使修改生效Apply Changes。 2.2 Pool 接着建立服务器池server pool。点击Pools标签的&#43;按钮来添加一个池。
+在该示例我指定ApacheSrvPool为服务池名称，设置Mode为Load Balance，端口80（。这个端口时你后端服务器的监听端口，你当然可以设定其它应用的其它端口，不一定非是web）。为这个池设定上一步创建的ApacheClusterMon，依次将你的所有web服务器IP添加到这个池中Add to pool，保存并应用。 2.3 Virtual Server 最后一步，选择Virtual Servers标签页，点击&#43;来添加一条记录。填写名称ApacheClusterVirtualServer、描述和IP地址，这个IP地址与第1步中说的未使用的IP相同，端口80，所有发送到这个WAN IP:port的连接都会被转发到服务器池中。虚拟服务器池Virtual Server Poll选择上一步创建的。提交并应用。 搞定！最后不要忘记为虚拟服务器IP和池添加防火墙规则。</p>
+  </div>
+  <footer class="entry-footer"><span title='2015-04-24 15:21:25 +0000 UTC'>April 24, 2015</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to 怎么用pfSense为你的web服务做负载均衡（翻译）" href="http://xgknight.com/posts/2015/04/%E6%80%8E%E4%B9%88%E7%94%A8pfsense%E4%B8%BA%E4%BD%A0%E7%9A%84web%E6%9C%8D%E5%8A%A1%E5%81%9A%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1%E7%BF%BB%E8%AF%91/"></a>
+</article>
+<footer class="page-footer">
+  <nav class="pagination">
+    <a class="next" href="http://xgknight.com/categories/linux/page/2/">Next&nbsp;&nbsp;»
+    </a>
+  </nav>
+</footer>
     </main>
     
 <footer class="footer">

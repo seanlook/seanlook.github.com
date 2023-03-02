@@ -128,6 +128,39 @@
 
 <article class="post-entry tag-entry"> 
   <header class="entry-header">
+    <h2>ProxySQL之读写分离与分库路由演示
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>本文演示使用ProxySQL来完成读写分离和后端分库的一个实际配置过程，安装及配置项介绍见前文 ProxySQL之安装及配置详解。
+环境
+instance0: 10.0.100.100 (db0,db2,db4,db6) instance1: 10.0.100.101 (db1,db3,db5,db7) instance2: 10.0.100.102 (db2,db6,db10,db14) instance3: 10.0.100.103 (db3,db7,db11,db15) instance0 slave: 192.168.10.4:3316 instance1 slave: 192.168.10.4:3326 instance2 slave: 192.168.10.4:3336 instance3 slave: 192.168.10.4:3346 proxysql node0: 10.0.100.36 现在想达到这样一个目的：客户端应用连接上 proxysql 的ip:port，连接时指定分库db名，执行sql时自动路由到对应的实例、对应的库。考虑下面的部署结构： 任何一个proxysql节点都是对等的，路由请求到后端instance的各个database上。
+1. 配置后端DB -- proxysql admin cli insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (100, &#39;10.0.100.100&#39;, 3307, 1, &#39;db0,ReadWrite&#39;), (1000, &#39;10.0.100.100&#39;, 3307, 1, &#39;db0,ReadWrite&#39;),(1000, &#39;192.168.10.4&#39;, 3316, 9, &#39;db0,ReadOnly&#39;); insert into mysql_servers(hostgroup_id,hostname,port,weight,weight,comment) values (101, &#39;10.0.100.101&#39;, 3307, 1, &#39;db1,ReadWrite&#39;), (1001, &#39;10.0.100.101&#39;, 3307, 1, &#39;db1,ReadWrite&#39;),(1001, &#39;192....</p>
+  </div>
+  <footer class="entry-footer"><span title='2017-04-17 15:32:49 +0000 UTC'>April 17, 2017</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to ProxySQL之读写分离与分库路由演示" href="http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%E4%B8%8E%E5%88%86%E5%BA%93%E8%B7%AF%E7%94%B1%E6%BC%94%E7%A4%BA/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
+    <h2>ProxySQL之安装及配置详解
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>ProxySQL是一个高性能的MySQL中间件，拥有强大的规则引擎。具有以下特性：
+连接池，而且是 multiplexing 主机和用户的最大连接数限制 自动下线后端DB 延迟超过阀值 ping 延迟超过阀值 网络不通或宕机 强大的规则路由引擎 实现读写分离 查询重写 sql流量镜像 支持prepared statement 支持Query Cache 支持负载均衡，与gelera结合自动failover 集这么多优秀特性于一身，那么缺点呢就是项目不够成熟，好在作者一直在及时更新，并且受到 Percona 官方的支持。
+1. 安装 从 https://github.com/sysown/proxysql/releases 下载相应的版本。这里我选择 proxysql-1.3.5-1-centos67.x86_64.rpm，也是当前最新稳定版。
+yum localinstall proxysql-1.3.5-1-centos67.x86_64.rpm -y 可以马上启动了：
+/etc/init.d/proxysql start Starting ProxySQL: DONE! proxysql有个配置文件 /etc/proxysql.cnf，只在第一次启动的时候有用，后续所有的配置修改都是对SQLite数据库操作，并且不会更新到proxysql.cnf文件中。ProxySQL绝大部分配置都可以在线修改，配置存储在 /var/lib/proxysql/proxysql.db 中，后面会介绍它的在线配置的设计方式。
+proxysql 启动后会像 mysqld 一样，马上fork一个子进程，真正处理请求，而父进程负责监控子进程运行状况，如果crash了就拉起来。
+编译安装 安装高版本 gcc-4.8 # cd /etc/yum.repos.d # wget https://copr.fedoraproject.org/coprs/rhscl/devtoolset-3/repo/epel-6/rhscl-devtoolset-3-epel-6.repo \ -O /etc/yum.repos.d/rhscl-devtoolset-3-epel-6.repo # yum install -y scl-utils policycoreutils-python # yum --disablerepo=&#39;*&#39; --enablerepo=&#39;rhscl-devtoolset-3&#39; install devtoolset-3-gcc devtoolset-3-gcc-c&#43;&#43; devtoolset-3-binutils # yum --enablerepo=testing-devtools-2-centos-6 install devtoolset-3-gcc devtoolset-3-gcc-c&#43;&#43; devtoolset-3-binutils 上一步会把 GCC 安装到以下目录 /opt/rh/devtoolset-3/root/usr/bin 接下来需要修改系统的配置，使默认的 gcc 和 g&#43;&#43; 命令使用的是新安装的版本。启用SCL环境中新版本GCC： # scl enable devtoolset-3 bash 现在查看 g&#43;&#43; 的版本号： # gcc --version 编译安装proxysql # cd proxysql-master # make # make install 2....</p>
+  </div>
+  <footer class="entry-footer"><span title='2017-04-10 21:32:49 +0000 UTC'>April 10, 2017</span>&nbsp;·&nbsp;admin</footer>
+  <a class="entry-link" aria-label="post link to ProxySQL之安装及配置详解" href="http://xgknight.com/posts/2017/04/proxysql%E4%B9%8B%E5%AE%89%E8%A3%85%E5%8F%8A%E9%85%8D%E7%BD%AE%E8%AF%A6%E8%A7%A3/"></a>
+</article>
+
+<article class="post-entry tag-entry"> 
+  <header class="entry-header">
     <h2>一次艰辛的字符集转换历程 ACMUG分享
     </h2>
   </header>
@@ -296,40 +329,6 @@ REDIS_POOL_CNT: 生产者（源库）redis客户端连接池。这个设计是�
   </div>
   <footer class="entry-footer"><span title='2016-11-20 16:32:49 +0000 UTC'>November 20, 2016</span>&nbsp;·&nbsp;admin</footer>
   <a class="entry-link" aria-label="post link to MySQL非主从环境下数据一致性校验及修复程序" href="http://xgknight.com/posts/2016/11/mysql%E9%9D%9E%E4%B8%BB%E4%BB%8E%E7%8E%AF%E5%A2%83%E4%B8%8B%E6%95%B0%E6%8D%AE%E4%B8%80%E8%87%B4%E6%80%A7%E6%A0%A1%E9%AA%8C%E5%8F%8A%E4%BF%AE%E5%A4%8D%E7%A8%8B%E5%BA%8F/"></a>
-</article>
-
-<article class="post-entry tag-entry"> 
-  <header class="entry-header">
-    <h2>让mysqldump变成并发导出导入的魔法
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>1. 简介 取名mypumpkin，是python封装的一个让mysqldump以多线程的方式导出库表，再以mysql命令多线程导入新库，用于成倍加快导出，特别是导入的速度。这一切只需要在 mysqldump 或 mysql 命令前面加上 mypumpkin.py 即可，所以称作魔法。
-项目地址：https://github.com/seanlook/mypumpkin
-该程序源于需要对现网单库几百G的数据进行转移到新库，并对中间进行一些特殊操作（如字符集转换），无法容忍mysqldump导入速度。有人可能会提到为什么不用 mydumper，其实也尝试过它但还是放弃了，原因有：
-不能设置字符集 mydumper强制使用 binary 方式来连接库以达到不关心备份恢复时的字符集问题，然而我的场景下需要特意以不同的字符集导出、再导入。写这个程序的时候正好在公众号看到网易有推送的一篇文章 (解密网易MySQL实例迁移高效完成背后的黑科技)，提到他们对mydumper的改进已支持字符集设置，可是在0.9.1版本的patch里还是没找到。 没有像 mysqldump 那样灵活控制过滤选项（导哪些表、忽略哪些表） 因为数据量之巨大，而且将近70%是不变更的历史表数据，这些表是可以提前导出转换的；又有少量单表大于50G的，最好是分库导出转换。mydumper 不具备 mysqldump 这样的灵活性 对忽略导出gtid信息、触发器等其它支持 阿里云rds 5.6 导出必须要设置 set-gtid-purged=OFF 另外有人还可能提到 mysqlpump —— 它才是我认为mysqldump应该具有的模样，语法兼容，基于表的并发导出。但是只有 mysql服务端 5.7.9 以上才支持，这就是现实和理想的距离。。。
-2. 实现方法 首先说明，mysqldump的导出速度并不慢，经测试能达到50M/s的速度，10G数据花费3分钟的样子，可以看到瓶颈在于网络和磁盘IO，再怎样的导出工具也快不了多少，但是导入却花了60分钟，磁盘和网络大概只用到了20%，瓶颈在目标库写入速度（而一般顺序写入达不到IOPS限制），所以mypumpkin就诞生了 —— 兼顾myloader的导入速度和mysqldump导出的灵活性。
-用python构造1个队列，将需要导出的所有表一次放到队列中，同时启动N个python线程，各自从这个Queue里取出表名，subprocess调用操作系统的mysqldump命令，导出数据到以 dbname.tablename.sql 命名的文件中。load in 与 dump out 类似，根据指定的库名或表名，从dump_dir目录找到所有sql文件，压进队列，N个线程同时调用mysql构造新的命令，模拟 &lt; 操作。
-参数解析从原来自己解析，到改用argparse模块，几乎做了一次重构。 对于没有指定--tables的情况，程序会主动去库里查询一下所有表名，然后过滤进队列。
-load in目标库，选项做到与dump out一样丰富，可以指定导入哪些db、哪些表、忽略哪些表。
-其中的重点是做到与原mysqldump兼容，因为需要对与表有关的选项（-B, -A, --tables, --ignore=），进行分析并组合成新的执行命令，考虑的异常情况非常多。
-3. 限制 重要：导出的数据不保证库级别的一致性 对历史不变表，是不影响的 具体到一个表能保证一致性，这是mysqldump本身采用哪些选项决定的 不同表导出动作在不同的mysqldump命令中，无法保证事务。 在我的案例场景下，是有开发同学辅助使用一套binlog解析程序，等完成后重放所有变更，来保证最终一致性。 另，许多情况下我们导数据，并不需要完整的或者一致的数据，只是用于离线分析或临时导出，重点是快速拿数据给到开发。 不寻常选项识别 程序已经尽力做到与mysqldump命令兼容，只需要加上 mypumpkin....</p>
-  </div>
-  <footer class="entry-footer"><span title='2016-11-17 16:32:49 +0000 UTC'>November 17, 2016</span>&nbsp;·&nbsp;admin</footer>
-  <a class="entry-link" aria-label="post link to 让mysqldump变成并发导出导入的魔法" href="http://xgknight.com/posts/2016/11/%E8%AE%A9mysqldump%E5%8F%98%E6%88%90%E5%B9%B6%E5%8F%91%E5%AF%BC%E5%87%BA%E5%AF%BC%E5%85%A5%E7%9A%84%E9%AD%94%E6%B3%95/"></a>
-</article>
-
-<article class="post-entry tag-entry"> 
-  <header class="entry-header">
-    <h2>mysql使用utf8mb4经验吐血总结
-    </h2>
-  </header>
-  <div class="entry-content">
-    <p>1. utf8 与 utf8mb4 异同 先看 官方手册 https://dev.mysql.com/doc/refman/5.6/en/charset-unicode-utf8mb4.html 的说明：
-The character set named utf8 uses a maximum of three bytes per character and contains only BMP characters. The utf8mb4 character set uses a maximum of four bytes per character supports supplementary characters: - For a BMP character, utf8 and utf8mb4 have identical storage characteristics: same code values, same encoding, same length. - For a supplementary character, utf8 cannot store the character at all, whereas utf8mb4 requires four bytes to store it....</p>
-  </div>
-  <footer class="entry-footer"><span title='2016-10-23 16:32:49 +0000 UTC'>October 23, 2016</span>&nbsp;·&nbsp;admin</footer>
-  <a class="entry-link" aria-label="post link to mysql使用utf8mb4经验吐血总结" href="http://xgknight.com/posts/2016/10/mysql%E4%BD%BF%E7%94%A8utf8mb4%E7%BB%8F%E9%AA%8C%E5%90%90%E8%A1%80%E6%80%BB%E7%BB%93/"></a>
 </article>
 <footer class="page-footer">
   <nav class="pagination">

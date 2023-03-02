@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>使用vmware vconverter从物理机迁移系统到虚拟机P2V（多图） | Sean Note</title>
+<meta name="keywords" content="vsphere, 虚拟化, vmware">
+<meta name="description" content="本文完整记录了如何从物理服务器，保持所有环境配置信息，纹丝不动的迁移到虚拟机上，俗称 P2V 。采用的工具是VMware公司的 VMware vcenter vconverter standalone，它支持将windows和linux操作系统用作源，可以执行若干转换任务：
+将正在运行的远程物理机和虚拟机作为虚拟机导入到vCenter Server管理的独立ESX/ESXi或ESX/ESXi主机 将由VMware Workstation或Microsoft Hyper-V Server托管的虚拟机导入到vCenter Server管理的ESX/ESXi主机 将第三方备份或磁盘映像导入到vCenterServer管理的ESX/ESXi主机中 将旧版服务器迁移到新硬件，而不重新安装操作系统或应用程序软件等 完整功能见《Converter Standalone 用户指南》 Converter Standalone的组件，只能安装在Windows操作系统上：
+Converter Standalone Server —— 启用并执行虚拟机的导入和导出 Converter Standalone agent —— Converter Standalone Server会在Windows物理机上安装代理，从而将这些物理机作为虚拟机导入，完成后可以选择自动删除 Converter Standalone client —— 与Converter服务端配合使用，包括看到的用户界面、创建和管理转换任务等 Vmware vCenter Converter引导CD：是单独的组件，可用于在物理机上执行冷克隆 冷克隆可以创建一致的源计算机的精确副本，而我们更多的是进行热克隆，也就是源服务器在迁移过程中会继续工作，这就可能会出现某些文件不一致，但Converter Standalone会在热克隆后将目标虚拟机与与主机同步，同步执行过程是将在初始克隆期间更改的块从源复制到目标。
+本文记录的过程是，源主机是 SUSE 11.x 物理机，运行华为的智能呼叫中心应用，因此安装有Oracle数据库，对于数据文件和控制文件的一致性和安全性较高，所以建议先把oracle数据库关闭再操作；目标虚拟服务器是 ESXi 5.1，但我使用的Converter是 5.5-en，操作过程类似。下面正式开始
+源主机：172.30.31.0/24 ESXi: 172.29.88.0/24，与源主机IP段无法通信 Helper VM: 172.29.41.0/24，与上面两个IP段都通
+1. 设置源和目的主机地址 Source System 选择你要转换的源系统，物理机为 Powered-on machine，填写其他登陆信息： Destination System 填写要在哪个主机上创建虚拟机，也就是ESXi服务器地址: 这两个过程有个简短的拉去主机信息的过程。 2. 选择目标虚拟机和存放位置 Destination Virtual Machine 目标虚拟机名字默认是源hostname，不用选择folder： Destination Location">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2015/04/%E4%BD%BF%E7%94%A8vmware-vconverter%E4%BB%8E%E7%89%A9%E7%90%86%E6%9C%BA%E8%BF%81%E7%A7%BB%E7%B3%BB%E7%BB%9F%E5%88%B0%E8%99%9A%E6%8B%9F%E6%9C%BAp2v%E5%A4%9A%E5%9B%BE/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="使用vmware vconverter从物理机迁移系统到虚拟机P2V（多图）" />
+<meta property="og:description" content="本文完整记录了如何从物理服务器，保持所有环境配置信息，纹丝不动的迁移到虚拟机上，俗称 P2V 。采用的工具是VMware公司的 VMware vcenter vconverter standalone，它支持将windows和linux操作系统用作源，可以执行若干转换任务：
+将正在运行的远程物理机和虚拟机作为虚拟机导入到vCenter Server管理的独立ESX/ESXi或ESX/ESXi主机 将由VMware Workstation或Microsoft Hyper-V Server托管的虚拟机导入到vCenter Server管理的ESX/ESXi主机 将第三方备份或磁盘映像导入到vCenterServer管理的ESX/ESXi主机中 将旧版服务器迁移到新硬件，而不重新安装操作系统或应用程序软件等 完整功能见《Converter Standalone 用户指南》 Converter Standalone的组件，只能安装在Windows操作系统上：
+Converter Standalone Server —— 启用并执行虚拟机的导入和导出 Converter Standalone agent —— Converter Standalone Server会在Windows物理机上安装代理，从而将这些物理机作为虚拟机导入，完成后可以选择自动删除 Converter Standalone client —— 与Converter服务端配合使用，包括看到的用户界面、创建和管理转换任务等 Vmware vCenter Converter引导CD：是单独的组件，可用于在物理机上执行冷克隆 冷克隆可以创建一致的源计算机的精确副本，而我们更多的是进行热克隆，也就是源服务器在迁移过程中会继续工作，这就可能会出现某些文件不一致，但Converter Standalone会在热克隆后将目标虚拟机与与主机同步，同步执行过程是将在初始克隆期间更改的块从源复制到目标。
+本文记录的过程是，源主机是 SUSE 11.x 物理机，运行华为的智能呼叫中心应用，因此安装有Oracle数据库，对于数据文件和控制文件的一致性和安全性较高，所以建议先把oracle数据库关闭再操作；目标虚拟服务器是 ESXi 5.1，但我使用的Converter是 5.5-en，操作过程类似。下面正式开始
+源主机：172.30.31.0/24 ESXi: 172.29.88.0/24，与源主机IP段无法通信 Helper VM: 172.29.41.0/24，与上面两个IP段都通
+1. 设置源和目的主机地址 Source System 选择你要转换的源系统，物理机为 Powered-on machine，填写其他登陆信息： Destination System 填写要在哪个主机上创建虚拟机，也就是ESXi服务器地址: 这两个过程有个简短的拉去主机信息的过程。 2. 选择目标虚拟机和存放位置 Destination Virtual Machine 目标虚拟机名字默认是源hostname，不用选择folder： Destination Location" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2015/04/%E4%BD%BF%E7%94%A8vmware-vconverter%E4%BB%8E%E7%89%A9%E7%90%86%E6%9C%BA%E8%BF%81%E7%A7%BB%E7%B3%BB%E7%BB%9F%E5%88%B0%E8%99%9A%E6%8B%9F%E6%9C%BAp2v%E5%A4%9A%E5%9B%BE/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2015-04-05T15:21:25+00:00" />
+<meta property="article:modified_time" content="2015-04-05T15:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="使用vmware vconverter从物理机迁移系统到虚拟机P2V（多图）"/>
+<meta name="twitter:description" content="本文完整记录了如何从物理服务器，保持所有环境配置信息，纹丝不动的迁移到虚拟机上，俗称 P2V 。采用的工具是VMware公司的 VMware vcenter vconverter standalone，它支持将windows和linux操作系统用作源，可以执行若干转换任务：
+将正在运行的远程物理机和虚拟机作为虚拟机导入到vCenter Server管理的独立ESX/ESXi或ESX/ESXi主机 将由VMware Workstation或Microsoft Hyper-V Server托管的虚拟机导入到vCenter Server管理的ESX/ESXi主机 将第三方备份或磁盘映像导入到vCenterServer管理的ESX/ESXi主机中 将旧版服务器迁移到新硬件，而不重新安装操作系统或应用程序软件等 完整功能见《Converter Standalone 用户指南》 Converter Standalone的组件，只能安装在Windows操作系统上：
+Converter Standalone Server —— 启用并执行虚拟机的导入和导出 Converter Standalone agent —— Converter Standalone Server会在Windows物理机上安装代理，从而将这些物理机作为虚拟机导入，完成后可以选择自动删除 Converter Standalone client —— 与Converter服务端配合使用，包括看到的用户界面、创建和管理转换任务等 Vmware vCenter Converter引导CD：是单独的组件，可用于在物理机上执行冷克隆 冷克隆可以创建一致的源计算机的精确副本，而我们更多的是进行热克隆，也就是源服务器在迁移过程中会继续工作，这就可能会出现某些文件不一致，但Converter Standalone会在热克隆后将目标虚拟机与与主机同步，同步执行过程是将在初始克隆期间更改的块从源复制到目标。
+本文记录的过程是，源主机是 SUSE 11.x 物理机，运行华为的智能呼叫中心应用，因此安装有Oracle数据库，对于数据文件和控制文件的一致性和安全性较高，所以建议先把oracle数据库关闭再操作；目标虚拟服务器是 ESXi 5.1，但我使用的Converter是 5.5-en，操作过程类似。下面正式开始
+源主机：172.30.31.0/24 ESXi: 172.29.88.0/24，与源主机IP段无法通信 Helper VM: 172.29.41.0/24，与上面两个IP段都通
+1. 设置源和目的主机地址 Source System 选择你要转换的源系统，物理机为 Powered-on machine，填写其他登陆信息： Destination System 填写要在哪个主机上创建虚拟机，也就是ESXi服务器地址: 这两个过程有个简短的拉去主机信息的过程。 2. 选择目标虚拟机和存放位置 Destination Virtual Machine 目标虚拟机名字默认是源hostname，不用选择folder： Destination Location"/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "使用vmware vconverter从物理机迁移系统到虚拟机P2V（多图）",
+      "item": "http://xgknight.com/posts/2015/04/%E4%BD%BF%E7%94%A8vmware-vconverter%E4%BB%8E%E7%89%A9%E7%90%86%E6%9C%BA%E8%BF%81%E7%A7%BB%E7%B3%BB%E7%BB%9F%E5%88%B0%E8%99%9A%E6%8B%9F%E6%9C%BAp2v%E5%A4%9A%E5%9B%BE/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "使用vmware vconverter从物理机迁移系统到虚拟机P2V（多图）",
+  "name": "使用vmware vconverter从物理机迁移系统到虚拟机P2V（多图）",
+  "description": "本文完整记录了如何从物理服务器，保持所有环境配置信息，纹丝不动的迁移到虚拟机上，俗称 P2V 。采用的工具是VMware公司的 VMware vcenter vconverter standalone，它支持将windows和linux操作系统用作源，可以执行若干转换任务：\n将正在运行的远程物理机和虚拟机作为虚拟机导入到vCenter Server管理的独立ESX/ESXi或ESX/ESXi主机 将由VMware Workstation或Microsoft Hyper-V Server托管的虚拟机导入到vCenter Server管理的ESX/ESXi主机 将第三方备份或磁盘映像导入到vCenterServer管理的ESX/ESXi主机中 将旧版服务器迁移到新硬件，而不重新安装操作系统或应用程序软件等 完整功能见《Converter Standalone 用户指南》 Converter Standalone的组件，只能安装在Windows操作系统上：\nConverter Standalone Server —— 启用并执行虚拟机的导入和导出 Converter Standalone agent —— Converter Standalone Server会在Windows物理机上安装代理，从而将这些物理机作为虚拟机导入，完成后可以选择自动删除 Converter Standalone client —— 与Converter服务端配合使用，包括看到的用户界面、创建和管理转换任务等 Vmware vCenter Converter引导CD：是单独的组件，可用于在物理机上执行冷克隆 冷克隆可以创建一致的源计算机的精确副本，而我们更多的是进行热克隆，也就是源服务器在迁移过程中会继续工作，这就可能会出现某些文件不一致，但Converter Standalone会在热克隆后将目标虚拟机与与主机同步，同步执行过程是将在初始克隆期间更改的块从源复制到目标。\n本文记录的过程是，源主机是 SUSE 11.x 物理机，运行华为的智能呼叫中心应用，因此安装有Oracle数据库，对于数据文件和控制文件的一致性和安全性较高，所以建议先把oracle数据库关闭再操作；目标虚拟服务器是 ESXi 5.1，但我使用的Converter是 5.5-en，操作过程类似。下面正式开始\n源主机：172.30.31.0/24 ESXi: 172.29.88.0/24，与源主机IP段无法通信 Helper VM: 172.29.41.0/24，与上面两个IP段都通\n1. 设置源和目的主机地址 Source System 选择你要转换的源系统，物理机为 Powered-on machine，填写其他登陆信息： Destination System 填写要在哪个主机上创建虚拟机，也就是ESXi服务器地址: 这两个过程有个简短的拉去主机信息的过程。 2. 选择目标虚拟机和存放位置 Destination Virtual Machine 目标虚拟机名字默认是源hostname，不用选择folder： Destination Location",
+  "keywords": [
+    "vsphere", "虚拟化", "vmware"
+  ],
+  "articleBody": "本文完整记录了如何从物理服务器，保持所有环境配置信息，纹丝不动的迁移到虚拟机上，俗称 P2V 。采用的工具是VMware公司的 VMware vcenter vconverter standalone，它支持将windows和linux操作系统用作源，可以执行若干转换任务：\n将正在运行的远程物理机和虚拟机作为虚拟机导入到vCenter Server管理的独立ESX/ESXi或ESX/ESXi主机 将由VMware Workstation或Microsoft Hyper-V Server托管的虚拟机导入到vCenter Server管理的ESX/ESXi主机 将第三方备份或磁盘映像导入到vCenterServer管理的ESX/ESXi主机中 将旧版服务器迁移到新硬件，而不重新安装操作系统或应用程序软件等 完整功能见《Converter Standalone 用户指南》 Converter Standalone的组件，只能安装在Windows操作系统上：\nConverter Standalone Server —— 启用并执行虚拟机的导入和导出 Converter Standalone agent —— Converter Standalone Server会在Windows物理机上安装代理，从而将这些物理机作为虚拟机导入，完成后可以选择自动删除 Converter Standalone client —— 与Converter服务端配合使用，包括看到的用户界面、创建和管理转换任务等 Vmware vCenter Converter引导CD：是单独的组件，可用于在物理机上执行冷克隆 冷克隆可以创建一致的源计算机的精确副本，而我们更多的是进行热克隆，也就是源服务器在迁移过程中会继续工作，这就可能会出现某些文件不一致，但Converter Standalone会在热克隆后将目标虚拟机与与主机同步，同步执行过程是将在初始克隆期间更改的块从源复制到目标。\n本文记录的过程是，源主机是 SUSE 11.x 物理机，运行华为的智能呼叫中心应用，因此安装有Oracle数据库，对于数据文件和控制文件的一致性和安全性较高，所以建议先把oracle数据库关闭再操作；目标虚拟服务器是 ESXi 5.1，但我使用的Converter是 5.5-en，操作过程类似。下面正式开始\n源主机：172.30.31.0/24 ESXi: 172.29.88.0/24，与源主机IP段无法通信 Helper VM: 172.29.41.0/24，与上面两个IP段都通\n1. 设置源和目的主机地址 Source System 选择你要转换的源系统，物理机为 Powered-on machine，填写其他登陆信息： Destination System 填写要在哪个主机上创建虚拟机，也就是ESXi服务器地址: 这两个过程有个简短的拉去主机信息的过程。 2. 选择目标虚拟机和存放位置 Destination Virtual Machine 目标虚拟机名字默认是源hostname，不用选择folder： Destination Location\n选择新虚拟机要放在ESXi的哪个Datastore上，请确保有足够的磁盘空间，不能小于源系统实际使用的大小： 3. 为转换任务设置其它选项 这一步尤为关键，直接关乎后面转换的成败。\nData to copy\n设置目标虚拟机的磁盘和分区，我们可以看到自动获取的源分区信息，我这里因为硬盘资源有限，没有遵循默认的 Maintain size，但比Minmun size（在源SUSE下 df -h 看到的used大小）大。 CPU个数和内存大小默认也是与源主机保持一致。\nNetwork 网络设置这一块比较纠结。按理说源主机不需要与目的主机的网卡通信，只需要与Helper VM能互通即可，但我一直卡在这走不过去。源主机有2块网卡在使用，最后在这一步只设置了一块能ping同源主机的网卡，迁移完成后再手动添加剂一块网卡。如下是vmware官方知识库的Note：\nIn the Conversion wizard, ensure to select the virtual machine portgroup when configuring the network card. This virtual machine portgroup must be connected to the physical network that is routable via port 22 (SSH) in both directions from the source Linux server’s configured network IP address. The IP address entered must be routable to the IP address of the physical Linux source machine. Helper virtual machine IP address should able to ping the physical machine.\n图中看到VM Local是事先在vSphere Server上新建的端口组（portgroup），而且这个虚拟交换机vSwitch没有关联任何物理网卡： Helper VM network Helper VM是做转换时的一个临时操作系统，运行在目的主机上，从源主机拷贝数据。如果转化的时windows，则没有这个vm，取而代之的时再源主机上运行一个agent，所以转换windows要求ESXi与源主机能互通，而转换Linux则只需要设定的Helper VM network能与源主机22端口互通即可。 4. 开始转换 可以看到转换的信息汇总，finish则开始迁移转换过程。 测试在ESXi上可以看到会自动创建一台虚拟机并启动。等待转换完成。\n5. 问题 转换几次失败都是因为网络设置不当，转换到1%时报错： Error：event.ObtainHelperVmIpFailedEvent.summary\n解决办法就是手动设置HelperVm的IP，并确保能够与源主机通信。如果继续报错，修改目标地址网卡设置，比如去除只剩一个网卡（后续添加），也设置成HelpVm网段。参考 Convert: converter.fault.HelperVmFailedToObtainIpFault 。\n转换Windows Server 2003时还有可能会出现\nUnable tp locate the required Sysprep files. Please upload them under c:\\documents and settings\\all users\\application data\\vmware\\vmware vcenter converter standalone\\sysprep\\svr2003 on the converter server machine 解决办法是，需要下载WindowsServer2003-KB926028-v2-x86-CHS.exe，在cmd下执行WindowsServer2003-KB926028-v2-x86-CHS –x(不可以用winrar)，解压缩出来2个目录加一堆文件,在SP2QFE目录下找到deploy.cab，再将deploy.cab解压缩(winrar即可),得到10个文件,拷贝到所提示的 svr2003 目录。参考 Sysprep文件位置和版本 (2040984)。\n6. on windows 加入迁移的是windows主机，上面的操作略有不同，主要区别在于没有HelperVm，而是在需要转换的源主机上安装agent。所以要求ESXi与源主机必须能够直接通信才可以迁移。\n参考：\n操作VMware vCenter Converter 实现物理机迁移到虚拟机\nVMware vCenter Converter Standalone User’s Guide 5.5 （中文）\nVMware vCenter Converter Standalone 用户指南 中文4.3\n",
+  "wordCount" : "246",
+  "inLanguage": "en",
+  "datePublished": "2015-04-05T15:21:25Z",
+  "dateModified": "2015-04-05T15:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2015/04/%E4%BD%BF%E7%94%A8vmware-vconverter%E4%BB%8E%E7%89%A9%E7%90%86%E6%9C%BA%E8%BF%81%E7%A7%BB%E7%B3%BB%E7%BB%9F%E5%88%B0%E8%99%9A%E6%8B%9F%E6%9C%BAp2v%E5%A4%9A%E5%9B%BE/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      使用vmware vconverter从物理机迁移系统到虚拟机P2V（多图）
+    </h1>
+    <div class="post-meta"><span title='2015-04-05 15:21:25 +0000 UTC'>April 5, 2015</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><p>本文完整记录了如何从物理服务器，保持所有环境配置信息，纹丝不动的迁移到虚拟机上，俗称 P2V 。采用的工具是VMware公司的 <code>VMware vcenter vconverter standalone</code>，它支持将windows和linux操作系统用作源，可以执行若干转换任务：</p>
+<ul>
+<li>将正在运行的远程物理机和虚拟机作为虚拟机导入到vCenter Server管理的独立ESX/ESXi或ESX/ESXi主机</li>
+<li>将由VMware Workstation或Microsoft Hyper-V Server托管的虚拟机导入到vCenter Server管理的ESX/ESXi主机</li>
+<li>将第三方备份或磁盘映像导入到vCenterServer管理的ESX/ESXi主机中</li>
+<li>将旧版服务器迁移到新硬件，而不重新安装操作系统或应用程序软件等</li>
+<li>完整功能见《Converter Standalone 用户指南》</li>
+</ul>
+<p>Converter Standalone的组件，只能安装在Windows操作系统上：</p>
+<ul>
+<li>Converter Standalone Server —— 启用并执行虚拟机的导入和导出</li>
+<li>Converter Standalone agent —— Converter Standalone Server会在Windows物理机上安装代理，从而将这些物理机作为虚拟机导入，完成后可以选择自动删除</li>
+<li>Converter Standalone client —— 与Converter服务端配合使用，包括看到的用户界面、创建和管理转换任务等</li>
+<li>Vmware vCenter Converter引导CD：是单独的组件，可用于在物理机上执行冷克隆</li>
+</ul>
+<!-- raw HTML omitted -->
+<p>冷克隆可以创建一致的源计算机的精确副本，而我们更多的是进行热克隆，也就是源服务器在迁移过程中会继续工作，这就可能会出现某些文件不一致，但Converter Standalone会在热克隆后将目标虚拟机与与主机同步，同步执行过程是将在初始克隆期间更改的块从源复制到目标。</p>
+<p>本文记录的过程是，源主机是 SUSE 11.x 物理机，运行华为的智能呼叫中心应用，因此安装有Oracle数据库，对于数据文件和控制文件的一致性和安全性较高，所以建议先把oracle数据库关闭再操作；目标虚拟服务器是 ESXi 5.1，但我使用的Converter是 5.5-en，操作过程类似。下面正式开始</p>
+<p>源主机：172.30.31.0/24
+ESXi: 172.29.88.0/24，与源主机IP段无法通信
+Helper VM: 172.29.41.0/24，与上面两个IP段都通</p>
+<h2 id="1-设置源和目的主机地址">1. 设置源和目的主机地址<a hidden class="anchor" aria-hidden="true" href="#1-设置源和目的主机地址">#</a></h2>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/vmware-converter-0.png" alt="vmware-converter-0.png"  />
+</p>
+<ul>
+<li>Source System</li>
+</ul>
+<p>选择你要转换的源系统，物理机为 Powered-on machine，填写其他登陆信息：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/vmware-converter-1.png" alt="vmware-converter-1.png"  />
+</p>
+<ul>
+<li>Destination System
+填写要在哪个主机上创建虚拟机，也就是ESXi服务器地址:
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/vmware-converter-2.png" alt="vmware-converter-2.png"  />
+
+这两个过程有个简短的拉去主机信息的过程。</li>
+</ul>
+<h2 id="2-选择目标虚拟机和存放位置">2. 选择目标虚拟机和存放位置<a hidden class="anchor" aria-hidden="true" href="#2-选择目标虚拟机和存放位置">#</a></h2>
+<ul>
+<li>
+<p>Destination Virtual Machine
+目标虚拟机名字默认是源hostname，不用选择folder：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/vmware-converter-3.png" alt="vmware-converter-3.png"  />
+</p>
+</li>
+<li>
+<p>Destination Location</p>
+</li>
+</ul>
+<p>选择新虚拟机要放在ESXi的哪个Datastore上，请确保有足够的磁盘空间，不能小于源系统实际使用的大小：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/vmware-converter-4.png" alt="vmware-converter-4.png"  />
+</p>
+<h2 id="3-为转换任务设置其它选项">3. 为转换任务设置其它选项<a hidden class="anchor" aria-hidden="true" href="#3-为转换任务设置其它选项">#</a></h2>
+<p>这一步尤为关键，直接关乎后面转换的成败。</p>
+<ul>
+<li>
+<p>Data to copy<br>
+设置目标虚拟机的磁盘和分区，我们可以看到自动获取的源分区信息，我这里因为硬盘资源有限，没有遵循默认的 Maintain size，但比Minmun size（在源SUSE下 <code>df -h</code> 看到的used大小）大。
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/vmware-converter-5.png" alt="vmware-converter-5.png"  />
+
+CPU个数和内存大小默认也是与源主机保持一致。</p>
+</li>
+<li>
+<p>Network
+网络设置这一块比较纠结。按理说源主机不需要与目的主机的网卡通信，只需要与Helper VM能互通即可，但我一直卡在这走不过去。源主机有2块网卡在使用，最后在这一步只设置了一块能ping同源主机的网卡，迁移完成后再手动添加剂一块网卡。如下是vmware官方知识库的Note：</p>
+</li>
+</ul>
+<blockquote>
+<p>In the Conversion wizard, ensure to select the virtual machine portgroup when configuring the network card. This virtual machine portgroup must be connected to the physical network that is routable via port 22 (SSH) in both directions from the source Linux server&rsquo;s configured network IP address.
+The IP address entered must be routable to the IP address of the physical Linux source machine. Helper virtual machine IP address should able to ping the physical machine.</p>
+</blockquote>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/vmware-converter-6-1.png" alt="vmware-converter-6-1.png"  />
+</p>
+<p>图中看到VM Local是事先在vSphere Server上新建的端口组（portgroup），而且这个虚拟交换机vSwitch没有关联任何物理网卡：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/vmware-converter-exsi-1.png" alt="vmware-converter-exsi-1.png"  />
+</p>
+<ul>
+<li>Helper VM network
+Helper VM是做转换时的一个临时操作系统，运行在目的主机上，从源主机拷贝数据。如果转化的时windows，则没有这个vm，取而代之的时再源主机上运行一个agent，所以转换windows要求ESXi与源主机能互通，而转换Linux则只需要设定的Helper VM network能与源主机22端口互通即可。
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/vmware-converter-6-2.png" alt="vmware-converter-6-2.png"  />
+</li>
+</ul>
+<h2 id="4-开始转换">4. 开始转换<a hidden class="anchor" aria-hidden="true" href="#4-开始转换">#</a></h2>
+<p>可以看到转换的信息汇总，finish则开始迁移转换过程。
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/vmware-converter-7.png" alt="vmware-converter-7.png"  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/vmware-converter-8-1.png" alt="vmware-converter-8-1.png"  />
+
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/vmware-converter-8-2.png" alt="vmware-converter-8-2.png"  />
+</p>
+<p>测试在ESXi上可以看到会自动创建一台虚拟机并启动。等待转换完成。</p>
+<h2 id="5-问题">5. 问题<a hidden class="anchor" aria-hidden="true" href="#5-问题">#</a></h2>
+<p>转换几次失败都是因为网络设置不当，转换到1%时报错：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/vmware-converter-9.png" alt="vmware-converter-9.png"  />
+</p>
+<p>Error：event.ObtainHelperVmIpFailedEvent.summary</p>
+<p>解决办法就是手动设置HelperVm的IP，并确保能够与源主机通信。如果继续报错，修改目标地址网卡设置，比如去除只剩一个网卡（后续添加），也设置成HelpVm网段。参考 <a href="http://kb.vmware.com/selfservice/microsites/search.do?language=en_US&amp;cmd=displayKC&amp;externalId=2033203">Convert: converter.fault.HelperVmFailedToObtainIpFault</a> 。</p>
+<p>转换Windows Server 2003时还有可能会出现</p>
+<pre tabindex="0"><code>Unable tp locate the required Sysprep files. Please upload them under 
+c:\documents and settings\all users\application data\vmware\vmware vcenter converter standalone\sysprep\svr2003 
+on the converter server machine
+</code></pre><p>解决办法是，需要下载<a href="http://download.microsoft.com/download/9/6/a/96a40c82-26ca-4b0d-840f-b08233548900/WindowsServer2003-KB926028-v2-x86-CHS.exe">WindowsServer2003-KB926028-v2-x86-CHS.exe</a>，在cmd下执行WindowsServer2003-KB926028-v2-x86-CHS –x(不可以用winrar)，解压缩出来2个目录加一堆文件,在SP2QFE目录下找到deploy.cab，再将deploy.cab解压缩(winrar即可),得到10个文件,拷贝到所提示的 svr2003 目录。参考 <a href="http://kb.vmware.com/selfservice/microsites/search.do?language=en_US&amp;cmd=displayKC&amp;externalId=2040984">Sysprep文件位置和版本 (2040984)</a>。</p>
+<h2 id="6-on-windows">6. on windows<a hidden class="anchor" aria-hidden="true" href="#6-on-windows">#</a></h2>
+<p>加入迁移的是windows主机，上面的操作略有不同，主要区别在于没有HelperVm，而是在需要转换的源主机上安装agent。所以要求ESXi与源主机必须能够直接通信才可以迁移。</p>
+<p>参考：</p>
+<ul>
+<li>
+<p><a href="http://yaabb163.blog.51cto.com/1975905/888856">操作VMware vCenter Converter 实现物理机迁移到虚拟机</a></p>
+</li>
+<li>
+<p><a href="https://www.vmware.com/pdf/convsa_55_guide.pdf">VMware vCenter Converter Standalone User&rsquo;s Guide 5.5</a> （<a href="https://www.vmware.com/files/cn/pdf/support/vsp_vcc_42_admin_guide-PG-CN.pdf">中文</a>）</p>
+</li>
+<li>
+<p><a href="http://www.vmware.com/files/cn/pdf/convsa_43_guide-PG-CN.pdf">VMware vCenter Converter Standalone 用户指南 中文4.3</a></p>
+</li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/vsphere/">vsphere</a></li>
+      <li><a href="http://xgknight.com/tags/%E8%99%9A%E6%8B%9F%E5%8C%96/">虚拟化</a></li>
+      <li><a href="http://xgknight.com/tags/vmware/">vmware</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD | Sean Note</title>
+<meta name="keywords" content="linux, 软件包, troubleshooting">
+<meta name="description" content="问题 在 CentOS 6.4 x86_64 上无论通过yum或rpm安装软件时，出现以下错误：
+yum install glibc-devel ... error: rpmts_HdrFromFdno: Header V3 RSA/SHA1 Signature, key ID c105b9de: BAD ... Problem opening package *.el6.x86_64.rpm 分析 rpm -ivh单独去安装软件也提示上面的错误。rpm -qa 无法列出系统中安装过的软件包，但许多库文件和软件命令是存在的。也尝试过rpm --rebuilddb来重建数据库，但情况依然没有得到改善（centos官网说千万不要在系统broken的情况下rebuilddb，不然有可能变成destroy）
+由上面的推断可知问题出现在rpm这个软件包管理工具本身，但此时又无法通过rpm来重新安装自己，所以只能找到具体是什么因素导致的。好在官网的这篇较新的文章正好就是解决该BUG：WARNING: nss-softokn-3.14.3-19.el6_6 updates may be broken ：
+大致是说当你使用yum update去更新你的系统时，nss-softokn、nss-softokn-freebl和其它软件一起都得到更新，所以不会有问题。但如果单独去更新某一个软件，如yum update nss-softokn或yum install &lt;software&gt;引起它的依赖包也升级，使得nss-softokn和nss-softokn-freebl版本不匹配，就会导致 rpm/yum 全面停止工作，表现就是上面的key .. BAD。
+解决 解决起来也很方便，首先你可以通过cat /var/log/messages|grep nss看到nss-softokn-freebl的版本：
+# cat /var/log/messages|grep nss-softokn Mar 2 09:56:18 poprod yum[14920]: Updated: nss-softokn-3.14.3-19.el6_6.x86_64 Mar 2 14:43:29 poprod yum[33040]: Installed: nss-softokn-freebl-3.14.3-19.el6_6.x86_64 Mar 2 14:44:14 poprod yum[33047]: Installed: nss-softokn-freebl-3.">
+<meta name="author" content="admin">
+<link rel="canonical" href="http://xgknight.com/posts/2015/03/rpm%E6%88%96yum%E5%AE%89%E8%A3%85%E8%BD%AF%E4%BB%B6%E6%8F%90%E7%A4%BAerror-rpmts_hdrfromfdno-key-id-bad/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.bccfefac377bc340f06c260aed1bddf49a4354816d7c570d6aac75a997986c95.css" integrity="sha256-vM/vrDd7w0DwbCYK7Rvd9JpDVIFtfFcNaqx1qZeYbJU=" rel="preload stylesheet" as="style">
+<script defer crossorigin="anonymous" src="/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js" integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG&#43;9vmJ0cTS&#43;ovo0FeA="
+    onload="hljs.initHighlightingOnLoad();"></script>
+<link rel="icon" href="http://xgknight.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://xgknight.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://xgknight.com/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://xgknight.com/apple-touch-icon.png">
+<link rel="mask-icon" href="http://xgknight.com/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --hljs-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><meta property="og:title" content="rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD" />
+<meta property="og:description" content="问题 在 CentOS 6.4 x86_64 上无论通过yum或rpm安装软件时，出现以下错误：
+yum install glibc-devel ... error: rpmts_HdrFromFdno: Header V3 RSA/SHA1 Signature, key ID c105b9de: BAD ... Problem opening package *.el6.x86_64.rpm 分析 rpm -ivh单独去安装软件也提示上面的错误。rpm -qa 无法列出系统中安装过的软件包，但许多库文件和软件命令是存在的。也尝试过rpm --rebuilddb来重建数据库，但情况依然没有得到改善（centos官网说千万不要在系统broken的情况下rebuilddb，不然有可能变成destroy）
+由上面的推断可知问题出现在rpm这个软件包管理工具本身，但此时又无法通过rpm来重新安装自己，所以只能找到具体是什么因素导致的。好在官网的这篇较新的文章正好就是解决该BUG：WARNING: nss-softokn-3.14.3-19.el6_6 updates may be broken ：
+大致是说当你使用yum update去更新你的系统时，nss-softokn、nss-softokn-freebl和其它软件一起都得到更新，所以不会有问题。但如果单独去更新某一个软件，如yum update nss-softokn或yum install &lt;software&gt;引起它的依赖包也升级，使得nss-softokn和nss-softokn-freebl版本不匹配，就会导致 rpm/yum 全面停止工作，表现就是上面的key .. BAD。
+解决 解决起来也很方便，首先你可以通过cat /var/log/messages|grep nss看到nss-softokn-freebl的版本：
+# cat /var/log/messages|grep nss-softokn Mar 2 09:56:18 poprod yum[14920]: Updated: nss-softokn-3.14.3-19.el6_6.x86_64 Mar 2 14:43:29 poprod yum[33040]: Installed: nss-softokn-freebl-3.14.3-19.el6_6.x86_64 Mar 2 14:44:14 poprod yum[33047]: Installed: nss-softokn-freebl-3." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://xgknight.com/posts/2015/03/rpm%E6%88%96yum%E5%AE%89%E8%A3%85%E8%BD%AF%E4%BB%B6%E6%8F%90%E7%A4%BAerror-rpmts_hdrfromfdno-key-id-bad/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2015-03-02T01:21:25+00:00" />
+<meta property="article:modified_time" content="2015-03-02T01:21:25+00:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD"/>
+<meta name="twitter:description" content="问题 在 CentOS 6.4 x86_64 上无论通过yum或rpm安装软件时，出现以下错误：
+yum install glibc-devel ... error: rpmts_HdrFromFdno: Header V3 RSA/SHA1 Signature, key ID c105b9de: BAD ... Problem opening package *.el6.x86_64.rpm 分析 rpm -ivh单独去安装软件也提示上面的错误。rpm -qa 无法列出系统中安装过的软件包，但许多库文件和软件命令是存在的。也尝试过rpm --rebuilddb来重建数据库，但情况依然没有得到改善（centos官网说千万不要在系统broken的情况下rebuilddb，不然有可能变成destroy）
+由上面的推断可知问题出现在rpm这个软件包管理工具本身，但此时又无法通过rpm来重新安装自己，所以只能找到具体是什么因素导致的。好在官网的这篇较新的文章正好就是解决该BUG：WARNING: nss-softokn-3.14.3-19.el6_6 updates may be broken ：
+大致是说当你使用yum update去更新你的系统时，nss-softokn、nss-softokn-freebl和其它软件一起都得到更新，所以不会有问题。但如果单独去更新某一个软件，如yum update nss-softokn或yum install &lt;software&gt;引起它的依赖包也升级，使得nss-softokn和nss-softokn-freebl版本不匹配，就会导致 rpm/yum 全面停止工作，表现就是上面的key .. BAD。
+解决 解决起来也很方便，首先你可以通过cat /var/log/messages|grep nss看到nss-softokn-freebl的版本：
+# cat /var/log/messages|grep nss-softokn Mar 2 09:56:18 poprod yum[14920]: Updated: nss-softokn-3.14.3-19.el6_6.x86_64 Mar 2 14:43:29 poprod yum[33040]: Installed: nss-softokn-freebl-3.14.3-19.el6_6.x86_64 Mar 2 14:44:14 poprod yum[33047]: Installed: nss-softokn-freebl-3."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://xgknight.com/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD",
+      "item": "http://xgknight.com/posts/2015/03/rpm%E6%88%96yum%E5%AE%89%E8%A3%85%E8%BD%AF%E4%BB%B6%E6%8F%90%E7%A4%BAerror-rpmts_hdrfromfdno-key-id-bad/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD",
+  "name": "rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD",
+  "description": "问题 在 CentOS 6.4 x86_64 上无论通过yum或rpm安装软件时，出现以下错误：\nyum install glibc-devel ... error: rpmts_HdrFromFdno: Header V3 RSA/SHA1 Signature, key ID c105b9de: BAD ... Problem opening package *.el6.x86_64.rpm 分析 rpm -ivh单独去安装软件也提示上面的错误。rpm -qa 无法列出系统中安装过的软件包，但许多库文件和软件命令是存在的。也尝试过rpm --rebuilddb来重建数据库，但情况依然没有得到改善（centos官网说千万不要在系统broken的情况下rebuilddb，不然有可能变成destroy）\n由上面的推断可知问题出现在rpm这个软件包管理工具本身，但此时又无法通过rpm来重新安装自己，所以只能找到具体是什么因素导致的。好在官网的这篇较新的文章正好就是解决该BUG：WARNING: nss-softokn-3.14.3-19.el6_6 updates may be broken ：\n大致是说当你使用yum update去更新你的系统时，nss-softokn、nss-softokn-freebl和其它软件一起都得到更新，所以不会有问题。但如果单独去更新某一个软件，如yum update nss-softokn或yum install \u0026lt;software\u0026gt;引起它的依赖包也升级，使得nss-softokn和nss-softokn-freebl版本不匹配，就会导致 rpm/yum 全面停止工作，表现就是上面的key .. BAD。\n解决 解决起来也很方便，首先你可以通过cat /var/log/messages|grep nss看到nss-softokn-freebl的版本：\n# cat /var/log/messages|grep nss-softokn Mar 2 09:56:18 poprod yum[14920]: Updated: nss-softokn-3.14.3-19.el6_6.x86_64 Mar 2 14:43:29 poprod yum[33040]: Installed: nss-softokn-freebl-3.14.3-19.el6_6.x86_64 Mar 2 14:44:14 poprod yum[33047]: Installed: nss-softokn-freebl-3.",
+  "keywords": [
+    "linux", "软件包", "troubleshooting"
+  ],
+  "articleBody": "问题 在 CentOS 6.4 x86_64 上无论通过yum或rpm安装软件时，出现以下错误：\nyum install glibc-devel ... error: rpmts_HdrFromFdno: Header V3 RSA/SHA1 Signature, key ID c105b9de: BAD ... Problem opening package *.el6.x86_64.rpm 分析 rpm -ivh单独去安装软件也提示上面的错误。rpm -qa 无法列出系统中安装过的软件包，但许多库文件和软件命令是存在的。也尝试过rpm --rebuilddb来重建数据库，但情况依然没有得到改善（centos官网说千万不要在系统broken的情况下rebuilddb，不然有可能变成destroy）\n由上面的推断可知问题出现在rpm这个软件包管理工具本身，但此时又无法通过rpm来重新安装自己，所以只能找到具体是什么因素导致的。好在官网的这篇较新的文章正好就是解决该BUG：WARNING: nss-softokn-3.14.3-19.el6_6 updates may be broken ：\n大致是说当你使用yum update去更新你的系统时，nss-softokn、nss-softokn-freebl和其它软件一起都得到更新，所以不会有问题。但如果单独去更新某一个软件，如yum update nss-softokn或yum install 引起它的依赖包也升级，使得nss-softokn和nss-softokn-freebl版本不匹配，就会导致 rpm/yum 全面停止工作，表现就是上面的key .. BAD。\n解决 解决起来也很方便，首先你可以通过cat /var/log/messages|grep nss看到nss-softokn-freebl的版本：\n# cat /var/log/messages|grep nss-softokn Mar 2 09:56:18 poprod yum[14920]: Updated: nss-softokn-3.14.3-19.el6_6.x86_64 Mar 2 14:43:29 poprod yum[33040]: Installed: nss-softokn-freebl-3.14.3-19.el6_6.x86_64 Mar 2 14:44:14 poprod yum[33047]: Installed: nss-softokn-freebl-3.14.3-19.el6_6.x86_64 ... 下载 nss-softokn-freebl-3.14.3-19.el6_6.x86_64.rpm：\nwget ftp://195.220.108.108/linux/centos/6.6/updates/x86_64/Packages/nss-softokn-freebl-3.14.3-19.el6_6.x86_64.rpm 解压rpm：\nrpm2cpio nss-softokn-freebl-3.14.3-19.el6_6.x86_64.rpm | cpio -idmv 复制 libfreeblpriv3.* 覆盖旧的库文件：\ncp ./lib64/libfreeblpriv3.* /lib64/ cp ./lib64/libfreebl3* /lib64/ 试一下 yum install gcc 看能否正常工作，如果不行，继续下一步：\nwget http://mirror.centos.org/centos/6/os/x86_64/Packages/yum-3.2.29-60.el6.centos.noarch.rpm rpm -ivh --nodeps yum-3.2.29-60.el6.centos.noarch.rpm 应该就好了：\nrpm -qa yum install glibc-devel 参考\nhttp://unix.stackexchange.com/questions/179344/big-trouble-rpm-empty-db-install-v3-rsa-sha1-signature-key-bad-yumrepo-erro https://www.centos.org/forums/viewtopic.php?p=214791\u0026f=13#p215140 http://blog.chinaunix.net/uid-26085226-id-4545167.html ",
+  "wordCount" : "118",
+  "inLanguage": "en",
+  "datePublished": "2015-03-02T01:21:25Z",
+  "dateModified": "2015-03-02T01:21:25Z",
+  "author":{
+    "@type": "Person",
+    "name": "admin"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://xgknight.com/posts/2015/03/rpm%E6%88%96yum%E5%AE%89%E8%A3%85%E8%BD%AF%E4%BB%B6%E6%8F%90%E7%A4%BAerror-rpmts_hdrfromfdno-key-id-bad/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Sean Note",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://xgknight.com/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://xgknight.com/" accesskey="h" title="Sean Note (Alt + H)">Sean Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://xgknight.com/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://xgknight.com/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title">
+      rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD
+    </h1>
+    <div class="post-meta"><span title='2015-03-02 01:21:25 +0000 UTC'>March 2, 2015</span>&nbsp;·&nbsp;admin
+
+</div>
+  </header> 
+  <div class="post-content"><h1 id="问题">问题<a hidden class="anchor" aria-hidden="true" href="#问题">#</a></h1>
+<p>在 CentOS 6.4 x86_64 上无论通过yum或rpm安装软件时，出现以下错误：</p>
+<pre tabindex="0"><code>yum install glibc-devel
+...
+error: rpmts_HdrFromFdno: Header V3 RSA/SHA1 Signature, key ID c105b9de: BAD
+...
+Problem opening package *.el6.x86_64.rpm
+</code></pre><h2 id="分析">分析<a hidden class="anchor" aria-hidden="true" href="#分析">#</a></h2>
+<p><code>rpm -ivh</code>单独去安装软件也提示上面的错误。<code>rpm -qa</code> 无法列出系统中安装过的软件包，但许多库文件和软件命令是存在的。也尝试过<code>rpm --rebuilddb</code>来重建数据库，但情况依然没有得到改善（centos官网说千万不要在系统broken的情况下rebuilddb，不然有可能变成destroy）</p>
+<p>由上面的推断可知问题出现在rpm这个软件包管理工具本身，但此时又无法通过rpm来重新安装自己，所以只能找到具体是什么因素导致的。好在官网的这篇较新的文章正好就是解决该BUG：<a href="https://www.centos.org/forums/viewtopic.php?p=214791&amp;f=13#p214791">WARNING: nss-softokn-3.14.3-19.el6_6 updates may be broken</a> ：</p>
+<p>大致是说当你使用<code>yum update</code>去更新你的系统时，<code>nss-softokn</code>、<code>nss-softokn-freebl</code>和其它软件一起都得到更新，所以不会有问题。但如果单独去更新某一个软件，如<code>yum update nss-softokn</code>或<code>yum install &lt;software&gt;</code>引起它的依赖包也升级，使得<code>nss-softokn</code>和<code>nss-softokn-freebl</code>版本不匹配，就会导致 rpm/yum 全面停止工作，表现就是上面的<code>key .. BAD</code>。</p>
+<h2 id="解决">解决<a hidden class="anchor" aria-hidden="true" href="#解决">#</a></h2>
+<p>解决起来也很方便，首先你可以通过<code>cat /var/log/messages|grep nss</code>看到<code>nss-softokn-freebl</code>的版本：</p>
+<pre tabindex="0"><code># cat /var/log/messages|grep nss-softokn
+Mar  2 09:56:18 poprod yum[14920]: Updated: nss-softokn-3.14.3-19.el6_6.x86_64
+Mar  2 14:43:29 poprod yum[33040]: Installed: nss-softokn-freebl-3.14.3-19.el6_6.x86_64
+Mar  2 14:44:14 poprod yum[33047]: Installed: nss-softokn-freebl-3.14.3-19.el6_6.x86_64
+...
+</code></pre><!-- raw HTML omitted -->
+<p>下载 <code>nss-softokn-freebl-3.14.3-19.el6_6.x86_64.rpm</code>：</p>
+<pre tabindex="0"><code>wget ftp://195.220.108.108/linux/centos/6.6/updates/x86_64/Packages/nss-softokn-freebl-3.14.3-19.el6_6.x86_64.rpm
+</code></pre><p>解压rpm：</p>
+<pre tabindex="0"><code>rpm2cpio nss-softokn-freebl-3.14.3-19.el6_6.x86_64.rpm | cpio -idmv
+</code></pre><p>复制 libfreeblpriv3.* 覆盖旧的库文件：</p>
+<pre tabindex="0"><code>cp ./lib64/libfreeblpriv3.* /lib64/
+cp ./lib64/libfreebl3* /lib64/
+</code></pre><p>试一下 <code>yum install gcc</code> 看能否正常工作，如果不行，继续下一步：</p>
+<pre tabindex="0"><code>wget http://mirror.centos.org/centos/6/os/x86_64/Packages/yum-3.2.29-60.el6.centos.noarch.rpm
+rpm -ivh --nodeps yum-3.2.29-60.el6.centos.noarch.rpm
+</code></pre><p>应该就好了：</p>
+<pre tabindex="0"><code>rpm -qa
+yum install glibc-devel
+</code></pre><p><strong>参考</strong></p>
+<ul>
+<li><a href="http://unix.stackexchange.com/questions/179344/big-trouble-rpm-empty-db-install-v3-rsa-sha1-signature-key-bad-yumrepo-erro">http://unix.stackexchange.com/questions/179344/big-trouble-rpm-empty-db-install-v3-rsa-sha1-signature-key-bad-yumrepo-erro</a></li>
+<li><a href="https://www.centos.org/forums/viewtopic.php?p=214791&amp;f=13#p215140">https://www.centos.org/forums/viewtopic.php?p=214791&amp;f=13#p215140</a></li>
+<li><a href="http://blog.chinaunix.net/uid-26085226-id-4545167.html">http://blog.chinaunix.net/uid-26085226-id-4545167.html</a></li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://xgknight.com/tags/linux/">linux</a></li>
+      <li><a href="http://xgknight.com/tags/%E8%BD%AF%E4%BB%B6%E5%8C%85/">软件包</a></li>
+      <li><a href="http://xgknight.com/tags/troubleshooting/">troubleshooting</a></li>
+    </ul>
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2023 <a href="http://xgknight.com/">Sean Note</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>
