@@ -1,3 +1,4 @@
+---
 title: Docker集中化web界面管理平台shipyard
 date: 2014-12-29 13:21:25
 updated: 2014-12-29 15:46:23
@@ -171,8 +172,8 @@ shipyard cli> shipyard destroy <container_id>
 不一一列举。。。
 
   
-  [1]: http://sean-images.qiniudn.com/docker-shipyard-login.png
-  [2]: http://sean-images.qiniudn.com/docker-shipyard.png
-  [3]: http://sean-images.qiniudn.com/docker-shipyard-containers.png
-  [4]: http://sean-images.qiniudn.com/docker-shipyard-containers2.png
-  [5]: http://sean-images.qiniudn.com/docker-shipyard-engine.png
+  [1]: http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-shipyard-login.png
+  [2]: http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-shipyard.png
+  [3]: http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-shipyard-containers.png
+  [4]: http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-shipyard-containers2.png
+  [5]: http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-shipyard-engine.png

@@ -1,3 +1,4 @@
+---
 title: 只怕时间走的太过匆忙，忘记了躲在角落中的我
 date: 2014-12-31 00:21:25
 updated: 2014-12-31 00:46:23
@@ -32,5 +33,5 @@ categories: Feel
 回头看，整篇写起来还真是天马行空，想到哪写到哪，连标题都想不到好一点的，没什么逻辑、文采可言，只是做个记录，剩下的交给心情……
 
 
-  [1]: http://sean-images.qiniudn.com/feel-jxzlmd1.jpg
-  [2]: http://sean-images.qiniudn.com/feel-jezuma1.jpg
+  [1]: http://github.com/seanlook/sean-notes-comment/raw/main/static/feel-jxzlmd1.jpg
+  [2]: http://github.com/seanlook/sean-notes-comment/raw/main/static/feel-jezuma1.jpg

@@ -1,3 +1,4 @@
+---
 title: 误删vSphere虚拟机.vmdk文件的恢复
 date: 2014-10-28 15:21:25
 updated: 2014-10-28 00:46:23
@@ -77,4 +78,4 @@ Create: 100% done.
 - [Virtual Machine files and settings explained ](https://anthbro.wordpress.com/2012/01/16/virtual_machine_files_explained/)
 
 
-  [1]: http://sean-images.qiniudn.com/vmdk_not_found.png
+  [1]: http://github.com/seanlook/sean-notes-comment/raw/main/static/vmdk_not_found.png

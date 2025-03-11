@@ -1,3 +1,4 @@
+---
 title: docker常用管理命令（上）
 date: 2014-10-31 20:21:25
 updated: 2014-11-05 15:46:23
@@ -325,4 +326,4 @@ fe022762070b09866eaab47bc943ccb796e53f3f416abf3f2327481b446a9503
 - [Docker基础与高级](http://17173ops.com/2014/10/13/docker%E5%9F%BA%E7%A1%80%E4%B8%8E%E9%AB%98%E7%BA%A7.shtml)
 
 
-  [1]: http://sean-images.qiniudn.com/docker_cli_stage.png
+  [1]: http://github.com/seanlook/sean-notes-comment/raw/main/static/docker_cli_stage.png

@@ -1,3 +1,4 @@
+---
 title: CentOS 6 服务器安全配置指南（通用）
 date: 2014-09-07 01:21:25
 updated: 2014-09-07-12 00:46:23
@@ -124,7 +125,7 @@ IPv6是为了解决IPv4地址耗尽的问题，但我们的服务器一般用不
 ## 4. iptables规则 ##
 启用linux防火墙来禁止非法程序访问。使用iptable的规则来过滤入站、出站和转发的包。我们可以针对来源和目的地址进行特定udp/tcp端口的准许和拒绝访问。
 
-关于防火墙的设置规则请参考博客文章 [iptables设置实例](http://seanlook.com/2014/02/26/iptables-example/)。
+关于防火墙的设置规则请参考博客文章 [iptables设置实例](http://xgknight.com/2014/02/26/iptables-example/)。
 
 ## 5. SSH安全 ##
 如果有可能，第一件事就是修改ssh的默认端口22，改成如20002这样的较大端口会大幅提高安全系数，降低ssh破解登录的可能性。
@@ -321,7 +322,7 @@ Logwatch是使用 Perl 开发的一个日志分析工具。能够对Linux 的日
 
 Logwatch的mail功能是借助宿主系统自带的 mail server 发邮件的，所以系统需安装mail server , 如sendmail,postfix,Qmail等
 
-安装和配置方法见博文 [linux日志监控logwatch](http://seanlook.com/2014/08/23/linux-logwatch-usage/)。
+安装和配置方法见博文 [linux日志监控logwatch](http://xgknight.com/2014/08/23/linux-logwatch-usage/)。
 
 ## 12. web服务器安全 ##
 

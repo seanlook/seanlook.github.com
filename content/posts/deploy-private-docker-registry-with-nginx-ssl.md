@@ -1,3 +1,4 @@
+---
 title: 搭建docker内网私服（docker-registry with nginx&ssl on centos）
 date: 2014-11-13 20:21:25
 updated: 2014-12-25 15:46:23
@@ -409,4 +410,4 @@ TO-DO
 - [The Docker Hub and the Registry spec](http://beta-docs.docker.io/reference/api/hub_registry_spec/)
 
 
-  [1]: http://sean-images.qiniudn.com/docker-registry-deploy.png
+  [1]: http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-registry-deploy.png

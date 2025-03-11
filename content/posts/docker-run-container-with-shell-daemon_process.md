@@ -1,3 +1,4 @@
+---
 title: docker如何创建一个运行后台进程的容器并同时提供shell终端
 date: 2014-11-03 20:21:25
 updated: 2014-11-07 15:46:23
@@ -6,7 +7,7 @@ categories: [Virtualization, Docker]
 ---
 
 只看标题还不是很明显，本文实现docker的这样一种比较常用的功能：通过`docker run`启动一个容器后，容器中已经运行了一个后台进程（这里以监听80端口的nginx为例），同时进入一个shell终端可供操作，而不受限于只能在前台运行nginx与运行shell终端之间的一种。这个例子实现了，那么其他类似的运行多任务docker就可以以此类推。另外本文还提供了一种在docker容器内部安装软件（`vim`）的方法，对于定制自己需要的镜像大有帮助。
-你可能需要先阅读[docker专题(2)：docker常用管理命令（上）](hhttp://seanlook.com/2014/10/31/docker-command-best-use-1/)、[docker专题(2)：docker常用管理命令（下）](http://seanlook.com/2014/11/05/docker-command-best-use-2/)来理解更多。
+你可能需要先阅读[docker专题(2)：docker常用管理命令（上）](hhttp://xgknight.com/2014/10/31/docker-command-best-use-1/)、[docker专题(2)：docker常用管理命令（下）](http://xgknight.com/2014/11/05/docker-command-best-use-2/)来理解更多。
 ## 1. 已经pull了官方的[nginx 1.7.6](https://registry.hub.docker.com/_/nginx/)的镜像（也可以从私服获取）##
 ```
 # docker images|grep nginx
@@ -140,4 +141,4 @@ root@3911d1104c3f:/# vi /etc/bash.bashrc
 从上面的操作中可以看出，`start`是可以保留`run`启动时的参数如`-v`、`-p`，而`commit`之后如果没在`Dockerfile`中指定，下次启动依然需要带上目录、端口的映射参数。
 另外提一点， `docker run -i -t seanlook/nginx:bash_vim`启动便会同时进入一个shell界面（但没有启动nginx），因为它的“前身”容器是在shell交互界面下`run`来的，但也没有保留`-v`、`-p`指定的映射关系。
 
-  [1]: http://sean-images.qiniudn.com/docker_registry_nginx_dist.png
+  [1]: http://github.com/seanlook/sean-notes-comment/raw/main/static/docker_registry_nginx_dist.png

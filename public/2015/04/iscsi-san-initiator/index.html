@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="noindex, nofollow">
+<title>iscsi网络存储介绍及客户端配置操作 | Sean&#39;s Note</title>
+<meta name="keywords" content="iscsi">
+<meta name="description" content="本文不介绍iSCSI服务端的搭建过程，不然就会很累赘。主题就是怎么去完成iscsi网络存储的挂载过程，并顺带介绍一些必要的概念。
+1. iscsi介绍与initiator安装
+1.1 iSCSI介绍
+iSCSI简单来说，就是把SCSI指令通过TCP/IP协议封装起来，在以太网中传输。iSCSI 可以实现在IP网络上传递和运行SCSI协议，使其能够在诸如高速千兆以太网上进行数据存取，实现了数据的网际传递和管理。基于iSCSI建立的存储区域网（SAN）与基于光纤的FC-SAN相比，具有很好的性价比。">
+<meta name="author" content="">
+<link rel="canonical" href="http://localhost:1313/2015/04/iscsi-san-initiator/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.8a19d6c7d40c68078a482516c7c2a326ccb9f6e9282cabe7240ecc1a80c6cb47.css" integrity="sha256-ihnWx9QMaAeKSCUWx8KjJsy59ukoLKvnJA7MGoDGy0c=" rel="preload stylesheet" as="style">
+<link rel="icon" href="http://localhost:1313/img/logo.gif">
+<link rel="icon" type="image/png" sizes="16x16" href="http://localhost:1313/img/logo.gif">
+<link rel="icon" type="image/png" sizes="32x32" href="http://localhost:1313/img/logo.gif">
+<link rel="apple-touch-icon" href="http://localhost:1313/logo.gif">
+<link rel="mask-icon" href="http://localhost:1313/logo.gif">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<link rel="alternate" hreflang="en" href="http://localhost:1313/2015/04/iscsi-san-initiator/">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --code-block-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://localhost:1313/" accesskey="h" title="Sean&#39;s Note (Alt + H)">Sean&#39;s Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://localhost:1313/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/categories/" title="Categories">
+                    <span>Categories</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/search/" title="Search (Alt &#43; /)" accesskey=/>
+                    <span>Search</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/tags/" title="Tags">
+                    <span>Tags</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    <div class="breadcrumbs"><a href="http://localhost:1313/">Home</a>&nbsp;»&nbsp;<a href="http://localhost:1313/posts/">Posts</a></div>
+    <h1 class="post-title entry-hint-parent">
+      iscsi网络存储介绍及客户端配置操作
+    </h1>
+    <div class="post-meta"><span title='2015-04-28 01:21:25 +0000 UTC'>2015-04-28</span>&nbsp;·&nbsp;11 min
+
+</div>
+  </header> <aside id="toc-container" class="toc-container wide">
+    <div class="toc">
+        <details  open>
+            <summary accesskey="c" title="(Alt + C)">
+                <span class="details">Table of Contents</span>
+            </summary>
+
+            <div class="inner"><ul>
+                    <li>
+                        <a href="#1-iscsi%e4%bb%8b%e7%bb%8d%e4%b8%8einitiator%e5%ae%89%e8%a3%85" aria-label="1. iscsi介绍与initiator安装">1. iscsi介绍与initiator安装</a><ul>
+                            
+                    <li>
+                        <a href="#11-iscsi%e4%bb%8b%e7%bb%8d" aria-label="1.1 iSCSI介绍">1.1 iSCSI介绍</a></li>
+                    <li>
+                        <a href="#12-initiator%e5%ae%89%e8%a3%85" aria-label="1.2 Initiator安装">1.2 Initiator安装</a></li>
+                    <li>
+                        <a href="#13-open-iscsi-initiator%e8%af%b4%e6%98%8e" aria-label="1.3 open-iscsi initiator说明">1.3 open-iscsi initiator说明</a></li></ul>
+                    </li>
+                    <li>
+                        <a href="#2-%e5%88%9d%e6%ac%a1%e6%8c%82%e8%bd%bd%e7%bd%91%e7%bb%9c%e5%ad%98%e5%82%a8" aria-label="2. 初次挂载网络存储">2. 初次挂载网络存储</a><ul>
+                            
+                    <li>
+                        <a href="#21-%e8%ae%be%e7%bd%aeinitiatorname" aria-label="2.1 设置InitiatorName">2.1 设置InitiatorName</a></li>
+                    <li>
+                        <a href="#22-iscsi-initiator%e9%85%8d%e7%bd%ae" aria-label="2.2 iSCSI Initiator配置">2.2 iSCSI Initiator配置</a><ul>
+                            
+                    <li>
+                        <a href="#221-%e6%b7%bb%e5%8a%a0chap%e8%ae%a4%e8%af%81" aria-label="2.2.1 添加CHAP认证">2.2.1 添加CHAP认证</a></li>
+                    <li>
+                        <a href="#222-%e5%85%b6%e4%bb%96%e9%85%8d%e7%bd%ae%e9%a1%b9" aria-label="2.2.2 其他配置项">2.2.2 其他配置项</a></li></ul>
+                    </li>
+                    <li>
+                        <a href="#23-%e6%89%ab%e6%8f%8f%e5%b9%b6%e7%99%bb%e5%bd%95%e5%88%b0iqn%e8%bf%9e%e6%8e%a5" aria-label="2.3 扫描并登录到iqn连接">2.3 扫描并登录到iqn连接</a><ul>
+                            
+                    <li>
+                        <a href="#231-discovery-sendtargets" aria-label="2.3.1 discovery sendtargets">2.3.1 discovery sendtargets</a></li>
+                    <li>
+                        <a href="#232-node-session-login" aria-label="2.3.2 node session login">2.3.2 node session login</a></li></ul>
+                    </li>
+                    <li>
+                        <a href="#24-%e4%bd%bf%e7%94%a8%e7%a3%81%e7%9b%98--lvm" aria-label="2.4 使用磁盘 — lvm">2.4 使用磁盘 — lvm</a></li></ul>
+                    </li>
+                    <li>
+                        <a href="#3-%e7%bb%b4%e6%8a%a4%e6%93%8d%e4%bd%9c" aria-label="3. 维护操作">3. 维护操作</a><ul>
+                            
+                    <li>
+                        <a href="#31-%e6%ad%a3%e5%b8%b8%e6%96%ad%e5%bc%80%e9%87%8d%e8%bf%9e%e7%bd%91%e7%bb%9c%e5%ad%98%e5%82%a8" aria-label="3.1 正常断开重连网络存储">3.1 正常断开重连网络存储</a></li>
+                    <li>
+                        <a href="#32-%e5%bc%82%e5%b8%b8%e6%96%ad%e5%bc%80%e6%81%a2%e5%a4%8d" aria-label="3.2 异常断开恢复">3.2 异常断开恢复</a></li>
+                    <li>
+                        <a href="#33-%e8%bf%9b%e7%a8%8b%e6%95%b0%e8%b6%85%e6%a0%87" aria-label="3.3 进程数超标">3.3 进程数超标</a></li></ul>
+                    </li>
+                    <li>
+                        <a href="#4-iscsi%e7%9a%84%e5%85%b6%e5%ae%83%e5%b8%b8%e7%94%a8%e6%93%8d%e4%bd%9c" aria-label="4. iscsi的其它常用操作">4. iscsi的其它常用操作</a>
+                    </li>
+                </ul>
+            </div>
+        </details>
+    </div>
+</aside>
+<script>
+    let activeElement;
+    let elements;
+    window.addEventListener('DOMContentLoaded', function (event) {
+        checkTocPosition();
+
+        elements = document.querySelectorAll('h1[id],h2[id],h3[id],h4[id],h5[id],h6[id]');
+         
+         activeElement = elements[0];
+         const id = encodeURI(activeElement.getAttribute('id')).toLowerCase();
+         document.querySelector(`.inner ul li a[href="#${id}"]`).classList.add('active');
+     }, false);
+
+    window.addEventListener('resize', function(event) {
+        checkTocPosition();
+    }, false);
+
+    window.addEventListener('scroll', () => {
+        
+        activeElement = Array.from(elements).find((element) => {
+            if ((getOffsetTop(element) - window.pageYOffset) > 0 && 
+                (getOffsetTop(element) - window.pageYOffset) < window.innerHeight/2) {
+                return element;
+            }
+        }) || activeElement
+
+        elements.forEach(element => {
+             const id = encodeURI(element.getAttribute('id')).toLowerCase();
+             if (element === activeElement){
+                 document.querySelector(`.inner ul li a[href="#${id}"]`).classList.add('active');
+             } else {
+                 document.querySelector(`.inner ul li a[href="#${id}"]`).classList.remove('active');
+             }
+         })
+     }, false);
+
+    const main = parseInt(getComputedStyle(document.body).getPropertyValue('--article-width'), 10);
+    const toc = parseInt(getComputedStyle(document.body).getPropertyValue('--toc-width'), 10);
+    const gap = parseInt(getComputedStyle(document.body).getPropertyValue('--gap'), 10);
+
+    function checkTocPosition() {
+        const width = document.body.scrollWidth;
+
+        if (width - main - (toc * 2) - (gap * 4) > 0) {
+            document.getElementById("toc-container").classList.add("wide");
+        } else {
+            document.getElementById("toc-container").classList.remove("wide");
+        }
+    }
+
+    function getOffsetTop(element) {
+        if (!element.getClientRects().length) {
+            return 0;
+        }
+        let rect = element.getBoundingClientRect();
+        let win = element.ownerDocument.defaultView;
+        return rect.top + win.pageYOffset;   
+    }
+</script>
+
+
+  <div class="post-content"><p>本文不介绍iSCSI服务端的搭建过程，不然就会很累赘。主题就是怎么去完成iscsi网络存储的挂载过程，并顺带介绍一些必要的概念。</p>
+<h1 id="1-iscsi介绍与initiator安装">1. iscsi介绍与initiator安装<a hidden class="anchor" aria-hidden="true" href="#1-iscsi介绍与initiator安装">#</a></h1>
+<h2 id="11-iscsi介绍">1.1 iSCSI介绍<a hidden class="anchor" aria-hidden="true" href="#11-iscsi介绍">#</a></h2>
+<p>iSCSI简单来说，就是把SCSI指令通过TCP/IP协议封装起来，在以太网中传输。iSCSI 可以实现在IP网络上传递和运行SCSI协议，使其能够在诸如高速千兆以太网上进行数据存取，实现了数据的网际传递和管理。基于iSCSI建立的存储区域网（SAN）与基于光纤的FC-SAN相比，具有很好的性价比。</p>
+<p>iSCSI属于端到端的会话层协议，它定义的是SCSI到TCP/IP的映射（如下图），即Initiator将SCSI指令和数据封装成iSCSI协议数据单元，向下提交给TCP层，最后封装成IP数据包在IP网络上传输，到达Target后通过解封装还原成SCSI指令和数据，再由存储控制器发送到指定的驱动器，从而实现SCSI命令和数据在IP网络上的透明传输。它整合了现有的存储协议SCSI和网络协议TCP/IP，实现了存储与TCP/IP网络的无缝融合。在本文中，将把发起器Initiator称为客户端，将目标器Target称为服务端以方便理解。</p>
+<p><img alt="iscsi-protocal-arch.gif" loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/iscsi-protocal-arch.gif"></p>
+<p>iSCSI 服务端和客户端的通讯就是一个在网络上封包和解包的过程，在网络的一端，数据包被封装成包括TCP/IP头、iSCSI 识别包和SCSI 数据三部分内容，传输到网络另一端时，这三部分内容分别被顺序地解开。为了保证安全，iSCSI 有约定操作顺序。在首次运行时，客户端（initiator）设备需要登录到服务端（target）中。任何一个接收到没有执行登录过程的客户端的iSCSI PDU （iSCSI rotocol Data Units，iSCSI 协议数据单元）服务端都将生成一个协议错误，并且关闭连接。在关闭会话之前，服务端可能发送回一个被驳回的iSCSI PDU。</p>
+<p>在工作时，iSCSI使SCSI数据块由原来的SCSI总线连接扩展到internet上，这一过程有些产品通过硬件来实现，这种硬件产品被简称为TOE（TCP Offload Engine），随着近年来服务器芯片技术的不断发展，服务器处理能力日益强劲，目前更为普遍的是通过软件来实现SCSI数据块的封装过程。这种软件通常被称为iSCSI Initiator软件/驱动。Initiator软件可以将以太网卡虚拟为iSCSI卡，接受和发送iSCSI数据报文，通过普通以太网卡来进行网络连接，但是需要占用CPU资源。另外的TOE和HBA连接转换方式都需要专门的硬件设备来完成，虽然相对昂贵但执行效率高，也可以减轻主机CPU的负载。本文客户端采用Initiator驱动的连接方式。</p>
+<h2 id="12-initiator安装">1.2 Initiator安装<a hidden class="anchor" aria-hidden="true" href="#12-initiator安装">#</a></h2>
+<p>在Linux 2.6内核中提供了iscsi驱动，iSCSI 驱动（driver）使主机拥有了通过IP网络访问存储的能力，但还需要一个具体的客户端工具（Linux用户空间组件）初始化iSCSI驱动，即<code>iscsi-initiator-utils</code>，也是大家常说的open-iscsi。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl"># rpm -qa|grep iscsi
+</span></span><span class="line"><span class="cl">iscsi-initiator-utils-6.2.0.873-10.el6.x86_64
+</span></span><span class="line"><span class="cl">iscsi-initiator-utils-devel-6.2.0.873-10.el6.x86_64
+</span></span><span class="line"><span class="cl"># rpm -qi iscsi-initiator-utils
+</span></span><span class="line"><span class="cl">（yum install iscsi-initiator-utils iscsi-initiator-utils-devel）
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这个安装将<code>iscsid</code>、<code>iscsiadm</code>安装到 /sbin 目录下，它还将把默认的配置文件安装到<code>/etc/iscsi/</code>目录下：</p>
+<ul>
+<li><code>/etc/iscsi/iscsid.conf</code>：所有刚发起的iSCSI session默认都将使用这个文件中的参数设定。</li>
+<li><code>/etc/iscsi/initiatorname.iscsi</code>：软件iSCSI initiator的intiator名称配置文件。</li>
+</ul>
+<p>确保iscsid和iscsi两个服务器开机自启动，<code>chkconfig --list |grep iscsi</code>，在iscsi启动的时候，iscsid和iscsiadm会读取这两个配置文件。</p>
+<p>service iscsid [status|start]
+service iscsi status        查看iscisi的信息，只有在连接成功后才输出
+这里可能遇到start始终没有启动成功的信息输出，请继续往下执行discovery，一般会启动iscsid。</p>
+<h2 id="13-open-iscsi-initiator说明">1.3 open-iscsi initiator说明<a hidden class="anchor" aria-hidden="true" href="#13-open-iscsi-initiator说明">#</a></h2>
+<p>open-iscsi包括两个守护进程iscsid和iscsi，其中iscsid是主进程，iscsi进程则主要负责根据配置在系统启动时进行发起端（Initiator）到服务端（target）的登录，建立发起端与服务端的会话，使主机在启动后即可使用通过iSCSI提供服务的存储设备。</p>
+<p>iscsid进程实现iSCSI协议的控制路径以及相关管理功能。例如守护进程（指iscsid）可配置为在系统启动时基于持久化的iSCSI数据库内容，自动重新开始发现（discovery）目标设备。</p>
+<p>Open-iSCSI是通过以下iSCSI数据库文件来实现永久配置的：</p>
+<ul>
+<li>Discovery (<code>/var/lib/iscsi/send_targets</code>)
+在 /var/lib/iscsi/send_targets 目录下包含iSCSI portals的配置信息，每个portal对应一个文件，文件名为“iSCSI portal IP，端口号”（例如<code>172.29.88.61,3260</code>）。</li>
+<li>Node (<code>/var/lib/iscsi/nodes</code>)
+在 /var/lib/iscsi/nodes 目录下，生成一个或多个以iSCSI存储服务器上的Target名命名的文件夹如<code>iqn.2000-01.com.synology:themain-3rd.ittest</code>，在该文件夹下有一个文件名为“iSCSI portal IP，编号” （例如<code>172.29.88.62,3260,0</code>）的配置参数文件default，该文件中是initiator登录target时要使用的参数，这些参数的设置是从<code>/etc/iscsi/iscsi.conf</code>中的参数设置继承而来的，可以通过iscsiadm对某一个参数文件进行更改（需要先注销到target的登录）。</li>
+</ul>
+<p><code>iscsiadm</code>是用来管理（更新、删除、插入、查询）iSCSI配置数据库文件的命令行工具，用户能够用它对iSCSI nodes、sessions、connections和discovery records进行一系列的操作。</p>
+<p>iSCSI node是一个在网络上可用的SCSI设备标识符，在open-iscsi中利用术语node表示目标（target）上的门户（portal）。一个target可以有多个portal，portal 由IP地址和端口构成。</p>
+<h1 id="2-初次挂载网络存储">2. 初次挂载网络存储<a hidden class="anchor" aria-hidden="true" href="#2-初次挂载网络存储">#</a></h1>
+<h2 id="21-设置initiatorname">2.1 设置InitiatorName<a hidden class="anchor" aria-hidden="true" href="#21-设置initiatorname">#</a></h2>
+<p>initiator名称用来唯一标识一个iSCSI Initiator端。保存此名称的配置文件为<code>/etc/iscsi/initiatorname.iscsi</code>：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl"># vi /etc/iscsi/initiatorname.iscsi
+</span></span><span class="line"><span class="cl">InitiatorName=iqn.2000-01.com.synology:themain-3rd.ittest
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>注意大小写，同时，必须顶格写，xxxx代表要设置的initiator名称，请遵循iqn命名规范，格式为iqn.domaindate.reverse.domain.name:optional_name。</p>
+<h2 id="22-iscsi-initiator配置">2.2 iSCSI Initiator配置<a hidden class="anchor" aria-hidden="true" href="#22-iscsi-initiator配置">#</a></h2>
+<p>iSCSI Initiator的配置文件为<code>/etc/iscsi/iscsid.conf</code>,在iSCSI initiator的iscsid进程启动和执行iscsiadm命令时，将读取这个配置文件的内容，获取与SCSI目标进行交互的相关信息。</p>
+<h3 id="221-添加chap认证">2.2.1 添加CHAP认证<a hidden class="anchor" aria-hidden="true" href="#221-添加chap认证">#</a></h3>
+<p>本组下的各个设置项主要用来指定Initiator与target验证方式。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">vi /etc/iscsi/iscsid.conf
+</span></span><span class="line"><span class="cl"># To enable CHAP authentication set node.session.auth.authmethod
+</span></span><span class="line"><span class="cl">node.session.auth.authmethod = CHAP        去掉注释
+</span></span><span class="line"><span class="cl"># To set a CHAP username and password for initiator
+</span></span><span class="line"><span class="cl">node.session.auth.username = ittest              修改为网管提供的认证username/password
+</span></span><span class="line"><span class="cl">node.session.auth.password = Storageittest
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>上面是在我的环境中最为简单的一种CHAP（Challenge Handshake Authentication Protocol）认证方式，而且只验证的节点会话initiator端。其实iSCSI验证可以是双向的，根据服务端的设置，可以验证节点会话的target端（username_in），验证发现会话的CHAP initiator，验证发现会话的CHAP target。（节点会话node.session即登录认证，发现会话discovery.sendtargets即查看）</p>
+<h3 id="222-其他配置项">2.2.2 其他配置项<a hidden class="anchor" aria-hidden="true" href="#222-其他配置项">#</a></h3>
+<p>处理CHAP认证需要关注外，其它的都保持默认即可，但是你需要知道可以修改如:</p>
+<ol>
+<li>设置initiator与target端交互的超时时间</li>
+<li>设置iscsid重试登录节点的次数</li>
+<li>是否开机启动iscsid等待</li>
+</ol>
+<h2 id="23-扫描并登录到iqn连接">2.3 扫描并登录到iqn连接<a hidden class="anchor" aria-hidden="true" href="#23-扫描并登录到iqn连接">#</a></h2>
+<p>open-iscsi initiator-utils提供的管理命令为<code>iscsiadm</code>，此命令包括discovery、node、session几种模式，分别处理不同的情况。在客户端使用Target提供的存储空间前，必须在服务器上通过Initiator软件执行以下步骤：发现目标设备 &ndash;&gt; 登录目标设备 &ndash;&gt; 与目标设备建立会话，下面分别说明通过各个命令进行说明。</p>
+<h3 id="231-discovery-sendtargets">2.3.1 discovery sendtargets<a hidden class="anchor" aria-hidden="true" href="#231-discovery-sendtargets">#</a></h3>
+<p>可以通过sendtargets方式（根据iscsi服务器端使用的方式不同还有slp、isns）发现属于你的iqn（iSCSI Qualified Name）：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">iscsiadm -m discovery -t sendtargets -p 172.29.88.62
+</span></span><span class="line"><span class="cl">iscsiadm -m discovery -t sendtargets -p 172.29.88.62:3260 |grep ittest
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>默认端口3260。discovery之前会自动启动iscsid服务，有时候<code>service iscsid start</code>启动没反应，可以通过这种方式启动服务。
+此命令查询目标门户（Portal）为172.29.88.62:3260上的目标，查找成功后，返回相应的target ID，同时在<code>/var/lib/iscsi/send_targets</code>和 <code>/var/lib/iscsi/nodes</code>目录下记录相应的门户和节点信息。使用<code>iscsiadm -m node</code>命令，可以查看到发现的节点记录。</p>
+<h3 id="232-node-session-login">2.3.2 node session login<a hidden class="anchor" aria-hidden="true" href="#232-node-session-login">#</a></h3>
+<p>在完成目标发现后，即可以登录到相应的节点，使用目标设备提供的存储空间：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl"># iscsiadm -m node -T iqn.2000-01.com.synology:themain-3rd.ittest -p 172.29.88.62 --login
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><code>-T</code>后面跟target名称，<code>--login</code>等同于<code>-l</code>，</p>
+<p>登录目标节点成功后，即建立了initiator与target之间的会话（session），同时target提供的存储设备也挂载到主机中，在/dev目录下生成一个新的设备文件类似于sdb、sdc等。使用<code>iscsiadm -m session -P 3</code>（与<code>service iscsi status</code>相同）来查看连接会话信息。</p>
+<h2 id="24-使用磁盘--lvm">2.4 使用磁盘 — lvm<a hidden class="anchor" aria-hidden="true" href="#24-使用磁盘--lvm">#</a></h2>
+<p>LVM是非常流行的可修改磁盘分区大小的管理方式，可以根据你的需要使用使用lvm管理磁盘。
+假设新存储的设备路径为<code>/dev/sdb</code></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">pvcreate /dev/sdb                    ## 在新存储上建立物理卷
+</span></span><span class="line"><span class="cl">pvdisplay                                   ## 查看物理卷状态
+</span></span><span class="line"><span class="cl">vgcreate vg_ittest /dev/sdb      ## 在该物理卷上建立名为vg_test的卷组
+</span></span><span class="line"><span class="cl">vgdisplay                                   ## 查看已建立的卷组状态
+</span></span><span class="line"><span class="cl">lvcreate -l 100%FREE -n lv_static vg_ittest
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>在vg_ittest卷组上建立名为lv_static的逻辑卷，-L可指定分区大小，此处-l表示使用全部空间</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">vgscan或lvdisplay                     ## 查看逻辑卷的状态
+</span></span><span class="line"><span class="cl">vgchange -ay                            ## 使卷组处于激活状态
+</span></span><span class="line"><span class="cl">mkfs.ext4 /dev/mapper/vg_ittest-lv_static            ## 格式化已创建的逻辑卷，文件系统格式为ext4
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>格式化完毕后，使用mount命令挂载即可：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">mount -o acl,rw /dev/mapper/vg_ittest-lv_static  /iscsi    ## /iscsi为事先建立的挂载点
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>也可以根据需求划分成多个分区挂载。</p>
+<p><strong>开机自动挂载</strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">vi /etc/rc.d/rc.local
+</span></span><span class="line"><span class="cl">iscsiadm -m node -T iqn.2000-01.com.synology:themain-3rd.ittest -p 172.29.88.62 --login
+</span></span><span class="line"><span class="cl">vgchange -ay &amp;&amp; mount -o acl,rw /dev/mapper/vg_ittest-lv_static /iscsi
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h1 id="3-维护操作">3. 维护操作<a hidden class="anchor" aria-hidden="true" href="#3-维护操作">#</a></h1>
+<h2 id="31-正常断开重连网络存储">3.1 正常断开重连网络存储<a hidden class="anchor" aria-hidden="true" href="#31-正常断开重连网络存储">#</a></h2>
+<p>因为磁盘上就是数据（一般网络存储用于备份），因此尽量减少异常断开存储的可能性，所以保险起见先卸载，再断开连接(<code>-u</code>)。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl"># umount /iscsi
+</span></span><span class="line"><span class="cl"># vgchange -an &amp;&amp; vgscan
+</span></span><span class="line"><span class="cl"># iscsiadm -m session
+</span></span><span class="line"><span class="cl"># iscsiadm -m node -T iqn.2000-01.com.synology:themain-3rd.ittest -p 172.29.88.62 --logout
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h2 id="32-异常断开恢复">3.2 异常断开恢复<a hidden class="anchor" aria-hidden="true" href="#32-异常断开恢复">#</a></h2>
+<p>如果使用LVM管理磁盘，由于网络中断，或主机突然关机，会导致网络存储异常断开，下次启动后重新连接可能会报如下错误：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl"># vgscan
+</span></span><span class="line"><span class="cl"> Reading all physical volumes.  This may take a while...
+</span></span><span class="line"><span class="cl"> /dev/backupdrive1/backup: read failed after 0 of 4096 at 319836585984: Input/output error
+</span></span><span class="line"><span class="cl"> /dev/backupdrive1/backup: read failed after 0 of 4096 at 319836643328: Input/output error
+</span></span><span class="line"><span class="cl"> /dev/backupdrive1/backup: read failed after 0 of 4096 at 0: Input/output error
+</span></span><span class="line"><span class="cl"> /dev/backupdrive1/backup: read failed after 0 of 4096 at 4096: Input/output error
+</span></span><span class="line"><span class="cl"> Found volume group &#34;backupdrive1&#34; using metadata type lvm2
+</span></span><span class="line"><span class="cl"> Found volume group &#34;networkdrive&#34; using metadata type lvm2
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>产生原因就是，在卷组（VG）失活（deactivate）之前就移除了外部的LVM设备。在你断开连接之前，需要保证以下命令被执行：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl"># vgchange -an volume_group_name
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>解决方案就是，（假设你已经用<code>vgchange -ay vg</code>命令来激活卷组，但仍有 Input/output error 的错误信息。）执行命令<code>vgchange -an volume group name</code>，移除外部设备，稍候几分钟后再执行以下命令：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl"># vgscan
+</span></span><span class="line"><span class="cl"># vgchange -ay volume_group_name
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h2 id="33-进程数超标">3.3 进程数超标<a hidden class="anchor" aria-hidden="true" href="#33-进程数超标">#</a></h2>
+<p>iscsi存储使用正常，但<code>ps -ef|grep iscsi</code>则包含200+以上的类似于<code>[iscsi_q_112]</code>进程，并且无法kill，使用<code>service iscsi status</code>不断输出类似：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">iscsiadm: could not read session targetname: 5
+</span></span><span class="line"><span class="cl">iscsiadm: could not find session info for session30
+</span></span><span class="line"><span class="cl">iscsiadm: could not read session targetname: 5
+</span></span><span class="line"><span class="cl">iscsiadm: could not find session info for session31
+</span></span><span class="line"><span class="cl">...
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这个问题很纠结，但重启服务器是可以解决的。网上资料很少，我猜想是iscsid服务端设置认证方面的问题。</p>
+<h1 id="4-iscsi的其它常用操作">4. iscsi的其它常用操作<a hidden class="anchor" aria-hidden="true" href="#4-iscsi的其它常用操作">#</a></h1>
+<ul>
+<li>
+<p>列出所有target
+<code>iscsiadm -m node</code></p>
+</li>
+<li>
+<p>连接所有target
+<code>iscsiadm -m node -L all</code></p>
+</li>
+<li>
+<p>连接指定target
+<code>iscsiadm -m node -T iqn.... -p 172.29.88.62 --login</code></p>
+</li>
+<li>
+<p>使用如下命令可以查看配置信息
+<code>iscsiadm -m node -o show -T iqn.2000-01.com.synology:rackstation.exservice-bak</code></p>
+</li>
+<li>
+<p>查看目前 iSCSI target 连接状态
+<code>iscsiadm -m session</code>
+iscsiadm: No active sessions.
+(目前没有已连接的 iSCSI target)</p>
+</li>
+<li>
+<p>断开所有target
+<code>iscsiadm -m node -U all</code></p>
+</li>
+<li>
+<p>断开指定target
+<code>iscsiadm -m node -T iqn...  -p 172.29.88.62 --logout</code></p>
+</li>
+<li>
+<p>删除所有node信息
+<code>iscsiadm -m node --op delete</code></p>
+</li>
+<li>
+<p>删除指定节点（/var/lib/iscsi/nodes目录下，先断开session）
+<code>iscsiadm -m node -o delete -name iqn.2012-01.cn.nayun:test-01</code></p>
+</li>
+<li>
+<p>删除一个目标（/var/lib/iscsi/send_targets目录下）
+<code>iscsiadm --mode discovery -o delete -p 172.29.88.62:3260</code></p>
+</li>
+</ul>
+<p><strong>参考</strong></p>
+<ul>
+<li>
+<p><a href="http://blog.csdn.net/sflsgfs/article/details/9180521">CentOS客户端加载ISCSI磁盘</a></p>
+</li>
+<li>
+<p><a href="http://tagche.blog.51cto.com/649757/267390/">linux iscsi initiator 安装配置</a></p>
+</li>
+<li>
+<p><a href="http://linux.vbird.org/linux_server/0460iscsi.php">http://linux.vbird.org/linux_server/0460iscsi.php</a></p>
+</li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://localhost:1313/tags/iscsi/">Iscsi</a></li>
+    </ul>
+<nav class="paginav">
+  <a class="prev" href="http://localhost:1313/2015/05/feel-wuyi-go/">
+    <span class="title">« Prev</span>
+    <br>
+    <span>五一去哪儿</span>
+  </a>
+  <a class="next" href="http://localhost:1313/2015/04/pfsense-loadbalancer/">
+    <span class="title">Next »</span>
+    <br>
+    <span>怎么用pfSense为你的web服务做负载均衡（翻译）</span>
+  </a>
+</nav>
+
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+        <span>&copy; 2025 <a href="http://localhost:1313/">Sean&#39;s Note</a></span> · 
+
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+<script>
+    document.querySelectorAll('pre > code').forEach((codeblock) => {
+        const container = codeblock.parentNode.parentNode;
+
+        const copybutton = document.createElement('button');
+        copybutton.classList.add('copy-code');
+        copybutton.innerHTML = 'copy';
+
+        function copyingDone() {
+            copybutton.innerHTML = 'copied!';
+            setTimeout(() => {
+                copybutton.innerHTML = 'copy';
+            }, 2000);
+        }
+
+        copybutton.addEventListener('click', (cb) => {
+            if ('clipboard' in navigator) {
+                navigator.clipboard.writeText(codeblock.textContent);
+                copyingDone();
+                return;
+            }
+
+            const range = document.createRange();
+            range.selectNodeContents(codeblock);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            try {
+                document.execCommand('copy');
+                copyingDone();
+            } catch (e) { };
+            selection.removeRange(range);
+        });
+
+        if (container.classList.contains("highlight")) {
+            container.appendChild(copybutton);
+        } else if (container.parentNode.firstChild == container) {
+            
+        } else if (codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName == "TABLE") {
+            
+            codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(copybutton);
+        } else {
+            
+            codeblock.parentNode.appendChild(copybutton);
+        }
+    });
+</script>
+</body>
+
+</html>

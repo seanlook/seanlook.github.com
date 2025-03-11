@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="noindex, nofollow">
+<title>Sean&#39;s Note</title>
+<meta name="keywords" content="">
+<meta name="description" content="title: iptables防火墙原理详解
+date: 2014-02-23 01:21:25
+updated: 2014-02-23-12 00:46:23
+tags: [iptables,安全]
+categories: Linux
+1. netfilter与iptables
+Netfilter是由Rusty Russell提出的Linux 2.4内核防火墙框架，该框架既简洁又灵活，可实现安全策略应用中的许多功能，如数据包过滤、数据包处理、地址伪装、透明代理、动态网络地址转换(Network Address Translation，NAT)，以及基于用户及媒体访问控制(Media Access Control，MAC)地址的过滤和基于状态的过滤、包速率限制等。Iptables/Netfilter的这些规则可以通过灵活组合，形成非常多的功能、涵盖各个方面，这一切都得益于它的优秀设计思想。">
+<meta name="author" content="">
+<link rel="canonical" href="http://localhost:1313/posts/iptables-understand/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.45e028aa8ce0961349adf411b013ee39406be2c0bc80d4ea3fc04555f7f4611a.css" integrity="sha256-ReAoqozglhNJrfQRsBPuOUBr4sC8gNTqP8BFVff0YRo=" rel="preload stylesheet" as="style">
+<link rel="icon" href="http://localhost:1313/img/logo.gif">
+<link rel="icon" type="image/png" sizes="16x16" href="http://localhost:1313/img/logo.gif">
+<link rel="icon" type="image/png" sizes="32x32" href="http://localhost:1313/img/logo.gif">
+<link rel="apple-touch-icon" href="http://localhost:1313/logo.gif">
+<link rel="mask-icon" href="http://localhost:1313/logo.gif">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<link rel="alternate" hreflang="en" href="http://localhost:1313/posts/iptables-understand/">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --code-block-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://localhost:1313/" accesskey="h" title="Sean&#39;s Note (Alt + H)">Sean&#39;s Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://localhost:1313/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/categories/" title="Categories">
+                    <span>Categories</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/search/" title="Search (Alt &#43; /)" accesskey=/>
+                    <span>Search</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/tags/" title="Tags">
+                    <span>Tags</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    <div class="breadcrumbs"><a href="http://localhost:1313/">Home</a>&nbsp;»&nbsp;<a href="http://localhost:1313/posts/">Posts</a></div>
+    <h1 class="post-title entry-hint-parent">
+      
+    </h1>
+    <div class="post-meta">9 min
+
+</div>
+  </header> <div class="toc">
+    <details  open>
+        <summary accesskey="c" title="(Alt + C)">
+            <span class="details">Table of Contents</span>
+        </summary>
+
+        <div class="inner"><ul>
+                <li>
+                    <a href="#1-netfilter%e4%b8%8eiptables" aria-label="1. netfilter与iptables">1. netfilter与iptables</a><ul>
+                        
+                <li>
+                    <a href="#11-filternatmangle%e7%ad%89%e8%a7%84%e5%88%99%e8%a1%a8" aria-label="1.1 filter、nat、mangle等规则表">1.1 filter、nat、mangle等规则表</a></li>
+                <li>
+                    <a href="#12-inputforward%e7%ad%89%e8%a7%84%e5%88%99%e9%93%be%e5%92%8c%e8%a7%84%e5%88%99" aria-label="1.2 INPUT、FORWARD等规则链和规则">1.2 INPUT、FORWARD等规则链和规则</a></li></ul>
+                </li>
+                <li>
+                    <a href="#2--linux%e6%95%b0%e6%8d%ae%e5%8c%85%e8%b7%af%e7%94%b1%e5%8e%9f%e7%90%86" aria-label="2.  Linux数据包路由原理">2.  Linux数据包路由原理</a></li>
+                <li>
+                    <a href="#3-iptables%e7%bc%96%e5%86%99%e8%a7%84%e5%88%99" aria-label="3. iptables编写规则">3. iptables编写规则</a>
+                </li>
+            </ul>
+        </div>
+    </details>
+</div>
+
+  <div class="post-content"><h2 id="categories-linux">title: iptables防火墙原理详解
+date: 2014-02-23 01:21:25
+updated: 2014-02-23-12 00:46:23
+tags: [iptables,安全]
+categories: Linux</h2>
+<h1 id="1-netfilter与iptables">1. netfilter与iptables<a hidden class="anchor" aria-hidden="true" href="#1-netfilter与iptables">#</a></h1>
+<p>Netfilter是由Rusty Russell提出的Linux 2.4内核防火墙框架，该框架既简洁又灵活，可实现安全策略应用中的许多功能，如数据包过滤、数据包处理、地址伪装、透明代理、动态网络地址转换(Network Address Translation，NAT)，以及基于用户及媒体访问控制(Media Access Control，MAC)地址的过滤和基于状态的过滤、包速率限制等。Iptables/Netfilter的这些规则可以通过灵活组合，形成非常多的功能、涵盖各个方面，这一切都得益于它的优秀设计思想。</p>
+<p>Netfilter是Linux操作系统核心层内部的一个数据包处理模块，它具有如下功能：</p>
+<ul>
+<li>网络地址转换(Network Address Translate)</li>
+<li>数据包内容修改</li>
+<li>以及数据包过滤的防火墙功能</li>
+</ul>
+<p>Netfilter 平台中制定了数据包的五个挂载点（Hook Point，我们可以理解为回调函数点，数据包到达这些位置的时候会主动调用我们的函数，使我们有机会能在数据包路由的时候改变它们的方向、内容），这5个挂载点分别是<code>PRE_ROUTING</code>、<code>INPUT</code>、<code>OUTPUT</code>、<code>FORWARD</code>、<code>POST_ROUTING</code>。</p>
+<p>Netfilter 所设置的规则是存放在内核内存中的，而 iptables 是一个应用层的应用程序，它通过 Netfilter 放出的接口来对存放在内核内存中的 XXtables（Netfilter的配置表）进行修改。这个XXtables由表<code>tables</code>、链<code>chains</code>、规则<code>rules</code>组成，iptables在应用层负责修改这个规则文件。类似的应用程序还有 firewalld 。</p>
+<p><img alt="iptables-netfilter" loading="lazy" src="http://sean-images.qiniudn.com/iptables-netfilter.png"></p>
+<h2 id="11-filternatmangle等规则表">1.1 filter、nat、mangle等规则表<a hidden class="anchor" aria-hidden="true" href="#11-filternatmangle等规则表">#</a></h2>
+<p><strong>filter表</strong></p>
+<p>主要用于对数据包进行过滤，根据具体的规则决定是否放行该数据包（如DROP、ACCEPT、REJECT、LOG）。filter 表对应的内核模块为iptable_filter，包含三个规则链：</p>
+<ul>
+<li><code>INPUT</code>链：INPUT针对那些目的地是本地的包</li>
+<li><code>FORWARD</code>链：FORWARD过滤所有不是本地产生的并且目的地不是本地(即本机只是负责转发)的包</li>
+<li><code>OUTPUT</code>链：OUTPUT是用来过滤所有本地生成的包</li>
+</ul>
+<p><strong>nat表</strong></p>
+<p>主要用于修改数据包的IP地址、端口号等信息（网络地址转换，如SNAT、DNAT、MASQUERADE、REDIRECT）。属于一个流的包(因为包
+的大小限制导致数据可能会被分成多个数据包)只会经过这个表一次。如果第一个包被允许做NAT或Masqueraded，那么余下的包都会自动地被做相同的操作，也就是说，余下的包不会再通过这个表。表对应的内核模块为 iptable_nat，包含三个链：</p>
+<ul>
+<li><code>PREROUTING</code>链：作用是在包刚刚到达防火墙时改变它的目的地址</li>
+<li><code>OUTPUT</code>链：改变本地产生的包的目的地址</li>
+<li><code>POSTROUTING</code>链：在包就要离开防火墙之前改变其源地址</li>
+</ul>
+<p><strong>mangle表</strong></p>
+<p>主要用于修改数据包的TOS（Type Of Service，服务类型）、TTL（Time To Live，生存周期）指以及为数据包设置Mark标记，以实现Qos(Quality Of Service，服务质量)调整以及策略路由等应用，由于需要相应的路由设备支持，因此应用并不广泛。包含五个规则链——PREROUTING，POSTROUTING，INPUT，OUTPUT，FORWARD。</p>
+<p><strong>raw表</strong></p>
+<p>是自1.2.9以后版本的iptables新增的表，主要用于决定数据包是否被状态跟踪机制处理。在匹配数据包时，raw表的规则要优先于其他表。包含两条规则链——OUTPUT、PREROUTING</p>
+<p>iptables中数据包和4种被跟踪连接的4种不同状态：</p>
+<ul>
+<li><code>NEW</code>：该包想要开始一个连接（重新连接或将连接重定向）</li>
+<li><code>RELATED</code>：该包是属于某个已经建立的连接所建立的新连接。例如：FTP的数据传输连接就是控制连接所 RELATED出来的连接。<code>--icmp-type  0</code> ( ping 应答) 就是<code>--icmp-type 8</code> (ping 请求)所RELATED出来的。</li>
+<li><code>ESTABLISHED</code> ：只要发送并接到应答，一个数据连接从NEW变为ESTABLISHED,而且该状态会继续匹配这个连接的后续数据包。</li>
+<li><code>INVALID</code>：数据包不能被识别属于哪个连接或没有任何状态比如内存溢出，收到不知属于哪个连接的ICMP错误信息，一般应该DROP这个状态的任何数据。</li>
+</ul>
+<h2 id="12-inputforward等规则链和规则">1.2 INPUT、FORWARD等规则链和规则<a hidden class="anchor" aria-hidden="true" href="#12-inputforward等规则链和规则">#</a></h2>
+<p>在处理各种数据包时，根据防火墙规则的不同介入时机，iptables供涉及5种默认规则链，从应用时间点的角度理解这些链：</p>
+<ul>
+<li><code>INPUT</code>链：当接收到防火墙本机地址的数据包（入站）时，应用此链中的规则。</li>
+<li><code>OUTPUT</code>链：当防火墙本机向外发送数据包（出站）时，应用此链中的规则。</li>
+<li><code>FORWARD</code>链：当接收到需要通过防火墙发送给其他地址的数据包（转发）时，应用此链中的规则。</li>
+<li><code>PREROUTING</code>链：在对数据包作路由选择之前，应用此链中的规则，如DNAT。</li>
+<li><code>POSTROUTING</code>链：在对数据包作路由选择之后，应用此链中的规则，如SNAT。</li>
+</ul>
+<pre tabindex="0"><code>--&gt;PREROUTING--&gt;[ROUTE]--&gt;FORWARD--&gt;POSTROUTING--&gt;
+     mangle        |       mangle        ^ mangle
+      nat          |       filter        |  nat
+                   |                     |
+                   |                     |
+                   v                     |
+                 INPUT                 OUTPUT
+                   | mangle              ^ mangle
+                   | filter              |  nat
+                   v ------&gt;local-------&gt;| filter
+</code></pre><p>其中中INPUT、OUTPUT链更多的应用在“主机防火墙”中，即主要针对服务器本机进出数据的安全控制；而FORWARD、PREROUTING、POSTROUTING链更多的应用在“网络防火墙”中，特别是防火墙服务器作为网关使用时的情况。</p>
+<p><strong>防火墙处理数据包的方式（规则）：</strong></p>
+<ul>
+<li>
+<p><code>ACCEPT</code>：允许数据包通过</p>
+</li>
+<li>
+<p><code>DROP</code>：直接丢弃数据包，不给任何回应信息</p>
+</li>
+<li>
+<p><code>REJECT</code>：拒绝数据包通过，必要时会给数据发送端一个响应的信息。</p>
+</li>
+<li>
+<p><code>SNAT</code>：源地址转换。在进入路由层面的route之前，重新改写源地址，目标地址不变，并在本机建立NAT表项，当数据返回时，根据NAT表将目的地址数据改写为数据发送出去时候的源地址，并发送给主机。解决内网用户用同一个公网地址上网的问题。
+<code>MASQUERADE</code>，是SNAT的一种特殊形式，适用于像adsl这种临时会变的ip上</p>
+</li>
+<li>
+<p><code>DNAT</code>:目标地址转换。和SNAT相反，IP包经过route之后、出本地的网络栈之前，重新修改目标地址，源地址不变，在本机建立NAT表项，当数据返回时，根据NAT表将源地址修改为数据发送过来时的目标地址，并发给远程主机。可以隐藏后端服务器的真实地址。
+<code>REDIRECT</code>：是DNAT的一种特殊形式，将网络包转发到本地host上（不管IP头部指定的目标地址是啥），方便在本机做端口转发。</p>
+</li>
+<li>
+<p><code>LOG</code>：在/var/log/messages文件中记录日志信息，然后将数据包传递给下一条规则</p>
+</li>
+</ul>
+<p>除去最后一个<code>LOG</code>，前3条规则匹配数据包后，该数据包不会再往下继续匹配了，所以编写的规则顺序极其关键。</p>
+<h1 id="2--linux数据包路由原理">2.  Linux数据包路由原理<a hidden class="anchor" aria-hidden="true" href="#2--linux数据包路由原理">#</a></h1>
+<p>我们已经知道了Netfilter和Iptables的架构和作用，并且学习了控制Netfilter行为的Xtables表的结构，那么这个Xtables表是怎么在内核协议栈的数据包路由中起作用的呢？</p>
+<p>网口数据包由底层的网卡NIC接收，通过数据链路层的解包之后(去除数据链路帧头)，就进入了TCP/IP协议栈(本质就是一个处理网络数据包的内核驱动)和Netfilter混合的数据包处理流程中了。数据包的接收、处理、转发流程构成一个有限状态向量机，经过一些列的内核处理函数、以及Netfilter Hook点，最后被转发、或者本次上层的应用程序消化掉。是时候看这张图了：
+<img alt="iptables-routing" loading="lazy" src="http://sean-images.qiniudn.com/iptables-routing.jpg"></p>
+<p>从上图中，我们可以总结出以下规律：</p>
+<ul>
+<li>当一个数据包进入网卡时，数据包首先进入PREROUTING链，在PREROUTING链中我们有机会修改数据包的DestIP(目的IP)，然后内核的&quot;路由模块&quot;根据&quot;数据包目的IP&quot;以及&quot;内核中的路由表&quot;判断是否需要转送出去(注意，这个时候数据包的DestIP有可能已经被我们修改过了)</li>
+<li>如果数据包就是进入本机的(即数据包的目的IP是本机的网口IP)，数据包就会沿着图向下移动，到达INPUT链。数据包到达INPUT链后，任何进程都会-收到它</li>
+<li>本机上运行的程序也可以发送数据包，这些数据包经过OUTPUT链，然后到达POSTROTING链输出(注意，这个时候数据包的SrcIP有可能已经被我们修改过了)</li>
+<li>如果数据包是要转发出去的(即目的IP地址不再当前子网中)，且内核允许转发，数据包就会向右移动，经过FORWARD链，然后到达POSTROUTING链输出(选择对应子网的网口发送出去)</li>
+</ul>
+<p>我们在写Iptables规则的时候，要时刻牢记这张路由次序图，根据所在Hook点的不同，灵活配置规则。</p>
+<h1 id="3-iptables编写规则">3. iptables编写规则<a hidden class="anchor" aria-hidden="true" href="#3-iptables编写规则">#</a></h1>
+<p>命令格式：
+<img alt="iptables-cli" loading="lazy" src="http://sean-images.qiniudn.com/iptables-cli.png"></p>
+<ul>
+<li><code>[-t 表名]</code>：该规则所操作的哪个表，可以使用filter、nat等，如果没有指定则默认为filter</li>
+<li><code>-A</code>：新增一条规则，到该规则链列表的最后一行</li>
+<li><code>-I</code>：插入一条规则，原本该位置上的规则会往后顺序移动，没有指定编号则为1</li>
+<li><code>-D</code>：从规则链中删除一条规则，要么输入完整的规则，或者指定规则编号加以删除</li>
+<li><code>-R</code>：替换某条规则，规则替换不会改变顺序，而且必须指定编号。</li>
+<li><code>-P</code>：设置某条规则链的默认动作</li>
+<li><code>-nL</code>：<code>-L</code>、<code>-n</code>，查看当前运行的防火墙规则列表</li>
+<li><code>chain名</code>：指定规则表的哪个链，如INPUT、OUPUT、FORWARD、PREROUTING等</li>
+<li><code>[规则编号]</code>：插入、删除、替换规则时用，<code>--line-numbers</code>显示号码</li>
+<li><code>[-i|o 网卡名称]</code>：i是指定数据包从哪块网卡进入，o是指定数据包从哪块网卡输出</li>
+<li><code>[-p 协议类型]</code>：可以指定规则应用的协议，包含tcp、udp和icmp等</li>
+<li><code>[-s 源IP地址]</code>：源主机的IP地址或子网地址</li>
+<li><code>[--sport 源端口号]</code>：数据包的IP的源端口号</li>
+<li><code>[-d目标IP地址]</code>：目标主机的IP地址或子网地址</li>
+<li><code>[--dport目标端口号]</code>：数据包的IP的目标端口号</li>
+<li><code>-m</code>：extend matches，这个选项用于提供更多的匹配参数，如：
+<ul>
+<li>-m state &ndash;state ESTABLISHED,RELATED</li>
+<li>-m tcp &ndash;dport 22</li>
+<li>-m multiport &ndash;dports 80,8080</li>
+<li>-m icmp &ndash;icmp-type 8</li>
+</ul>
+</li>
+<li><code>&lt;-j 动作&gt;</code>：处理数据包的动作，包括ACCEPT、DROP、REJECT等</li>
+</ul>
+<p>具体实例请参考 <a href="http://seanlook.com/2014/02/26/iptables-example/">iptables常用实例备查</a>。</p>
+<p><strong>参考</strong></p>
+<ul>
+<li><a href="http://zh.wikipedia.org/wiki/Iptables">wikipedia iptables</a> (里面有张原理图片值得收藏)</li>
+<li>2小时玩转iptables企业版.ppt  (网上可下)</li>
+<li><a href="http://www.netfilter.org/documentation/index.html">netfilter/iptables documentation</a></li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+    </ul>
+<nav class="paginav">
+  <a class="prev" href="http://localhost:1313/posts/iptables-example/">
+    <span class="title">« Prev</span>
+    <br>
+    <span></span>
+  </a>
+  <a class="next" href="http://localhost:1313/posts/linux-logwatch-usage/">
+    <span class="title">Next »</span>
+    <br>
+    <span></span>
+  </a>
+</nav>
+
+
+<ul class="share-buttons">
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on x"
+            href="https://x.com/intent/tweet/?text=&amp;url=http%3a%2f%2flocalhost%3a1313%2fposts%2fiptables-understand%2f&amp;hashtags=">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M512 62.554 L 512 449.446 C 512 483.97 483.97 512 449.446 512 L 62.554 512 C 28.03 512 0 483.97 0 449.446 L 0 62.554 C 0 28.03 28.029 0 62.554 0 L 449.446 0 C 483.971 0 512 28.03 512 62.554 Z M 269.951 190.75 L 182.567 75.216 L 56 75.216 L 207.216 272.95 L 63.9 436.783 L 125.266 436.783 L 235.9 310.383 L 332.567 436.783 L 456 436.783 L 298.367 228.367 L 432.367 75.216 L 371.033 75.216 Z M 127.633 110 L 164.101 110 L 383.481 400.065 L 349.5 400.065 Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on linkedin"
+            href="https://www.linkedin.com/shareArticle?mini=true&amp;url=http%3a%2f%2flocalhost%3a1313%2fposts%2fiptables-understand%2f&amp;title=&amp;summary=&amp;source=http%3a%2f%2flocalhost%3a1313%2fposts%2fiptables-understand%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-288.985,423.278l0,-225.717l-75.04,0l0,225.717l75.04,0Zm270.539,0l0,-129.439c0,-69.333 -37.018,-101.586 -86.381,-101.586c-39.804,0 -57.634,21.891 -67.617,37.266l0,-31.958l-75.021,0c0.995,21.181 0,225.717 0,225.717l75.02,0l0,-126.056c0,-6.748 0.486,-13.492 2.474,-18.315c5.414,-13.475 17.767,-27.434 38.494,-27.434c27.135,0 38.007,20.707 38.007,51.037l0,120.768l75.024,0Zm-307.552,-334.556c-25.674,0 -42.448,16.879 -42.448,39.002c0,21.658 16.264,39.002 41.455,39.002l0.484,0c26.165,0 42.452,-17.344 42.452,-39.002c-0.485,-22.092 -16.241,-38.954 -41.943,-39.002Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on reddit"
+            href="https://reddit.com/submit?url=http%3a%2f%2flocalhost%3a1313%2fposts%2fiptables-understand%2f&title=">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-3.446,265.638c0,-22.964 -18.616,-41.58 -41.58,-41.58c-11.211,0 -21.361,4.457 -28.841,11.666c-28.424,-20.508 -67.586,-33.757 -111.204,-35.278l18.941,-89.121l61.884,13.157c0.756,15.734 13.642,28.29 29.56,28.29c16.407,0 29.706,-13.299 29.706,-29.701c0,-16.403 -13.299,-29.702 -29.706,-29.702c-11.666,0 -21.657,6.792 -26.515,16.578l-69.105,-14.69c-1.922,-0.418 -3.939,-0.042 -5.585,1.036c-1.658,1.073 -2.811,2.761 -3.224,4.686l-21.152,99.438c-44.258,1.228 -84.046,14.494 -112.837,35.232c-7.468,-7.164 -17.589,-11.591 -28.757,-11.591c-22.965,0 -41.585,18.616 -41.585,41.58c0,16.896 10.095,31.41 24.568,37.918c-0.639,4.135 -0.99,8.328 -0.99,12.576c0,63.977 74.469,115.836 166.33,115.836c91.861,0 166.334,-51.859 166.334,-115.836c0,-4.218 -0.347,-8.387 -0.977,-12.493c14.564,-6.47 24.735,-21.034 24.735,-38.001Zm-119.474,108.193c-20.27,20.241 -59.115,21.816 -70.534,21.816c-11.428,0 -50.277,-1.575 -70.522,-21.82c-3.007,-3.008 -3.007,-7.882 0,-10.889c3.003,-2.999 7.882,-3.003 10.885,0c12.777,12.781 40.11,17.317 59.637,17.317c19.522,0 46.86,-4.536 59.657,-17.321c3.016,-2.999 7.886,-2.995 10.885,0.008c3.008,3.011 3.003,7.882 -0.008,10.889Zm-5.23,-48.781c-16.373,0 -29.701,-13.324 -29.701,-29.698c0,-16.381 13.328,-29.714 29.701,-29.714c16.378,0 29.706,13.333 29.706,29.714c0,16.374 -13.328,29.698 -29.706,29.698Zm-160.386,-29.702c0,-16.381 13.328,-29.71 29.714,-29.71c16.369,0 29.689,13.329 29.689,29.71c0,16.373 -13.32,29.693 -29.689,29.693c-16.386,0 -29.714,-13.32 -29.714,-29.693Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on facebook"
+            href="https://facebook.com/sharer/sharer.php?u=http%3a%2f%2flocalhost%3a1313%2fposts%2fiptables-understand%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-106.468,0l0,-192.915l66.6,0l12.672,-82.621l-79.272,0l0,-53.617c0,-22.603 11.073,-44.636 46.58,-44.636l36.042,0l0,-70.34c0,0 -32.71,-5.582 -63.982,-5.582c-65.288,0 -107.96,39.569 -107.96,111.204l0,62.971l-72.573,0l0,82.621l72.573,0l0,192.915l-191.104,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on whatsapp"
+            href="https://api.whatsapp.com/send?text=%20-%20http%3a%2f%2flocalhost%3a1313%2fposts%2fiptables-understand%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-58.673,127.703c-33.842,-33.881 -78.847,-52.548 -126.798,-52.568c-98.799,0 -179.21,80.405 -179.249,179.234c-0.013,31.593 8.241,62.428 23.927,89.612l-25.429,92.884l95.021,-24.925c26.181,14.28 55.659,21.807 85.658,21.816l0.074,0c98.789,0 179.206,-80.413 179.247,-179.243c0.018,-47.895 -18.61,-92.93 -52.451,-126.81Zm-126.797,275.782l-0.06,0c-26.734,-0.01 -52.954,-7.193 -75.828,-20.767l-5.441,-3.229l-56.386,14.792l15.05,-54.977l-3.542,-5.637c-14.913,-23.72 -22.791,-51.136 -22.779,-79.287c0.033,-82.142 66.867,-148.971 149.046,-148.971c39.793,0.014 77.199,15.531 105.329,43.692c28.128,28.16 43.609,65.592 43.594,105.4c-0.034,82.149 -66.866,148.983 -148.983,148.984Zm81.721,-111.581c-4.479,-2.242 -26.499,-13.075 -30.604,-14.571c-4.105,-1.495 -7.091,-2.241 -10.077,2.241c-2.986,4.483 -11.569,14.572 -14.182,17.562c-2.612,2.988 -5.225,3.364 -9.703,1.12c-4.479,-2.241 -18.91,-6.97 -36.017,-22.23c-13.314,-11.876 -22.304,-26.542 -24.916,-31.026c-2.612,-4.484 -0.279,-6.908 1.963,-9.14c2.016,-2.007 4.48,-5.232 6.719,-7.847c2.24,-2.615 2.986,-4.484 4.479,-7.472c1.493,-2.99 0.747,-5.604 -0.374,-7.846c-1.119,-2.241 -10.077,-24.288 -13.809,-33.256c-3.635,-8.733 -7.327,-7.55 -10.077,-7.688c-2.609,-0.13 -5.598,-0.158 -8.583,-0.158c-2.986,0 -7.839,1.121 -11.944,5.604c-4.105,4.484 -15.675,15.32 -15.675,37.364c0,22.046 16.048,43.342 18.287,46.332c2.24,2.99 31.582,48.227 76.511,67.627c10.685,4.615 19.028,7.371 25.533,9.434c10.728,3.41 20.492,2.929 28.209,1.775c8.605,-1.285 26.499,-10.833 30.231,-21.295c3.732,-10.464 3.732,-19.431 2.612,-21.298c-1.119,-1.869 -4.105,-2.99 -8.583,-5.232Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on telegram"
+            href="https://telegram.me/share/url?text=&amp;url=http%3a%2f%2flocalhost%3a1313%2fposts%2fiptables-understand%2f">
+            <svg version="1.1" xml:space="preserve" viewBox="2 2 28 28" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M26.49,29.86H5.5a3.37,3.37,0,0,1-2.47-1,3.35,3.35,0,0,1-1-2.47V5.48A3.36,3.36,0,0,1,3,3,3.37,3.37,0,0,1,5.5,2h21A3.38,3.38,0,0,1,29,3a3.36,3.36,0,0,1,1,2.46V26.37a3.35,3.35,0,0,1-1,2.47A3.38,3.38,0,0,1,26.49,29.86Zm-5.38-6.71a.79.79,0,0,0,.85-.66L24.73,9.24a.55.55,0,0,0-.18-.46.62.62,0,0,0-.41-.17q-.08,0-16.53,6.11a.59.59,0,0,0-.41.59.57.57,0,0,0,.43.52l4,1.24,1.61,4.83a.62.62,0,0,0,.63.43.56.56,0,0,0,.4-.17L16.54,20l4.09,3A.9.9,0,0,0,21.11,23.15ZM13.8,20.71l-1.21-4q8.72-5.55,8.78-5.55c.15,0,.23,0,.23.16a.18.18,0,0,1,0,.06s-2.51,2.3-7.52,6.8Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on ycombinator"
+            href="https://news.ycombinator.com/submitlink?t=&u=http%3a%2f%2flocalhost%3a1313%2fposts%2fiptables-understand%2f">
+            <svg version="1.1" xml:space="preserve" width="30px" height="30px" viewBox="0 0 512 512" fill="currentColor"
+                xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape">
+                <path
+                    d="M449.446 0C483.971 0 512 28.03 512 62.554L512 449.446C512 483.97 483.97 512 449.446 512L62.554 512C28.03 512 0 483.97 0 449.446L0 62.554C0 28.03 28.029 0 62.554 0L449.446 0ZM183.8767 87.9921H121.8427L230.6673 292.4508V424.0079H281.3328V292.4508L390.1575 87.9921H328.1233L256 238.2489z" />
+            </svg>
+        </a>
+    </li>
+</ul>
+
+  </footer>
+</article>
+    </main>
+    
+<footer class="footer">
+        <span>&copy; 2025 <a href="http://localhost:1313/">Sean&#39;s Note</a></span> · 
+
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+<script>
+    document.querySelectorAll('pre > code').forEach((codeblock) => {
+        const container = codeblock.parentNode.parentNode;
+
+        const copybutton = document.createElement('button');
+        copybutton.classList.add('copy-code');
+        copybutton.innerHTML = 'copy';
+
+        function copyingDone() {
+            copybutton.innerHTML = 'copied!';
+            setTimeout(() => {
+                copybutton.innerHTML = 'copy';
+            }, 2000);
+        }
+
+        copybutton.addEventListener('click', (cb) => {
+            if ('clipboard' in navigator) {
+                navigator.clipboard.writeText(codeblock.textContent);
+                copyingDone();
+                return;
+            }
+
+            const range = document.createRange();
+            range.selectNodeContents(codeblock);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            try {
+                document.execCommand('copy');
+                copyingDone();
+            } catch (e) { };
+            selection.removeRange(range);
+        });
+
+        if (container.classList.contains("highlight")) {
+            container.appendChild(copybutton);
+        } else if (container.parentNode.firstChild == container) {
+            
+        } else if (codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName == "TABLE") {
+            
+            codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(copybutton);
+        } else {
+            
+            codeblock.parentNode.appendChild(copybutton);
+        }
+    });
+</script>
+</body>
+
+</html>

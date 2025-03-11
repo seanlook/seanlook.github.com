@@ -1,3 +1,4 @@
+---
 title: Docker简介
 date: 2014-12-18 11:21:25
 updated: 2014-12-18 18:46:23
@@ -110,7 +111,7 @@ Docker作为一个开源的应用容器引擎，让开发者可以打包他们�
 
 Docker使用客户端-服务器(client-server)架构模式。Docker客户端会与Docker守护进程进行通信。Docker守护进程会处理复杂繁重的任务，例如建立、运行、发布你的Docker容器。Docker客户端和守护进程可以运行在同一个系统上，当然你也可以使用Docker客户端去连接一个远程的Docker守护进程。Docker客户端和守护进程之间通过socket或者RESTful API进行通信。
 
-更多内容请参考：[Docker核心技术预览](http://seanlook.com/2014/12/18/docker-core-technology-preview/) 及[docker常用管理命令](http://seanlook.com/2014/10/31/docker-command-best-use-1/)。
+更多内容请参考：[Docker核心技术预览](http://xgknight.com/2014/12/18/docker-core-technology-preview/) 及[docker常用管理命令](http://xgknight.com/2014/10/31/docker-command-best-use-1/)。
 
 ## 4.1 images（镜像）##
 Docker 镜像就是一个只读的模板。例如，一个镜像可以包含一个完整的 ubuntu 操作系统环境，里面仅安装了 Apache 或用户需要的其它应用程序。
@@ -195,7 +196,7 @@ Pushing tag for rev [fe022762070b] on {https://cdn-registry-1.docker.io/v1/repos
 
 这里所说的私有仓库是指自己在本地服务器上搭建的专属自己的内部仓库`docker-registry`，俗称“私服”，供无法访问互联网的内部网络使用，或者镜像到本地一份以加快pull、push的速度。
 
-它与公共仓库最明显的区分就是repository的命名，如必须使用带`.`的主机名或域名，后面必须接`:port`，如`sean.tp-link.net:5000/centos6:your_tag_name`，而公共仓库第一个斜杠前表示的是登录用户名。命名关系到推送到哪个服务器的哪个位置，更过内容可以关注[搭建docker内网私服（docker-registry with nginx&ssl on centos）](http://seanlook.com/2014/11/13/deploy-private-docker-registry-with-nginx-ssl/)。
+它与公共仓库最明显的区分就是repository的命名，如必须使用带`.`的主机名或域名，后面必须接`:port`，如`sean.tp-link.net:5000/centos6:your_tag_name`，而公共仓库第一个斜杠前表示的是登录用户名。命名关系到推送到哪个服务器的哪个位置，更过内容可以关注[搭建docker内网私服（docker-registry with nginx&ssl on centos）](http://xgknight.com/2014/11/13/deploy-private-docker-registry-with-nginx-ssl/)。
 
 ## 4.4 运行一个容器的内部过程 ##
 docker client告诉docker daemon运行一个容器，例如：`docker run -i -t ubuntu  /bin/bash`
@@ -223,6 +224,6 @@ docker检查是否存在ubuntu镜像，如果本地不存在ubuntu镜像，则do
 - [Docker简介与入门](http://www.pchou.info/open-source/2014/03/29/docker-introduction.html)
 
 
-  [1]: http://sean-images.qiniudn.com/docker-traditional-virtualization.png
-  [2]: http://sean-images.qiniudn.com/docker-virtualization.png
-  [3]: http://sean-images.qiniudn.com/docker_arch.png
+  [1]: http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-traditional-virtualization.png
+  [2]: http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-virtualization.png
+  [3]: http://github.com/seanlook/sean-notes-comment/raw/main/static/docker_arch.png

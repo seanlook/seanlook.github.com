@@ -1,5 +1,7 @@
-+++
-date = '2025-02-10T18:33:06+08:00'
-draft = true
-title = 'My First Post'
-+++
+---
+title: "My First Post"
+date: 2023-01-10T09:56:35+08:00
+draft: true
+---
+
+visit xgknight.com

@@ -1,3 +1,4 @@
+---
 title: OpenSSL 与 SSL 数字证书概念贴
 date: 2015-01-15 01:21:25
 updated: 2015-01-15 10:46:23
@@ -6,8 +7,8 @@ categories: 安全
 ---
 
 
-SSL/TLS 介绍见文章 [SSL/TLS原理详解](http://seanlook.com/2015/01/07/tls-ssl)。
-如果你想快速自建CA然后签发数字证书，请移步 [基于OpenSSL自建CA和颁发SSL证书 ](http://seanlook.com/2015/01/18/openssl-self-sign-ca) 。
+SSL/TLS 介绍见文章 [SSL/TLS原理详解](http://xgknight.com/2015/01/07/tls-ssl)。
+如果你想快速自建CA然后签发数字证书，请移步 [基于OpenSSL自建CA和颁发SSL证书 ](http://xgknight.com/2015/01/18/openssl-self-sign-ca) 。
 
 首先简单区分一下HTTPS、SSL、OpenSSL三者的关系：
 
@@ -216,5 +217,5 @@ c/aCD55l0K63Hv2fwddBbA8Gle4=
 - [数字证书及CA的扫盲介绍](http://kb.cnblogs.com/page/194742/)
 
 
-  [1]: http://sean-images.qiniudn.com/openssl-encrpt01.gif
+  [1]: http://github.com/seanlook/sean-notes-comment/raw/main/static/openssl-encrpt01.gif
 

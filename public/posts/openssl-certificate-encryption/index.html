@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="noindex, nofollow">
+<title>Sean&#39;s Note</title>
+<meta name="keywords" content="">
+<meta name="description" content="title: OpenSSL 与 SSL 数字证书概念贴
+date: 2015-01-15 01:21:25
+updated: 2015-01-15 10:46:23
+tags: [openssl, ssl,加密]
+categories: 安全
+SSL/TLS 介绍见文章 SSL/TLS原理详解。
+如果你想快速自建CA然后签发数字证书，请移步 基于OpenSSL自建CA和颁发SSL证书  。
+首先简单区分一下HTTPS、SSL、OpenSSL三者的关系：">
+<meta name="author" content="">
+<link rel="canonical" href="http://localhost:1313/posts/openssl-certificate-encryption/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.45e028aa8ce0961349adf411b013ee39406be2c0bc80d4ea3fc04555f7f4611a.css" integrity="sha256-ReAoqozglhNJrfQRsBPuOUBr4sC8gNTqP8BFVff0YRo=" rel="preload stylesheet" as="style">
+<link rel="icon" href="http://localhost:1313/img/logo.gif">
+<link rel="icon" type="image/png" sizes="16x16" href="http://localhost:1313/img/logo.gif">
+<link rel="icon" type="image/png" sizes="32x32" href="http://localhost:1313/img/logo.gif">
+<link rel="apple-touch-icon" href="http://localhost:1313/logo.gif">
+<link rel="mask-icon" href="http://localhost:1313/logo.gif">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<link rel="alternate" hreflang="en" href="http://localhost:1313/posts/openssl-certificate-encryption/">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --code-block-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://localhost:1313/" accesskey="h" title="Sean&#39;s Note (Alt + H)">Sean&#39;s Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://localhost:1313/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/categories/" title="Categories">
+                    <span>Categories</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/search/" title="Search (Alt &#43; /)" accesskey=/>
+                    <span>Search</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/tags/" title="Tags">
+                    <span>Tags</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    <div class="breadcrumbs"><a href="http://localhost:1313/">Home</a>&nbsp;»&nbsp;<a href="http://localhost:1313/posts/">Posts</a></div>
+    <h1 class="post-title entry-hint-parent">
+      
+    </h1>
+    <div class="post-meta">9 min
+
+</div>
+  </header> <div class="toc">
+    <details  open>
+        <summary accesskey="c" title="(Alt + C)">
+            <span class="details">Table of Contents</span>
+        </summary>
+
+        <div class="inner"><ul>
+                <li>
+                    <a href="#1-pkica%e4%b8%8e%e8%af%81%e4%b9%a6" aria-label="1. PKI、CA与证书">1. PKI、CA与证书</a><ul>
+                        
+                <li>
+                    <a href="#11-ca" aria-label="1.1 CA">1.1 CA</a></li>
+                <li>
+                    <a href="#12-certificate" aria-label="1.2 Certificate">1.2 Certificate</a><ul>
+                        
+                <li>
+                    <a href="#121-x509%e6%a0%87%e5%87%86" aria-label="1.2.1 X.509标准">1.2.1 X.509标准</a></li>
+                <li>
+                    <a href="#122-ssl%e5%85%ac%e9%92%a5%e8%af%81%e4%b9%a6%e6%a0%bc%e5%bc%8f" aria-label="1.2.2 ssl公钥证书格式">1.2.2 ssl公钥证书格式</a></li></ul>
+                </li></ul>
+                </li>
+                <li>
+                    <a href="#2-%e9%99%84%e6%95%b0%e6%8d%ae%e5%8a%a0%e5%af%86%e7%9a%84%e5%9f%ba%e7%a1%80%e7%9f%a5%e8%af%86" aria-label="2. 附：数据加密的基础知识">2. 附：数据加密的基础知识</a><ul>
+                        
+                <li>
+                    <a href="#%e5%af%b9%e7%a7%b0%e5%af%86%e9%92%a5%e5%8a%a0%e5%af%86" aria-label="对称密钥加密">对称密钥加密</a></li>
+                <li>
+                    <a href="#%e5%85%ac%e9%92%a5%e5%8a%a0%e5%af%86" aria-label="公钥加密">公钥加密</a></li>
+                <li>
+                    <a href="#%e5%8d%95%e5%90%91%e6%95%a3%e5%88%97%e7%ae%97%e6%b3%95" aria-label="单向散列算法">单向散列算法</a></li>
+                <li>
+                    <a href="#%e6%95%b0%e5%ad%97%e7%ad%be%e5%90%8d%e7%bb%93%e5%90%88%e4%bd%bf%e7%94%a8%e5%85%ac%e9%92%a5%e4%b8%8e%e6%95%a3%e5%88%97%e7%ae%97%e6%b3%95" aria-label="数字签名：结合使用公钥与散列算法">数字签名：结合使用公钥与散列算法</a></li>
+                <li>
+                    <a href="#%e5%af%86%e9%92%a5%e4%ba%a4%e6%8d%a2%e7%bb%93%e5%90%88%e4%bd%bf%e7%94%a8%e5%af%b9%e7%a7%b0%e5%af%86%e9%92%a5%e4%b8%8e%e5%85%ac%e9%92%a5" aria-label="密钥交换：结合使用对称密钥与公钥">密钥交换：结合使用对称密钥与公钥</a></li></ul>
+                </li>
+                <li>
+                    <a href="#%e5%8f%82%e8%80%83" aria-label="参考">参考</a>
+                </li>
+            </ul>
+        </div>
+    </details>
+</div>
+
+  <div class="post-content"><h2 id="categories-安全">title: OpenSSL 与 SSL 数字证书概念贴
+date: 2015-01-15 01:21:25
+updated: 2015-01-15 10:46:23
+tags: [openssl, ssl,加密]
+categories: 安全</h2>
+<p>SSL/TLS 介绍见文章 <a href="http://seanlook.com/2015/01/07/tls-ssl">SSL/TLS原理详解</a>。
+如果你想快速自建CA然后签发数字证书，请移步 <a href="http://seanlook.com/2015/01/18/openssl-self-sign-ca">基于OpenSSL自建CA和颁发SSL证书 </a> 。</p>
+<p>首先简单区分一下HTTPS、SSL、OpenSSL三者的关系：</p>
+<p>SSL是在客户端和服务器之间建立一条SSL安全通道的安全协议，而OpenSSL是TLS/SSL协议的开源实现，提供开发库和命令行程序。常说的HTTPS是HTTP的加密版，底层使用的加密协议是SSL。</p>
+<h2 id="1-pkica与证书">1. PKI、CA与证书<a hidden class="anchor" aria-hidden="true" href="#1-pkica与证书">#</a></h2>
+<p>PKI 就是 Public Key Infrastructure 的缩写，翻译过来就是公开密钥基础设施。它是利用公开密钥技术所构建的，解决网络安全问题的，普遍适用的一种基础设施;是一种遵循既定标准的密钥管理平台,它能够为所有网络应用提供加密和数字签名等密码服务及所必需的密钥和证书管理体系。</p>
+<p>PKI既不是一个协议，也不是一个软件，它是一个标准，在这个标准之下发展出的为了实现安全基础服务目的的技术统称为PKI。可以说CA(认证中心)是PKI的核心，而数字证书是PKI的最基本元素，还有如apache等服务器、浏览器等客户端、银行等应用，都是pki的组件。这篇文章可以帮助理解：<a href="http://netsecurity.51cto.com/art/200602/21066.htm">PKI/CA 技术的介绍</a> 。</p>
+<h3 id="11-ca">1.1 CA<a hidden class="anchor" aria-hidden="true" href="#11-ca">#</a></h3>
+<p>为保证用户之间在网上传递信息的安全性、真实性、可靠性、完整性和不可抵赖性</p>
+<p>CA 机构，又称为证书认证中心 (Certificate Authority) 中心，是一个负责发放和管理数字证书的第三方权威机构，它负责管理PKI结构下的所有用户(包括各种应用程序)的证书，把用户的公钥和用户的其他信息捆绑在一起，在网上验证用户的身份。CA机构的数字签名使得攻击者不能伪造和篡改证书。</p>
+<p>认证中心主要有以下5个功能：</p>
+<ol>
+<li>证书的颁发：接收、验证用户(包括下级认证中心和最终用户)的数字证书的申请。可以受理或拒绝</li>
+<li>证书的更新：认证中心可以定期更新所有用户的证书，或者根据用户的请求来更新用户的证书</li>
+<li>证书的查询：查询当前用户证书申请处理过程；查询用户证书的颁发信息，这类查询由目录服务器ldap来完成</li>
+<li>证书的作废：由于用户私钥泄密等原因，需要向认证中心提出证书作废的请求；证书已经过了有效期，认证中心自动将该证书作废。认证中心通过维护证书作废列表 (Certificate Revocation List,CRL) 来完成上述功能。</li>
+<li>证书的归档：证书具有一定的有效期，证书过了有效期之后就将作废，但是我们不能将作废的证书简单地丢弃，因为有时我们可能需要验证以前的某个交易过程中产生的数字签名，这时我们就需要查询作废的证书。</li>
+</ol>
+<h3 id="12-certificate">1.2 Certificate<a hidden class="anchor" aria-hidden="true" href="#12-certificate">#</a></h3>
+<h4 id="121-x509标准">1.2.1 X.509标准<a hidden class="anchor" aria-hidden="true" href="#121-x509标准">#</a></h4>
+<p>&ldquo;SSL证书&quot;这个词是一个相对较大的概念，整个PKI体系中有很多SSL证书格式标准。PKI的标准规定了PKI的设计、实施和运营，规定了PKI各种角色的&quot;游戏规则&rdquo;，提供数据语法和语义的共同约定。x.509是PKI中最重要的标准，它定义了公钥证书的基本结构，可以说PKI是在X.509标准基础上发展起来的：</p>
+<ul>
+<li>SSL公钥证书</li>
+<li>证书废除列表CRL(Certificate revocation lists 证书黑名单)</li>
+</ul>
+<p>参考 <a href="http://en.wikipedia.org/wiki/X.509">http://en.wikipedia.org/wiki/X.509</a> 。</p>
+<p>另外一个常用的标准是<code>PKCS#12</code>，通常采用pfx,p12作为文件扩展名，openssl和java的keytool工具都可以用作生产此类格式的证书。</p>
+<h4 id="122-ssl公钥证书格式">1.2.2 ssl公钥证书格式<a hidden class="anchor" aria-hidden="true" href="#122-ssl公钥证书格式">#</a></h4>
+<pre tabindex="0"><code>1. 证书版本号(Version)
+版本号指明X.509证书的格式版本，现在的值可以为:
+    1) 0: v1
+    2) 1: v2
+    3) 2: v3
+也为将来的版本进行了预定义
+
+2. 证书序列号(Serial Number)
+序列号指定由CA分配给证书的唯一的&#34;数字型标识符&#34;。当证书被取消时，实际上是将此证书的序列号放入由CA签发的CRL中，
+这也是序列号唯一的原因。
+
+3. 签名算法标识符(Signature Algorithm)
+签名算法标识用来指定由CA签发证书时所使用的&#34;签名算法&#34;。算法标识符用来指定CA签发证书时所使用的:
+    1) 公开密钥算法
+    2) hash算法
+example: sha256WithRSAEncryption
+须向国际知名标准组织(如ISO)注册
+
+4. 签发机构名(Issuer)
+此域用来标识签发证书的CA的X.500 DN(DN-Distinguished Name)名字。包括:
+    1) 国家(C)
+    2) 省市(ST)
+    3) 地区(L)
+    4) 组织机构(O)
+    5) 单位部门(OU)
+    6) 通用名(CN)
+    7) 邮箱地址
+
+5. 有效期(Validity)
+指定证书的有效期，包括:
+    1) 证书开始生效的日期时间
+    2) 证书失效的日期和时间
+每次使用证书时，需要检查证书是否在有效期内。
+
+6. 证书用户名(Subject)
+指定证书持有者的X.500唯一名字。包括:
+    1) 国家(C)
+    2) 省市(ST)
+    3) 地区(L)
+    4) 组织机构(O)
+    5) 单位部门(OU)
+    6) 通用名(CN)
+    7) 邮箱地址
+
+7. 证书持有者公开密钥信息(Subject Public Key Info)
+证书持有者公开密钥信息域包含两个重要信息:
+    1) 证书持有者的公开密钥的值
+    2) 公开密钥使用的算法标识符。此标识符包含公开密钥算法和hash算法。
+8. 扩展项(extension)
+X.509 V3证书是在v2的基础上一标准形式或普通形式增加了扩展项，以使证书能够附带额外信息。标准扩展是指
+由X.509 V3版本定义的对V2版本增加的具有广泛应用前景的扩展项，任何人都可以向一些权威机构，如ISO，来
+注册一些其他扩展，如果这些扩展项应用广泛，也许以后会成为标准扩展项。
+
+9. 签发者唯一标识符(Issuer Unique Identifier)
+签发者唯一标识符在第2版加入证书定义中。此域用在当同一个X.500名字用于多个认证机构时，用一比特字符串
+来唯一标识签发者的X.500名字。可选。
+
+10. 证书持有者唯一标识符(Subject Unique Identifier)
+持有证书者唯一标识符在第2版的标准中加入X.509证书定义。此域用在当同一个X.500名字用于多个证书持有者时，
+用一比特字符串来唯一标识证书持有者的X.500名字。可选。
+
+11. 签名算法(Signature Algorithm)
+证书签发机构对证书上述内容的签名算法
+example: sha256WithRSAEncryption
+
+12. 签名值(Issuer&#39;s Signature)
+证书签发机构对证书上述内容的签名值
+</code></pre><p>example:</p>
+<pre tabindex="0"><code>Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 9 (0x9)
+    Signature Algorithm: sha256WithRSAEncryption
+        Issuer: C=CN, ST=GuangDong, L=ShenZhen, O=COMPANY Technologies Co., Ltd, OU=IT_SECTION, CN=registry.example.com.net/emailAddress=zhouxiao@example.com.net
+        Validity
+            Not Before: Feb 11 06:04:56 2015 GMT
+            Not After : Feb  8 06:04:56 2025 GMT
+        Subject: C=CN, ST=GuangDong, L=ShenZhen, O=TP-Link Co.,Ltd., OU=Network Management, CN=172.31.1.210
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: (2048 bit)
+                Modulus:
+                    00:a4:b0:dd:eb:c1:cf:5d:47:61:a6:ea:ef:8b:aa:
+                    4b:f0:b4:2c:d8:96:c7:7c:ac:fa:c7:35:88:53:d0:
+                    ...
+                    8a:76:dc:8f:8c:44:c8:0b:3c:36:88:5f:01:f0:44:
+                    4e:81:e6:7a:2b:ff:ba:da:33:a5:27:11:c6:f0:08:
+                    6e:f3
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Basic Constraints: 
+                CA:FALSE
+            Netscape Comment: 
+                OpenSSL Generated Certificate
+            X509v3 Subject Key Identifier: 
+                07:C6:87:B7:C1:1E:28:E8:96:3F:EB:40:1E:82:41:45:CA:81:B6:3D
+            X509v3 Authority Key Identifier: 
+                keyid:A4:C2:14:6A:39:D1:95:1E:BD:DF:3B:92:4A:5C:12:42:1B:BC:53:B8
+
+    Signature Algorithm: sha256WithRSAEncryption
+         0c:c6:81:70:cd:0a:2d:94:4f:cb:a4:1d:ef:9e:8e:e4:73:ae:
+         50:62:a8:9c:64:ef:56:0f:41:fe:6b:b4:d3:07:37:39:2c:ed:
+         ...
+         6f:62:61:b8:03:d7:97:31:ab:05:44:20:07:65:8b:ad:e2:cc:
+         ad:65:73:f6:82:0f:9e:65:d0:ae:b7:1e:fd:9f:c1:d7:41:6c:
+         0f:06:95:ee
+-----BEGIN CERTIFICATE-----
+MIIEMDCCAxigAwIBAgIBCTANBgkqhkiG9w0BAQsFADCBtTELMAkGA1UEBhMCQ04x
+EjAQBgNVBAgMCUd1YW5nRG9uZzERMA8GA1UEBwwIU2hlblpoZW4xJjAkBgNVBAoM
+...
+ujwwRar6pPzusO95WuS93HsNmL2ZFZ63DS4LcW9iYbgD15cxqwVEIAdli63izK1l
+c/aCD55l0K63Hv2fwddBbA8Gle4=
+-----END CERTIFICATE-----
+</code></pre><h2 id="2-附数据加密的基础知识">2. 附：数据加密的基础知识<a hidden class="anchor" aria-hidden="true" href="#2-附数据加密的基础知识">#</a></h2>
+<h3 id="对称密钥加密">对称密钥加密<a hidden class="anchor" aria-hidden="true" href="#对称密钥加密">#</a></h3>
+<p>对称密钥加密（一个密钥），也叫做共享密钥加密或机密密钥加密，使用发件人和收件人共同拥有的单个密钥。这种密钥既用于加密，也用于解密，叫做机密密钥。对称密钥加密是加密大量数据的一种行之有效的方法。</p>
+<p>对称密钥加密有许多种算法如DES,RC4,IDEA等，但所有这些算法都有一个共同的目的：以可还原的方式将明文 （未加密的数据转换为暗文。暗文使用加密密钥编码，对于没有解密密钥的任何人来说它都是没有意义的。由于对称密钥加密在加密和解密时使用相同的密钥，所以这种加密过程的安全性取决于是否有未经授权的人获得了对称密钥。</p>
+<p>衡量对称算法优劣的主要尺度是其密钥的长度。密钥越长，在找到解密数据所需的正确密钥之前必须测试的密钥数量就越多。需要测试的密钥越多，破解这种算法就越困难。</p>
+<h3 id="公钥加密">公钥加密<a hidden class="anchor" aria-hidden="true" href="#公钥加密">#</a></h3>
+<p>公钥加密使用两个密钥:一个公钥和一个私钥，这两个密钥在数学上是相关的。为了与对称密钥加密相对照，公钥加密有时也叫做不对称密钥加密。在公钥加密中，公钥可在通信双方之间公开传递，或在公用储备库中发布，但相关的私钥是保密的。只有使用私钥才能解密用公钥加密的数据。使用私钥加密的数据只能用公钥解密。下图中，发件人拥有收件人的公钥，并用它加密了一封邮件，但只有收件人掌握解密该邮件的有关私钥。
+<img alt="openssl-encrpt01" loading="lazy" src="http://sean-images.qiniudn.com/openssl-encrpt01.gif"></p>
+<p>公钥算法的主要局限在于，这种加密形式的速度相对较低。实际上，通常仅在关键时刻才使用公钥算法，如在实体之间交换对称密钥时，或者在签署一封邮件的散列时（散列是通过应用一种单向数学函数获得的一个定长结果，对于数据而言，叫做散列算法）。将公钥加密与其它加密形式（如对称密钥加密）结合使用，可以优化性能，如数字签名和密钥交换。</p>
+<p>常用公钥算法：</p>
+<ul>
+<li>RSA：适用于数字签名和密钥交换。 是目前应用最广泛的公钥加密算法，特别适用于通过 Internet 传送的数据，RSA算法以它的三位发明者的名字命名。</li>
+<li>DSA：仅适用于数字签名。 数字签名算法 (Digital Signature Algorithm, DSA) 由美国国家安全署 (United States National Security Agency, NSA) 发明，已作为数字签名的标准。DSA 算法的安全性取决于自计算离散算法的困难。这种算法，不适用于数据加密。</li>
+<li>Diffie-Hellman：仅适用于密钥交换。 Diffie-Hellman 是发明的第一个公钥算法，以其发明者 Whitfield Diffie 和 Martin Hellman 的名字命名。Diffie-Hellman 算法的安全性取决于在一个有限字段中计算离散算法的困难。</li>
+</ul>
+<h3 id="单向散列算法">单向散列算法<a hidden class="anchor" aria-hidden="true" href="#单向散列算法">#</a></h3>
+<p>散列，也称为散列值或消息摘要 ，是一种与基于密钥（对称密钥或公钥）的加密不同的数据转换类型。散列就是通过把一个叫做散列算法的单向数学函数应用于数据，将任意长度的一块数据转换为一个定长的、不可逆转的数字，其长度通常在128～256位之间。所产生的散列值的长度应足够长，因此使找到两块具有相同散列值的数据的机会很少。如发件人生成邮件的散列值并加密它，然后将它与邮件本身一起发送。而收件人同时解密邮件和散列值，并由接收到的邮件产生另外一个散列值，然后将两个散列值进行比较。如果两者相同，邮件极有可能在传输期间没有发生任何改变。</p>
+<p>下面是几个常用的散列函数：</p>
+<ul>
+<li>MD5：是RSA数据安全公司开发的一种单向散列算法，MD5被广泛使用，可以用来把不同长度的数据块进行暗码运算成一个128位的数值。</li>
+<li>SHA-1：与 DSA 公钥算法相似，安全散列算法1（SHA-1）也是由 NSA 设计的，并由 NIST 将其收录到 FIPS 中，作为散列数据的标准。它可产生一个 160 位的散列值。SHA-1 是流行的用于创建数字签名的单向散列算法。</li>
+<li>MAC（Message Authentication Code）：消息认证代码，是一种使用密钥的单向函数，可以用它们在系统上或用户之间认证文件或消息，常见的是HMAC（用于消息认证的密钥散列算法）。</li>
+<li>CRC（Cyclic Redundancy Check）：循环冗余校验码，CRC校验由于实现简单，检错能力强，被广泛使用在各种数据校验应用中。占用系统资源少，用软硬件均能实现，是进行数据传输差错检测地一种很好的手段（CRC 并不是严格意义上的散列算法，但它的作用与散列算法大致相同，所以归于此类）。</li>
+</ul>
+<h3 id="数字签名结合使用公钥与散列算法">数字签名：结合使用公钥与散列算法<a hidden class="anchor" aria-hidden="true" href="#数字签名结合使用公钥与散列算法">#</a></h3>
+<p>数字签名是邮件、文件或其它数字编码信息的发件人将他们的身份与信息绑定在一起（即为信息提供签名）的方法。对信息进行数字签名的过程，需要将信息与由发件人掌握的秘密信息一起转换（使用私钥）为叫做签名的标记。数字签名用于公钥环境（任何人都可以拥有）中，它通过验证发件人确实是他或她所声明的那个人，并确认收到的邮件与发送的邮件完全相同。</p>
+<p>散列算法处理数据的速度比公钥算法快得多。散列数据还缩短了要签名的数据的长度，因而加快了签名过程。</p>
+<h3 id="密钥交换结合使用对称密钥与公钥">密钥交换：结合使用对称密钥与公钥<a hidden class="anchor" aria-hidden="true" href="#密钥交换结合使用对称密钥与公钥">#</a></h3>
+<p>对称密钥算法非常适合于快速并安全地加密数据。但其缺点是，发件人和收件人必须在交换数据之前先交换机密密钥。结合使用加密数据的对称密钥算法与交换机密密钥的公钥算法可产生一种既快速又灵活的解决方案。</p>
+<h2 id="参考">参考<a hidden class="anchor" aria-hidden="true" href="#参考">#</a></h2>
+<ul>
+<li>
+<p><a href="http://www.cnblogs.com/littlehann/p/3738141.html">openSSL命令、PKI、CA、SSL证书原理</a></p>
+</li>
+<li>
+<p><a href="http://en.wikipedia.org/wiki/X.509">X.509 wikipeida</a></p>
+</li>
+<li>
+<p><a href="http://www.wosign.cn/Basic/aboutPKI.htm">PKI 基础知识</a></p>
+</li>
+<li>
+<p><a href="http://kb.cnblogs.com/page/194742/">数字证书及CA的扫盲介绍</a></p>
+</li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+    </ul>
+<nav class="paginav">
+  <a class="prev" href="http://localhost:1313/posts/one-troubleshooting-for-centos-corrupt/">
+    <span class="title">« Prev</span>
+    <br>
+    <span></span>
+  </a>
+  <a class="next" href="http://localhost:1313/posts/openssl-self-sign-ca/">
+    <span class="title">Next »</span>
+    <br>
+    <span></span>
+  </a>
+</nav>
+
+
+<ul class="share-buttons">
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on x"
+            href="https://x.com/intent/tweet/?text=&amp;url=http%3a%2f%2flocalhost%3a1313%2fposts%2fopenssl-certificate-encryption%2f&amp;hashtags=">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M512 62.554 L 512 449.446 C 512 483.97 483.97 512 449.446 512 L 62.554 512 C 28.03 512 0 483.97 0 449.446 L 0 62.554 C 0 28.03 28.029 0 62.554 0 L 449.446 0 C 483.971 0 512 28.03 512 62.554 Z M 269.951 190.75 L 182.567 75.216 L 56 75.216 L 207.216 272.95 L 63.9 436.783 L 125.266 436.783 L 235.9 310.383 L 332.567 436.783 L 456 436.783 L 298.367 228.367 L 432.367 75.216 L 371.033 75.216 Z M 127.633 110 L 164.101 110 L 383.481 400.065 L 349.5 400.065 Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on linkedin"
+            href="https://www.linkedin.com/shareArticle?mini=true&amp;url=http%3a%2f%2flocalhost%3a1313%2fposts%2fopenssl-certificate-encryption%2f&amp;title=&amp;summary=&amp;source=http%3a%2f%2flocalhost%3a1313%2fposts%2fopenssl-certificate-encryption%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-288.985,423.278l0,-225.717l-75.04,0l0,225.717l75.04,0Zm270.539,0l0,-129.439c0,-69.333 -37.018,-101.586 -86.381,-101.586c-39.804,0 -57.634,21.891 -67.617,37.266l0,-31.958l-75.021,0c0.995,21.181 0,225.717 0,225.717l75.02,0l0,-126.056c0,-6.748 0.486,-13.492 2.474,-18.315c5.414,-13.475 17.767,-27.434 38.494,-27.434c27.135,0 38.007,20.707 38.007,51.037l0,120.768l75.024,0Zm-307.552,-334.556c-25.674,0 -42.448,16.879 -42.448,39.002c0,21.658 16.264,39.002 41.455,39.002l0.484,0c26.165,0 42.452,-17.344 42.452,-39.002c-0.485,-22.092 -16.241,-38.954 -41.943,-39.002Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on reddit"
+            href="https://reddit.com/submit?url=http%3a%2f%2flocalhost%3a1313%2fposts%2fopenssl-certificate-encryption%2f&title=">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-3.446,265.638c0,-22.964 -18.616,-41.58 -41.58,-41.58c-11.211,0 -21.361,4.457 -28.841,11.666c-28.424,-20.508 -67.586,-33.757 -111.204,-35.278l18.941,-89.121l61.884,13.157c0.756,15.734 13.642,28.29 29.56,28.29c16.407,0 29.706,-13.299 29.706,-29.701c0,-16.403 -13.299,-29.702 -29.706,-29.702c-11.666,0 -21.657,6.792 -26.515,16.578l-69.105,-14.69c-1.922,-0.418 -3.939,-0.042 -5.585,1.036c-1.658,1.073 -2.811,2.761 -3.224,4.686l-21.152,99.438c-44.258,1.228 -84.046,14.494 -112.837,35.232c-7.468,-7.164 -17.589,-11.591 -28.757,-11.591c-22.965,0 -41.585,18.616 -41.585,41.58c0,16.896 10.095,31.41 24.568,37.918c-0.639,4.135 -0.99,8.328 -0.99,12.576c0,63.977 74.469,115.836 166.33,115.836c91.861,0 166.334,-51.859 166.334,-115.836c0,-4.218 -0.347,-8.387 -0.977,-12.493c14.564,-6.47 24.735,-21.034 24.735,-38.001Zm-119.474,108.193c-20.27,20.241 -59.115,21.816 -70.534,21.816c-11.428,0 -50.277,-1.575 -70.522,-21.82c-3.007,-3.008 -3.007,-7.882 0,-10.889c3.003,-2.999 7.882,-3.003 10.885,0c12.777,12.781 40.11,17.317 59.637,17.317c19.522,0 46.86,-4.536 59.657,-17.321c3.016,-2.999 7.886,-2.995 10.885,0.008c3.008,3.011 3.003,7.882 -0.008,10.889Zm-5.23,-48.781c-16.373,0 -29.701,-13.324 -29.701,-29.698c0,-16.381 13.328,-29.714 29.701,-29.714c16.378,0 29.706,13.333 29.706,29.714c0,16.374 -13.328,29.698 -29.706,29.698Zm-160.386,-29.702c0,-16.381 13.328,-29.71 29.714,-29.71c16.369,0 29.689,13.329 29.689,29.71c0,16.373 -13.32,29.693 -29.689,29.693c-16.386,0 -29.714,-13.32 -29.714,-29.693Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on facebook"
+            href="https://facebook.com/sharer/sharer.php?u=http%3a%2f%2flocalhost%3a1313%2fposts%2fopenssl-certificate-encryption%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-106.468,0l0,-192.915l66.6,0l12.672,-82.621l-79.272,0l0,-53.617c0,-22.603 11.073,-44.636 46.58,-44.636l36.042,0l0,-70.34c0,0 -32.71,-5.582 -63.982,-5.582c-65.288,0 -107.96,39.569 -107.96,111.204l0,62.971l-72.573,0l0,82.621l72.573,0l0,192.915l-191.104,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on whatsapp"
+            href="https://api.whatsapp.com/send?text=%20-%20http%3a%2f%2flocalhost%3a1313%2fposts%2fopenssl-certificate-encryption%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-58.673,127.703c-33.842,-33.881 -78.847,-52.548 -126.798,-52.568c-98.799,0 -179.21,80.405 -179.249,179.234c-0.013,31.593 8.241,62.428 23.927,89.612l-25.429,92.884l95.021,-24.925c26.181,14.28 55.659,21.807 85.658,21.816l0.074,0c98.789,0 179.206,-80.413 179.247,-179.243c0.018,-47.895 -18.61,-92.93 -52.451,-126.81Zm-126.797,275.782l-0.06,0c-26.734,-0.01 -52.954,-7.193 -75.828,-20.767l-5.441,-3.229l-56.386,14.792l15.05,-54.977l-3.542,-5.637c-14.913,-23.72 -22.791,-51.136 -22.779,-79.287c0.033,-82.142 66.867,-148.971 149.046,-148.971c39.793,0.014 77.199,15.531 105.329,43.692c28.128,28.16 43.609,65.592 43.594,105.4c-0.034,82.149 -66.866,148.983 -148.983,148.984Zm81.721,-111.581c-4.479,-2.242 -26.499,-13.075 -30.604,-14.571c-4.105,-1.495 -7.091,-2.241 -10.077,2.241c-2.986,4.483 -11.569,14.572 -14.182,17.562c-2.612,2.988 -5.225,3.364 -9.703,1.12c-4.479,-2.241 -18.91,-6.97 -36.017,-22.23c-13.314,-11.876 -22.304,-26.542 -24.916,-31.026c-2.612,-4.484 -0.279,-6.908 1.963,-9.14c2.016,-2.007 4.48,-5.232 6.719,-7.847c2.24,-2.615 2.986,-4.484 4.479,-7.472c1.493,-2.99 0.747,-5.604 -0.374,-7.846c-1.119,-2.241 -10.077,-24.288 -13.809,-33.256c-3.635,-8.733 -7.327,-7.55 -10.077,-7.688c-2.609,-0.13 -5.598,-0.158 -8.583,-0.158c-2.986,0 -7.839,1.121 -11.944,5.604c-4.105,4.484 -15.675,15.32 -15.675,37.364c0,22.046 16.048,43.342 18.287,46.332c2.24,2.99 31.582,48.227 76.511,67.627c10.685,4.615 19.028,7.371 25.533,9.434c10.728,3.41 20.492,2.929 28.209,1.775c8.605,-1.285 26.499,-10.833 30.231,-21.295c3.732,-10.464 3.732,-19.431 2.612,-21.298c-1.119,-1.869 -4.105,-2.99 -8.583,-5.232Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on telegram"
+            href="https://telegram.me/share/url?text=&amp;url=http%3a%2f%2flocalhost%3a1313%2fposts%2fopenssl-certificate-encryption%2f">
+            <svg version="1.1" xml:space="preserve" viewBox="2 2 28 28" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M26.49,29.86H5.5a3.37,3.37,0,0,1-2.47-1,3.35,3.35,0,0,1-1-2.47V5.48A3.36,3.36,0,0,1,3,3,3.37,3.37,0,0,1,5.5,2h21A3.38,3.38,0,0,1,29,3a3.36,3.36,0,0,1,1,2.46V26.37a3.35,3.35,0,0,1-1,2.47A3.38,3.38,0,0,1,26.49,29.86Zm-5.38-6.71a.79.79,0,0,0,.85-.66L24.73,9.24a.55.55,0,0,0-.18-.46.62.62,0,0,0-.41-.17q-.08,0-16.53,6.11a.59.59,0,0,0-.41.59.57.57,0,0,0,.43.52l4,1.24,1.61,4.83a.62.62,0,0,0,.63.43.56.56,0,0,0,.4-.17L16.54,20l4.09,3A.9.9,0,0,0,21.11,23.15ZM13.8,20.71l-1.21-4q8.72-5.55,8.78-5.55c.15,0,.23,0,.23.16a.18.18,0,0,1,0,.06s-2.51,2.3-7.52,6.8Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on ycombinator"
+            href="https://news.ycombinator.com/submitlink?t=&u=http%3a%2f%2flocalhost%3a1313%2fposts%2fopenssl-certificate-encryption%2f">
+            <svg version="1.1" xml:space="preserve" width="30px" height="30px" viewBox="0 0 512 512" fill="currentColor"
+                xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape">
+                <path
+                    d="M449.446 0C483.971 0 512 28.03 512 62.554L512 449.446C512 483.97 483.97 512 449.446 512L62.554 512C28.03 512 0 483.97 0 449.446L0 62.554C0 28.03 28.029 0 62.554 0L449.446 0ZM183.8767 87.9921H121.8427L230.6673 292.4508V424.0079H281.3328V292.4508L390.1575 87.9921H328.1233L256 238.2489z" />
+            </svg>
+        </a>
+    </li>
+</ul>
+
+  </footer>
+</article>
+    </main>
+    
+<footer class="footer">
+        <span>&copy; 2025 <a href="http://localhost:1313/">Sean&#39;s Note</a></span> · 
+
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+<script>
+    document.querySelectorAll('pre > code').forEach((codeblock) => {
+        const container = codeblock.parentNode.parentNode;
+
+        const copybutton = document.createElement('button');
+        copybutton.classList.add('copy-code');
+        copybutton.innerHTML = 'copy';
+
+        function copyingDone() {
+            copybutton.innerHTML = 'copied!';
+            setTimeout(() => {
+                copybutton.innerHTML = 'copy';
+            }, 2000);
+        }
+
+        copybutton.addEventListener('click', (cb) => {
+            if ('clipboard' in navigator) {
+                navigator.clipboard.writeText(codeblock.textContent);
+                copyingDone();
+                return;
+            }
+
+            const range = document.createRange();
+            range.selectNodeContents(codeblock);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            try {
+                document.execCommand('copy');
+                copyingDone();
+            } catch (e) { };
+            selection.removeRange(range);
+        });
+
+        if (container.classList.contains("highlight")) {
+            container.appendChild(copybutton);
+        } else if (container.parentNode.firstChild == container) {
+            
+        } else if (codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName == "TABLE") {
+            
+            codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(copybutton);
+        } else {
+            
+            codeblock.parentNode.appendChild(copybutton);
+        }
+    });
+</script>
+</body>
+
+</html>

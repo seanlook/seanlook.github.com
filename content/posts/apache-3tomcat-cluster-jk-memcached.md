@@ -1,6 +1,7 @@
+---
 title: apache+3tomcat+jk+memcached集群环境搭建
 date: 2014-10-29 10:21:25
-updated: 2014-11-01 00:46:23
+updated: 2015-03-26 00:46:23
 tags: [apache, tomcat, 集群, mod_jk, memcached, centos]
 categories: [Linux, Web_Server]
 ---
@@ -285,4 +286,16 @@ out.println(request.getLocalAddr() + " : " + request.getLocalPort()+"<br>");%>
 在浏览器访问`http://192.168.10.100/test.jsp`。主要测试负载均衡与session共享。
 
 
-  [1]: http://sean-images.qiniudn.com/apache_tomcat_cluster_msm.png
+  [1]: http://github.com/seanlook/sean-notes-comment/raw/main/static/apache_tomcat_cluster_msm.png
+
+
+**参考**
+
+- https://people.apache.org/~mturk/docs/article/ftwai.html
+
+
+---
+
+原文链接地址：http://xgknight.com/2015/04/23/pfsense-usage/
+
+---

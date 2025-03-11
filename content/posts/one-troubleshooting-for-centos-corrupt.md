@@ -1,3 +1,4 @@
+---
 title: 记一次错误卸载软件包导致Linux系统崩溃的修复解决过程
 date: 2014-11-03 01:21:25
 updated: 2014-11-07 00:46:23
@@ -105,9 +106,9 @@ is corrupt, and you might try running e2fsck with an alternate superblock:
 以后处理其他系统故障时也可使用类似的方法修复，Redhat、CentOS、OracleLinux、Ubuntu等都适用。
 
 
-  [1]: http://sean-images.qiniudn.com/kernel-panic.png
-  [2]: http://sean-images.qiniudn.com/boot_up_fail.png
-  [3]: http://sean-images.qiniudn.com/rescue_mode.png
-  [4]: http://sean-images.qiniudn.com/chroot_sysimage.png
-  [5]: http://sean-images.qiniudn.com/start_shell_mount.png
-  [6]: http://sean-images.qiniudn.com/file_system_check.png
+  [1]: http://github.com/seanlook/sean-notes-comment/raw/main/static/kernel-panic.png
+  [2]: http://github.com/seanlook/sean-notes-comment/raw/main/static/boot_up_fail.png
+  [3]: http://github.com/seanlook/sean-notes-comment/raw/main/static/rescue_mode.png
+  [4]: http://github.com/seanlook/sean-notes-comment/raw/main/static/chroot_sysimage.png
+  [5]: http://github.com/seanlook/sean-notes-comment/raw/main/static/start_shell_mount.png
+  [6]: http://github.com/seanlook/sean-notes-comment/raw/main/static/file_system_check.png

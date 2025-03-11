@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Schema设计 on Sean&#39;s Note</title>
+    <link>http://localhost:1313/tags/schema%E8%AE%BE%E8%AE%A1/</link>
+    <description>Recent content in Schema设计 on Sean&#39;s Note</description>
+    <generator>Hugo -- 0.143.1</generator>
+    <language>en-us</language>
+    <lastBuildDate>Fri, 17 Feb 2017 16:32:49 +0000</lastBuildDate>
+    <atom:link href="http://localhost:1313/tags/schema%E8%AE%BE%E8%AE%A1/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>关于MySQL自增主键的几点问题（下）</title>
+      <link>http://localhost:1313/2017/02/mysql-autoincrement_2/</link>
+      <pubDate>Fri, 17 Feb 2017 16:32:49 +0000</pubDate>
+      <guid>http://localhost:1313/2017/02/mysql-autoincrement_2/</guid>
+      <description>&lt;h3 id=&#34;auto-inc-waiting-锁等待&#34;&gt;AUTO-INC waiting 锁等待&lt;/h3&gt;
+&lt;p&gt;这是生产环境出现的现象，某日下午5点业务高峰期，我们的 &lt;a href=&#34;http://xgknight.com/2016/09/27/python-mysql-querykill/&#34;&gt;慢查询快照抓取程序&lt;/a&gt; 报出大量线程阻塞，但是1分钟以后就好了。于是分析了当时的 processlist 和 innodb status 现场记录，发现有大量的 &lt;code&gt;AUTO-INC waiting&lt;/code&gt;：&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>关于MySQL自增主键的几点问题（上）</title>
+      <link>http://localhost:1313/2017/02/mysql-autoincrement/</link>
+      <pubDate>Thu, 16 Feb 2017 16:32:49 +0000</pubDate>
+      <guid>http://localhost:1313/2017/02/mysql-autoincrement/</guid>
+      <description>&lt;p&gt;前段时间遇到一个InnoDB表自增锁导致的问题，最近刚好有一个同行网友也问到自增锁的疑问，所以抽空系统的总结一下，这两个问题下篇会有阐述。&lt;/p&gt;
+&lt;h2 id=&#34;1-划分三种插入类型&#34;&gt;1. 划分三种插入类型&lt;/h2&gt;
+&lt;p&gt;这里区分一下几种插入数据行的类型，便于后面描述：（纯逻辑上的划分）&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>InnoDB行格式对text/blob大变长字段的影响</title>
+      <link>http://localhost:1313/2016/05/mysql-blob-row_format/</link>
+      <pubDate>Wed, 18 May 2016 16:32:49 +0000</pubDate>
+      <guid>http://localhost:1313/2016/05/mysql-blob-row_format/</guid>
+      <description>&lt;p&gt;最近在排查现网Text与Blob类型，发现有不少，在《高性能MySQL(第3版)》看到对这两种变长数据类型的处理会涉及到在磁盘上创建临时表，性能开销比较大。于是把影响blob型数据存储方式了解了一下：row_format。&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>小心MySQL的隐式类型转换陷阱</title>
+      <link>http://localhost:1313/2016/05/mysql-type-conversion/</link>
+      <pubDate>Thu, 05 May 2016 16:32:49 +0000</pubDate>
+      <guid>http://localhost:1313/2016/05/mysql-type-conversion/</guid>
+      <description>&lt;h2 id=&#34;1-隐式类型转换实例&#34;&gt;1. 隐式类型转换实例&lt;/h2&gt;
+&lt;p&gt;今天生产库上突然出现MySQL线程数告警，IOPS很高，实例会话里面出现许多类似下面的sql：(修改了相关字段和值)&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;SELECT f_col3_id,f_qq1_id FROM d_dbname.t_tb1 WHERE f_col1_id=1226391 and f_col2_id=1244378 and 
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;f_qq1_id in (12345,23456,34567,45678,56789,67890,78901,89012,90123,901231,901232,901233)
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;用 explain 看了下扫描行数和索引选择情况：&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>MySQL数字类型int与tinyint、float与decimal如何选择</title>
+      <link>http://localhost:1313/2016/04/mysql-numeric-int-float/</link>
+      <pubDate>Fri, 29 Apr 2016 16:32:49 +0000</pubDate>
+      <guid>http://localhost:1313/2016/04/mysql-numeric-int-float/</guid>
+      <description>&lt;p&gt;最近在准备给开发做一个mysql数据库开发规范方面培训，一步一步来，结合在生产环境发现的数据库方面的问题，从几个常用的数据类型说起。&lt;/p&gt;
+&lt;h2 id=&#34;inttinyint与bigint&#34;&gt;int、tinyint与bigint&lt;/h2&gt;
+&lt;p&gt;它们都是（精确）整型数据类型，但是占用字节数和表达的范围不同。首先没有这个表就说不过去了：&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>MySQL字符数据类型char与varchar的区别</title>
+      <link>http://localhost:1313/2016/04/mysql-char-varchar-set/</link>
+      <pubDate>Thu, 28 Apr 2016 16:32:49 +0000</pubDate>
+      <guid>http://localhost:1313/2016/04/mysql-char-varchar-set/</guid>
+      <description>&lt;p&gt;数据类型差不多是接触mysql一开始就了解的内容，最近遇到几个现象如varchar自动转mediumtext，blob存储性能的问题，不得不回头明确一下关于MySQL常用数据类型的选择。&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>

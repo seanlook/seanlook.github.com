@@ -1,3 +1,4 @@
+---
 title: 在Linux上使用logwatch分析监控日志文件
 date: 2014-08-23 01:21:25
 updated: 2014-08-23 10:46:23
@@ -217,6 +218,6 @@ grep -i ERROR
 - [Logwatch简单配置教程](http://blog.atime.me/note/logwatch.html)
 
 
-  [1]: http://sean-images.qiniudn.com/logwatch-html-mail.png
-  [2]: http://sean-images.qiniudn.com/logwatch-script-service.png
-  [3]: http://sean-images.qiniudn.com/logwatch-dir-structure.jpg
+  [1]: http://github.com/seanlook/sean-notes-comment/raw/main/static/logwatch-html-mail.png
+  [2]: http://github.com/seanlook/sean-notes-comment/raw/main/static/logwatch-script-service.png
+  [3]: http://github.com/seanlook/sean-notes-comment/raw/main/static/logwatch-dir-structure.jpg

@@ -1,3 +1,4 @@
+---
 title: 基于OpenSSL自建CA和颁发SSL证书 
 date: 2015-01-18 01:21:25
 updated: 2015-01-18 10:46:23
@@ -6,8 +7,8 @@ categories: 安全
 ---
 
 
-关于SSL/TLS介绍见文章 [SSL/TLS原理详解](http://seanlook.com/2015/01/07/tls-ssl)。
-关于证书授权中心CA以及数字证书等概念，请移步 [OpenSSL 与 SSL 数字证书概念贴](http://seanlook.com/2015/01/15/openssl-certificate-encryption) 。
+关于SSL/TLS介绍见文章 [SSL/TLS原理详解](http://xgknight.com/2015/01/07/tls-ssl)。
+关于证书授权中心CA以及数字证书等概念，请移步 [OpenSSL 与 SSL 数字证书概念贴](http://xgknight.com/2015/01/15/openssl-certificate-encryption) 。
 
 openssl是一个开源程序的套件、这个套件有三个部分组成：一是`libcryto`，这是一个具有通用功能的加密库，里面实现了众多的加密库；二是`libssl`，这个是实现ssl机制的，它是用于实现TLS/SSL的功能；三是openssl，是个多功能命令行工具，它可以实现加密解密，甚至还可以当CA来用，可以让你创建证书、吊销证书。
 
@@ -215,7 +216,7 @@ If you'd like to turn off curl's verification of the certificate, use
 - [The Secure Sockets Layer and Transport Layer Security](http://www.ibm.com/developerworks/library/ws-ssl-security/)
 
 
-  [1]:http://sean-images.qiniudn.com/openssl-https-browser-ie.png
-  [2]:http://sean-images.qiniudn.com/openssl-https-browser.png
-  [3]:http://sean-images.qiniudn.com/openssl-https-12306.png
-  [4]:http://sean-images.qiniudn.com/openssl-https-browser-cert.png
+  [1]:http://github.com/seanlook/sean-notes-comment/raw/main/static/openssl-https-browser-ie.png
+  [2]:http://github.com/seanlook/sean-notes-comment/raw/main/static/openssl-https-browser.png
+  [3]:http://github.com/seanlook/sean-notes-comment/raw/main/static/openssl-https-12306.png
+  [4]:http://github.com/seanlook/sean-notes-comment/raw/main/static/openssl-https-browser-cert.png

@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="noindex, nofollow">
+<title>InnoDB行格式对text/blob大变长字段的影响 | Sean&#39;s Note</title>
+<meta name="keywords" content="mysql, schema设计">
+<meta name="description" content="最近在排查现网Text与Blob类型，发现有不少，在《高性能MySQL(第3版)》看到对这两种变长数据类型的处理会涉及到在磁盘上创建临时表，性能开销比较大。于是把影响blob型数据存储方式了解了一下：row_format。">
+<meta name="author" content="">
+<link rel="canonical" href="http://localhost:1313/2016/05/mysql-blob-row_format/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.8a19d6c7d40c68078a482516c7c2a326ccb9f6e9282cabe7240ecc1a80c6cb47.css" integrity="sha256-ihnWx9QMaAeKSCUWx8KjJsy59ukoLKvnJA7MGoDGy0c=" rel="preload stylesheet" as="style">
+<link rel="icon" href="http://localhost:1313/img/logo.gif">
+<link rel="icon" type="image/png" sizes="16x16" href="http://localhost:1313/img/logo.gif">
+<link rel="icon" type="image/png" sizes="32x32" href="http://localhost:1313/img/logo.gif">
+<link rel="apple-touch-icon" href="http://localhost:1313/logo.gif">
+<link rel="mask-icon" href="http://localhost:1313/logo.gif">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<link rel="alternate" hreflang="en" href="http://localhost:1313/2016/05/mysql-blob-row_format/">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --code-block-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://localhost:1313/" accesskey="h" title="Sean&#39;s Note (Alt + H)">Sean&#39;s Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://localhost:1313/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/categories/" title="Categories">
+                    <span>Categories</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/search/" title="Search (Alt &#43; /)" accesskey=/>
+                    <span>Search</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/tags/" title="Tags">
+                    <span>Tags</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    <div class="breadcrumbs"><a href="http://localhost:1313/">Home</a>&nbsp;»&nbsp;<a href="http://localhost:1313/posts/">Posts</a></div>
+    <h1 class="post-title entry-hint-parent">
+      InnoDB行格式对text/blob大变长字段的影响
+    </h1>
+    <div class="post-meta"><span title='2016-05-18 16:32:49 +0000 UTC'>2016-05-18</span>&nbsp;·&nbsp;9 min
+
+</div>
+  </header> <aside id="toc-container" class="toc-container wide">
+    <div class="toc">
+        <details  open>
+            <summary accesskey="c" title="(Alt + C)">
+                <span class="details">Table of Contents</span>
+            </summary>
+
+            <div class="inner"><ul>
+                    <li>
+                        <a href="#1-innodb%e7%9a%84antelop%e4%b8%8ebarracuda%e6%96%87%e4%bb%b6%e6%a0%bc%e5%bc%8f" aria-label="1. InnoDB的Antelop与Barracuda文件格式">1. InnoDB的Antelop与Barracuda文件格式</a></li>
+                    <li>
+                        <a href="#2-%e5%af%b9textblob%e8%bf%99%e7%b1%bb%e5%a4%a7%e5%ad%97%e6%ae%b5%e7%b1%bb%e5%9e%8b%e7%9a%84%e5%bd%b1%e5%93%8d" aria-label="2. 对TEXT/BLOB这类大字段类型的影响">2. 对TEXT/BLOB这类大字段类型的影响</a><ul>
+                            
+                    <li>
+                        <a href="#21-compact" aria-label="2.1 compact">2.1 compact</a></li>
+                    <li>
+                        <a href="#22-dynamic" aria-label="2.2 dynamic">2.2 dynamic</a></li></ul>
+                    </li>
+                    <li>
+                        <a href="#3-%e5%af%b9blob%e5%9e%8b%e5%ad%97%e6%ae%b5%e5%ad%98%e5%8f%96%e4%bc%98%e5%8c%96" aria-label="3. 对blob型字段存取优化">3. 对blob型字段存取优化</a></li>
+                    <li>
+                        <a href="#%e5%8f%82%e8%80%83" aria-label="参考">参考</a>
+                    </li>
+                </ul>
+            </div>
+        </details>
+    </div>
+</aside>
+<script>
+    let activeElement;
+    let elements;
+    window.addEventListener('DOMContentLoaded', function (event) {
+        checkTocPosition();
+
+        elements = document.querySelectorAll('h1[id],h2[id],h3[id],h4[id],h5[id],h6[id]');
+         
+         activeElement = elements[0];
+         const id = encodeURI(activeElement.getAttribute('id')).toLowerCase();
+         document.querySelector(`.inner ul li a[href="#${id}"]`).classList.add('active');
+     }, false);
+
+    window.addEventListener('resize', function(event) {
+        checkTocPosition();
+    }, false);
+
+    window.addEventListener('scroll', () => {
+        
+        activeElement = Array.from(elements).find((element) => {
+            if ((getOffsetTop(element) - window.pageYOffset) > 0 && 
+                (getOffsetTop(element) - window.pageYOffset) < window.innerHeight/2) {
+                return element;
+            }
+        }) || activeElement
+
+        elements.forEach(element => {
+             const id = encodeURI(element.getAttribute('id')).toLowerCase();
+             if (element === activeElement){
+                 document.querySelector(`.inner ul li a[href="#${id}"]`).classList.add('active');
+             } else {
+                 document.querySelector(`.inner ul li a[href="#${id}"]`).classList.remove('active');
+             }
+         })
+     }, false);
+
+    const main = parseInt(getComputedStyle(document.body).getPropertyValue('--article-width'), 10);
+    const toc = parseInt(getComputedStyle(document.body).getPropertyValue('--toc-width'), 10);
+    const gap = parseInt(getComputedStyle(document.body).getPropertyValue('--gap'), 10);
+
+    function checkTocPosition() {
+        const width = document.body.scrollWidth;
+
+        if (width - main - (toc * 2) - (gap * 4) > 0) {
+            document.getElementById("toc-container").classList.add("wide");
+        } else {
+            document.getElementById("toc-container").classList.remove("wide");
+        }
+    }
+
+    function getOffsetTop(element) {
+        if (!element.getClientRects().length) {
+            return 0;
+        }
+        let rect = element.getBoundingClientRect();
+        let win = element.ownerDocument.defaultView;
+        return rect.top + win.pageYOffset;   
+    }
+</script>
+
+
+  <div class="post-content"><p>最近在排查现网Text与Blob类型，发现有不少，在《高性能MySQL(第3版)》看到对这两种变长数据类型的处理会涉及到在磁盘上创建临时表，性能开销比较大。于是把影响blob型数据存储方式了解了一下：row_format。</p>
+<h2 id="1-innodb的antelop与barracuda文件格式">1. InnoDB的Antelop与Barracuda文件格式<a hidden class="anchor" aria-hidden="true" href="#1-innodb的antelop与barracuda文件格式">#</a></h2>
+<p>Innodb存储引擎保存记录，是以行的形式存放的（与之对应的是像Google BigTable这种列数据库）。在InnoDB 1.0.x版本之前，InnoDB 存储引擎提供了 <code>Compact</code> 和 <code>Redundant</code> 两种格式来存放行记录数据，这也是目前使用最多的一种格式。Redundant 格式是为兼容之前版本而保留的。</p>
+<p>MySQL 5.1 中的 innodb_plugin 引入了新的<em>文件格式</em>：<code>Barracuda</code>（将以前的<em>行格式</em> compact 和 redundant 合称为<code>Antelope</code>），该文件格式拥有新的两种行格式：<code>compressed</code>和<code>dynamic</code>。</p>
+<p>在 MySQL 5.6 版本中，默认还是 Compact 行格式，也是目前使用最多的一种 ROW FORMAT。用户可以通过命令 <code>SHOW TABLE STATUS LIKE'table_name'</code> 来查看当前表使用的行格式，其中 <em>row_format</em> 列表示当前所使用的行记录结构类型。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-gdscript3" data-lang="gdscript3"><span class="line"><span class="cl"><span class="n">mysql</span><span class="o">&gt;</span> <span class="n">show</span> <span class="n">variables</span> <span class="n">like</span> <span class="s2">&#34;innodb_file_format&#34;</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="o">+--------------------+-----------+</span>
+</span></span><span class="line"><span class="cl"><span class="o">|</span> <span class="n">Variable_name</span>      <span class="o">|</span> <span class="n">Value</span>     <span class="o">|</span>
+</span></span><span class="line"><span class="cl"><span class="o">+--------------------+-----------+</span>
+</span></span><span class="line"><span class="cl"><span class="o">|</span> <span class="n">innodb_file_format</span> <span class="o">|</span> <span class="n">Barracuda</span> <span class="o">|</span>
+</span></span><span class="line"><span class="cl"><span class="o">+--------------------+-----------+</span>
+</span></span><span class="line"><span class="cl"><span class="mi">1</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">set</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">mysql</span><span class="o">&gt;</span> <span class="n">show</span> <span class="n">table</span> <span class="n">status</span> <span class="n">like</span> <span class="s2">&#34;tablename%&#34;</span>\<span class="n">G</span>
+</span></span><span class="line"><span class="cl"><span class="o">***************************</span> <span class="mf">1.</span> <span class="n">row</span> <span class="o">***************************</span>
+</span></span><span class="line"><span class="cl">           <span class="n">Name</span><span class="p">:</span> <span class="n">t_rf_compact</span>
+</span></span><span class="line"><span class="cl">         <span class="n">Engine</span><span class="p">:</span> <span class="n">InnoDB</span>
+</span></span><span class="line"><span class="cl">        <span class="n">Version</span><span class="p">:</span> <span class="mi">10</span>
+</span></span><span class="line"><span class="cl">     <span class="n">Row_format</span><span class="p">:</span> <span class="n">Compact</span>
+</span></span><span class="line"><span class="cl">           <span class="n">Rows</span><span class="p">:</span> <span class="mi">4</span>
+</span></span><span class="line"><span class="cl"> <span class="n">Avg_row_length</span><span class="p">:</span> <span class="mi">36864</span>
+</span></span><span class="line"><span class="cl">    <span class="n">Data_length</span><span class="p">:</span> <span class="mi">147456</span>
+</span></span><span class="line"><span class="cl"><span class="n">Max_data_length</span><span class="p">:</span> <span class="mi">0</span>
+</span></span><span class="line"><span class="cl">   <span class="n">Index_length</span><span class="p">:</span> <span class="mi">0</span>
+</span></span><span class="line"><span class="cl">      <span class="n">Data_free</span><span class="p">:</span> <span class="mi">0</span>
+</span></span><span class="line"><span class="cl"> <span class="n">Auto_increment</span><span class="p">:</span> <span class="mi">7</span>
+</span></span><span class="line"><span class="cl">    <span class="n">Create_time</span><span class="p">:</span> <span class="mi">2016</span><span class="o">-</span><span class="mi">05</span><span class="o">-</span><span class="mi">14</span> <span class="mi">20</span><span class="p">:</span><span class="mi">52</span><span class="p">:</span><span class="mi">58</span>
+</span></span><span class="line"><span class="cl">    <span class="n">Update_time</span><span class="p">:</span> <span class="n">NULL</span>
+</span></span><span class="line"><span class="cl">     <span class="n">Check_time</span><span class="p">:</span> <span class="n">NULL</span>
+</span></span><span class="line"><span class="cl">      <span class="n">Collation</span><span class="p">:</span> <span class="n">utf8_general_ci</span>
+</span></span><span class="line"><span class="cl">       <span class="n">Checksum</span><span class="p">:</span> <span class="n">NULL</span>
+</span></span><span class="line"><span class="cl"> <span class="n">Create_options</span><span class="p">:</span> 
+</span></span><span class="line"><span class="cl">        <span class="n">Comment</span><span class="p">:</span> 
+</span></span><span class="line"><span class="cl"><span class="mi">1</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">set</span> <span class="p">(</span><span class="mf">0.00</span> <span class="n">sec</span><span class="p">)</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>在 msyql 5.7.9 及以后版本，默认行格式由<code>innodb_default_row_format</code>变量决定，它的默认值是<code>DYNAMIC</code>，也可以在 create table 的时候指定<code>ROW_FORMAT=DYNAMIC</code>。</p>
+<p>注意，如果要修改现有表的行模式为<code>compressed</code>或<code>dynamic</code>，必须先将文件格式设置成Barracuda：<code>set global innodb_file_format=Barracuda;</code>，再用<code>ALTER TABLE tablename ROW_FORMAT=COMPRESSED;</code>去修改才能生效，否则修改无效却无提示：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">mysql&gt; ALTER TABLE tablename ROW_FORMAT=COMPRESSED;
+</span></span><span class="line"><span class="cl">Query OK, 0 rows affected
+</span></span><span class="line"><span class="cl">Records: 0  Duplicates: 0  Warnings: 2
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">修改失败
+</span></span><span class="line"><span class="cl">mysql&gt; show warnings;
+</span></span><span class="line"><span class="cl">+---------+------+-----------------------------------------------------------------------+
+</span></span><span class="line"><span class="cl">| Level   | Code | Message                                                               |
+</span></span><span class="line"><span class="cl">+---------+------+-----------------------------------------------------------------------+
+</span></span><span class="line"><span class="cl">| Warning | 1478 | InnoDB: ROW_FORMAT=COMPRESSED requires innodb_file_format &gt; Antelope. |
+</span></span><span class="line"><span class="cl">| Warning | 1478 | InnoDB: assuming ROW_FORMAT=COMPACT.                                  |
+</span></span><span class="line"><span class="cl">+---------+------+-----------------------------------------------------------------------+
+</span></span><span class="line"><span class="cl">2 rows in set
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h2 id="2-对textblob这类大字段类型的影响">2. 对TEXT/BLOB这类大字段类型的影响<a hidden class="anchor" aria-hidden="true" href="#2-对textblob这类大字段类型的影响">#</a></h2>
+<h3 id="21-compact">2.1 compact<a hidden class="anchor" aria-hidden="true" href="#21-compact">#</a></h3>
+<p>在 Antelope 两种行格式下，如果blob列值长度 &lt;= 768 bytes，就不会发生行溢出(page overflow)，内容都在数据页(B-tree Node)；如果列值长度 &gt; 768字节，那么前768字节依然在数据页，而剩余的则放在溢出页(off-page)，如下图：</p>
+<p><img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-compact-768.png"></p>
+<p>上面所讲的讲的blob或变长大字段类型包括blob,text,varchar，其中varchar列值长度大于某数N时也会存溢出页，在latin1字符集下N值可以这样计算：innodb的块大小默认为16kb，由于innodb存储引擎表为索引组织表，树底层的叶子节点为一双向链表，因此每个页中至少应该有两行记录，这就决定了innodb在存储一行数据的时候不能够超过8k，减去其它列值所占字节数，约等于N。</p>
+<p>我们知道对于InnoDB来说，内存是极为珍贵的，如果把768字节长度的blob都放在数据页，虽然可以节省部分IO，但相对来说能缓存行数就变少，也就是能缓存的索引值变少了，降低了索引效率。</p>
+<h3 id="22-dynamic">2.2 dynamic<a hidden class="anchor" aria-hidden="true" href="#22-dynamic">#</a></h3>
+<p>Barracuda 的两种行格式对blob采用完全行溢出，即聚集索引记录（数据页）只保留20字节的指针，指向真实存放它的溢出段地址：
+<img loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/mysql-barracuda-20-off-page.png"></p>
+<p>dynamic行格式，列存储是否放到off-page页，主要取决于行大小，它会把行中最长的那一列放到off-page，直到数据页能存放下两行。TEXT/BLOB列 &lt;=40 bytes 时总是存放于数据页。这种方式可以避免compact那样把太多的大列值放到 B-tree Node，因为dynamic格式认为，只要大列值有部分数据放在off-page，那把整个值放入都放入off-page更有效。</p>
+<p><strong>compressed</strong> 物理结构上与dynamic类似，但是对表的数据行使用zlib算法进行了压缩存储。在long blob列类型比较多的情况下用，可以降低off-page的使用，减少存储空间（一般40%左右），但要求更高的CPU，buffer pool里面可能会同时存储数据的压缩版和非压缩版，所以也多占用部分内存。这里 <a href="http://dev.mysql.com/doc/refman/5.6/en/innodb-compression-internals.html">MySQL 5.6 Manual innodb-compression-internals</a> 讲的十分清楚。</p>
+<p>另外，由于<code>ROW_FORMAT=DYNAMIC</code> 和 <code>ROW_FORMAT=COMPRESSED</code> 是从 <code>ROW_FORMAT=COMPACT</code> 变化来的，所以他们处理 <code>CHAR</code>类型存储的方式和 COMPACT 一样。</p>
+<h2 id="3-对blob型字段存取优化">3. 对blob型字段存取优化<a hidden class="anchor" aria-hidden="true" href="#3-对blob型字段存取优化">#</a></h2>
+<p>如果一个查询涉及BLOB值，又需要使用临时表——不管它多小——它都会立即在磁盘上创建临时表。这样效率很低，尤其是对小而快的查询，临时表可能是查询中最大的开销。</p>
+<p>比如：创建一个带Text字段的compact表：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span><span class="lnt">45
+</span><span class="lnt">46
+</span><span class="lnt">47
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-mysql" data-lang="mysql"><span class="line"><span class="cl"><span class="n">mysql</span><span class="o">&gt;</span><span class="w"> </span><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="o">`</span><span class="n">t_rf_compact</span><span class="o">`</span><span class="w"> </span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="o">`</span><span class="n">f_id</span><span class="o">`</span><span class="w"> </span><span class="kt">int</span><span class="p">(</span><span class="mi">11</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="no">NULL</span><span class="w"> </span><span class="kp">AUTO_INCREMENT</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="o">`</span><span class="n">f_char</span><span class="o">`</span><span class="w"> </span><span class="kt">char</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="no">NULL</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="o">`</span><span class="n">f_varchar</span><span class="o">`</span><span class="w"> </span><span class="kt">varchar</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="no">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="s1">&#39;&#39;</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="o">`</span><span class="n">f_text</span><span class="o">`</span><span class="w"> </span><span class="kt">text</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="no">NULL</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="o">`</span><span class="n">f_id</span><span class="o">`</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">)</span><span class="w"> </span><span class="kp">ENGINE</span><span class="o">=</span><span class="n">InnoDB</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="kp">CHARSET</span><span class="o">=</span><span class="n">utf8</span><span class="w"> </span><span class="n">ROW_FORMAT</span><span class="o">=</span><span class="n">COMPACT</span><span class="p">;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">mysql</span><span class="o">&gt;</span><span class="w"> </span><span class="k">insert</span><span class="w"> </span><span class="k">into</span><span class="w"> </span><span class="nf">t_rf_compact</span><span class="p">(</span><span class="n">f_char</span><span class="p">,</span><span class="n">f_varchar</span><span class="p">,</span><span class="n">f_text</span><span class="p">)</span><span class="w"> </span><span class="k">values</span><span class="p">(</span><span class="s1">&#39;aa&#39;</span><span class="p">,</span><span class="s1">&#39;中中&#39;</span><span class="p">,</span><span class="k">repeat</span><span class="p">(</span><span class="s1">&#39;b&#39;</span><span class="p">,</span><span class="mi">700</span><span class="p">));</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">mysql</span><span class="o">&gt;</span><span class="w"> </span><span class="k">insert</span><span class="w"> </span><span class="k">into</span><span class="w"> </span><span class="nf">t_rf_compact</span><span class="p">(</span><span class="n">f_char</span><span class="p">,</span><span class="n">f_varchar</span><span class="p">,</span><span class="n">f_text</span><span class="p">)</span><span class="w"> </span><span class="k">values</span><span class="p">(</span><span class="s1">&#39;aa&#39;</span><span class="p">,</span><span class="s1">&#39;文&#39;</span><span class="p">,</span><span class="k">repeat</span><span class="p">(</span><span class="s1">&#39;c&#39;</span><span class="p">,</span><span class="mi">60000</span><span class="p">));</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="err">第二条数据会行溢出，前</span><span class="mi">768</span><span class="err">字节放在</span><span class="n">Clustered</span><span class="w"> </span><span class="n">Index数据页</span><span class="err">，剩余的放扩展存储空间</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">mysql</span><span class="o">&gt;</span><span class="w"> </span><span class="k">explain</span><span class="w"> </span><span class="k">select</span><span class="w"> </span><span class="n">t1</span><span class="p">.</span><span class="n">f_id</span><span class="w"> </span><span class="k">from</span><span class="w"> </span><span class="n">t_rf_compact</span><span class="w"> </span><span class="n">t1</span><span class="p">,</span><span class="n">t_rf_compact</span><span class="w"> </span><span class="n">t2</span><span class="w"> </span><span class="k">where</span><span class="w"> </span><span class="n">t1</span><span class="p">.</span><span class="n">f_id</span><span class="o">=</span><span class="n">t2</span><span class="p">.</span><span class="n">f_id</span><span class="w"> </span><span class="k">order</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">t1</span><span class="p">.</span><span class="n">f_id</span><span class="w"> </span><span class="k">limit</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"> 
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">+----+-------------+-------+--------+---------------+---------+---------+-------------------+------+-------------+</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">|</span><span class="w"> </span><span class="n">id</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">select_type</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="k">table</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">type</span><span class="w">   </span><span class="o">|</span><span class="w"> </span><span class="n">possible_keys</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="k">key</span><span class="w">     </span><span class="o">|</span><span class="w"> </span><span class="n">key_len</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">ref</span><span class="w">               </span><span class="o">|</span><span class="w"> </span><span class="n">rows</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Extra</span><span class="w">       </span><span class="o">|</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">+----+-------------+-------+--------+---------------+---------+---------+-------------------+------+-------------+</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">|</span><span class="w">  </span><span class="mi">1</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">SIMPLE</span><span class="w">      </span><span class="o">|</span><span class="w"> </span><span class="n">t1</span><span class="w">    </span><span class="o">|</span><span class="w"> </span><span class="k">index</span><span class="w">  </span><span class="o">|</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="mi">4</span><span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="no">NULL</span><span class="w">              </span><span class="o">|</span><span class="w">    </span><span class="mi">6</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="k">Using</span><span class="w"> </span><span class="k">index</span><span class="w"> </span><span class="o">|</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">|</span><span class="w">  </span><span class="mi">1</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">SIMPLE</span><span class="w">      </span><span class="o">|</span><span class="w"> </span><span class="n">t2</span><span class="w">    </span><span class="o">|</span><span class="w"> </span><span class="n">eq_ref</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="mi">4</span><span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">d_ec_crm2</span><span class="p">.</span><span class="n">t1</span><span class="p">.</span><span class="n">f_id</span><span class="w"> </span><span class="o">|</span><span class="w">    </span><span class="mi">1</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="k">Using</span><span class="w"> </span><span class="k">index</span><span class="w"> </span><span class="o">|</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">+----+-------------+-------+--------+---------------+---------+---------+-------------------+------+-------------+</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="mi">2</span><span class="w"> </span><span class="n">rows</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="kt">set</span><span class="w"> </span><span class="p">(</span><span class="mi">0</span><span class="p">.</span><span class="mi">00</span><span class="w"> </span><span class="n">sec</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">mysql</span><span class="o">&gt;</span><span class="w"> </span><span class="k">show</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="k">like</span><span class="w"> </span><span class="s2">&#34;%tmp%tables&#34;</span><span class="p">;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">+-------------------------+-------+</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">|</span><span class="w"> </span><span class="n">Variable_name</span><span class="w">           </span><span class="o">|</span><span class="w"> </span><span class="n">Value</span><span class="w"> </span><span class="o">|</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">+-------------------------+-------+</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">|</span><span class="w"> </span><span class="n">Created_tmp_disk_tables</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="mi">7</span><span class="w">     </span><span class="o">|</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">|</span><span class="w"> </span><span class="n">Created_tmp_tables</span><span class="w">      </span><span class="o">|</span><span class="w"> </span><span class="mi">36</span><span class="w">    </span><span class="o">|</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">+-------------------------+-------+</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="mi">2</span><span class="w"> </span><span class="n">rows</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="kt">set</span><span class="w"> </span><span class="p">(</span><span class="mi">0</span><span class="p">.</span><span class="mi">00</span><span class="w"> </span><span class="n">sec</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">mysql</span><span class="o">&gt;</span><span class="w"> </span><span class="k">select</span><span class="w"> </span><span class="n">t1</span><span class="p">.</span><span class="n">f_id</span><span class="w"> </span><span class="k">from</span><span class="w"> </span><span class="n">t_rf_compact</span><span class="w"> </span><span class="n">t1</span><span class="p">,</span><span class="n">t_rf_compact</span><span class="w"> </span><span class="n">t2</span><span class="w"> </span><span class="k">where</span><span class="w"> </span><span class="n">t1</span><span class="p">.</span><span class="n">f_id</span><span class="o">=</span><span class="n">t2</span><span class="p">.</span><span class="n">f_id</span><span class="w"> </span><span class="k">order</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">t1</span><span class="p">.</span><span class="n">f_id</span><span class="w"> </span><span class="k">limit</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">+------+</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">|</span><span class="w"> </span><span class="n">f_id</span><span class="w"> </span><span class="o">|</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">+------+</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">|</span><span class="w">    </span><span class="mi">1</span><span class="w"> </span><span class="o">|</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">+------+</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="mi">1</span><span class="w"> </span><span class="n">row</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="kt">set</span><span class="w"> </span><span class="p">(</span><span class="mi">0</span><span class="p">.</span><span class="mi">00</span><span class="w"> </span><span class="n">sec</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">mysql</span><span class="o">&gt;</span><span class="w"> </span><span class="k">show</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="k">like</span><span class="w"> </span><span class="s2">&#34;%tmp%tables&#34;</span><span class="p">;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">+-------------------------+-------+</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">|</span><span class="w"> </span><span class="n">Variable_name</span><span class="w">           </span><span class="o">|</span><span class="w"> </span><span class="n">Value</span><span class="w"> </span><span class="o">|</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">+-------------------------+-------+</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">|</span><span class="w"> </span><span class="n">Created_tmp_disk_tables</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="mi">7</span><span class="w">     </span><span class="o">|</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">|</span><span class="w"> </span><span class="n">Created_tmp_tables</span><span class="w">      </span><span class="o">|</span><span class="w"> </span><span class="mi">36</span><span class="w">    </span><span class="o">|</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">+-------------------------+-------+</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="mi">2</span><span class="w"> </span><span class="n">rows</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="kt">set</span><span class="w"> </span><span class="p">(</span><span class="mi">0</span><span class="p">.</span><span class="mi">00</span><span class="w"> </span><span class="n">sec</span><span class="p">)</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>没有临时表产生，所以磁盘临时表无变化。让它产生临时表：（但不涉及text列）</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">mysql&gt; explain select t1.f_id from t_rf_compact t1,t_rf_compact t2 where t1.f_id=t2.f_id order by t2.f_id;
+</span></span><span class="line"><span class="cl">+----+-------------+-------+--------+---------------+---------+---------+-------------------+------+----------------------------------------------+
+</span></span><span class="line"><span class="cl">| id | select_type | table | type   | possible_keys | key     | key_len | ref               | rows | Extra                                        |
+</span></span><span class="line"><span class="cl">+----+-------------+-------+--------+---------------+---------+---------+-------------------+------+----------------------------------------------+
+</span></span><span class="line"><span class="cl">|  1 | SIMPLE      | t1    | index  | PRIMARY       | PRIMARY | 4       | NULL              |    6 | Using index; Using temporary; Using filesort |
+</span></span><span class="line"><span class="cl">|  1 | SIMPLE      | t2    | eq_ref | PRIMARY       | PRIMARY | 4       | d_ec_crm2.t1.f_id |    1 | Using index                                  |
+</span></span><span class="line"><span class="cl">+----+-------------+-------+--------+---------------+---------+---------+-------------------+------+----------------------------------------------+
+</span></span><span class="line"><span class="cl">2 rows in set (0.00 sec)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">mysql&gt; select t1.f_id from t_rf_compact t1,t_rf_compact t2 where t1.f_id=t2.f_id order by t2.f_id;
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">mysql&gt; show status like &#34;%tmp%tables&#34;;
+</span></span><span class="line"><span class="cl">+-------------------------+-------+
+</span></span><span class="line"><span class="cl">| Variable_name           | Value |
+</span></span><span class="line"><span class="cl">+-------------------------+-------+
+</span></span><span class="line"><span class="cl">| Created_tmp_disk_tables | 7     |
+</span></span><span class="line"><span class="cl">| Created_tmp_tables      | 37    |
+</span></span><span class="line"><span class="cl">+-------------------------+-------+
+</span></span><span class="line"><span class="cl">2 rows in set (0.00 sec)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>虽然有<code>Using temporary</code>，但内存临时表还是够用，磁盘临时表还是无变化。返回TEXT列（也会使用临时表排序）：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span><span class="lnt">9
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">mysql&gt; select t1.f_text from t_rf_compact t1,t_rf_compact t2 where t1.f_id=t2.f_id order by t2.f_id;
+</span></span><span class="line"><span class="cl">mysql&gt; show status like &#34;%tmp%tables&#34;;
+</span></span><span class="line"><span class="cl">+-------------------------+-------+
+</span></span><span class="line"><span class="cl">| Variable_name           | Value |
+</span></span><span class="line"><span class="cl">+-------------------------+-------+
+</span></span><span class="line"><span class="cl">| Created_tmp_disk_tables | 8     |
+</span></span><span class="line"><span class="cl">| Created_tmp_tables      | 38    |
+</span></span><span class="line"><span class="cl">+-------------------------+-------+
+</span></span><span class="line"><span class="cl">2 rows in set (0.00 sec)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><code>Created_tmp_disk_tables</code>磁盘临时表有增加，与上面结论相符：只有有TEXT/BLOB列参与，如果用到临时表，不管它多小，都会创建在磁盘上，从而带来性能消耗。</p>
+<p>注：磁盘临时表存储引擎一定是 MyISAM，与<code>select @@default_tmp_storage_engine;</code>（5.6.3开始）看到的<em>InnoDB</em>无关，它是控制<em>CREATE TEMPORARY TABLE</em>时的默认引擎。在 5.7.5 开始<code>internal_tmp_disk_storage_engine</code>选项可以定义磁盘临时表的引擎类型。关于临时表与内存表可以参考 <a href="http://imysql.com/2015/07/11/mysql-faq-how-using-temp-table.shtml">[MySQL FAQ]系列 — 什么情况下会用到临时表 -老叶</a> 。</p>
+<p>有两种办法来减轻这种不利的情况：通过 <code>SUBSTRING()</code> 函数把值转换为 VARCHAR，或者让磁盘临时表更快一些。</p>
+<p>让磁盘临时表运行更快的方式是，把它们放在基于内存的文件系统tmpfs，tmpfs文件系统为了降低开销不会刷新内存数据到磁盘，读写速度也很快，而临时表也不需要持久存放。mysql的 tmpdir 参数控制临时文件存放位置，建议如果使用的话要监控空间使用率。另外如果BLOB列非常大或多，可以考虑调大InnoDB日志缓存大小<code>innodb_log_buffer_size</code>。</p>
+<p>如果使用BLOB这类变长大字段类型，需要以下后果考虑：</p>
+<blockquote>
+<ul>
+<li>大字段在InnoDB里可能浪费大量空间。例如，若存储字段值只是比行的要求多了一个字节，也会使用整个页面来存储剩下的字节，浪费了页面的大部分空间。同样的，如果有一个值只是稍微超过了32个页的大小，实际上就需要使用96个页面。</li>
+</ul></blockquote>
+<ul>
+<li>扩展存储禁用了自适应哈希，因为需要完整的比较列的整个长度，才能发现是不是正确的数据（哈希帮助InnoDB非常快速的找到“猜测的位置”，但是必须检查“猜测的位置”是不是正确）。因为自适应哈希是完全的内存结构，并且直接指向Buffer Pool中访问“最”频繁的页面，但对于扩展存储空间却无法使用Adaptive Hash。</li>
+<li>太长的值可能使得在查询中作为WHERE条件不能使用索引，因而执行很慢。在应用WHERE条件之前，MySQL需要把所有的列读出来，所以可能导致MySQL要求InnoDB读取很多扩展存储，然后检查WHERE条件，丢弃所有不需要的数据。查询不需要的列绝对不是好主意，在这种特殊的场景下尤其需要避免这样做。如果发现查询正遇到这个限制带来的问题，可以尝试通过覆盖索引来解决部分问题。</li>
+<li>如果一张表里有很多大字段，最好是把它们组合起来单独存到一个列里面，比如说用XML文档格式存储。这让所有的大字段共享一个扩展存储空间，这比每个字段用自己的页要好。</li>
+<li>有时候可以把大字段用COMPRESS()压缩后再存为BLOB，或者在发送到MySQL前在应用程序中进行压缩，这可以获得显著的空间优势和性能收益。
+—— 《高性能MySQL(第3版)》 P368</li>
+</ul>
+<p>对上面的解读就是：</p>
+<ul>
+<li>如果预期长度范围varchar就满足，就避免使用TEXT</li>
+<li>对于字段非常大的列可以在应用程序里压缩后再存到mysql，如果列值很长请考虑用单独的表存放</li>
+<li>一张表有多个类blob字段，把它们组合起来如<code>&lt;TEXT&gt;&lt;f_big_col1&gt;long..&lt;/f_big_col1&gt; &lt;f_content&gt;long..&lt;/f_content&gt;&lt;/TEXT&gt;</code>，再压缩存储。但要考虑是否使用全文索引，是否需要前缀索引。</li>
+</ul>
+<h2 id="参考">参考<a hidden class="anchor" aria-hidden="true" href="#参考">#</a></h2>
+<ul>
+<li>
+<p><a href="http://blog.opskumu.com/mysql-blob.html">MySQL 大字段溢出导致数据回写失败</a></p>
+</li>
+<li>
+<p><a href="http://hidba.org/?p=551">innodb使用大字段text，blob的一些优化建议 -玄惭</a></p>
+</li>
+<li>
+<p><a href="http://imysql.com/2014/09/28/mysql-optimization-case-blob-stored-in-innodb-optimization.shtml">[MySQL优化案例]系列 — 优化InnoDB表BLOB列的存储效率 -老叶</a></p>
+</li>
+<li>
+<p><a href="http://blog.chinaunix.net/uid-24485075-id-3523032.html">InnoDB 数据表压缩原理与限制 </a></p>
+</li>
+<li>
+<p><a href="http://dev.mysql.com/doc/refman/5.6/en/innodb-row-format-dynamic.html">MySQL Manual DYNAMIC and COMPRESSED Row Formats </a></p>
+</li>
+<li>
+<p>《MySQL技术内幕·InnoDB存储引擎》 P</p>
+</li>
+</ul>
+<hr>
+<p>原文链接地址：http://xgknight.com/2016/05/18/mysql-blob-row_format/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://localhost:1313/tags/mysql/">Mysql</a></li>
+      <li><a href="http://localhost:1313/tags/schema%E8%AE%BE%E8%AE%A1/">Schema设计</a></li>
+    </ul>
+<nav class="paginav">
+  <a class="prev" href="http://localhost:1313/2016/05/mysql-online-ddl-concept/">
+    <span class="title">« Prev</span>
+    <br>
+    <span>mysql 5.6 原生Online DDL解析</span>
+  </a>
+  <a class="next" href="http://localhost:1313/2016/05/mysql-innodb-primary_key/">
+    <span class="title">Next »</span>
+    <br>
+    <span>InnoDB表主键设计方案</span>
+  </a>
+</nav>
+
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+        <span>&copy; 2025 <a href="http://localhost:1313/">Sean&#39;s Note</a></span> · 
+
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+<script>
+    document.querySelectorAll('pre > code').forEach((codeblock) => {
+        const container = codeblock.parentNode.parentNode;
+
+        const copybutton = document.createElement('button');
+        copybutton.classList.add('copy-code');
+        copybutton.innerHTML = 'copy';
+
+        function copyingDone() {
+            copybutton.innerHTML = 'copied!';
+            setTimeout(() => {
+                copybutton.innerHTML = 'copy';
+            }, 2000);
+        }
+
+        copybutton.addEventListener('click', (cb) => {
+            if ('clipboard' in navigator) {
+                navigator.clipboard.writeText(codeblock.textContent);
+                copyingDone();
+                return;
+            }
+
+            const range = document.createRange();
+            range.selectNodeContents(codeblock);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            try {
+                document.execCommand('copy');
+                copyingDone();
+            } catch (e) { };
+            selection.removeRange(range);
+        });
+
+        if (container.classList.contains("highlight")) {
+            container.appendChild(copybutton);
+        } else if (container.parentNode.firstChild == container) {
+            
+        } else if (codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName == "TABLE") {
+            
+            codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(copybutton);
+        } else {
+            
+            codeblock.parentNode.appendChild(copybutton);
+        }
+    });
+</script>
+</body>
+
+</html>

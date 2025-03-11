@@ -1,3 +1,4 @@
+---
 title: 【转+改】Docker核心技术预览
 date: 2014-12-18 13:21:25
 updated: 2014-12-18 15:46:23
@@ -8,7 +9,7 @@ categories: [Virtualization, Docker]
 本文简单介绍docker使用到的部分核心技术，但不做深入探究，因为每一个技术都是一个独立的项目，有机会再分别详细介绍。
 来源地址：http://www.infoq.com/cn/articles/docker-core-technology-preview
 
-![docker-core-tech](http://sean-images.qiniudn.com/docker-core-tech.png)
+![docker-core-tech](http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-core-tech.png)
 
 ## Linux Namespace （实例隔离）##
 > The purpose of each namespace is to wrap a particular global system resource in an abstraction that makes it appear to the processes within the namespace that they have their own isolated instance of the global resource.
@@ -183,12 +184,12 @@ bootfs（boot file system）主要包含 bootloader 和 kernel, bootloader主要
 - http://www.slideshare.net/BodenRussell/realizing-linux-containerslxc
 
 
-  [1]: http://sean-images.qiniudn.com/docker-kernel-pid-namespace.png
-  [2]: http://sean-images.qiniudn.com/docker-filesystems-generic.png
-  [3]: http://sean-images.qiniudn.com/docker-filesystems-multiroot.png
-  [4]: http://sean-images.qiniudn.com/docker-filesystems-multilayer.png
-  [5]: http://sean-images.qiniudn.com/docker-filesystems-debian.png
-  [6]: http://sean-images.qiniudn.com/docker-filesystems-debianrw.png
-  [7]: http://sean-images.qiniudn.com/docker-filesystems-busyboxrw.png
+  [1]: http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-kernel-pid-namespace.png
+  [2]: http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-filesystems-generic.png
+  [3]: http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-filesystems-multiroot.png
+  [4]: http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-filesystems-multilayer.png
+  [5]: http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-filesystems-debian.png
+  [6]: http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-filesystems-debianrw.png
+  [7]: http://github.com/seanlook/sean-notes-comment/raw/main/static/docker-filesystems-busyboxrw.png
 
 

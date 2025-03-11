@@ -1,3 +1,4 @@
+---
 title: SSL/TLS原理详解
 date: 2015-01-07 01:21:25
 updated: 2015-01-07 10:46:23
@@ -7,7 +8,7 @@ categories: Linux
 
 本文大部分整理自网络，相关文章请见文后参考。
 
-关于证书授权中心CA以及数字证书等概念，请移步 [OpenSSL 与 SSL 数字证书概念贴](http://seanlook.com/2015/01/15/openssl-certificate-encryption) ，如果你想快速自建CA然后签发数字证书，请移步 [基于OpenSSL自建CA和颁发SSL证书 ](http://seanlook.com/2015/01/18/openssl-self-sign-ca) 。
+关于证书授权中心CA以及数字证书等概念，请移步 [OpenSSL 与 SSL 数字证书概念贴](http://xgknight.com/2015/01/15/openssl-certificate-encryption) ，如果你想快速自建CA然后签发数字证书，请移步 [基于OpenSSL自建CA和颁发SSL证书 ](http://xgknight.com/2015/01/18/openssl-self-sign-ca) 。
 
 SSL/TLS作为一种互联网安全加密技术，原理较为复杂，枯燥而无味，我也是试图理解之后重新整理，尽量做到层次清晰。正文开始。
 
@@ -201,7 +202,7 @@ SecurityPortal在2000年底有一份文章《The End of SSL and SSH?》激起了
        
 然后proxy会向webserver端建立tcp连接,之后，这个代理便完全成了个内容转发装置。浏览器与web server会建立一个安全通道，因此这个安全通道是端到端的，尽管所有的信息流过了proxy,但其内容proxy是无法解密和改动的（当然要由证书的支持，否则这个地方便是个man in the middle攻击的好场所，见上面的安全部分）。       
 
-CA证书以及如何使用OpenSSL自签署，见文章[OpenSSL自签署证书](http://seanlook.com/2015/01/18/openssl-self-sign-ca) 。
+CA证书以及如何使用OpenSSL自签署，见文章[OpenSSL自签署证书](http://xgknight.com/2015/01/18/openssl-self-sign-ca) 。
 
 # 6. 参考 #
 
@@ -215,7 +216,7 @@ CA证书以及如何使用OpenSSL自签署，见文章[OpenSSL自签署证书](h
 - [Survival guides - TLS/SSL and SSL (X.509) Certificates](http://www.zytrax.com/tech/survival/ssl.html)
 
 
-  [1]: http://sean-images.qiniudn.com/tls-ssl-_tcp-ip_protocol.png
-  [2]: http://sean-images.qiniudn.com/tls-ssl.svg
-  [3]: http://sean-images.qiniudn.com/tls-keys-create.svg
-  [4]: http://sean-images.qiniudn.com/tls-keys.svg
+  [1]: http://github.com/seanlook/sean-notes-comment/raw/main/static/tls-ssl-_tcp-ip_protocol.png
+  [2]: http://github.com/seanlook/sean-notes-comment/raw/main/static/tls-ssl.svg
+  [3]: http://github.com/seanlook/sean-notes-comment/raw/main/static/tls-keys-create.svg
+  [4]: http://github.com/seanlook/sean-notes-comment/raw/main/static/tls-keys.svg

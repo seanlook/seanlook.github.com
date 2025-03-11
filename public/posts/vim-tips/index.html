@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="noindex, nofollow">
+<title>Sean&#39;s Note</title>
+<meta name="keywords" content="">
+<meta name="description" content="title: vim编辑器技巧备忘（初级-中级）
+date: 2014-08-07 01:21:25
+updated: 2014-08-07-12 00:46:23
+tags: [vim,编辑器]
+categories: Linux
+“学习vim并且其会成为你最后一个使用的文本编辑器”
+学习建议：
+
+丢弃鼠标和小键盘
+具有搭配使用各种按键的意识
+
+首先来一张 mindmap :">
+<meta name="author" content="">
+<link rel="canonical" href="http://localhost:1313/posts/vim-tips/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.45e028aa8ce0961349adf411b013ee39406be2c0bc80d4ea3fc04555f7f4611a.css" integrity="sha256-ReAoqozglhNJrfQRsBPuOUBr4sC8gNTqP8BFVff0YRo=" rel="preload stylesheet" as="style">
+<link rel="icon" href="http://localhost:1313/img/logo.gif">
+<link rel="icon" type="image/png" sizes="16x16" href="http://localhost:1313/img/logo.gif">
+<link rel="icon" type="image/png" sizes="32x32" href="http://localhost:1313/img/logo.gif">
+<link rel="apple-touch-icon" href="http://localhost:1313/logo.gif">
+<link rel="mask-icon" href="http://localhost:1313/logo.gif">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<link rel="alternate" hreflang="en" href="http://localhost:1313/posts/vim-tips/">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --code-block-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://localhost:1313/" accesskey="h" title="Sean&#39;s Note (Alt + H)">Sean&#39;s Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://localhost:1313/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/categories/" title="Categories">
+                    <span>Categories</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/search/" title="Search (Alt &#43; /)" accesskey=/>
+                    <span>Search</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/tags/" title="Tags">
+                    <span>Tags</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    <div class="breadcrumbs"><a href="http://localhost:1313/">Home</a>&nbsp;»&nbsp;<a href="http://localhost:1313/posts/">Posts</a></div>
+    <h1 class="post-title entry-hint-parent">
+      
+    </h1>
+    <div class="post-meta">7 min
+
+</div>
+  </header> <div class="toc">
+    <details  open>
+        <summary accesskey="c" title="(Alt + C)">
+            <span class="details">Table of Contents</span>
+        </summary>
+
+        <div class="inner"><ul>
+                <li>
+                    <a href="#1-%e5%88%9d%e7%ba%a7" aria-label="1. 初级">1. 初级</a><ul>
+                        
+                <li>
+                    <a href="#11-%e7%bc%96%e8%be%91%e6%a8%a1%e5%bc%8finsert-mode" aria-label="1.1 编辑模式（Insert Mode）">1.1 编辑模式（Insert Mode）</a></li>
+                <li>
+                    <a href="#12-%e6%99%ae%e9%80%9a%e6%a8%a1%e5%bc%8fnormal-mode" aria-label="1.2 普通模式（Normal Mode）">1.2 普通模式（Normal Mode）</a></li>
+                <li>
+                    <a href="#13-%e5%91%bd%e4%bb%a4%e6%a8%a1%e5%bc%8f" aria-label="1.3 命令模式">1.3 命令模式</a></li>
+                <li>
+                    <a href="#14-%e5%8f%af%e8%a7%86%e5%8c%96%e6%a8%a1%e5%bc%8f" aria-label="1.4 可视化模式">1.4 可视化模式</a></li></ul>
+                </li>
+                <li>
+                    <a href="#2-%e4%b8%ad%e7%ba%a7" aria-label="2. 中级">2. 中级</a><ul>
+                        
+                <li>
+                    <a href="#21-%e9%ab%98%e7%ba%a7%e7%bb%84%e5%90%88%e5%91%bd%e4%bb%a4" aria-label="2.1 高级组合命令">2.1 高级组合命令</a></li>
+                <li>
+                    <a href="#22-%e5%88%86%e5%b1%8fsplit" aria-label="2.2 分屏(split)">2.2 分屏(split)</a></li>
+                <li>
+                    <a href="#23-%e6%8a%98%e5%8f%a0fold" aria-label="2.3 折叠(fold)">2.3 折叠(fold)</a></li>
+                <li>
+                    <a href="#24-%e6%a0%87%e8%ae%b0" aria-label="2.4 标记">2.4 标记</a></li></ul>
+                </li>
+                <li>
+                    <a href="#3-%e6%8f%92%e4%bb%b6" aria-label="3. 插件">3. 插件</a></li>
+                <li>
+                    <a href="#4-vimrc" aria-label="4. vimrc">4. vimrc</a>
+                </li>
+            </ul>
+        </div>
+    </details>
+</div>
+
+  <div class="post-content"><h2 id="categories-linux">title: vim编辑器技巧备忘（初级-中级）
+date: 2014-08-07 01:21:25
+updated: 2014-08-07-12 00:46:23
+tags: [vim,编辑器]
+categories: Linux</h2>
+<p>“学习vim并且其会成为你最后一个使用的文本编辑器”
+学习建议：</p>
+<ul>
+<li>丢弃鼠标和小键盘</li>
+<li>具有搭配使用各种按键的意识</li>
+</ul>
+<p>首先来一张 <a href="http://jrmiii.com/2009/03/06/learning-vim-the-pragmatic-way.html">mindmap</a> :</p>
+<p><img alt="vim-learn-card" loading="lazy" src="http://sean-images.qiniudn.com/Vim-mindmap.png"></p>
+<h1 id="1-初级">1. 初级<a hidden class="anchor" aria-hidden="true" href="#1-初级">#</a></h1>
+<h2 id="11-编辑模式insert-mode">1.1 编辑模式（Insert Mode）<a hidden class="anchor" aria-hidden="true" href="#11-编辑模式insert-mode">#</a></h2>
+<p>编辑模式包括以下动作：</p>
+<ul>
+<li>insert：<code>i</code>在光标所在字符前插入，<code>I</code>在当前行首第一个非空格字符前插入</li>
+<li>append：<code>a</code>在光标所在字符后插入，<code>A</code>在行末尾开始插入</li>
+<li>open：<code>o</code>在下一行插入新行，<code>O</code>在光标所在行的上一行插入新行</li>
+<li>replace：<code>r</code>将光标处字符替换成r紧接的字符；<code>R</code>一直替换字符串，知道<code>ESC</code>键退出，同windows下的Insert键</li>
+<li><code>Ctrl+p</code>：自动提示</li>
+<li><code>[ESC]</code>：回到普通模式</li>
+</ul>
+<p><img alt="vim-mode" loading="lazy" src="http://sean-images.qiniudn.com/vim-mode.png"></p>
+<h2 id="12-普通模式normal-mode">1.2 普通模式（Normal Mode）<a hidden class="anchor" aria-hidden="true" href="#12-普通模式normal-mode">#</a></h2>
+<ul>
+<li>
+<p><code>h, j, k, l </code>，分别对应 左←  下↓  上↑  右→</p>
+</li>
+<li>
+<p><code>:q, :q!, :wq</code>  退出 不保存强行退出 保存退出</p>
+</li>
+<li>
+<p>移动光标到当前行首/非空格，同^，:0</p>
+</li>
+<li>
+<p><code>$</code>  移动光标到当前行尾，同:$</p>
+</li>
+<li>
+<p><code>G</code>  移动光标到文档最后一行首</p>
+</li>
+<li>
+<p><code>30G</code>  转到第30行，同 :30</p>
+</li>
+<li>
+<p><code>9-</code>  光标向上移动9行，同9k</p>
+</li>
+<li>
+<p><code>9+</code>  光饼向下移动9行，同9[space]，9j</p>
+</li>
+<li>
+<p><code>gg</code>  转到文档第一行(1G)</p>
+</li>
+<li>
+<p><code>H</code>  移动到屏幕的第一列</p>
+</li>
+<li>
+<p><code>M</code>  移动到屏幕的中间列</p>
+</li>
+<li>
+<p><code>L</code>  移动到屏幕的最后列</p>
+</li>
+<li>
+<p><code>w</code>  移动到下一个单词的首字母，（标点符号认为是一个单词，W表示单词以空格分隔）</p>
+</li>
+<li>
+<p><code>e</code>  移动到下一个单词的末尾，（E认为单词以空格分隔）</p>
+</li>
+<li>
+<p><code>b</code>  移动到上一个单词的首字母，（B认为单词以空格分隔）</p>
+</li>
+<li>
+<p><code>fx</code>  移动到下一个字母是x的位置。Fx向上移动。</p>
+</li>
+<li>
+<p><code>%</code>  匹配括号移动，包括 (, {, [ ，你需要把光标先移到括号上</p>
+</li>
+<li>
+<p><code>CTRL+b</code> 向上（前）翻页</p>
+</li>
+<li>
+<p><code>CTRL+f</code> 向后翻页</p>
+</li>
+<li>
+<p><code>d</code>  删除开始。其实是放到寄存器中，p或P命令调用。c即change，删完进入编辑模式</p>
+</li>
+<li>
+<p><code>d$</code>  删除光标到行尾的所有文字，同D。C指令进入编辑模式</p>
+</li>
+<li>
+<p><code>dw</code>    删除当前字符到单词尾的所有字符。cw删除光标后的单词并进入插入模式，等同替换</p>
+</li>
+<li>
+<p><code>dd</code>  删除当前一行</p>
+</li>
+<li>
+<p><code>2dd</code>  删除当前两行</p>
+</li>
+<li>
+<p><code>x</code>  剪切光标处字符，可以p粘贴出来</p>
+</li>
+<li>
+<p><code>y</code>  复制开始。yank起来，p或P命令调用</p>
+</li>
+<li>
+<p><code>yy p</code>  复制当前行并粘贴到下一行</p>
+</li>
+<li>
+<p><code>5yy p</code> 复制当前行以下5行，在合适的地方粘贴</p>
+</li>
+<li>
+<p><code>yw p</code>  复制一个单词并粘贴。</p>
+</li>
+<li>
+<p><code>yi{</code>  复制光标所在{}中的内容。很容易知道ci{ 和 di &quot; 的意思。</p>
+</li>
+<li>
+<p><code>u</code>      撤销</p>
+</li>
+<li>
+<p><code>CTRL+r</code> 重做</p>
+</li>
+<li>
+<p><code>.</code>   点号重复做上一个命令</p>
+</li>
+<li>
+<p>``.`  移动光标到上一次的修改点</p>
+</li>
+<li>
+<p><code>Ctrl+g</code> 查看我当前位置</p>
+</li>
+</ul>
+<h2 id="13-命令模式">1.3 命令模式<a hidden class="anchor" aria-hidden="true" href="#13-命令模式">#</a></h2>
+<ul>
+<li>
+<p><code>/word</code> 向下查找word，n定位到下一个。?word 向上开始查找，同 /word 配合N。* 直接查找光标所在处单词</p>
+</li>
+<li>
+<p><code>:%s/word1/word2/g</code>  替换所有 word1 为 word2 (^$ [])</p>
+</li>
+<li>
+<p><code>:set noic</code>    区分大小写 (即set no igorecase，set ic不区分大小写)</p>
+</li>
+<li>
+<p><code>:set nu</code>  显示行号。:set nonu相反，不显示行号</p>
+</li>
+<li>
+<p><code>:set paste</code>  设置为粘贴模式，解决Ctrl+Insert粘贴时缩进错乱问题。:set nopaste设置回默认</p>
+</li>
+<li>
+<p><code>:se ff=unix</code> 设置文本文件的格式为unix，去掉windows系统文件中的^M。</p>
+</li>
+<li>
+<p><code>:!ls</code>  执行bash下的命令ls，回车后继续回到vi。一般在一个不存在的目录中创建文件时用到</p>
+</li>
+<li>
+<p><code>:set all</code> 查看vim说有设置属性值</p>
+</li>
+<li>
+<p><code>:map</code> 查看绑定的快捷键</p>
+</li>
+<li>
+<p><code>:marks</code> 查看可用标记</p>
+</li>
+</ul>
+<p>熟练上面的命令，已经可以满足日常工作要求，要提高效率可以学习vim的高级用法，如分屏显示、分页、标签功能、代码折叠、键盘映射。</p>
+<h2 id="14-可视化模式">1.4 可视化模式<a hidden class="anchor" aria-hidden="true" href="#14-可视化模式">#</a></h2>
+<p>visual mode多用于用键盘灵活选择文本。<code>v</code>或<code>V</code>键进入，可以实现同时编辑多行（如注释）</p>
+<h1 id="2-中级">2. 中级<a hidden class="anchor" aria-hidden="true" href="#2-中级">#</a></h1>
+<h2 id="21-高级组合命令">2.1 高级组合命令<a hidden class="anchor" aria-hidden="true" href="#21-高级组合命令">#</a></h2>
+<ul>
+<li>
+<p><code>:sh</code>   暂时离开vi，进入shell命令行</p>
+</li>
+<li>
+<p><code>:!ls</code>  !表示要执行一个shell命令</p>
+</li>
+<li>
+<p><code>q:</code>  调出历史命令窗口</p>
+</li>
+<li>
+<p><code>cc</code>  替换一行，清空一行</p>
+</li>
+<li>
+<p><code>cw</code>  替换一个单词，进入插入模式</p>
+</li>
+<li>
+<p><code>ea</code>  在当前单词最后插入</p>
+</li>
+<li>
+<p><code>vw</code>  visual模式选择一个单词</p>
+</li>
+<li>
+<p><code>VU</code>  全选一行，转换成大写</p>
+</li>
+<li>
+<p><code>:5,12 co 13</code> 将5至12行复制到第13行下</p>
+</li>
+<li>
+<p><code>gg=G</code> 自动缩排文件
+<code>%</code> : 匹配括号移动，包括 (, {, [. ，你需要把光标先移到括号上
+<code>*</code> 和 <code>#</code>:匹配光标当前所在的单词，移动光标到下一个（或上一个）匹配单词（*是下一个，#是上一个）</p>
+</li>
+</ul>
+<p>当光标在<code>( )</code>, <code>[ ]</code>,<code>&lt; &gt;</code>, <code>{ }</code>, <code>&quot; &quot;</code>, <code>''</code> 内时，可以用<code>ci</code>, <code>di</code>, 或<code>yi</code>，加上<code>(</code>, <code>[</code>, <code>&lt;</code>,<code>{</code>, <code>&quot;</code>, <code>'</code>。这样可以改写/删除/复制<code>( )</code>内，<code>[ ]</code>内，<code>&lt; &gt;</code>内，<code>{ }</code>内，<code>&quot; &quot;</code>内，<code>' '</code>内的内容</p>
+<p><strong>多行注释（块操作）</strong></p>
+<ol>
+<li>首先按<code>esc</code>进入命令行模式下，按下<code>Ctrl + v</code>，进入列（也叫区块）模式;</li>
+<li>在行首使用上下键<code>kj</code>选择需要注释的多行;</li>
+<li>按下键盘（大写）<code>I</code>键，进入插入模式；</li>
+<li>然后输入注释符（“//”、“#”等）;</li>
+<li>最后按下<code>esc</code>键</li>
+</ol>
+<p>删除多行开头的一个字符与此类似，删除多个字符也只要左右键，然后使用d。</p>
+<p>另外一种多行注释的方式就是替换：</p>
+<ul>
+<li><code>:5,9s/^/#/g</code>    添加注释#</li>
+<li><code>:5,9s/^#//g</code>    删除注释#</li>
+<li><code>:5,9s#^#//#g</code>    添加注释//，同:5,9s/^///#/g</li>
+<li><code>:5,9s#^//##g</code>    删除注释//</li>
+</ul>
+<p>多行缩进
+<code>[ESC]</code>,  <code>Ctrl+v</code>  选择行 &lt;或&gt;左右缩进，=自动缩进（gg=G的局部功能）</p>
+<p>多行行末尾加上 &raquo; ${log}：Ctrl+v  /^echo <br>
+<code>&gt;&gt;</code>相当于tab键，一个缩进</p>
+<p><strong>多行删除</strong></p>
+<ol>
+<li>首先在命令模式下，输入<code>set nu</code>显示行号；</li>
+<li>通过行号确定你要删除的行；</li>
+<li>命令输入<code>:32,65d</code>,回车键，32-65行就被删除了</li>
+</ol>
+<p><strong>自动补全</strong>
+在Insert模式下，你可以输入一个词的开头，然后按 <code>&lt;C-p&gt;</code>或是<code>&lt;C-n&gt;</code>，自动补齐功能就出现了</p>
+<h2 id="22-分屏split">2.2 分屏(split)<a hidden class="anchor" aria-hidden="true" href="#22-分屏split">#</a></h2>
+<p>分割窗口（同时编辑多个文件）</p>
+<ul>
+<li><code>vi -o file1 file2</code> 水平分屏，也可以在先打开file1后，使用<code>:sp file2</code></li>
+<li><code>vi -O file1 file2 </code>    垂直分屏，也可以在先打开file1后，使用<code>:vsp file2</code></li>
+<li><code>Ctrl+w w</code>  光标切换到另一个屏</li>
+<li><code>k</code>    关闭当前窗口，如果有改动则提示要先保存。<code>:wqa!</code>保存退出所有文件</li>
+<li><code>Ctrl+w v</code>  左右分割当前打开的文件。<code>Ctrl+w s</code>上下分割显示</li>
+<li><code>Ctrl+w H</code>  左移该屏（大写，<code>L</code>右移，<code>K</code>上移—改变vertical为horizontal）</li>
+<li><code>:set scb</code>  分屏同步滚动</li>
+</ul>
+<p>另外一种不分屏，同时编辑多个文件的方法</p>
+<p><code>vi file1 file2</code></p>
+<ul>
+<li><code>:ls </code>              展示全部打开的文档。其中 <code>%</code> 代表正在打开的文件（buffer），<code>#</code> 代表上一个编辑过的文件，<code>a</code> 代表当前激活的buffer空间，<code>+</code> 代表有修改过的内容但还未保存</li>
+<li><code>:buffer 2 </code>   转到打开的第二个文件。或简写为 <code>:b2</code></li>
+<li><code>:bn</code>             转到下一个文件。没有保存不能离开这个文件。<code>:bp</code> 上一个文件</li>
+<li><code>:b#</code>             转到上一个编辑过的文件，同 <code>:e #</code>。类似于多屏中<code>Ctrl+w w</code></li>
+<li><code>:e file3</code>      编辑一个新的文件</li>
+<li><code>Ctrl+g </code>       显示当前文件名和行号，同 <code>:f</code></li>
+</ul>
+<h2 id="23-折叠fold">2.3 折叠(fold)<a hidden class="anchor" aria-hidden="true" href="#23-折叠fold">#</a></h2>
+<p>主要应用在复杂脚本的场合，特别是函数比较多，逻辑结构比较复杂的代码。（<code>:help folding</code>）
+有6种方式来折叠代码</p>
+<ol>
+<li>manual //手工定义折叠</li>
+<li>indent //用缩进表示折叠</li>
+<li>expr　 //用表达式来定义折叠</li>
+<li>syntax //用语法高亮来定义折叠</li>
+<li>diff   //对没有更改的文本进行折叠</li>
+<li>marker //用标志折叠</li>
+</ol>
+<p><strong>indent</strong>
+<code>:set foldmethod=indent</code>    设置缩进折叠，fdm为简写。只对当前会话有效，要使每次打开vim时折叠都生效，则在.vimrc文件中添加设置，如添加：<code>set fdm=indent</code></p>
+<ul>
+<li><code>zc</code>    折叠与当前缩进相同的行</li>
+<li><code>zo</code>    打开折叠</li>
+<li><code>zj</code>    移到下一个折叠处</li>
+<li><code>zk</code>    移到上一个折叠处</li>
+<li><code>zm</code>    折叠所有可折叠标记</li>
+<li><code>zr</code>      展开所有折叠</li>
+<li><code>[z</code>    到当前打开折叠的开始</li>
+<li><code>]z</code>    到当前打开折叠的结束</li>
+</ul>
+<p><strong>marker</strong>
+注意与后文的mark不是同一东西，<code>:set fdm=marker</code></p>
+<ul>
+<li><code>zf</code>    创建marker，默认 <code>#{ { {</code>, <code>#} } }</code></li>
+<li><code>Ctrl+v zf</code> 进入可视化模式，选择需要折叠的行，zc执行折叠。会自动加入 <code>#{ { {</code>  code block <code>#} } }</code></li>
+<li><code>zf9j</code>  创建从当前行起至以下9行的折叠标记，<code>zc</code>进行折叠。同<code>9zf</code>。类似有<code>zf30G</code>，从当前行折叠刀第30行</li>
+<li><code>zf%</code>   创建匹配的 <code>{}</code>, <code>[]</code>, <code>()</code>, <code>&lt;&gt;</code> 的fold。不用执行<code>zc</code></li>
+<li><code>zd</code>    删除当前行上存在的折叠标记。仅当 &lsquo;foldmethod&rsquo; 设为 &ldquo;manual&rdquo; 或 &ldquo;marker&rdquo; 时有效</li>
+</ul>
+<h2 id="24-标记">2.4 标记<a hidden class="anchor" aria-hidden="true" href="#24-标记">#</a></h2>
+<p>标记(mark)是vim提供的精确定位技术，只要你知道标记的名字，就可以使用命令直接跳转到该标记所在的位置。vim中的标记都有一个名字，这个名字用单一的字符表示。大写和小写字母(A-Za-z)都可以做为标记的名字，这些标志的位置可以由用户来设置；而数字标记0-9，以及一些标点符号标记，用户不能进行设置，由vim来自动设置。（:help mark-motions查看更多帮助）</p>
+<ul>
+<li><code>ms</code>    定义一个标记s</li>
+<li>``s`    跳转到标记s的地方</li>
+<li><code>'s</code>    跳转到调剂s所在行首</li>
+<li>``.`    jump to position where last change occurred in current buffer</li>
+<li>``    jump back (to position in current buffer where jumped from)</li>
+<li><code>:delmarks aA</code> 使用 :delmarks! 删除所有小写（a-z）的标记</li>
+<li><code>:marks</code>    查看所有标记</li>
+</ul>
+<h1 id="3-插件">3. 插件<a hidden class="anchor" aria-hidden="true" href="#3-插件">#</a></h1>
+<p>待续</p>
+<h1 id="4-vimrc">4. vimrc<a hidden class="anchor" aria-hidden="true" href="#4-vimrc">#</a></h1>
+<p><a href="http://sean-images.qiniudn.com/vimrc">.vimrc</a> 是目前自己用的比较习惯的vim风格。</p>
+<p><strong>参考</strong></p>
+<ul>
+<li>
+<p><a href="http://coolshell.cn/articles/5426.html">简明 Vim 练级攻略</a></p>
+</li>
+<li>
+<p><a href="http://michael.peopleofhonoronly.com/vim/">Vim Cheat Sheet for Programmers</a></p>
+</li>
+<li>
+<p><a href="http://segmentfault.com/blog/nightire/1190000000445598">VIM哲学</a></p>
+</li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+    </ul>
+<nav class="paginav">
+  <a class="prev" href="http://localhost:1313/posts/upgrade-centos6_kernel-to-3.10.x/">
+    <span class="title">« Prev</span>
+    <br>
+    <span></span>
+  </a>
+  <a class="next" href="http://localhost:1313/posts/vsphere-recover-from-missing-vmdk/">
+    <span class="title">Next »</span>
+    <br>
+    <span></span>
+  </a>
+</nav>
+
+
+<ul class="share-buttons">
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on x"
+            href="https://x.com/intent/tweet/?text=&amp;url=http%3a%2f%2flocalhost%3a1313%2fposts%2fvim-tips%2f&amp;hashtags=">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M512 62.554 L 512 449.446 C 512 483.97 483.97 512 449.446 512 L 62.554 512 C 28.03 512 0 483.97 0 449.446 L 0 62.554 C 0 28.03 28.029 0 62.554 0 L 449.446 0 C 483.971 0 512 28.03 512 62.554 Z M 269.951 190.75 L 182.567 75.216 L 56 75.216 L 207.216 272.95 L 63.9 436.783 L 125.266 436.783 L 235.9 310.383 L 332.567 436.783 L 456 436.783 L 298.367 228.367 L 432.367 75.216 L 371.033 75.216 Z M 127.633 110 L 164.101 110 L 383.481 400.065 L 349.5 400.065 Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on linkedin"
+            href="https://www.linkedin.com/shareArticle?mini=true&amp;url=http%3a%2f%2flocalhost%3a1313%2fposts%2fvim-tips%2f&amp;title=&amp;summary=&amp;source=http%3a%2f%2flocalhost%3a1313%2fposts%2fvim-tips%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-288.985,423.278l0,-225.717l-75.04,0l0,225.717l75.04,0Zm270.539,0l0,-129.439c0,-69.333 -37.018,-101.586 -86.381,-101.586c-39.804,0 -57.634,21.891 -67.617,37.266l0,-31.958l-75.021,0c0.995,21.181 0,225.717 0,225.717l75.02,0l0,-126.056c0,-6.748 0.486,-13.492 2.474,-18.315c5.414,-13.475 17.767,-27.434 38.494,-27.434c27.135,0 38.007,20.707 38.007,51.037l0,120.768l75.024,0Zm-307.552,-334.556c-25.674,0 -42.448,16.879 -42.448,39.002c0,21.658 16.264,39.002 41.455,39.002l0.484,0c26.165,0 42.452,-17.344 42.452,-39.002c-0.485,-22.092 -16.241,-38.954 -41.943,-39.002Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on reddit"
+            href="https://reddit.com/submit?url=http%3a%2f%2flocalhost%3a1313%2fposts%2fvim-tips%2f&title=">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-3.446,265.638c0,-22.964 -18.616,-41.58 -41.58,-41.58c-11.211,0 -21.361,4.457 -28.841,11.666c-28.424,-20.508 -67.586,-33.757 -111.204,-35.278l18.941,-89.121l61.884,13.157c0.756,15.734 13.642,28.29 29.56,28.29c16.407,0 29.706,-13.299 29.706,-29.701c0,-16.403 -13.299,-29.702 -29.706,-29.702c-11.666,0 -21.657,6.792 -26.515,16.578l-69.105,-14.69c-1.922,-0.418 -3.939,-0.042 -5.585,1.036c-1.658,1.073 -2.811,2.761 -3.224,4.686l-21.152,99.438c-44.258,1.228 -84.046,14.494 -112.837,35.232c-7.468,-7.164 -17.589,-11.591 -28.757,-11.591c-22.965,0 -41.585,18.616 -41.585,41.58c0,16.896 10.095,31.41 24.568,37.918c-0.639,4.135 -0.99,8.328 -0.99,12.576c0,63.977 74.469,115.836 166.33,115.836c91.861,0 166.334,-51.859 166.334,-115.836c0,-4.218 -0.347,-8.387 -0.977,-12.493c14.564,-6.47 24.735,-21.034 24.735,-38.001Zm-119.474,108.193c-20.27,20.241 -59.115,21.816 -70.534,21.816c-11.428,0 -50.277,-1.575 -70.522,-21.82c-3.007,-3.008 -3.007,-7.882 0,-10.889c3.003,-2.999 7.882,-3.003 10.885,0c12.777,12.781 40.11,17.317 59.637,17.317c19.522,0 46.86,-4.536 59.657,-17.321c3.016,-2.999 7.886,-2.995 10.885,0.008c3.008,3.011 3.003,7.882 -0.008,10.889Zm-5.23,-48.781c-16.373,0 -29.701,-13.324 -29.701,-29.698c0,-16.381 13.328,-29.714 29.701,-29.714c16.378,0 29.706,13.333 29.706,29.714c0,16.374 -13.328,29.698 -29.706,29.698Zm-160.386,-29.702c0,-16.381 13.328,-29.71 29.714,-29.71c16.369,0 29.689,13.329 29.689,29.71c0,16.373 -13.32,29.693 -29.689,29.693c-16.386,0 -29.714,-13.32 -29.714,-29.693Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on facebook"
+            href="https://facebook.com/sharer/sharer.php?u=http%3a%2f%2flocalhost%3a1313%2fposts%2fvim-tips%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-106.468,0l0,-192.915l66.6,0l12.672,-82.621l-79.272,0l0,-53.617c0,-22.603 11.073,-44.636 46.58,-44.636l36.042,0l0,-70.34c0,0 -32.71,-5.582 -63.982,-5.582c-65.288,0 -107.96,39.569 -107.96,111.204l0,62.971l-72.573,0l0,82.621l72.573,0l0,192.915l-191.104,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on whatsapp"
+            href="https://api.whatsapp.com/send?text=%20-%20http%3a%2f%2flocalhost%3a1313%2fposts%2fvim-tips%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-58.673,127.703c-33.842,-33.881 -78.847,-52.548 -126.798,-52.568c-98.799,0 -179.21,80.405 -179.249,179.234c-0.013,31.593 8.241,62.428 23.927,89.612l-25.429,92.884l95.021,-24.925c26.181,14.28 55.659,21.807 85.658,21.816l0.074,0c98.789,0 179.206,-80.413 179.247,-179.243c0.018,-47.895 -18.61,-92.93 -52.451,-126.81Zm-126.797,275.782l-0.06,0c-26.734,-0.01 -52.954,-7.193 -75.828,-20.767l-5.441,-3.229l-56.386,14.792l15.05,-54.977l-3.542,-5.637c-14.913,-23.72 -22.791,-51.136 -22.779,-79.287c0.033,-82.142 66.867,-148.971 149.046,-148.971c39.793,0.014 77.199,15.531 105.329,43.692c28.128,28.16 43.609,65.592 43.594,105.4c-0.034,82.149 -66.866,148.983 -148.983,148.984Zm81.721,-111.581c-4.479,-2.242 -26.499,-13.075 -30.604,-14.571c-4.105,-1.495 -7.091,-2.241 -10.077,2.241c-2.986,4.483 -11.569,14.572 -14.182,17.562c-2.612,2.988 -5.225,3.364 -9.703,1.12c-4.479,-2.241 -18.91,-6.97 -36.017,-22.23c-13.314,-11.876 -22.304,-26.542 -24.916,-31.026c-2.612,-4.484 -0.279,-6.908 1.963,-9.14c2.016,-2.007 4.48,-5.232 6.719,-7.847c2.24,-2.615 2.986,-4.484 4.479,-7.472c1.493,-2.99 0.747,-5.604 -0.374,-7.846c-1.119,-2.241 -10.077,-24.288 -13.809,-33.256c-3.635,-8.733 -7.327,-7.55 -10.077,-7.688c-2.609,-0.13 -5.598,-0.158 -8.583,-0.158c-2.986,0 -7.839,1.121 -11.944,5.604c-4.105,4.484 -15.675,15.32 -15.675,37.364c0,22.046 16.048,43.342 18.287,46.332c2.24,2.99 31.582,48.227 76.511,67.627c10.685,4.615 19.028,7.371 25.533,9.434c10.728,3.41 20.492,2.929 28.209,1.775c8.605,-1.285 26.499,-10.833 30.231,-21.295c3.732,-10.464 3.732,-19.431 2.612,-21.298c-1.119,-1.869 -4.105,-2.99 -8.583,-5.232Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on telegram"
+            href="https://telegram.me/share/url?text=&amp;url=http%3a%2f%2flocalhost%3a1313%2fposts%2fvim-tips%2f">
+            <svg version="1.1" xml:space="preserve" viewBox="2 2 28 28" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M26.49,29.86H5.5a3.37,3.37,0,0,1-2.47-1,3.35,3.35,0,0,1-1-2.47V5.48A3.36,3.36,0,0,1,3,3,3.37,3.37,0,0,1,5.5,2h21A3.38,3.38,0,0,1,29,3a3.36,3.36,0,0,1,1,2.46V26.37a3.35,3.35,0,0,1-1,2.47A3.38,3.38,0,0,1,26.49,29.86Zm-5.38-6.71a.79.79,0,0,0,.85-.66L24.73,9.24a.55.55,0,0,0-.18-.46.62.62,0,0,0-.41-.17q-.08,0-16.53,6.11a.59.59,0,0,0-.41.59.57.57,0,0,0,.43.52l4,1.24,1.61,4.83a.62.62,0,0,0,.63.43.56.56,0,0,0,.4-.17L16.54,20l4.09,3A.9.9,0,0,0,21.11,23.15ZM13.8,20.71l-1.21-4q8.72-5.55,8.78-5.55c.15,0,.23,0,.23.16a.18.18,0,0,1,0,.06s-2.51,2.3-7.52,6.8Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on ycombinator"
+            href="https://news.ycombinator.com/submitlink?t=&u=http%3a%2f%2flocalhost%3a1313%2fposts%2fvim-tips%2f">
+            <svg version="1.1" xml:space="preserve" width="30px" height="30px" viewBox="0 0 512 512" fill="currentColor"
+                xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape">
+                <path
+                    d="M449.446 0C483.971 0 512 28.03 512 62.554L512 449.446C512 483.97 483.97 512 449.446 512L62.554 512C28.03 512 0 483.97 0 449.446L0 62.554C0 28.03 28.029 0 62.554 0L449.446 0ZM183.8767 87.9921H121.8427L230.6673 292.4508V424.0079H281.3328V292.4508L390.1575 87.9921H328.1233L256 238.2489z" />
+            </svg>
+        </a>
+    </li>
+</ul>
+
+  </footer>
+</article>
+    </main>
+    
+<footer class="footer">
+        <span>&copy; 2025 <a href="http://localhost:1313/">Sean&#39;s Note</a></span> · 
+
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+<script>
+    document.querySelectorAll('pre > code').forEach((codeblock) => {
+        const container = codeblock.parentNode.parentNode;
+
+        const copybutton = document.createElement('button');
+        copybutton.classList.add('copy-code');
+        copybutton.innerHTML = 'copy';
+
+        function copyingDone() {
+            copybutton.innerHTML = 'copied!';
+            setTimeout(() => {
+                copybutton.innerHTML = 'copy';
+            }, 2000);
+        }
+
+        copybutton.addEventListener('click', (cb) => {
+            if ('clipboard' in navigator) {
+                navigator.clipboard.writeText(codeblock.textContent);
+                copyingDone();
+                return;
+            }
+
+            const range = document.createRange();
+            range.selectNodeContents(codeblock);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            try {
+                document.execCommand('copy');
+                copyingDone();
+            } catch (e) { };
+            selection.removeRange(range);
+        });
+
+        if (container.classList.contains("highlight")) {
+            container.appendChild(copybutton);
+        } else if (container.parentNode.firstChild == container) {
+            
+        } else if (codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName == "TABLE") {
+            
+            codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(copybutton);
+        } else {
+            
+            codeblock.parentNode.appendChild(copybutton);
+        }
+    });
+</script>
+</body>
+
+</html>

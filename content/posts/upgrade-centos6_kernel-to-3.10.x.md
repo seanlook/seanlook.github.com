@@ -1,3 +1,4 @@
+---
 title: CentOS 6.x 内核升级（2.6.32 -> 3.10.58）过程记录
 date: 2014-10-24 01:21:25
 updated: 2014-10-27 10:46:23
@@ -143,5 +144,5 @@ ERROR: modinfo: could not find module vmware_balloon
 - [Linux Kernel内核配置方式详解](http://smilejay.com/2011/05/linux-kernel-configuration/)
 
 
-  [1]: http://sean-images.qiniudn.com/config-kernel-module.png
-  [2]: http://sean-images.qiniudn.com/boot-with-new-kernel.png
+  [1]: http://github.com/seanlook/sean-notes-comment/raw/main/static/config-kernel-module.png
+  [2]: http://github.com/seanlook/sean-notes-comment/raw/main/static/boot-with-new-kernel.png

@@ -1,3 +1,4 @@
+---
 title: rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD
 date: 2015-03-02 01:21:25
 updated: 2015-03-02 00:46:23
@@ -30,6 +31,8 @@ Mar  2 14:43:29 poprod yum[33040]: Installed: nss-softokn-freebl-3.14.3-19.el6_6
 Mar  2 14:44:14 poprod yum[33047]: Installed: nss-softokn-freebl-3.14.3-19.el6_6.x86_64
 ...
 ```
+
+<!-- more -->
 
 下载 `nss-softokn-freebl-3.14.3-19.el6_6.x86_64.rpm`：
 ```

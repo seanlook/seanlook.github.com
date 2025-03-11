@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="noindex, nofollow">
+<title>Sean&#39;s Note</title>
+<meta name="keywords" content="">
+<meta name="description" content="title: SSL/TLS原理详解
+date: 2015-01-07 01:21:25
+updated: 2015-01-07 10:46:23
+tags: [ssl, tls, 安全]
+categories: Linux
+本文大部分整理自网络，相关文章请见文后参考。
+关于证书授权中心CA以及数字证书等概念，请移步 OpenSSL 与 SSL 数字证书概念贴 ，如果你想快速自建CA然后签发数字证书，请移步 基于OpenSSL自建CA和颁发SSL证书  。">
+<meta name="author" content="">
+<link rel="canonical" href="http://localhost:1313/posts/1/01/tls-ssl/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.8a19d6c7d40c68078a482516c7c2a326ccb9f6e9282cabe7240ecc1a80c6cb47.css" integrity="sha256-ihnWx9QMaAeKSCUWx8KjJsy59ukoLKvnJA7MGoDGy0c=" rel="preload stylesheet" as="style">
+<link rel="icon" href="http://localhost:1313/img/logo.gif">
+<link rel="icon" type="image/png" sizes="16x16" href="http://localhost:1313/img/logo.gif">
+<link rel="icon" type="image/png" sizes="32x32" href="http://localhost:1313/img/logo.gif">
+<link rel="apple-touch-icon" href="http://localhost:1313/logo.gif">
+<link rel="mask-icon" href="http://localhost:1313/logo.gif">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<link rel="alternate" hreflang="en" href="http://localhost:1313/posts/1/01/tls-ssl/">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --code-block-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://localhost:1313/" accesskey="h" title="Sean&#39;s Note (Alt + H)">Sean&#39;s Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://localhost:1313/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/categories/" title="Categories">
+                    <span>Categories</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/search/" title="Search (Alt &#43; /)" accesskey=/>
+                    <span>Search</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/tags/" title="Tags">
+                    <span>Tags</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    <div class="breadcrumbs"><a href="http://localhost:1313/">Home</a>&nbsp;»&nbsp;<a href="http://localhost:1313/posts/">Posts</a></div>
+    <h1 class="post-title entry-hint-parent">
+      
+    </h1>
+    <div class="post-meta">16 min
+
+</div>
+  </header> <aside id="toc-container" class="toc-container wide">
+    <div class="toc">
+        <details  open>
+            <summary accesskey="c" title="(Alt + C)">
+                <span class="details">Table of Contents</span>
+            </summary>
+
+            <div class="inner"><ul>
+                    <li>
+                        <a href="#1-ssltls%e6%a6%82%e8%a7%88" aria-label="1. SSL/TLS概览">1. SSL/TLS概览</a><ul>
+                            
+                    <li>
+                        <a href="#11-%e6%95%b4%e4%bd%93%e7%bb%93%e6%9e%84" aria-label="1.1 整体结构">1.1 整体结构</a></li>
+                    <li>
+                        <a href="#12-tls%e4%b8%8essl%e7%9a%84%e5%b7%ae%e5%bc%82" aria-label="1.2 TLS与SSL的差异">1.2 TLS与SSL的差异</a></li></ul>
+                    </li>
+                    <li>
+                        <a href="#2-%e5%af%86%e9%92%a5%e5%8d%8f%e5%95%86%e8%bf%87%e7%a8%8btls%e6%8f%a1%e6%89%8b" aria-label="2. 密钥协商过程——TLS握手">2. 密钥协商过程——TLS握手</a><ul>
+                            
+                    <li>
+                        <a href="#21-%e5%ae%a2%e6%88%b7%e7%ab%af%e5%8f%91%e5%87%ba%e8%af%b7%e6%b1%82clienthello" aria-label="2.1 客户端发出请求（ClientHello）">2.1 客户端发出请求（ClientHello）</a></li>
+                    <li>
+                        <a href="#22-%e6%9c%8d%e5%8a%a1%e5%99%a8%e5%9b%9e%e5%ba%94severhello" aria-label="2.2 服务器回应（SeverHello)">2.2 服务器回应（SeverHello)</a></li>
+                    <li>
+                        <a href="#23-%e5%ae%a2%e6%88%b7%e7%ab%af%e5%9b%9e%e5%ba%94certificate-verify" aria-label="2.3 客户端回应（Certificate Verify）">2.3 客户端回应（Certificate Verify）</a></li>
+                    <li>
+                        <a href="#24-%e6%9c%8d%e5%8a%a1%e5%99%a8%e7%9a%84%e6%9c%80%e5%90%8e%e5%9b%9e%e5%ba%94server-finish" aria-label="2.4 服务器的最后回应（Server Finish）">2.4 服务器的最后回应（Server Finish）</a></li>
+                    <li>
+                        <a href="#25-%e5%87%a0%e4%b8%aasecret" aria-label="2.5 几个secret">2.5 几个secret</a></li>
+                    <li>
+                        <a href="#26-%e5%ba%94%e7%94%a8%e6%95%b0%e6%8d%ae%e4%bc%a0%e8%be%93" aria-label="2.6 应用数据传输">2.6 应用数据传输</a></li>
+                    <li>
+                        <a href="#27-%e6%80%bb%e7%bb%93" aria-label="2.7 总结">2.7 总结</a></li></ul>
+                    </li>
+                    <li>
+                        <a href="#3-%e9%99%84%e5%af%86%e9%92%a5%e5%8d%8f%e5%95%86%e7%9a%84%e5%bd%a2%e8%b1%a1%e5%8c%96%e6%af%94%e5%96%bb" aria-label="3. 附：密钥协商的形象化比喻">3. 附：密钥协商的形象化比喻</a></li>
+                    <li>
+                        <a href="#4-ssl%e5%ae%89%e5%85%a8%e6%80%a7" aria-label="4. SSL安全性">4. SSL安全性</a></li>
+                    <li>
+                        <a href="#5-%e4%bb%a3%e7%90%86" aria-label="5. 代理">5. 代理</a></li>
+                    <li>
+                        <a href="#6-%e5%8f%82%e8%80%83" aria-label="6. 参考">6. 参考</a>
+                    </li>
+                </ul>
+            </div>
+        </details>
+    </div>
+</aside>
+<script>
+    let activeElement;
+    let elements;
+    window.addEventListener('DOMContentLoaded', function (event) {
+        checkTocPosition();
+
+        elements = document.querySelectorAll('h1[id],h2[id],h3[id],h4[id],h5[id],h6[id]');
+         
+         activeElement = elements[0];
+         const id = encodeURI(activeElement.getAttribute('id')).toLowerCase();
+         document.querySelector(`.inner ul li a[href="#${id}"]`).classList.add('active');
+     }, false);
+
+    window.addEventListener('resize', function(event) {
+        checkTocPosition();
+    }, false);
+
+    window.addEventListener('scroll', () => {
+        
+        activeElement = Array.from(elements).find((element) => {
+            if ((getOffsetTop(element) - window.pageYOffset) > 0 && 
+                (getOffsetTop(element) - window.pageYOffset) < window.innerHeight/2) {
+                return element;
+            }
+        }) || activeElement
+
+        elements.forEach(element => {
+             const id = encodeURI(element.getAttribute('id')).toLowerCase();
+             if (element === activeElement){
+                 document.querySelector(`.inner ul li a[href="#${id}"]`).classList.add('active');
+             } else {
+                 document.querySelector(`.inner ul li a[href="#${id}"]`).classList.remove('active');
+             }
+         })
+     }, false);
+
+    const main = parseInt(getComputedStyle(document.body).getPropertyValue('--article-width'), 10);
+    const toc = parseInt(getComputedStyle(document.body).getPropertyValue('--toc-width'), 10);
+    const gap = parseInt(getComputedStyle(document.body).getPropertyValue('--gap'), 10);
+
+    function checkTocPosition() {
+        const width = document.body.scrollWidth;
+
+        if (width - main - (toc * 2) - (gap * 4) > 0) {
+            document.getElementById("toc-container").classList.add("wide");
+        } else {
+            document.getElementById("toc-container").classList.remove("wide");
+        }
+    }
+
+    function getOffsetTop(element) {
+        if (!element.getClientRects().length) {
+            return 0;
+        }
+        let rect = element.getBoundingClientRect();
+        let win = element.ownerDocument.defaultView;
+        return rect.top + win.pageYOffset;   
+    }
+</script>
+
+
+  <div class="post-content"><h2 id="categories-linux">title: SSL/TLS原理详解
+date: 2015-01-07 01:21:25
+updated: 2015-01-07 10:46:23
+tags: [ssl, tls, 安全]
+categories: Linux</h2>
+<p>本文大部分整理自网络，相关文章请见文后参考。</p>
+<p>关于证书授权中心CA以及数字证书等概念，请移步 <a href="http://xgknight.com/2015/01/15/openssl-certificate-encryption">OpenSSL 与 SSL 数字证书概念贴</a> ，如果你想快速自建CA然后签发数字证书，请移步 <a href="http://xgknight.com/2015/01/18/openssl-self-sign-ca">基于OpenSSL自建CA和颁发SSL证书 </a> 。</p>
+<p>SSL/TLS作为一种互联网安全加密技术，原理较为复杂，枯燥而无味，我也是试图理解之后重新整理，尽量做到层次清晰。正文开始。</p>
+<h1 id="1-ssltls概览">1. SSL/TLS概览<a hidden class="anchor" aria-hidden="true" href="#1-ssltls概览">#</a></h1>
+<h2 id="11-整体结构">1.1 整体结构<a hidden class="anchor" aria-hidden="true" href="#11-整体结构">#</a></h2>
+<p>SSL是一个介于HTTP协议与TCP之间的一个可选层，其位置大致如下:
+<img alt="tls-ssl-_tcp-ip_protocol.png" loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/tls-ssl-_tcp-ip_protocol.png"></p>
+<ul>
+<li>
+<p><strong>SSL</strong>：（Secure Socket Layer，安全套接字层），为Netscape所研发，用以保障在Internet上数据传输之安全，利用数据加密(Encryption)技术，可确保数据在网络上之传输过程中不会被截取。当前版本为3.0。它已被广泛地用于Web浏览器与服务器之间的身份认证和加密数据传输。
+SSL协议位于TCP/IP协议与各种应用层协议之间，为数据通讯提供安全支持。SSL协议可分为两层： SSL记录协议（SSL Record Protocol）：它建立在可靠的传输协议（如TCP）之上，为高层协议提供数据封装、压缩、加密等基本功能的支持。 SSL握手协议（SSL Handshake Protocol）：它建立在SSL记录协议之上，用于在实际的数据传输开始前，通讯双方进行身份认证、协商加密算法、交换加密密钥等。</p>
+</li>
+<li>
+<p><strong>TLS</strong>：(Transport Layer Security，传输层安全协议)，用于两个应用程序之间提供保密性和数据完整性。
+TLS 1.0是IETF（Internet Engineering Task Force，Internet工程任务组）制定的一种新的协议，它建立在SSL 3.0协议规范之上，是SSL 3.0的后续版本，可以理解为SSL 3.1，它是写入了  <a href="http://tools.ietf.org/html/rfc5246">RFC</a> 的。该协议由两层组成： TLS 记录协议（TLS Record）和 TLS 握手协议（TLS Handshake）。较低的层为 TLS 记录协议，位于某个可靠的传输协议（例如 TCP）上面。</p>
+</li>
+</ul>
+<p>SSL/TLS协议提供的服务主要有：</p>
+<ol>
+<li>认证用户和服务器，确保数据发送到正确的客户机和服务器；</li>
+<li>加密数据以防止数据中途被窃取；</li>
+<li>维护数据的完整性，确保数据在传输过程中不被改变。</li>
+</ol>
+<h2 id="12-tls与ssl的差异">1.2 TLS与SSL的差异<a hidden class="anchor" aria-hidden="true" href="#12-tls与ssl的差异">#</a></h2>
+<ol>
+<li>版本号：TLS记录格式与SSL记录格式相同，但版本号的值不同，TLS的版本1.0使用的版本号为SSLv3.1。</li>
+<li>报文鉴别码：SSLv3.0和TLS的MAC算法及MAC计算的范围不同。TLS使用了RFC-2104定义的HMAC算法。SSLv3.0使用了相似的算法，两者差别在于SSLv3.0中，填充字节与密钥之间采用的是连接运算，而HMAC算法采用的是异或运算。但是两者的安全程度是相同的。</li>
+<li>伪随机函数：TLS使用了称为PRF的伪随机函数来将密钥扩展成数据块，是更安全的方式。</li>
+<li>报警代码：TLS支持几乎所有的SSLv3.0报警代码，而且TLS还补充定义了很多报警代码，如解密失败（decryption_failed）、记录溢出（record_overflow）、未知CA（unknown_ca）、拒绝访问（access_denied）等。</li>
+<li>密文族和客户证书：SSLv3.0和TLS存在少量差别，即TLS不支持Fortezza密钥交换、加密算法和客户证书。</li>
+<li>certificate_verify和finished消息：SSLv3.0和TLS在用certificate_verify和finished消息计算MD5和SHA-1散列码时，计算的输入有少许差别，但安全性相当。</li>
+<li>加密计算：TLS与SSLv3.0在计算主密值（master secret）时采用的方式不同。</li>
+<li>填充：用户数据加密之前需要增加的填充字节。在SSL中，填充后的数据长度要达到密文块长度的最小整数倍。而在TLS中，填充后的数据长度可以是密文块长度的任意整数倍（但填充的最大长度为255字节），这种方式可以防止基于对报文长度进行分析的攻击。</li>
+</ol>
+<p><strong>TLS的主要增强内容</strong></p>
+<p>TLS的主要目标是使SSL更安全，并使协议的规范更精确和完善。TLS 在SSL v3.0 的基础上，提供了以下增强内容：</p>
+<ol>
+<li>更安全的MAC算法</li>
+<li>更严密的警报</li>
+<li>“灰色区域”规范的更明确的定义</li>
+</ol>
+<p><strong>TLS对于安全性的改进</strong></p>
+<ol>
+<li>对于消息认证使用密钥散列法：TLS 使用“消息认证代码的密钥散列法”（HMAC），当记录在开放的网络（如因特网）上传送时，该代码确保记录不会被变更。SSLv3.0还提供键控消息认证，但HMAC比SSLv3.0使用的（消息认证代码）MAC 功能更安全。</li>
+<li>增强的伪随机功能（PRF）：PRF生成密钥数据。在TLS中，HMAC定义PRF。PRF使用两种散列算法保证其安全性。如果任一算法暴露了，只要第二种算法未暴露，则数据仍然是安全的。</li>
+<li>改进的已完成消息验证：TLS和SSLv3.0都对两个端点提供已完成的消息，该消息认证交换的消息没有被变更。然而，TLS将此已完成消息基于PRF和HMAC值之上，这也比SSLv3.0更安全。</li>
+<li>一致证书处理：与SSLv3.0不同，TLS试图指定必须在TLS之间实现交换的证书类型。</li>
+<li>特定警报消息：TLS提供更多的特定和附加警报，以指示任一会话端点检测到的问题。TLS还对何时应该发送某些警报进行记录。</li>
+</ol>
+<h1 id="2-密钥协商过程tls握手">2. 密钥协商过程——TLS握手<a hidden class="anchor" aria-hidden="true" href="#2-密钥协商过程tls握手">#</a></h1>
+<p>SSL协议分为两部分：Handshake Protocol和Record Protocol。其中Handshake Protocol用来协商密钥，协议的大部分内容就是通信双方如何利用它来安全的协商出一份密钥。 Record Protocol则定义了传输的格式。</p>
+<p>由于非对称加密的速度比较慢，所以它一般用于密钥交换，双方通过公钥算法协商出一份密钥，然后通过对称加密来通信，当然，为了保证数据的完整性，在加密前要先经过HMAC的处理。</p>
+<p>SSL缺省只进行server端的认证，客户端的认证是可选的。以下是其流程图（摘自TLS协议）。
+<img alt="tls-ssl.svg" loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/tls-ssl.svg"></p>
+<h2 id="21-客户端发出请求clienthello">2.1 客户端发出请求（ClientHello）<a hidden class="anchor" aria-hidden="true" href="#21-客户端发出请求clienthello">#</a></h2>
+<p>由于客户端(如浏览器)对一些加解密算法的支持程度不一样，但是在TLS协议传输过程中必须使用同一套加解密算法才能保证数据能够正常的加解密。在TLS握手阶段，客户端首先要告知服务端，自己支持哪些加密算法，所以客户端需要将本地支持的加密套件(Cipher Suite)的列表传送给服务端。除此之外，客户端还要产生一个随机数，这个随机数一方面需要在客户端保存，另一方面需要传送给服务端，客户端的随机数需要跟服务端产生的随机数结合起来产生后面要讲到的 Master Secret 。</p>
+<p>综上，在这一步，客户端主要向服务器提供以下信息：</p>
+<ol>
+<li>支持的协议版本，比如TLS 1.0版</li>
+<li>一个客户端生成的随机数，稍后用于生成&quot;对话密钥&quot;</li>
+<li>支持的加密方法，比如RSA公钥加密</li>
+<li>支持的压缩方法</li>
+</ol>
+<h2 id="22-服务器回应severhello">2.2 服务器回应（SeverHello)<a hidden class="anchor" aria-hidden="true" href="#22-服务器回应severhello">#</a></h2>
+<p>上图中，从Server Hello到Server Done，有些服务端的实现是每条单独发送，有服务端实现是合并到一起发送。Sever Hello和Server Done都是只有头没有内容的数据。</p>
+<p>服务端在接收到客户端的Client Hello之后，服务端需要将自己的证书发送给客户端。这个证书是对于服务端的一种认证。例如，客户端收到了一个来自于称自己是www.alipay.com的数据，但是如何证明对方是合法的alipay支付宝呢？这就是证书的作用，支付宝的证书可以证明它是alipay，而不是财付通。证书是需要申请，并由专门的数字证书认证机构(CA)通过非常严格的审核之后颁发的电子证书。颁发证书的同时会产生一个私钥和公钥。私钥由服务端自己保存，不可泄漏。公钥则是附带在证书的信息中，可以公开的。证书本身也附带一个证书电子签名，这个签名用来验证证书的完整性和真实性，可以防止证书被串改。另外，证书还有个有效期。</p>
+<p>在服务端向客户端发送的证书中没有提供足够的信息（证书公钥）的时候，还可以向客户端发送一个 Server Key Exchange，</p>
+<p>此外，对于非常重要的保密数据，服务端还需要对客户端进行验证，以保证数据传送给了安全的合法的客户端。服务端可以向客户端发出 Cerficate Request 消息，要求客户端发送证书对客户端的合法性进行验证。比如，金融机构往往只允许认证客户连入自己的网络，就会向正式客户提供USB密钥，里面就包含了一张客户端证书。</p>
+<p>跟客户端一样，服务端也需要产生一个随机数发送给客户端。客户端和服务端都需要使用这两个随机数来产生Master Secret。</p>
+<p>最后服务端会发送一个Server Hello Done消息给客户端，表示Server Hello消息结束了。</p>
+<p>综上，在这一步，服务器的回应包含以下内容：</p>
+<ol>
+<li>确认使用的加密通信协议版本，比如TLS 1.0版本。如果浏览器与服务器支持的版本不一致，服务器关闭加密通信</li>
+<li>一个服务器生成的随机数，稍后用于生成&quot;对话密钥&quot;</li>
+<li>确认使用的加密方法，比如RSA公钥加密</li>
+<li>服务器证书</li>
+</ol>
+<h2 id="23-客户端回应certificate-verify">2.3 客户端回应（Certificate Verify）<a hidden class="anchor" aria-hidden="true" href="#23-客户端回应certificate-verify">#</a></h2>
+<p><strong>Client Key Exchange</strong></p>
+<p>如果服务端需要对客户端进行验证，在客户端收到服务端的 Server Hello 消息之后，首先需要向服务端发送客户端的证书，让服务端来验证客户端的合法性。</p>
+<p><strong>Certificate Verify</strong>
+接着，客户端需要对服务端的证书进行检查，如果证书不是可信机构颁布、或者证书中的域名与实际域名不一致、或者证书已经过期，就会向访问者显示一个警告，由其选择是否还要继续通信。如果证书没有问题，客户端就会从服务器证书中取出服务器的公钥。然后，向服务器发送下面三项信息：</p>
+<ol>
+<li>一个随机数。该随机数用服务器公钥加密，防止被窃听</li>
+<li>编码改变通知，表示随后的信息都将用双方商定的加密方法和密钥发送</li>
+<li>客户端握手结束通知，表示客户端的握手阶段已经结束。这一项同时也是前面发送的所有内容的hash值，用来供服务器校验</li>
+</ol>
+<p>上面第一项的随机数，是整个握手阶段出现的第三个随机数，它是客户端使用一些加密算法(例如：RSA, Diffie-Hellman)产生一个48个字节的Key，这个Key叫 PreMaster Secret，很多材料上也被称作 PreMaster Key。</p>
+<p><strong>ChangeCipherSpec</strong>
+ChangeCipherSpec是一个独立的协议，体现在数据包中就是一个字节的数据，用于告知服务端，客户端已经切换到之前协商好的加密套件（Cipher Suite）的状态，准备使用之前协商好的加密套件加密数据并传输了。</p>
+<p>在ChangecipherSpec传输完毕之后，客户端会使用之前协商好的加密套件和Session Secret加密一段 Finish 的数据传送给服务端，此数据是为了在正式传输应用数据之前对刚刚握手建立起来的加解密通道进行验证。</p>
+<h2 id="24-服务器的最后回应server-finish">2.4 服务器的最后回应（Server Finish）<a hidden class="anchor" aria-hidden="true" href="#24-服务器的最后回应server-finish">#</a></h2>
+<p>服务端在接收到客户端传过来的 PreMaster 加密数据之后，使用私钥对这段加密数据进行解密，并对数据进行验证，也会使用跟客户端同样的方式生成 Session Secret，一切准备好之后，会给客户端发送一个 ChangeCipherSpec，告知客户端已经切换到协商过的加密套件状态，准备使用加密套件和 Session Secret加密数据了。之后，服务端也会使用 Session Secret 加密一段 Finish 消息发送给客户端，以验证之前通过握手建立起来的加解密通道是否成功。</p>
+<p>根据之前的握手信息，如果客户端和服务端都能对Finish信息进行正常加解密且消息正确的被验证，则说明握手通道已经建立成功，接下来，双方可以使用上面产生的Session Secret对数据进行加密传输了。</p>
+<h2 id="25-几个secret">2.5 几个secret<a hidden class="anchor" aria-hidden="true" href="#25-几个secret">#</a></h2>
+<p><strong>Secret Keys</strong>
+上面的分析和讲解主要是为了突出握手的过程，所以PreMaster secret，Master secret，session secret都是一代而过，但是对于Https，SSL/TLS深入的理解和掌握，这些Secret Keys是非常重要的部分。所以，准备把这些Secret Keys抽出来单独分析和讲解。</p>
+<p>我们先来看看这些Secret Keys的生成过程以及作用流程图：
+<img alt="tls-keys-create.svg" loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/tls-keys-create.svg"></p>
+<p><strong>PreMaster secret</strong>
+PreMaster Secret是在客户端使用RSA或者Diffie-Hellman等加密算法生成的。它将用来跟服务端和客户端在Hello阶段产生的随机数结合在一起生成 Master Secret。在客户端使用服务端的公钥对PreMaster Secret进行加密之后传送给服务端，服务端将使用私钥进行解密得到PreMaster secret。也就是说服务端和客户端都有一份相同的PreMaster secret和随机数。</p>
+<p>PreMaster secret前两个字节是TLS的版本号，这是一个比较重要的用来核对握手数据的版本号，因为在Client Hello阶段，客户端会发送一份加密套件列表和当前支持的SSL/TLS的版本号给服务端，而且是使用明文传送的，如果握手的数据包被破解之后，攻击者很有可能串改数据包，选择一个安全性较低的加密套件和版本给服务端，从而对数据进行破解。所以，服务端需要对密文中解密出来对的PreMaster版本号跟之前Client Hello阶段的版本号进行对比，如果版本号变低，则说明被串改，则立即停止发送任何消息。</p>
+<p>关于PreMaster Secret(Key)的计算请参考 <a href="http://www.fenesky.com/blog/2014/07/25/how-premaster-secret.html">Https SSL/TLS PreMaster/Master Secret(Key)计算</a>。</p>
+<p><strong>Master secret</strong>
+上面已经提到，由于服务端和客户端都有一份相同的PreMaster secret和随机数，这个随机数将作为后面产生Master secret的种子，结合PreMaster secret，客户端和服务端将计算出同样的Master secret。</p>
+<p>Master secret是有系列的hash值组成的，它将作为数据加解密相关的secret的 Key Material 的一部分。Key Material最终解析出来的数据如下：
+<img alt="tls-keys.svg" loading="lazy" src="http://github.com/seanlook/sean-notes-comment/raw/main/static/tls-keys.svg"></p>
+<p>其中，write MAC key，就是session secret或者说是session key。Client write MAC key是客户端发数据的session secret，Server write MAC secret是服务端发送数据的session key。MAC(Message Authentication Code)，是一个数字签名，用来验证数据的完整性，可以检测到数据是否被串改。</p>
+<p>关于Session Secret(Key)的计算请参考 <a href="http://www.fenesky.com/blog/2014/07/25/how-session-secret.html">Https SSL/TLS Session Secret(Key)计算</a>。</p>
+<h2 id="26-应用数据传输">2.6 应用数据传输<a hidden class="anchor" aria-hidden="true" href="#26-应用数据传输">#</a></h2>
+<p>在所有的握手阶段都完成之后，就可以开始传送应用数据了。应用数据在传输之前，首先要附加上MAC secret，然后再对这个数据包使用write encryption key进行加密。在服务端收到密文之后，使用Client write encryption key进行解密，客户端收到服务端的数据之后使用Server write encryption key进行解密，然后使用各自的write MAC key对数据的完整性包括是否被串改进行验证。</p>
+<h2 id="27-总结">2.7 总结<a hidden class="anchor" aria-hidden="true" href="#27-总结">#</a></h2>
+<p>SSL客户端（也是TCP的客户端）在TCP链接建立之后，发出一个ClientHello来发起握手，这个消息里面包含了自己可实现的算法列表和其它一些需要的消息，SSL的服务器端会回应一个ServerHello，这里面确定了这次通信所需要的算法，然后发过去自己的证书（里面包含了身份和自己的公钥）。Client在收到这个消息后会生成一个秘密消息，用SSL服务器的公钥加密后传过去，SSL服务器端用自己的私钥解密后，会话密钥协商成功，双方可以用同一份会话密钥来通信了。</p>
+<h1 id="3-附密钥协商的形象化比喻">3. 附：密钥协商的形象化比喻<a hidden class="anchor" aria-hidden="true" href="#3-附密钥协商的形象化比喻">#</a></h1>
+<p>如果上面的说明不够清晰，这里我们用个形象的比喻，我们假设A与B通信，A是SSL客户端，B是SSL服务器端，加密后的消息放在方括号[]里，以突出明文消息的区别。双方的处理动作的说明用圆括号（）括起。</p>
+<p>A：我想和你安全的通话，我这里的对称加密算法有DES,RC5,密钥交换算法有RSA和DH，摘要算法有MD5和SHA。</p>
+<p>B：我们用DES－RSA－SHA这对组合好了。
+这是我的证书，里面有我的名字和公钥，你拿去验证一下我的身份（把证书发给A）。
+目前没有别的可说的了。</p>
+<p>A：（查看证书上B的名字是否无误，并通过手头早已有的CA的证书验证了B的证书的真实性，如果其中一项有误，发出警告并断开连接，这一步保证了B的公钥的真实性）
+（产生一份秘密消息，这份秘密消息处理后将用作加密密钥，加密初始化向量（IV）和hmac的密钥。将这份秘密消息-协议中称为per_master_secret-用B的公钥加密，封装成称作ClientKeyExchange的消息。由于用了B的公钥，保证了第三方无法窃听）
+我生成了一份秘密消息，并用你的公钥加密了，给你（把ClientKeyExchange发给B）
+注意，下面我就要用加密的办法给你发消息了！
+（将秘密消息进行处理，生成加密密钥，加密初始化向量和hmac的密钥）
+[我说完了]</p>
+<p>B：（用自己的私钥将ClientKeyExchange中的秘密消息解密出来，然后将秘密消息进行处理，生成加密密钥，加密初始化向量和hmac的密钥，这时双方已经安全的协商出一套加密办法了）<br>
+注意，我也要开始用加密的办法给你发消息了！
+[我说完了]</p>
+<p>A: [我的秘密是&hellip;]</p>
+<p>B: [其它人不会听到的&hellip;]</p>
+<h1 id="4-ssl安全性">4. SSL安全性<a hidden class="anchor" aria-hidden="true" href="#4-ssl安全性">#</a></h1>
+<p>SecurityPortal在2000年底有一份文章《The End of SSL and SSH?》激起了很多的讨论， 目前也有一些成熟的工具如dsniff（http://www.monkey.org/~dugsong/dsniff/）可以通过man in the middle攻击来截获https的消息。</p>
+<p>从上面的原理可知，SSL的结构是严谨的，问题一般出现在实际不严谨的应用中。常见的攻击就是middle in the middle攻击，它是指在A和B通信的同时，有第三方C处于信道的中间，可以完全听到A与B通信的消息，并可拦截，替换和添加这些消息。</p>
+<ol>
+<li>SSL可以允许多种密钥交换算法，而有些算法，如DH，没有证书的概念，这样A便无法验证B的公钥和身份的真实性，从而C可以轻易的冒充，用自己的密钥与双方通信，从而窃听到别人谈话的内容。
+而为了防止middle in the middle攻击，应该采用有证书的密钥交换算法。</li>
+<li>有了证书以后，如果C用自己的证书替换掉原有的证书之后，A的浏览器会弹出一个警告框进行警告，但又有多少人会注意这个警告呢？</li>
+<li>由于美国密码出口的限制，IE，netscape等浏览器所支持的加密强度是很弱的，如果只采用浏览器自带的加密功能的话，理论上存在被破解可能。</li>
+</ol>
+<h1 id="5-代理">5. 代理<a hidden class="anchor" aria-hidden="true" href="#5-代理">#</a></h1>
+<p>下面探讨一下SSL的代理是怎样工作的
+当在浏览器里设置了https的代理，而且里输入了<code>https://www.example.com</code>之后，浏览器会与proxy建立tcp链接，然后向其发出这么一段消息：</p>
+<pre><code>   CONNECT server.example.com:443 HTTP/1.1
+   Host: server.example.com:443
+</code></pre>
+<p>然后proxy会向webserver端建立tcp连接,之后，这个代理便完全成了个内容转发装置。浏览器与web server会建立一个安全通道，因此这个安全通道是端到端的，尽管所有的信息流过了proxy,但其内容proxy是无法解密和改动的（当然要由证书的支持，否则这个地方便是个man in the middle攻击的好场所，见上面的安全部分）。</p>
+<p>CA证书以及如何使用OpenSSL自签署，见文章<a href="http://xgknight.com/2015/01/18/openssl-self-sign-ca">OpenSSL自签署证书</a> 。</p>
+<h1 id="6-参考">6. 参考<a hidden class="anchor" aria-hidden="true" href="#6-参考">#</a></h1>
+<ul>
+<li>
+<p><a href="http://www.fenesky.com/blog/2014/07/19/how-https-works.html">Https(SSL/TLS)原理详解</a></p>
+</li>
+<li>
+<p><a href="https://blog.cloudflare.com/keyless-ssl-the-nitty-gritty-technical-details/">Keyless SSL: The Nitty Gritty Technical Details</a></p>
+</li>
+<li>
+<p><a href="http://kb.cnblogs.com/page/197396/">SSL与TLS的区别以及介绍</a></p>
+</li>
+<li>
+<p><a href="http://www.ruanyifeng.com/blog/2014/02/ssl_tls.html">SSL/TLS协议运行机制的概述</a></p>
+</li>
+<li>
+<p><a href="http://www.nsfocus.net/?act=magazine&amp;do=view&amp;mid=841">SSL/TLS/WTLS原理</a></p>
+</li>
+<li>
+<p><a href="http://tech.yanatm.com/?p=338">Transport Layer Security (TLS)</a></p>
+</li>
+<li>
+<p><a href="http://zh.wikipedia.org/wiki/%E4%BC%A0%E8%BE%93%E5%B1%82%E5%AE%89%E5%85%A8%E5%8D%8F%E8%AE%AE">传输层安全协议</a></p>
+</li>
+<li>
+<p><a href="http://www.zytrax.com/tech/survival/ssl.html">Survival guides - TLS/SSL and SSL (X.509) Certificates</a></p>
+</li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+    </ul>
+<nav class="paginav">
+  <a class="prev" href="http://localhost:1313/posts/1/01/the-way-home-20151001/">
+    <span class="title">« Prev</span>
+    <br>
+    <span></span>
+  </a>
+  <a class="next" href="http://localhost:1313/posts/1/01/vim-tips/">
+    <span class="title">Next »</span>
+    <br>
+    <span></span>
+  </a>
+</nav>
+
+
+<ul class="share-buttons">
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on x"
+            href="https://x.com/intent/tweet/?text=&amp;url=http%3a%2f%2flocalhost%3a1313%2fposts%2f1%2f01%2ftls-ssl%2f&amp;hashtags=">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M512 62.554 L 512 449.446 C 512 483.97 483.97 512 449.446 512 L 62.554 512 C 28.03 512 0 483.97 0 449.446 L 0 62.554 C 0 28.03 28.029 0 62.554 0 L 449.446 0 C 483.971 0 512 28.03 512 62.554 Z M 269.951 190.75 L 182.567 75.216 L 56 75.216 L 207.216 272.95 L 63.9 436.783 L 125.266 436.783 L 235.9 310.383 L 332.567 436.783 L 456 436.783 L 298.367 228.367 L 432.367 75.216 L 371.033 75.216 Z M 127.633 110 L 164.101 110 L 383.481 400.065 L 349.5 400.065 Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on linkedin"
+            href="https://www.linkedin.com/shareArticle?mini=true&amp;url=http%3a%2f%2flocalhost%3a1313%2fposts%2f1%2f01%2ftls-ssl%2f&amp;title=&amp;summary=&amp;source=http%3a%2f%2flocalhost%3a1313%2fposts%2f1%2f01%2ftls-ssl%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-288.985,423.278l0,-225.717l-75.04,0l0,225.717l75.04,0Zm270.539,0l0,-129.439c0,-69.333 -37.018,-101.586 -86.381,-101.586c-39.804,0 -57.634,21.891 -67.617,37.266l0,-31.958l-75.021,0c0.995,21.181 0,225.717 0,225.717l75.02,0l0,-126.056c0,-6.748 0.486,-13.492 2.474,-18.315c5.414,-13.475 17.767,-27.434 38.494,-27.434c27.135,0 38.007,20.707 38.007,51.037l0,120.768l75.024,0Zm-307.552,-334.556c-25.674,0 -42.448,16.879 -42.448,39.002c0,21.658 16.264,39.002 41.455,39.002l0.484,0c26.165,0 42.452,-17.344 42.452,-39.002c-0.485,-22.092 -16.241,-38.954 -41.943,-39.002Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on reddit"
+            href="https://reddit.com/submit?url=http%3a%2f%2flocalhost%3a1313%2fposts%2f1%2f01%2ftls-ssl%2f&title=">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-3.446,265.638c0,-22.964 -18.616,-41.58 -41.58,-41.58c-11.211,0 -21.361,4.457 -28.841,11.666c-28.424,-20.508 -67.586,-33.757 -111.204,-35.278l18.941,-89.121l61.884,13.157c0.756,15.734 13.642,28.29 29.56,28.29c16.407,0 29.706,-13.299 29.706,-29.701c0,-16.403 -13.299,-29.702 -29.706,-29.702c-11.666,0 -21.657,6.792 -26.515,16.578l-69.105,-14.69c-1.922,-0.418 -3.939,-0.042 -5.585,1.036c-1.658,1.073 -2.811,2.761 -3.224,4.686l-21.152,99.438c-44.258,1.228 -84.046,14.494 -112.837,35.232c-7.468,-7.164 -17.589,-11.591 -28.757,-11.591c-22.965,0 -41.585,18.616 -41.585,41.58c0,16.896 10.095,31.41 24.568,37.918c-0.639,4.135 -0.99,8.328 -0.99,12.576c0,63.977 74.469,115.836 166.33,115.836c91.861,0 166.334,-51.859 166.334,-115.836c0,-4.218 -0.347,-8.387 -0.977,-12.493c14.564,-6.47 24.735,-21.034 24.735,-38.001Zm-119.474,108.193c-20.27,20.241 -59.115,21.816 -70.534,21.816c-11.428,0 -50.277,-1.575 -70.522,-21.82c-3.007,-3.008 -3.007,-7.882 0,-10.889c3.003,-2.999 7.882,-3.003 10.885,0c12.777,12.781 40.11,17.317 59.637,17.317c19.522,0 46.86,-4.536 59.657,-17.321c3.016,-2.999 7.886,-2.995 10.885,0.008c3.008,3.011 3.003,7.882 -0.008,10.889Zm-5.23,-48.781c-16.373,0 -29.701,-13.324 -29.701,-29.698c0,-16.381 13.328,-29.714 29.701,-29.714c16.378,0 29.706,13.333 29.706,29.714c0,16.374 -13.328,29.698 -29.706,29.698Zm-160.386,-29.702c0,-16.381 13.328,-29.71 29.714,-29.71c16.369,0 29.689,13.329 29.689,29.71c0,16.373 -13.32,29.693 -29.689,29.693c-16.386,0 -29.714,-13.32 -29.714,-29.693Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on facebook"
+            href="https://facebook.com/sharer/sharer.php?u=http%3a%2f%2flocalhost%3a1313%2fposts%2f1%2f01%2ftls-ssl%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-106.468,0l0,-192.915l66.6,0l12.672,-82.621l-79.272,0l0,-53.617c0,-22.603 11.073,-44.636 46.58,-44.636l36.042,0l0,-70.34c0,0 -32.71,-5.582 -63.982,-5.582c-65.288,0 -107.96,39.569 -107.96,111.204l0,62.971l-72.573,0l0,82.621l72.573,0l0,192.915l-191.104,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on whatsapp"
+            href="https://api.whatsapp.com/send?text=%20-%20http%3a%2f%2flocalhost%3a1313%2fposts%2f1%2f01%2ftls-ssl%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-58.673,127.703c-33.842,-33.881 -78.847,-52.548 -126.798,-52.568c-98.799,0 -179.21,80.405 -179.249,179.234c-0.013,31.593 8.241,62.428 23.927,89.612l-25.429,92.884l95.021,-24.925c26.181,14.28 55.659,21.807 85.658,21.816l0.074,0c98.789,0 179.206,-80.413 179.247,-179.243c0.018,-47.895 -18.61,-92.93 -52.451,-126.81Zm-126.797,275.782l-0.06,0c-26.734,-0.01 -52.954,-7.193 -75.828,-20.767l-5.441,-3.229l-56.386,14.792l15.05,-54.977l-3.542,-5.637c-14.913,-23.72 -22.791,-51.136 -22.779,-79.287c0.033,-82.142 66.867,-148.971 149.046,-148.971c39.793,0.014 77.199,15.531 105.329,43.692c28.128,28.16 43.609,65.592 43.594,105.4c-0.034,82.149 -66.866,148.983 -148.983,148.984Zm81.721,-111.581c-4.479,-2.242 -26.499,-13.075 -30.604,-14.571c-4.105,-1.495 -7.091,-2.241 -10.077,2.241c-2.986,4.483 -11.569,14.572 -14.182,17.562c-2.612,2.988 -5.225,3.364 -9.703,1.12c-4.479,-2.241 -18.91,-6.97 -36.017,-22.23c-13.314,-11.876 -22.304,-26.542 -24.916,-31.026c-2.612,-4.484 -0.279,-6.908 1.963,-9.14c2.016,-2.007 4.48,-5.232 6.719,-7.847c2.24,-2.615 2.986,-4.484 4.479,-7.472c1.493,-2.99 0.747,-5.604 -0.374,-7.846c-1.119,-2.241 -10.077,-24.288 -13.809,-33.256c-3.635,-8.733 -7.327,-7.55 -10.077,-7.688c-2.609,-0.13 -5.598,-0.158 -8.583,-0.158c-2.986,0 -7.839,1.121 -11.944,5.604c-4.105,4.484 -15.675,15.32 -15.675,37.364c0,22.046 16.048,43.342 18.287,46.332c2.24,2.99 31.582,48.227 76.511,67.627c10.685,4.615 19.028,7.371 25.533,9.434c10.728,3.41 20.492,2.929 28.209,1.775c8.605,-1.285 26.499,-10.833 30.231,-21.295c3.732,-10.464 3.732,-19.431 2.612,-21.298c-1.119,-1.869 -4.105,-2.99 -8.583,-5.232Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on telegram"
+            href="https://telegram.me/share/url?text=&amp;url=http%3a%2f%2flocalhost%3a1313%2fposts%2f1%2f01%2ftls-ssl%2f">
+            <svg version="1.1" xml:space="preserve" viewBox="2 2 28 28" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M26.49,29.86H5.5a3.37,3.37,0,0,1-2.47-1,3.35,3.35,0,0,1-1-2.47V5.48A3.36,3.36,0,0,1,3,3,3.37,3.37,0,0,1,5.5,2h21A3.38,3.38,0,0,1,29,3a3.36,3.36,0,0,1,1,2.46V26.37a3.35,3.35,0,0,1-1,2.47A3.38,3.38,0,0,1,26.49,29.86Zm-5.38-6.71a.79.79,0,0,0,.85-.66L24.73,9.24a.55.55,0,0,0-.18-.46.62.62,0,0,0-.41-.17q-.08,0-16.53,6.11a.59.59,0,0,0-.41.59.57.57,0,0,0,.43.52l4,1.24,1.61,4.83a.62.62,0,0,0,.63.43.56.56,0,0,0,.4-.17L16.54,20l4.09,3A.9.9,0,0,0,21.11,23.15ZM13.8,20.71l-1.21-4q8.72-5.55,8.78-5.55c.15,0,.23,0,.23.16a.18.18,0,0,1,0,.06s-2.51,2.3-7.52,6.8Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on ycombinator"
+            href="https://news.ycombinator.com/submitlink?t=&u=http%3a%2f%2flocalhost%3a1313%2fposts%2f1%2f01%2ftls-ssl%2f">
+            <svg version="1.1" xml:space="preserve" width="30px" height="30px" viewBox="0 0 512 512" fill="currentColor"
+                xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape">
+                <path
+                    d="M449.446 0C483.971 0 512 28.03 512 62.554L512 449.446C512 483.97 483.97 512 449.446 512L62.554 512C28.03 512 0 483.97 0 449.446L0 62.554C0 28.03 28.029 0 62.554 0L449.446 0ZM183.8767 87.9921H121.8427L230.6673 292.4508V424.0079H281.3328V292.4508L390.1575 87.9921H328.1233L256 238.2489z" />
+            </svg>
+        </a>
+    </li>
+</ul>
+
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+        <span>&copy; 2025 <a href="http://localhost:1313/">Sean&#39;s Note</a></span> · 
+
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+<script>
+    document.querySelectorAll('pre > code').forEach((codeblock) => {
+        const container = codeblock.parentNode.parentNode;
+
+        const copybutton = document.createElement('button');
+        copybutton.classList.add('copy-code');
+        copybutton.innerHTML = 'copy';
+
+        function copyingDone() {
+            copybutton.innerHTML = 'copied!';
+            setTimeout(() => {
+                copybutton.innerHTML = 'copy';
+            }, 2000);
+        }
+
+        copybutton.addEventListener('click', (cb) => {
+            if ('clipboard' in navigator) {
+                navigator.clipboard.writeText(codeblock.textContent);
+                copyingDone();
+                return;
+            }
+
+            const range = document.createRange();
+            range.selectNodeContents(codeblock);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            try {
+                document.execCommand('copy');
+                copyingDone();
+            } catch (e) { };
+            selection.removeRange(range);
+        });
+
+        if (container.classList.contains("highlight")) {
+            container.appendChild(copybutton);
+        } else if (container.parentNode.firstChild == container) {
+            
+        } else if (codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName == "TABLE") {
+            
+            codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(copybutton);
+        } else {
+            
+            codeblock.parentNode.appendChild(copybutton);
+        }
+    });
+</script>
+</body>
+
+</html>

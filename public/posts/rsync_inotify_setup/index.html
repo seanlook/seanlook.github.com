@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="noindex, nofollow">
+<title>Sean&#39;s Note</title>
+<meta name="keywords" content="">
+<meta name="description" content="title: Linux下同步工具inotify&#43;rsync使用详解
+date: 2014-12-12 01:21:25
+updated: 2014-12-12 00:46:23
+tags: [rsync,inotify,backup，文件同步]
+categories: Linux
+1. rsync
+1.1 什么是rsync
+rsync是一个远程数据同步工具，可通过LAN/WAN快速同步多台主机间的文件。它使用所谓的“Rsync演算法”来使本地和远程两个主机之间的文件达到同步，这个算法只传送两个文件的不同部分，而不是每次都整份传送，因此速度相当快。所以通常可以作为备份工具来使用。">
+<meta name="author" content="">
+<link rel="canonical" href="http://localhost:1313/posts/rsync_inotify_setup/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.45e028aa8ce0961349adf411b013ee39406be2c0bc80d4ea3fc04555f7f4611a.css" integrity="sha256-ReAoqozglhNJrfQRsBPuOUBr4sC8gNTqP8BFVff0YRo=" rel="preload stylesheet" as="style">
+<link rel="icon" href="http://localhost:1313/img/logo.gif">
+<link rel="icon" type="image/png" sizes="16x16" href="http://localhost:1313/img/logo.gif">
+<link rel="icon" type="image/png" sizes="32x32" href="http://localhost:1313/img/logo.gif">
+<link rel="apple-touch-icon" href="http://localhost:1313/logo.gif">
+<link rel="mask-icon" href="http://localhost:1313/logo.gif">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<link rel="alternate" hreflang="en" href="http://localhost:1313/posts/rsync_inotify_setup/">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --code-block-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://localhost:1313/" accesskey="h" title="Sean&#39;s Note (Alt + H)">Sean&#39;s Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://localhost:1313/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/categories/" title="Categories">
+                    <span>Categories</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/search/" title="Search (Alt &#43; /)" accesskey=/>
+                    <span>Search</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/tags/" title="Tags">
+                    <span>Tags</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    <div class="breadcrumbs"><a href="http://localhost:1313/">Home</a>&nbsp;»&nbsp;<a href="http://localhost:1313/posts/">Posts</a></div>
+    <h1 class="post-title entry-hint-parent">
+      
+    </h1>
+    <div class="post-meta">11 min
+
+</div>
+  </header> <div class="toc">
+    <details  open>
+        <summary accesskey="c" title="(Alt + C)">
+            <span class="details">Table of Contents</span>
+        </summary>
+
+        <div class="inner"><ul>
+                <li>
+                    <a href="#1-rsync" aria-label="1. rsync">1. rsync</a><ul>
+                        
+                <li>
+                    <a href="#11-%e4%bb%80%e4%b9%88%e6%98%afrsync" aria-label="1.1 什么是rsync">1.1 什么是rsync</a></li>
+                <li>
+                    <a href="#12-%e5%90%8c%e6%ad%a5%e6%b5%8b%e8%af%95" aria-label="1.2 同步测试">1.2 同步测试</a><ul>
+                        
+                <li>
+                    <a href="#121-%e6%9c%ac%e6%9c%ba%e6%96%87%e4%bb%b6%e5%a4%b9%e5%90%8c%e6%ad%a5" aria-label="1.2.1 本机文件夹同步">1.2.1 本机文件夹同步</a></li></ul>
+                </li>
+                <li>
+                    <a href="#13-%e5%90%8c%e6%ad%a5%e5%88%b0%e8%bf%9c%e7%a8%8b%e6%9c%8d%e5%8a%a1%e5%99%a8" aria-label="1.3 同步到远程服务器">1.3 同步到远程服务器</a><ul>
+                        
+                <li>
+                    <a href="#131-%e6%9c%8d%e5%8a%a1%e7%ab%af%e9%85%8d%e7%bd%ae%e6%96%87%e4%bb%b6" aria-label="1.3.1 服务端配置文件">1.3.1 服务端配置文件</a></li>
+                <li>
+                    <a href="#132-%e6%9c%8d%e5%8a%a1%e5%99%a8%e5%90%af%e5%8a%a8rsync%e5%90%8e%e5%8f%b0%e6%9c%8d%e5%8a%a1" aria-label="1.3.2 服务器启动rsync后台服务">1.3.2 服务器启动rsync后台服务</a></li>
+                <li>
+                    <a href="#133-%e5%ae%a2%e6%88%b7%e7%ab%af%e6%b5%8b%e8%af%95%e5%90%8c%e6%ad%a5" aria-label="1.3.3 客户端测试同步">1.3.3 客户端测试同步</a></li></ul>
+                </li>
+                <li>
+                    <a href="#14-rsync%e4%b8%8d%e8%b6%b3" aria-label="1.4 rsync不足">1.4 rsync不足</a></li></ul>
+                </li>
+                <li>
+                    <a href="#2-inotify-tools" aria-label="2. inotify-tools">2. inotify-tools</a><ul>
+                        
+                <li>
+                    <a href="#21-%e4%bb%80%e4%b9%88%e6%98%afinotify" aria-label="2.1 什么是inotify">2.1 什么是inotify</a></li>
+                <li>
+                    <a href="#22-inotifywait%e4%bd%bf%e7%94%a8%e7%a4%ba%e4%be%8b" aria-label="2.2 inotifywait使用示例">2.2 inotifywait使用示例</a></li></ul>
+                </li>
+                <li>
+                    <a href="#3-rsync%e7%bb%84%e5%90%88inotify-tools%e5%ae%8c%e6%88%90%e5%ae%9e%e6%97%b6%e5%90%8c%e6%ad%a5" aria-label="3. rsync组合inotify-tools完成实时同步">3. rsync组合inotify-tools完成实时同步</a><ul>
+                        
+                <li>
+                    <a href="#31-%e5%88%9b%e5%bb%ba%e6%8e%92%e9%99%a4%e5%9c%a8%e5%a4%96%e4%b8%8d%e5%90%8c%e6%ad%a5%e7%9a%84%e6%96%87%e4%bb%b6%e5%88%97%e8%a1%a8" aria-label="3.1 创建排除在外不同步的文件列表">3.1 创建排除在外不同步的文件列表</a></li>
+                <li>
+                    <a href="#32-%e5%ae%a2%e6%88%b7%e7%ab%af%e5%90%8c%e6%ad%a5%e5%88%b0%e8%bf%9c%e7%a8%8b%e7%9a%84%e8%84%9a%e6%9c%acrsyncsh" aria-label="3.2 客户端同步到远程的脚本rsync.sh">3.2 客户端同步到远程的脚本rsync.sh</a></li>
+                <li>
+                    <a href="#%e5%8f%82%e8%80%83" aria-label="参考">参考</a>
+                </li>
+            </ul>
+            </li>
+            </ul>
+        </div>
+    </details>
+</div>
+
+  <div class="post-content"><h2 id="categories-linux">title: Linux下同步工具inotify+rsync使用详解
+date: 2014-12-12 01:21:25
+updated: 2014-12-12 00:46:23
+tags: [rsync,inotify,backup，文件同步]
+categories: Linux</h2>
+<h1 id="1-rsync">1. rsync<a hidden class="anchor" aria-hidden="true" href="#1-rsync">#</a></h1>
+<h2 id="11-什么是rsync">1.1 什么是rsync<a hidden class="anchor" aria-hidden="true" href="#11-什么是rsync">#</a></h2>
+<p>rsync是一个远程数据同步工具，可通过LAN/WAN快速同步多台主机间的文件。它使用所谓的“Rsync演算法”来使本地和远程两个主机之间的文件达到同步，这个算法只传送两个文件的不同部分，而不是每次都整份传送，因此速度相当快。所以通常可以作为备份工具来使用。</p>
+<p>运行Rsync server的机器也叫backup server，一个Rsync server可同时备份多个client的数据；也可以多个Rsync server备份一个client的数据。Rsync可以搭配ssh甚至使用daemon模式。Rsync server会打开一个873的服务通道(port)，等待对方rsync连接。连接时，Rsync server会检查口令是否相符，若通过口令查核，则可以开始进行文件传输。第一次连通完成时，会把整份文件传输一次，下一次就只传送二个文件之间不同的部份。</p>
+<p><strong>基本特点：</strong></p>
+<ol>
+<li>可以镜像保存整个目录树和文件系统；</li>
+<li>可以很容易做到保持原来文件的权限、时间、软硬链接等；</li>
+<li>无须特殊权限即可安装；</li>
+<li>优化的流程，文件传输效率高；</li>
+<li>可以使用rcp、ssh等方式来传输文件，当然也可以通过直接的socket连接；</li>
+<li>支持匿名传输。</li>
+</ol>
+<p><strong>命令语法：</strong>
+rsync的命令格式可以为以下六种：
+　rsync [OPTION]… SRC DEST
+　rsync [OPTION]… SRC [USER@]HOST:DEST
+　rsync [OPTION]… [USER@]HOST:SRC DEST
+　rsync [OPTION]… [USER@]HOST::SRC DEST
+　rsync [OPTION]… SRC [USER@]HOST::DEST
+　rsync [OPTION]… rsync://[USER@]HOST[:PORT]/SRC [DEST]</p>
+<p>对应于以上六种命令格式，我们可以总结rsync有2种不同的工作模式：</p>
+<ul>
+<li>shell模式：使用远程shell程序（如ssh或rsh）进行连接。当源路径或目的路径的主机名后面包含一个冒号分隔符时使用这种模式，rsync安装完成后就可以直接使用了，无所谓启动。（目前没有尝试过这个方法）</li>
+<li>daemon模式：使用TCP直接连接rsync daemon。当源路径或目的路径的主机名后面包含两个冒号，或使用rsync://URL时使用这种模式，无需远程shell，但必须在一台机器上启动rsync daemon，默认端口873，这里可以通过<code>rsync --daemon</code>使用独立进程的方式，或者通过xinetd超级进程来管理rsync后台进程。</li>
+</ul>
+<p>当rsync作为daemon运行时，它需要一个用户身份。如果你希望启用chroot，则必须以root的身份来运行daemon，监听端口，或设定文件属主；如果不启用chroot，也可以不使用root用户来运行daemon，但该用户必须对相应的模块拥有读写数据、日志和lock file的权限。当rsync以daemon模式运行时，它还需要一个配置文件——rsyncd.conf。修改这个配置后不必重启rsync daemon，因为每一次的client连接都会去重新读取该文件。</p>
+<p>我们一般把DEST远程服务器端成为rsync Server，运行rsync命令的一端SRC称为Client。</p>
+<p><strong>安装：</strong>
+rsync在CentOS6上默认已经安装，如果没有则可以使用<code>yum install rsync -y</code>，服务端和客户端是同一个安装包。</p>
+<pre tabindex="0"><code># rsync -h
+</code></pre><h2 id="12-同步测试">1.2 同步测试<a hidden class="anchor" aria-hidden="true" href="#12-同步测试">#</a></h2>
+<p>关于<code>rsync</code>命令的诸多选项说明，见另外一篇文章<a href="http://seanlook.com/2014/12/13/rsync_inotify_configuration">rsync与inotifywait命令和配置选项说明</a>。</p>
+<h3 id="121-本机文件夹同步">1.2.1 本机文件夹同步<a hidden class="anchor" aria-hidden="true" href="#121-本机文件夹同步">#</a></h3>
+<pre tabindex="0"><code># rsync -auvrtzopgP --progress  /root/ /tmp/rsync_bak/
+</code></pre><p>会看到从<code>/root/</code>传输文件到<code>/tmp/rsync_bak/</code>的列表和速率，再运行一次会看到sending incremental file list下没有复制的内容，可以在/root/下<code>touch</code>某一个文件再运行看到只同步了修改过的文件。</p>
+<p>上面需要考虑以下问题：</p>
+<ul>
+<li>删除/root/下的文件不会同步删除/tmp/rsync_bak，除非加入<code>--delete</code>选项</li>
+<li>文件访问时间等属性、读写等权限、文件内容等有任何变动，都会被认为修改</li>
+<li>目标目录下如果文件比源目录还新，则不会同步</li>
+<li>源路径的最后是否有斜杠有不同的含义：有斜杠，只是复制目录中的文件；没有斜杠的话，不但要复制目录中的文件，还要复制目录本身</li>
+</ul>
+<h2 id="13-同步到远程服务器">1.3 同步到远程服务器<a hidden class="anchor" aria-hidden="true" href="#13-同步到远程服务器">#</a></h2>
+<p>在服务器间rsync传输文件，需要有一个是开着rsync的服务，而这一服务需要两个配置文件，说明当前运行的用户名和用户组，这个用户名和用户组在改变文件权限和相关内容的时候有用，否则有时候会出现提示权限问题。配置文件也说明了模块、模块化管理服务的安全性，每个模块的名称都是自己定义的，可以添加用户名密码验证，也可以验证IP，设置目录是否可写等，不同模块用于同步不同需求的目录。</p>
+<h3 id="131-服务端配置文件">1.3.1 服务端配置文件<a hidden class="anchor" aria-hidden="true" href="#131-服务端配置文件">#</a></h3>
+<p>** /etc/rsyncd.conf： **</p>
+<pre tabindex="0"><code>#2014-12-11 by Sean
+uid=root
+gid=root
+use chroot=no
+max connections=10
+timeout=600
+strict modes=yes
+port=873
+pid file=/var/run/rsyncd.pid
+lock file=/var/run/rsyncd.lock
+log file=/var/log/rsyncd.log
+
+[module_test]
+path=/tmp/rsync_bak2
+comment=rsync test logs
+auth users=sean
+uid=sean
+gid=sean
+secrets file=/etc/rsyncd.secrets
+read only=no
+list=no
+hosts allow=172.29.88.204
+hosts deny=0.0.0.0/32
+</code></pre><p>这里配置socket方式传输文件，端口873，[module_test]开始定义一个模块，指定要同步的目录（接收）path，授权用户，密码文件，允许哪台服务器IP同步（发送）等。关于配置文件中选项的详细说明依然参考<a href="http://seanlook.com/2014/12/13/rsync_inotify_configuration">rsync与inotifywait命令和配置选项说明</a>。</p>
+<p>经测试，上述配置文件每行后面不能使用<code>#</code>来来注释</p>
+<p>** /etc/rsyncd.secrets： **</p>
+<pre tabindex="0"><code>sean:passw0rd
+</code></pre><p>一行一个用户，用户名:密码。请注意这里的用户名和密码与操作系统的用户名密码无关，可以随意指定，与<code>/etc/rsyncd.conf</code>中的<code>auth users</code>对应。</p>
+<p>修改权限：<code>chmod 600 /etc/rsyncd.d/rsync_server.pwd</code>。</p>
+<h3 id="132-服务器启动rsync后台服务">1.3.2 服务器启动rsync后台服务<a hidden class="anchor" aria-hidden="true" href="#132-服务器启动rsync后台服务">#</a></h3>
+<p>修改<code>/etc/xinetd.d/rsync</code>文件，disable 改为 no</p>
+<pre tabindex="0"><code># default: off
+# description: The rsync server is a good addition to an ftp server, as it \
+#	allows crc checksumming etc.
+service rsync
+{
+	disable	= no
+	flags		= IPv6
+	socket_type     = stream
+	wait            = no
+	user            = root
+	server          = /usr/bin/rsync
+	server_args     = --daemon
+	log_on_failure  += USERID
+}
+</code></pre><p>执行<code>service xinetd restart</code>会一起重启rsync后台进程，默认使用配置文件<code>/etc/rsyncd.conf</code>。也可以使用<code>/usr/bin/rsync --daemon --config=/etc/rsyncd.conf</code>。</p>
+<p>为了以防rsync写入过多的无用日志到<code>/var/log/message</code>（容易塞满从而错过重要的信息），建议注释掉<code>/etc/xinetd.conf</code>的success：</p>
+<pre tabindex="0"><code># log_on_success  = PID HOST DURATION EXIT
+</code></pre><p>如果使用了防火墙，要添加允许IP到873端口的规则。</p>
+<pre tabindex="0"><code># iptables -A INPUT -p tcp -m state --state NEW  -m tcp --dport 873 -j ACCEPT
+# iptables -L  查看一下防火墙是不是打开了 873端口
+# netstat -anp|grep 873
+</code></pre><p>建议关闭<code>selinux</code>，可能会由于强访问控制导致同步报错。</p>
+<h3 id="133-客户端测试同步">1.3.3 客户端测试同步<a hidden class="anchor" aria-hidden="true" href="#133-客户端测试同步">#</a></h3>
+<p>单向同步时，客户端只需要一个包含密码的文件。
+<strong>/etc/rsync_client.pwd：</strong></p>
+<pre tabindex="0"><code>passw0rd
+</code></pre><p>chmod 600 /etc/rsync_client.pwd</p>
+<p><strong>命令：</strong>
+将本地<code>/root/</code>目录同步到远程172.29.88.223的/tmp/rsync_bak2目录（module_test指定）：</p>
+<pre tabindex="0"><code>/usr/bin/rsync -auvrtzopgP --progress --password-file=/etc/rsync_client.pwd /root/ sean@172.29.88.223::module_test 
+</code></pre><p>当然你也可以将远程的/tmp/rsync_bak2目录同步到本地目录/root/tmp：</p>
+<pre tabindex="0"><code>/usr/bin/rsync -auvrtzopgP --progress --password-file=/etc/rsync_client.pwd sean@172.29.88.223::module_test /root/ 
+</code></pre><p>从上面两个命令可以看到，其实这里的服务器与客户端的概念是很模糊的，rsync daemon都运行在远程172.29.88.223上，第一条命令是本地主动推送目录到远程，远程服务器是用来备份的；第二条命令是本地主动向远程索取文件，本地服务器用来备份，也可以认为是本地服务器恢复的一个过程。</p>
+<h2 id="14-rsync不足">1.4 rsync不足<a hidden class="anchor" aria-hidden="true" href="#14-rsync不足">#</a></h2>
+<p>与传统的cp、tar备份方式相比，rsync具有安全性高、备份迅速、支持增量备份等优点，通过rsync可以解决对实时性要求不高的数据备份需求，例如定期的备份文件服务器数据到远端服务器，对本地磁盘定期做数据镜像等。</p>
+<p>随着应用系统规模的不断扩大，对数据的安全性和可靠性也提出的更好的要求，rsync在高端业务系统中也逐渐暴露出了很多不足，首先，rsync同步数据时，需要扫描所有文件后进行比对，进行差量传输。如果文件数量达到了百万甚至千万量级，扫描所有文件将是非常耗时的。而且正在发生变化的往往是其中很少的一部分，这是非常低效的方式。其次，rsync不能实时的去监测、同步数据，虽然它可以通过crontab方式进行触发同步，但是两次触发动作一定会有时间差，这样就导致了服务端和客户端数据可能出现不一致，无法在应用故障时完全的恢复数据。基于以上原因，rsync+inotify组合出现了！</p>
+<h1 id="2-inotify-tools">2. inotify-tools<a hidden class="anchor" aria-hidden="true" href="#2-inotify-tools">#</a></h1>
+<h2 id="21-什么是inotify">2.1 什么是inotify<a hidden class="anchor" aria-hidden="true" href="#21-什么是inotify">#</a></h2>
+<p>inotify是一种强大的、细粒度的、异步的文件系统事件监控机制，Linux内核从2.6.13开始引入，允许监控程序打开一个独立文件描述符，并针对事件集监控一个或者多个文件，例如打开、关闭、移动/重命名、删除、创建或者改变属性。</p>
+<p>CentOS6自然已经支持：
+使用<code>ll /proc/sys/fs/inotify</code>命令，是否有以下三条信息输出，如果没有表示不支持。</p>
+<pre tabindex="0"><code>total 0
+-rw-r--r-- 1 root root 0 Dec 11 15:23 max_queued_events
+-rw-r--r-- 1 root root 0 Dec 11 15:23 max_user_instances
+-rw-r--r-- 1 root root 0 Dec 11 15:23 max_user_watches
+</code></pre><ul>
+<li><code>/proc/sys/fs/inotify/max_queued_evnets</code>表示调用inotify_init时分配给inotify instance中可排队的event的数目的最大值，超出这个值的事件被丢弃，但会触发IN_Q_OVERFLOW事件。</li>
+<li><code>/proc/sys/fs/inotify/max_user_instances</code>表示每一个real user ID可创建的inotify instatnces的数量上限。</li>
+<li><code>/proc/sys/fs/inotify/max_user_watches</code>表示每个inotify instatnces可监控的最大目录数量。如果监控的文件数目巨大，需要根据情况，适当增加此值的大小。</li>
+</ul>
+<p><strong>inotify-tools：</strong></p>
+<p>inotify-tools是为linux下inotify文件监控工具提供的一套C的开发接口库函数，同时还提供了一系列的命令行工具，这些工具可以用来监控文件系统的事件。 inotify-tools是用c编写的，除了要求内核支持inotify外，不依赖于其他。inotify-tools提供两种工具，一是<code>inotifywait</code>，它是用来监控文件或目录的变化，二是<code>inotifywatch</code>，它是用来统计文件系统访问的次数。</p>
+<p>下载inotify-tools-3.14-1.el6.x86_64.rpm，通过rpm包安装：</p>
+<pre tabindex="0"><code># rpm -ivh /apps/crm/soft_src/inotify-tools-3.14-1.el6.x86_64.rpm 
+warning: /apps/crm/soft_src/inotify-tools-3.14-1.el6.x86_64.rpm: Header V3 DSA/SHA1 Signature, key ID 4026433f: NOKEY
+Preparing...                ########################################### [100%]
+   1:inotify-tools          ########################################### [100%]
+# rpm -qa|grep inotify
+inotify-tools-3.14-1.el5.x86_64
+</code></pre><h2 id="22-inotifywait使用示例">2.2 inotifywait使用示例<a hidden class="anchor" aria-hidden="true" href="#22-inotifywait使用示例">#</a></h2>
+<p>监控/root/tmp目录文件的变化：</p>
+<pre tabindex="0"><code>/usr/bin/inotifywait -mrq --timefmt &#39;%Y/%m/%d-%H:%M:%S&#39; --format &#39;%T %w %f&#39; \
+ -e modify,delete,create,move,attrib /root/tmp/
+</code></pre><p>上面的命令表示，持续监听<code>/root/tmp</code>目录及其子目录的文件变化，监听事件包括文件被修改、删除、创建、移动、属性更改，显示到屏幕。执行完上面的命令后，在<code>/root/tmp</code>下创建或修改文件都会有信息输出：</p>
+<pre tabindex="0"><code>2014/12/11-15:40:04 /root/tmp/ new.txt
+2014/12/11-15:40:22 /root/tmp/ .new.txt.swp
+2014/12/11-15:40:22 /root/tmp/ .new.txt.swx
+2014/12/11-15:40:22 /root/tmp/ .new.txt.swx
+2014/12/11-15:40:22 /root/tmp/ .new.txt.swp
+2014/12/11-15:40:22 /root/tmp/ .new.txt.swp
+2014/12/11-15:40:23 /root/tmp/ .new.txt.swp
+2014/12/11-15:40:31 /root/tmp/ .new.txt.swp
+2014/12/11-15:40:32 /root/tmp/ 4913
+2014/12/11-15:40:32 /root/tmp/ 4913
+2014/12/11-15:40:32 /root/tmp/ 4913
+2014/12/11-15:40:32 /root/tmp/ new.txt
+2014/12/11-15:40:32 /root/tmp/ new.txt~
+2014/12/11-15:40:32 /root/tmp/ new.txt
+...
+</code></pre><h1 id="3-rsync组合inotify-tools完成实时同步">3. rsync组合inotify-tools完成实时同步<a hidden class="anchor" aria-hidden="true" href="#3-rsync组合inotify-tools完成实时同步">#</a></h1>
+<p>这一步的核心其实就是在客户端创建一个脚本<code>rsync.sh</code>，适用<code>inotifywait</code>监控本地目录的变化，触发<code>rsync</code>将变化的文件传输到远程备份服务器上。为了更接近实战，我们要求一部分子目录不同步，如<code>/root/tmp/log</code>和临时文件。</p>
+<h2 id="31-创建排除在外不同步的文件列表">3.1 创建排除在外不同步的文件列表<a hidden class="anchor" aria-hidden="true" href="#31-创建排除在外不同步的文件列表">#</a></h2>
+<p>排除不需要同步的文件或目录有两种做法，第一种是inotify监控整个目录，在rsync中加入排除选项；第二种是inotify排除部分不监控的目录，rsync自然也不会触发。我们选择第二种。</p>
+<p>这个操作在客户端进行，<code>/root/tmp/log</code>以及<code>/root/tmp/src</code>目录下的js、css和一些临时文件不同步，所以不需要<code>inotifywait</code>，<code>/root/tmp</code>下的其他文件和目录都同步。（其实对于打开的临时文件，可以不监听<code>modify</code>时间而改成监听<code>close_write</code>）</p>
+<pre tabindex="0"><code># vi /etc/inotify_rsync_exclude.lst：
+@/root/tmp/cache??*
+@/root/tmp/src/js
+@/root/tmp/src/css
+@/root/tmp/src
+@/root/tmp/src/20*/20*/20*/.??*
+@/root/tmp/log/
+</code></pre><p>目前测试看到只能用绝对路径。</p>
+<h2 id="32-客户端同步到远程的脚本rsyncsh">3.2 客户端同步到远程的脚本<code>rsync.sh</code><a hidden class="anchor" aria-hidden="true" href="#32-客户端同步到远程的脚本rsyncsh">#</a></h2>
+<p>rsync.sh：</p>
+<pre tabindex="0"><code>#rsync auto sync script with inotify
+#2014-12-11 Sean
+#variables
+current_date=$(date +%Y%m%d_%H%M%S)
+source_path=/root/tmp/
+log_file=/var/log/rsync_client.log
+
+#rsync
+rsync_server=172.29.88.223
+rsync_user=sean
+rsync_pwd=/etc/rsync_client.pwd
+rsync_module=module_test
+
+#rsync client pwd check
+if [ ! -e ${rsync_pwd} ];then
+    echo -e &#34;rsync client passwod file ${rsync_pwd} does not exist!&#34;
+    exit 0
+fi
+
+#inotify_function
+inotify_fun(){
+    /usr/bin/inotifywait -mrq --timefmt &#39;%Y/%m/%d-%H:%M:%S&#39; --format &#39;%T %w %f&#39; \
+          --fromfile /etc/inotify_rsync_exclude.lst -e modify,delete,create,move,attrib ${source_path} \
+          | while read file
+      do
+          /usr/bin/rsync -auvrtzopgP --progress --bwlimit=200 --password-file=${rsync_pwd} ${source_path} ${rsync_user}@${rsync_server}::${rsync_module} 
+      done
+}
+
+#inotify log
+inotify_fun &gt;&gt; ${log_file} 2&gt;&amp;1 &amp;
+</code></pre><p><code>--bwlimit=200</code>用于限制传输速率最大200kb，因为在实际应用中发现如果不做速率限制，会导致巨大的CPU消耗。</p>
+<p>在客户端运行脚本<code># ./rsync.sh</code>即可实时同步目录。</p>
+<p>其他功能：<a href="http://seanlook/2014/12/13/rsync_two-way_eg">双向同步</a>、<a href="http://seanlook2014/12/16/rsync_sersyc2_muti_remote_dest">sersync2实时同步多远程服务器</a></p>
+<h2 id="参考">参考<a hidden class="anchor" aria-hidden="true" href="#参考">#</a></h2>
+<ul>
+<li><a href="http://rsync.samba.org/how-rsync-works.html">How Rsync Works</a></li>
+<li><a href="https://www.ibm.com/developerworks/cn/linux/l-inotify/">用 inotify 监控 Linux 文件系统事件</a></li>
+<li><a href="http://www.infoq.com/cn/articles/inotify-linux-file-system-event-monitoring">Inotify: 高效、实时的Linux文件系统事件监控框架</a></li>
+<li><a href="http://coolshell.cn/articles/7425.html">rsync 的核心算法</a></li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+    </ul>
+<nav class="paginav">
+  <a class="prev" href="http://localhost:1313/posts/rpm-yum-recover/">
+    <span class="title">« Prev</span>
+    <br>
+    <span></span>
+  </a>
+  <a class="next" href="http://localhost:1313/posts/shell-batch-replace-files-from-rar-zip/">
+    <span class="title">Next »</span>
+    <br>
+    <span></span>
+  </a>
+</nav>
+
+
+<ul class="share-buttons">
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on x"
+            href="https://x.com/intent/tweet/?text=&amp;url=http%3a%2f%2flocalhost%3a1313%2fposts%2frsync_inotify_setup%2f&amp;hashtags=">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M512 62.554 L 512 449.446 C 512 483.97 483.97 512 449.446 512 L 62.554 512 C 28.03 512 0 483.97 0 449.446 L 0 62.554 C 0 28.03 28.029 0 62.554 0 L 449.446 0 C 483.971 0 512 28.03 512 62.554 Z M 269.951 190.75 L 182.567 75.216 L 56 75.216 L 207.216 272.95 L 63.9 436.783 L 125.266 436.783 L 235.9 310.383 L 332.567 436.783 L 456 436.783 L 298.367 228.367 L 432.367 75.216 L 371.033 75.216 Z M 127.633 110 L 164.101 110 L 383.481 400.065 L 349.5 400.065 Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on linkedin"
+            href="https://www.linkedin.com/shareArticle?mini=true&amp;url=http%3a%2f%2flocalhost%3a1313%2fposts%2frsync_inotify_setup%2f&amp;title=&amp;summary=&amp;source=http%3a%2f%2flocalhost%3a1313%2fposts%2frsync_inotify_setup%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-288.985,423.278l0,-225.717l-75.04,0l0,225.717l75.04,0Zm270.539,0l0,-129.439c0,-69.333 -37.018,-101.586 -86.381,-101.586c-39.804,0 -57.634,21.891 -67.617,37.266l0,-31.958l-75.021,0c0.995,21.181 0,225.717 0,225.717l75.02,0l0,-126.056c0,-6.748 0.486,-13.492 2.474,-18.315c5.414,-13.475 17.767,-27.434 38.494,-27.434c27.135,0 38.007,20.707 38.007,51.037l0,120.768l75.024,0Zm-307.552,-334.556c-25.674,0 -42.448,16.879 -42.448,39.002c0,21.658 16.264,39.002 41.455,39.002l0.484,0c26.165,0 42.452,-17.344 42.452,-39.002c-0.485,-22.092 -16.241,-38.954 -41.943,-39.002Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on reddit"
+            href="https://reddit.com/submit?url=http%3a%2f%2flocalhost%3a1313%2fposts%2frsync_inotify_setup%2f&title=">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-3.446,265.638c0,-22.964 -18.616,-41.58 -41.58,-41.58c-11.211,0 -21.361,4.457 -28.841,11.666c-28.424,-20.508 -67.586,-33.757 -111.204,-35.278l18.941,-89.121l61.884,13.157c0.756,15.734 13.642,28.29 29.56,28.29c16.407,0 29.706,-13.299 29.706,-29.701c0,-16.403 -13.299,-29.702 -29.706,-29.702c-11.666,0 -21.657,6.792 -26.515,16.578l-69.105,-14.69c-1.922,-0.418 -3.939,-0.042 -5.585,1.036c-1.658,1.073 -2.811,2.761 -3.224,4.686l-21.152,99.438c-44.258,1.228 -84.046,14.494 -112.837,35.232c-7.468,-7.164 -17.589,-11.591 -28.757,-11.591c-22.965,0 -41.585,18.616 -41.585,41.58c0,16.896 10.095,31.41 24.568,37.918c-0.639,4.135 -0.99,8.328 -0.99,12.576c0,63.977 74.469,115.836 166.33,115.836c91.861,0 166.334,-51.859 166.334,-115.836c0,-4.218 -0.347,-8.387 -0.977,-12.493c14.564,-6.47 24.735,-21.034 24.735,-38.001Zm-119.474,108.193c-20.27,20.241 -59.115,21.816 -70.534,21.816c-11.428,0 -50.277,-1.575 -70.522,-21.82c-3.007,-3.008 -3.007,-7.882 0,-10.889c3.003,-2.999 7.882,-3.003 10.885,0c12.777,12.781 40.11,17.317 59.637,17.317c19.522,0 46.86,-4.536 59.657,-17.321c3.016,-2.999 7.886,-2.995 10.885,0.008c3.008,3.011 3.003,7.882 -0.008,10.889Zm-5.23,-48.781c-16.373,0 -29.701,-13.324 -29.701,-29.698c0,-16.381 13.328,-29.714 29.701,-29.714c16.378,0 29.706,13.333 29.706,29.714c0,16.374 -13.328,29.698 -29.706,29.698Zm-160.386,-29.702c0,-16.381 13.328,-29.71 29.714,-29.71c16.369,0 29.689,13.329 29.689,29.71c0,16.373 -13.32,29.693 -29.689,29.693c-16.386,0 -29.714,-13.32 -29.714,-29.693Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on facebook"
+            href="https://facebook.com/sharer/sharer.php?u=http%3a%2f%2flocalhost%3a1313%2fposts%2frsync_inotify_setup%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-106.468,0l0,-192.915l66.6,0l12.672,-82.621l-79.272,0l0,-53.617c0,-22.603 11.073,-44.636 46.58,-44.636l36.042,0l0,-70.34c0,0 -32.71,-5.582 -63.982,-5.582c-65.288,0 -107.96,39.569 -107.96,111.204l0,62.971l-72.573,0l0,82.621l72.573,0l0,192.915l-191.104,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on whatsapp"
+            href="https://api.whatsapp.com/send?text=%20-%20http%3a%2f%2flocalhost%3a1313%2fposts%2frsync_inotify_setup%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-58.673,127.703c-33.842,-33.881 -78.847,-52.548 -126.798,-52.568c-98.799,0 -179.21,80.405 -179.249,179.234c-0.013,31.593 8.241,62.428 23.927,89.612l-25.429,92.884l95.021,-24.925c26.181,14.28 55.659,21.807 85.658,21.816l0.074,0c98.789,0 179.206,-80.413 179.247,-179.243c0.018,-47.895 -18.61,-92.93 -52.451,-126.81Zm-126.797,275.782l-0.06,0c-26.734,-0.01 -52.954,-7.193 -75.828,-20.767l-5.441,-3.229l-56.386,14.792l15.05,-54.977l-3.542,-5.637c-14.913,-23.72 -22.791,-51.136 -22.779,-79.287c0.033,-82.142 66.867,-148.971 149.046,-148.971c39.793,0.014 77.199,15.531 105.329,43.692c28.128,28.16 43.609,65.592 43.594,105.4c-0.034,82.149 -66.866,148.983 -148.983,148.984Zm81.721,-111.581c-4.479,-2.242 -26.499,-13.075 -30.604,-14.571c-4.105,-1.495 -7.091,-2.241 -10.077,2.241c-2.986,4.483 -11.569,14.572 -14.182,17.562c-2.612,2.988 -5.225,3.364 -9.703,1.12c-4.479,-2.241 -18.91,-6.97 -36.017,-22.23c-13.314,-11.876 -22.304,-26.542 -24.916,-31.026c-2.612,-4.484 -0.279,-6.908 1.963,-9.14c2.016,-2.007 4.48,-5.232 6.719,-7.847c2.24,-2.615 2.986,-4.484 4.479,-7.472c1.493,-2.99 0.747,-5.604 -0.374,-7.846c-1.119,-2.241 -10.077,-24.288 -13.809,-33.256c-3.635,-8.733 -7.327,-7.55 -10.077,-7.688c-2.609,-0.13 -5.598,-0.158 -8.583,-0.158c-2.986,0 -7.839,1.121 -11.944,5.604c-4.105,4.484 -15.675,15.32 -15.675,37.364c0,22.046 16.048,43.342 18.287,46.332c2.24,2.99 31.582,48.227 76.511,67.627c10.685,4.615 19.028,7.371 25.533,9.434c10.728,3.41 20.492,2.929 28.209,1.775c8.605,-1.285 26.499,-10.833 30.231,-21.295c3.732,-10.464 3.732,-19.431 2.612,-21.298c-1.119,-1.869 -4.105,-2.99 -8.583,-5.232Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on telegram"
+            href="https://telegram.me/share/url?text=&amp;url=http%3a%2f%2flocalhost%3a1313%2fposts%2frsync_inotify_setup%2f">
+            <svg version="1.1" xml:space="preserve" viewBox="2 2 28 28" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M26.49,29.86H5.5a3.37,3.37,0,0,1-2.47-1,3.35,3.35,0,0,1-1-2.47V5.48A3.36,3.36,0,0,1,3,3,3.37,3.37,0,0,1,5.5,2h21A3.38,3.38,0,0,1,29,3a3.36,3.36,0,0,1,1,2.46V26.37a3.35,3.35,0,0,1-1,2.47A3.38,3.38,0,0,1,26.49,29.86Zm-5.38-6.71a.79.79,0,0,0,.85-.66L24.73,9.24a.55.55,0,0,0-.18-.46.62.62,0,0,0-.41-.17q-.08,0-16.53,6.11a.59.59,0,0,0-.41.59.57.57,0,0,0,.43.52l4,1.24,1.61,4.83a.62.62,0,0,0,.63.43.56.56,0,0,0,.4-.17L16.54,20l4.09,3A.9.9,0,0,0,21.11,23.15ZM13.8,20.71l-1.21-4q8.72-5.55,8.78-5.55c.15,0,.23,0,.23.16a.18.18,0,0,1,0,.06s-2.51,2.3-7.52,6.8Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share  on ycombinator"
+            href="https://news.ycombinator.com/submitlink?t=&u=http%3a%2f%2flocalhost%3a1313%2fposts%2frsync_inotify_setup%2f">
+            <svg version="1.1" xml:space="preserve" width="30px" height="30px" viewBox="0 0 512 512" fill="currentColor"
+                xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape">
+                <path
+                    d="M449.446 0C483.971 0 512 28.03 512 62.554L512 449.446C512 483.97 483.97 512 449.446 512L62.554 512C28.03 512 0 483.97 0 449.446L0 62.554C0 28.03 28.029 0 62.554 0L449.446 0ZM183.8767 87.9921H121.8427L230.6673 292.4508V424.0079H281.3328V292.4508L390.1575 87.9921H328.1233L256 238.2489z" />
+            </svg>
+        </a>
+    </li>
+</ul>
+
+  </footer>
+</article>
+    </main>
+    
+<footer class="footer">
+        <span>&copy; 2025 <a href="http://localhost:1313/">Sean&#39;s Note</a></span> · 
+
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+<script>
+    document.querySelectorAll('pre > code').forEach((codeblock) => {
+        const container = codeblock.parentNode.parentNode;
+
+        const copybutton = document.createElement('button');
+        copybutton.classList.add('copy-code');
+        copybutton.innerHTML = 'copy';
+
+        function copyingDone() {
+            copybutton.innerHTML = 'copied!';
+            setTimeout(() => {
+                copybutton.innerHTML = 'copy';
+            }, 2000);
+        }
+
+        copybutton.addEventListener('click', (cb) => {
+            if ('clipboard' in navigator) {
+                navigator.clipboard.writeText(codeblock.textContent);
+                copyingDone();
+                return;
+            }
+
+            const range = document.createRange();
+            range.selectNodeContents(codeblock);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            try {
+                document.execCommand('copy');
+                copyingDone();
+            } catch (e) { };
+            selection.removeRange(range);
+        });
+
+        if (container.classList.contains("highlight")) {
+            container.appendChild(copybutton);
+        } else if (container.parentNode.firstChild == container) {
+            
+        } else if (codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName == "TABLE") {
+            
+            codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(copybutton);
+        } else {
+            
+            codeblock.parentNode.appendChild(copybutton);
+        }
+    });
+</script>
+</body>
+
+</html>

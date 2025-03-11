@@ -1,3 +1,4 @@
+---
 title: 管理多tomcat服务shell脚本（CentOS）
 date: 2014-10-29 18:21:25
 updated: 2014-10-29 11:46:23

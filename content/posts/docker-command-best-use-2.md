@@ -1,3 +1,4 @@
+---
 title: docker常用管理命令（下）
 date: 2014-11-05 16:21:25
 updated: 2014-11-05 19:46:23
@@ -5,7 +6,7 @@ tags: [docker, command,linux]
 categories: [Virtualization, Docker]
 ---
 
-本文承接[docker专题(2)：docker常用管理命令（上）](http://seanlook.com/2014/10/31/docker-command-best-use-1/)。
+本文承接[docker专题(2)：docker常用管理命令（上）](http://xgknight.com/2014/10/31/docker-command-best-use-1/)。
 ### 1. 开启/停止/重启container（start/stop/restart） ###
 容器可以通过`run`新建一个来运行，也可以重新`start`已经停止的container，但`start`不能够再指定容器启动时运行的指令，因为docker只能有一个前台进程。
 容器stop（或`Ctrl+D`）时，会在保存当前容器的状态之后退出，下次start时保有上次关闭时更改。而且每次进入`attach`进去的界面是一样的，与第一次run启动或commit提交的时刻相同。
@@ -14,7 +15,7 @@ CONTAINER_ID=$(docker start <containner_id>)
 docker stop $CONTAINER_ID
 docker restart $CONTAINER_ID
 ```
-关于这几个命令可以通过一个完整的实例使用：[docker如何创建一个运行后台进程的容器并同时提供shell终端](http://seanlook.com/2014/11/03/docker-run-container-with-shell-daemon_process/)。
+关于这几个命令可以通过一个完整的实例使用：[docker如何创建一个运行后台进程的容器并同时提供shell终端](http://xgknight.com/2014/11/03/docker-run-container-with-shell-daemon_process/)。
 
 ### 2. 连接到正在运行中的container（attach） ###
 要`attach`上去的容器必须正在运行，可以同时连接上同一个container来共享屏幕（与`screen`命令的attach类似）。

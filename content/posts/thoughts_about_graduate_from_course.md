@@ -1,3 +1,4 @@
+---
 title: 关于研究生的一点担忧
 date: 2014-11-30 18:21:25
 updated: 2014-11-30 20:46:23
@@ -29,5 +30,5 @@ categories: Feel
 
 写这么多，有点不自量力了，额，请看到的同学不要对号入座，没有任何针对性和攻击性。
 
-  [1]: http://sean-images.qiniudn.com/give_yourself_courage.jpg
-  [2]: http://sean-images.qiniudn.com/rate_online_test.png
+  [1]: http://github.com/seanlook/sean-notes-comment/raw/main/static/give_yourself_courage.jpg
+  [2]: http://github.com/seanlook/sean-notes-comment/raw/main/static/rate_online_test.png

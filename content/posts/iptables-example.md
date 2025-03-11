@@ -1,3 +1,4 @@
+---
 title: iptables常用实例备查（更新中）
 date: 2014-02-26 01:21:25
 updated: 2014-02-26-12 00:46:23
@@ -88,7 +89,7 @@ categories: Linux
 
     # iptables -t nat -A PREROUTING -p tcp -m tcp --dport 80 -j REDIRECT --to-ports 8080
 
-根据 [iptables防火墙原理详解](http://seanlook.com/2014/02/23/iptables-understand/) 可知，实际上在数据包进入INPUT链之前，修改了目标地址（端口），于是不难理解在开放端口时需要设置的是放行8080端口，无需考虑80：
+根据 [iptables防火墙原理详解](http://xgknight.com/2014/02/23/iptables-understand/) 可知，实际上在数据包进入INPUT链之前，修改了目标地址（端口），于是不难理解在开放端口时需要设置的是放行8080端口，无需考虑80：
 
     # iptables -A INPUT -s 172.29.88.0/24 -p tcp -m state --state NEW -m tcp --dport 8080 -j ACCEPT
 

@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="noindex, nofollow">
+<title>MySQL数据库开发规范-EC | Sean&#39;s Note</title>
+<meta name="keywords" content="mysql, 规范">
+<meta name="description" content="updated: 2017-11-12
+本文所提规范，在我博客上可以找到多篇案例。
+最近一段时间一边在线上抓取SQL来优化，一边在整理这个开发规范，尽量减少新的问题SQL进入生产库。今天也是对公司的开发做了一次培训，PPT就不放上来了，里面有十来个生产SQL的案例。因为规范大部分还是具有通用性，所以也借鉴了像去哪儿和赶集的规范，但实际在撰写本文的过程中，每一条规范的背后无不是在工作中有参照的反面例子的。如果时间可以的话，会抽出一部分或分析其原理，或用案例证明。">
+<meta name="author" content="">
+<link rel="canonical" href="http://localhost:1313/2016/05/mysql-dev-principle-ec/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.8a19d6c7d40c68078a482516c7c2a326ccb9f6e9282cabe7240ecc1a80c6cb47.css" integrity="sha256-ihnWx9QMaAeKSCUWx8KjJsy59ukoLKvnJA7MGoDGy0c=" rel="preload stylesheet" as="style">
+<link rel="icon" href="http://localhost:1313/img/logo.gif">
+<link rel="icon" type="image/png" sizes="16x16" href="http://localhost:1313/img/logo.gif">
+<link rel="icon" type="image/png" sizes="32x32" href="http://localhost:1313/img/logo.gif">
+<link rel="apple-touch-icon" href="http://localhost:1313/logo.gif">
+<link rel="mask-icon" href="http://localhost:1313/logo.gif">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<link rel="alternate" hreflang="en" href="http://localhost:1313/2016/05/mysql-dev-principle-ec/">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --code-block-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://localhost:1313/" accesskey="h" title="Sean&#39;s Note (Alt + H)">Sean&#39;s Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://localhost:1313/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/categories/" title="Categories">
+                    <span>Categories</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/search/" title="Search (Alt &#43; /)" accesskey=/>
+                    <span>Search</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/tags/" title="Tags">
+                    <span>Tags</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    <div class="breadcrumbs"><a href="http://localhost:1313/">Home</a>&nbsp;»&nbsp;<a href="http://localhost:1313/posts/">Posts</a></div>
+    <h1 class="post-title entry-hint-parent">
+      MySQL数据库开发规范-EC
+    </h1>
+    <div class="post-meta"><span title='2016-05-11 16:32:49 +0000 UTC'>2016-05-11</span>&nbsp;·&nbsp;19 min
+
+</div>
+  </header> <aside id="toc-container" class="toc-container wide">
+    <div class="toc">
+        <details  open>
+            <summary accesskey="c" title="(Alt + C)">
+                <span class="details">Table of Contents</span>
+            </summary>
+
+            <div class="inner"><ul>
+                    <li>
+                        <a href="#1-%e5%91%bd%e5%90%8d%e8%a7%84%e8%8c%83" aria-label="1. 命名规范">1. 命名规范</a><ul>
+                            
+                    <li>
+                        <a href="#%e5%ba%93%e5%90%8d%e8%a1%a8%e5%90%8d%e5%ad%97%e6%ae%b5%e5%90%8d%e5%bf%85%e9%a1%bb%e4%bd%bf%e7%94%a8%e5%b0%8f%e5%86%99%e5%ad%97%e6%af%8d%e5%b9%b6%e9%87%87%e7%94%a8%e4%b8%8b%e5%88%92%e7%ba%bf%e5%88%86%e5%89%b2" aria-label="库名、表名、字段名必须使用小写字母，并采用下划线分割">库名、表名、字段名必须使用小写字母，并采用下划线分割</a></li>
+                    <li>
+                        <a href="#%e5%ba%93%e5%90%8d%e4%bb%a5-d_-%e5%bc%80%e5%a4%b4%e8%a1%a8%e5%90%8d%e4%bb%a5-t_-%e5%bc%80%e5%a4%b4%e5%ad%97%e6%ae%b5%e5%90%8d%e4%bb%a5-f_-%e5%bc%80%e5%a4%b4" aria-label="库名以 d_ 开头，表名以 t_ 开头，字段名以 f_ 开头">库名以 d_ 开头，表名以 t_ 开头，字段名以 f_ 开头</a></li>
+                    <li>
+                        <a href="#%e5%ba%93%e5%90%8d%e8%a1%a8%e5%90%8d%e5%ad%97%e6%ae%b5%e5%90%8d%e7%a6%81%e6%ad%a2%e8%b6%85%e8%bf%8732%e4%b8%aa%e5%ad%97%e7%ac%a6%e9%9c%80%e8%a7%81%e5%90%8d%e7%9f%a5%e6%84%8f" aria-label="库名、表名、字段名禁止超过32个字符，需见名知意">库名、表名、字段名禁止超过32个字符，需见名知意</a></li>
+                    <li>
+                        <a href="#%e4%b8%b4%e6%97%b6%e7%94%a8%e7%9a%84%e5%ba%93%e8%a1%a8%e5%90%8d%e9%a1%bb%e4%bb%a5tmp%e4%bd%8d%e5%89%8d%e7%bc%80%e6%97%a5%e6%9c%9f%e4%b8%ba%e5%90%8e%e7%bc%80" aria-label="临时用的库、表名须以tmp位前缀，日期为后缀">临时用的库、表名须以tmp位前缀，日期为后缀</a></li>
+                    <li>
+                        <a href="#%e6%8c%89%e6%97%a5%e6%9c%9f%e6%97%b6%e9%97%b4%e5%88%86%e8%a1%a8%e9%a1%bb%e7%ac%a6%e5%90%88_yyyymmdd%e6%a0%bc%e5%bc%8f" aria-label="按日期时间分表须符合_YYYY[MM][DD]格式">按日期时间分表须符合_YYYY[MM][DD]格式</a></li></ul>
+                    </li>
+                    <li>
+                        <a href="#2-%e5%ba%93%e8%a1%a8%e5%9f%ba%e7%a1%80%e8%a7%84%e8%8c%83" aria-label="2. 库表基础规范">2. 库表基础规范</a><ul>
+                            
+                    <li>
+                        <a href="#%e4%bd%bf%e7%94%a8innodb%e5%ad%98%e5%82%a8%e5%bc%95%e6%93%8e" aria-label="使用Innodb存储引擎">使用Innodb存储引擎</a></li>
+                    <li>
+                        <a href="#%e8%a1%a8%e5%ad%97%e7%ac%a6%e9%9b%86%e7%bb%9f%e4%b8%80%e4%bd%bf%e7%94%a8utf8mb4" aria-label="表字符集统一使用UTF8MB4">表字符集统一使用UTF8MB4</a></li>
+                    <li>
+                        <a href="#%e6%89%80%e6%9c%89%e8%a1%a8%e9%83%bd%e8%a6%81%e6%b7%bb%e5%8a%a0%e6%b3%a8%e9%87%8a" aria-label="所有表都要添加注释">所有表都要添加注释</a></li>
+                    <li>
+                        <a href="#%e6%8e%a7%e5%88%b6%e5%8d%95%e8%a1%a8%e5%ad%97%e6%ae%b5%e6%95%b0%e9%87%8f" aria-label="控制单表字段数量">控制单表字段数量</a></li>
+                    <li>
+                        <a href="#%e6%89%80%e6%9c%89%e8%a1%a8%e9%83%bd%e5%bf%85%e9%a1%bb%e8%a6%81%e6%98%be%e5%bc%8f%e6%8c%87%e5%ae%9a%e4%b8%bb%e9%94%ae" aria-label="所有表都必须要显式指定主键">所有表都必须要显式指定主键</a></li>
+                    <li>
+                        <a href="#%e4%b8%8d%e5%bc%ba%e5%88%b6%e4%bd%bf%e7%94%a8%e5%a4%96%e9%94%ae%e5%8f%82%e8%80%83" aria-label="不强制使用外键参考">不强制使用外键参考</a></li>
+                    <li>
+                        <a href="#%e9%80%82%e5%ba%a6%e4%bd%bf%e7%94%a8%e5%ad%98%e5%82%a8%e8%bf%87%e7%a8%8b%e8%a7%86%e5%9b%be%e7%a6%81%e6%ad%a2%e4%bd%bf%e7%94%a8%e8%a7%a6%e5%8f%91%e5%99%a8%e4%ba%8b%e4%bb%b6" aria-label="适度使用存储过程、视图，禁止使用触发器、事件">适度使用存储过程、视图，禁止使用触发器、事件</a></li>
+                    <li>
+                        <a href="#%e5%8d%95%e8%a1%a8%e6%95%b0%e6%8d%ae%e9%87%8f%e6%8e%a7%e5%88%b6%e5%9c%a85000w%e4%bb%a5%e5%86%85" aria-label="单表数据量控制在5000w以内">单表数据量控制在5000w以内</a></li></ul>
+                    </li>
+                    <li>
+                        <a href="#3-%e5%ad%97%e6%ae%b5%e8%a7%84%e8%8c%83" aria-label="3. 字段规范">3. 字段规范</a><ul>
+                            
+                    <li>
+                        <a href="#charvarchartext%e7%ad%89%e5%ad%97%e7%ac%a6%e4%b8%b2%e7%b1%bb%e5%9e%8b%e5%ae%9a%e4%b9%89" aria-label="char、varchar、text等字符串类型定义">char、varchar、text等字符串类型定义</a></li>
+                    <li>
+                        <a href="#inttinyintdecimal%e7%ad%89%e6%95%b0%e5%ad%97%e7%b1%bb%e5%9e%8b%e5%ae%9a%e4%b9%89" aria-label="int、tinyint、decimal等数字类型定义">int、tinyint、decimal等数字类型定义</a></li>
+                    <li>
+                        <a href="#timestamp%e4%b8%8edatetime%e9%80%89%e6%8b%a9" aria-label="timestamp与datetime选择">timestamp与datetime选择</a></li>
+                    <li>
+                        <a href="#%e5%bb%ba%e8%ae%ae%e5%ad%97%e6%ae%b5%e9%83%bd%e5%ae%9a%e4%b9%89%e4%b8%banot-null" aria-label="建议字段都定义为NOT NULL">建议字段都定义为NOT NULL</a></li>
+                    <li>
+                        <a href="#%e5%90%8c%e4%b8%80%e6%84%8f%e4%b9%89%e7%9a%84%e5%ad%97%e6%ae%b5%e5%ae%9a%e4%b9%89%e5%bf%85%e9%a1%bb%e7%9b%b8%e5%90%8c" aria-label="同一意义的字段定义必须相同">同一意义的字段定义必须相同</a></li></ul>
+                    </li>
+                    <li>
+                        <a href="#4-%e7%b4%a2%e5%bc%95%e8%a7%84%e8%8c%83" aria-label="4. 索引规范">4. 索引规范</a><ul>
+                            
+                    <li>
+                        <a href="#%e4%bb%bb%e4%bd%95%e6%96%b0%e7%9a%84selectupdatedelete%e4%b8%8a%e7%ba%bf%e9%83%bd%e8%a6%81%e5%85%88explain%e7%9c%8b%e7%b4%a2%e5%bc%95%e4%bd%bf%e7%94%a8%e6%83%85%e5%86%b5" aria-label="任何新的select,update,delete上线，都要先explain，看索引使用情况">任何新的select,update,delete上线，都要先explain，看索引使用情况</a></li>
+                    <li>
+                        <a href="#%e7%b4%a2%e5%bc%95%e4%b8%aa%e6%95%b0%e9%99%90%e5%88%b6" aria-label="索引个数限制">索引个数限制</a></li>
+                    <li>
+                        <a href="#%e9%81%bf%e5%85%8d%e5%86%97%e4%bd%99%e7%b4%a2%e5%bc%95" aria-label="避免冗余索引">避免冗余索引</a></li>
+                    <li>
+                        <a href="#%e6%b2%a1%e6%9c%89%e7%89%b9%e6%ae%8a%e8%a6%81%e6%b1%82%e4%bd%bf%e7%94%a8%e8%87%aa%e5%a2%9eid%e4%bd%9c%e4%b8%ba%e4%b8%bb%e9%94%ae" aria-label="没有特殊要求，使用自增id作为主键">没有特殊要求，使用自增id作为主键</a></li>
+                    <li>
+                        <a href="#%e7%b4%a2%e5%bc%95%e5%b0%bd%e9%87%8f%e5%bb%ba%e5%9c%a8%e9%80%89%e6%8b%a9%e6%80%a7%e9%ab%98%e7%9a%84%e5%88%97%e4%b8%8a" aria-label="索引尽量建在选择性高的列上">索引尽量建在选择性高的列上</a></li>
+                    <li>
+                        <a href="#%e6%9c%80%e5%b7%a6%e5%89%8d%e7%bc%80%e5%8e%9f%e5%88%99" aria-label="最左前缀原则">最左前缀原则</a></li>
+                    <li>
+                        <a href="#%e5%89%8d%e7%bc%80%e7%b4%a2%e5%bc%95" aria-label="前缀索引">前缀索引</a></li>
+                    <li>
+                        <a href="#%e5%90%88%e7%90%86%e4%bd%bf%e7%94%a8%e8%a6%86%e7%9b%96%e7%b4%a2%e5%bc%95%e5%87%8f%e5%b0%91io" aria-label="合理使用覆盖索引减少IO">合理使用覆盖索引减少IO</a></li>
+                    <li>
+                        <a href="#%e5%b0%bd%e9%87%8f%e4%b8%8d%e8%a6%81%e5%9c%a8%e9%a2%91%e7%b9%81%e6%9b%b4%e6%96%b0%e7%9a%84%e5%88%97%e4%b8%8a%e5%88%9b%e5%bb%ba%e7%b4%a2%e5%bc%95" aria-label="尽量不要在频繁更新的列上创建索引">尽量不要在频繁更新的列上创建索引</a></li></ul>
+                    </li>
+                    <li>
+                        <a href="#5-sql%e8%ae%be%e8%ae%a1" aria-label="5. SQL设计">5. SQL设计</a><ul>
+                            
+                    <li>
+                        <a href="#%e6%9d%9c%e7%bb%9d%e7%9b%b4%e6%8e%a5-select--%e8%af%bb%e5%8f%96%e5%85%a8%e9%83%a8%e5%ad%97%e6%ae%b5" aria-label="杜绝直接 SELECT * 读取全部字段">杜绝直接 SELECT * 读取全部字段</a></li>
+                    <li>
+                        <a href="#%e8%83%bd%e7%a1%ae%e5%ae%9a%e8%bf%94%e5%9b%9e%e7%bb%93%e6%9e%9c%e5%8f%aa%e6%9c%89%e4%b8%80%e6%9d%a1%e6%97%b6%e4%bd%bf%e7%94%a8-limit-1" aria-label="能确定返回结果只有一条时，使用 limit 1">能确定返回结果只有一条时，使用 limit 1</a></li>
+                    <li>
+                        <a href="#%e5%b0%8f%e5%bf%83%e9%9a%90%e5%bc%8f%e7%b1%bb%e5%9e%8b%e8%bd%ac%e6%8d%a2" aria-label="小心隐式类型转换">小心隐式类型转换</a></li>
+                    <li>
+                        <a href="#%e7%a6%81%e6%ad%a2%e5%9c%a8where%e6%9d%a1%e4%bb%b6%e5%88%97%e4%b8%8a%e4%bd%bf%e7%94%a8%e5%87%bd%e6%95%b0" aria-label="禁止在where条件列上使用函数">禁止在where条件列上使用函数</a></li>
+                    <li>
+                        <a href="#%e4%bd%bf%e7%94%a8like%e6%a8%a1%e7%b3%8a%e5%8c%b9%e9%85%8d%e4%b8%8d%e8%a6%81%e6%94%be%e9%a6%96%e4%bd%8d" aria-label="使用like模糊匹配，%不要放首位">使用like模糊匹配，%不要放首位</a></li>
+                    <li>
+                        <a href="#%e6%b6%89%e5%8f%8a%e5%88%b0%e5%a4%8d%e6%9d%82sql%e6%97%b6%e5%8a%a1%e5%bf%85%e5%85%88%e5%8f%82%e8%80%83%e5%b7%b2%e6%9c%89%e7%b4%a2%e5%bc%95%e8%ae%be%e8%ae%a1%e5%85%88explain" aria-label="涉及到复杂sql时，务必先参考已有索引设计，先explain">涉及到复杂sql时，务必先参考已有索引设计，先explain</a></li>
+                    <li>
+                        <a href="#%e4%bd%bf%e7%94%a8join%e6%97%b6where%e6%9d%a1%e4%bb%b6%e5%b0%bd%e9%87%8f%e4%bd%bf%e7%94%a8%e5%85%85%e5%88%86%e5%88%a9%e7%94%a8%e5%90%8c%e4%b8%80%e8%a1%a8%e4%b8%8a%e7%9a%84%e7%b4%a2%e5%bc%95" aria-label="使用join时，where条件尽量使用充分利用同一表上的索引">使用join时，where条件尽量使用充分利用同一表上的索引</a></li>
+                    <li>
+                        <a href="#%e5%b0%91%e7%94%a8%e5%ad%90%e6%9f%a5%e8%af%a2%e6%94%b9%e7%94%a8join" aria-label="少用子查询，改用join">少用子查询，改用join</a></li>
+                    <li>
+                        <a href="#%e8%80%83%e8%99%91%e4%bd%bf%e7%94%a8union-all%e5%b0%91%e4%bd%bf%e7%94%a8union%e6%b3%a8%e6%84%8f%e8%80%83%e8%99%91%e5%8e%bb%e9%87%8d" aria-label="考虑使用union all，少使用union，注意考虑去重">考虑使用union all，少使用union，注意考虑去重</a></li>
+                    <li>
+                        <a href="#in%e7%9a%84%e5%86%85%e5%ae%b9%e5%b0%bd%e9%87%8f%e4%b8%8d%e8%b6%85%e8%bf%87200%e4%b8%aa" aria-label="IN的内容尽量不超过200个">IN的内容尽量不超过200个</a></li>
+                    <li>
+                        <a href="#%e6%8b%92%e7%bb%9d%e5%a4%a7%e4%ba%8b%e5%8a%a1" aria-label="拒绝大事务">拒绝大事务</a></li>
+                    <li>
+                        <a href="#%e9%81%bf%e5%85%8d%e4%bd%bf%e7%94%a8is-null-is-not-null%e8%bf%99%e6%a0%b7%e7%9a%84%e6%af%94%e8%be%83" aria-label="避免使用is null, is not null这样的比较">避免使用is null, is not null这样的比较</a></li>
+                    <li>
+                        <a href="#order-by--limit" aria-label="order by .. limit">order by .. limit</a></li>
+                    <li>
+                        <a href="#c1--a-order-by-c2" aria-label="c1 &lt; a order by c2">c1 &lt; a order by c2</a></li>
+                    <li>
+                        <a href="#%e5%88%86%e9%a1%b5%e4%bc%98%e5%8c%96" aria-label="分页优化">分页优化</a></li>
+                    <li>
+                        <a href="#count%e8%ae%a1%e6%95%b0" aria-label="count计数">count计数</a></li>
+                    <li>
+                        <a href="#deleteupdate%e8%af%ad%e5%8f%a5%e6%94%b9%e6%88%90select%e5%86%8dexplain" aria-label="delete,update语句改成select再explain">delete,update语句改成select再explain</a></li>
+                    <li>
+                        <a href="#%e5%87%8f%e5%b0%91%e4%b8%8e%e6%95%b0%e6%8d%ae%e5%ba%93%e4%ba%a4%e4%ba%92%e7%9a%84%e6%ac%a1%e6%95%b0%e5%b0%bd%e9%87%8f%e9%87%87%e7%94%a8%e6%89%b9%e9%87%8fsql%e8%af%ad%e5%8f%a5" aria-label="减少与数据库交互的次数，尽量采用批量SQL语句">减少与数据库交互的次数，尽量采用批量SQL语句</a></li>
+                    <li>
+                        <a href="#%e6%9d%9c%e7%bb%9d%e5%8d%b1%e9%99%a9sql" aria-label="杜绝危险SQL">杜绝危险SQL</a></li></ul>
+                    </li>
+                    <li>
+                        <a href="#6-%e8%a1%8c%e4%b8%ba%e8%a7%84%e8%8c%83" aria-label="6. 行为规范">6. 行为规范</a></li>
+                    <li>
+                        <a href="#7-dba%e8%bf%90%e7%bb%b4%e8%a7%84%e8%8c%83" aria-label="7. DBA运维规范">7. DBA运维规范</a></li>
+                    <li>
+                        <a href="#%e6%9c%ac%e6%96%87%e5%8f%82%e8%80%83" aria-label="本文参考">本文参考</a>
+                    </li>
+                </ul>
+            </div>
+        </details>
+    </div>
+</aside>
+<script>
+    let activeElement;
+    let elements;
+    window.addEventListener('DOMContentLoaded', function (event) {
+        checkTocPosition();
+
+        elements = document.querySelectorAll('h1[id],h2[id],h3[id],h4[id],h5[id],h6[id]');
+         
+         activeElement = elements[0];
+         const id = encodeURI(activeElement.getAttribute('id')).toLowerCase();
+         document.querySelector(`.inner ul li a[href="#${id}"]`).classList.add('active');
+     }, false);
+
+    window.addEventListener('resize', function(event) {
+        checkTocPosition();
+    }, false);
+
+    window.addEventListener('scroll', () => {
+        
+        activeElement = Array.from(elements).find((element) => {
+            if ((getOffsetTop(element) - window.pageYOffset) > 0 && 
+                (getOffsetTop(element) - window.pageYOffset) < window.innerHeight/2) {
+                return element;
+            }
+        }) || activeElement
+
+        elements.forEach(element => {
+             const id = encodeURI(element.getAttribute('id')).toLowerCase();
+             if (element === activeElement){
+                 document.querySelector(`.inner ul li a[href="#${id}"]`).classList.add('active');
+             } else {
+                 document.querySelector(`.inner ul li a[href="#${id}"]`).classList.remove('active');
+             }
+         })
+     }, false);
+
+    const main = parseInt(getComputedStyle(document.body).getPropertyValue('--article-width'), 10);
+    const toc = parseInt(getComputedStyle(document.body).getPropertyValue('--toc-width'), 10);
+    const gap = parseInt(getComputedStyle(document.body).getPropertyValue('--gap'), 10);
+
+    function checkTocPosition() {
+        const width = document.body.scrollWidth;
+
+        if (width - main - (toc * 2) - (gap * 4) > 0) {
+            document.getElementById("toc-container").classList.add("wide");
+        } else {
+            document.getElementById("toc-container").classList.remove("wide");
+        }
+    }
+
+    function getOffsetTop(element) {
+        if (!element.getClientRects().length) {
+            return 0;
+        }
+        let rect = element.getBoundingClientRect();
+        let win = element.ownerDocument.defaultView;
+        return rect.top + win.pageYOffset;   
+    }
+</script>
+
+
+  <div class="post-content"><p>updated: 2017-11-12
+本文所提规范，在我博客上可以找到多篇案例。</p>
+<p>最近一段时间一边在线上抓取SQL来优化，一边在整理这个开发规范，尽量减少新的问题SQL进入生产库。今天也是对公司的开发做了一次培训，PPT就不放上来了，里面有十来个生产SQL的案例。因为规范大部分还是具有通用性，所以也借鉴了像去哪儿和赶集的规范，但实际在撰写本文的过程中，每一条规范的背后无不是在工作中有参照的反面例子的。如果时间可以的话，会抽出一部分或分析其原理，或用案例证明。</p>
+<h2 id="1-命名规范">1. 命名规范<a hidden class="anchor" aria-hidden="true" href="#1-命名规范">#</a></h2>
+<ol>
+<li>
+<h3 id="库名表名字段名必须使用小写字母并采用下划线分割">库名、表名、字段名必须使用小写字母，并采用下划线分割<a hidden class="anchor" aria-hidden="true" href="#库名表名字段名必须使用小写字母并采用下划线分割">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>MySQL有配置参数lower_case_table_names=1，即库表名以小写存储，大小写不敏感。如果是0，则库表名以实际情况存储，大小写敏感；如果是2，以实际情况存储，但以小写比较。</li>
+<li>如果大小写混合使用，可能存在abc，Abc，ABC等多个表共存，容易导致混乱。</li>
+<li>字段名显示区分大小写，但实际使⽤时不区分，即不可以建立两个名字一样但大小写不一样的字段。</li>
+<li>为了统一规范， 库名、表名、字段名使用小写字母，不允许 <code>-</code> 号。</li>
+</ul>
+<ol start="2">
+<li>
+<h3 id="库名以-d_-开头表名以-t_-开头字段名以-f_-开头">库名以 d_ 开头，表名以 t_ 开头，字段名以 f_ 开头<a hidden class="anchor" aria-hidden="true" href="#库名以-d_-开头表名以-t_-开头字段名以-f_-开头">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>比如表 <code>t_crm_relation</code>，中间的 crm 代表业务模块名</li>
+<li>库名，如果不是分库，两个不同db实例里面的db名，不能相同，以免混淆</li>
+<li>视图以<code>view_</code>开头，事件以<code>event_</code>开头，触发器以<code>trig_</code>开头，存储过程以<code>proc_</code>开头，函数以<code>func_</code>开头</li>
+<li>普通索引以<code>idx_col1_col2</code>命名，唯一索引以<code>uk_col1_col2</code>命名（可去掉f_公共部分）。如 idx_companyid_corpid_contacttime(f_company_id,f_corp_id,f_contact_time)</li>
+<li>如果某些特殊情况需要在sql里面指定索引，select * from t_test using index(idx_i_abc)，这种所以如果可以，命名的时候加上 i 分隔，如idx_i_corpid, uk_i_user，方便DBA在修改索引的时候会注意到这个 i 标识，不能随意修改这个索引(名称)，否则查询会出错。当然这种情况尽量不要出现。</li>
+</ul>
+<ol start="3">
+<li>
+<h3 id="库名表名字段名禁止超过32个字符需见名知意">库名、表名、字段名禁止超过32个字符，需见名知意<a hidden class="anchor" aria-hidden="true" href="#库名表名字段名禁止超过32个字符需见名知意">#</a></h3>
+</li>
+</ol>
+<p>库名、表名、字段名支持最多64个字符，但为了统一规范、易于辨识以及减少传输量，禁止超过32个字符</p>
+<ol start="4">
+<li>
+<h3 id="临时用的库表名须以tmp位前缀日期为后缀">临时用的库、表名须以tmp位前缀，日期为后缀<a hidden class="anchor" aria-hidden="true" href="#临时用的库表名须以tmp位前缀日期为后缀">#</a></h3>
+</li>
+</ol>
+<p>如 <code>tmp_t_crm_relation_0425</code>。备份表也类似，形如 bak_t_xxxx_20160425 ，这样便于查找和知道有效期。
+正常业务里用的临时表、中间表，后缀尽量不要包含 tmp 命名，以免造成歧义。</p>
+<ol start="5">
+<li>
+<h3 id="按日期时间分表须符合_yyyymmdd格式">按日期时间分表须符合_YYYY[MM][DD]格式<a hidden class="anchor" aria-hidden="true" href="#按日期时间分表须符合_yyyymmdd格式">#</a></h3>
+</li>
+</ol>
+<p>这也是为将来有可能分表做准备的，比如<code>t_crm_ec_record_201403</code>，但像 t_crm_contact_at201506就打破了这种规范。
+不具有时间特性的，直接以 <code>t_tbname_001</code> 这样的方式命名。</p>
+<h2 id="2-库表基础规范">2. 库表基础规范<a hidden class="anchor" aria-hidden="true" href="#2-库表基础规范">#</a></h2>
+<ol>
+<li>
+<h3 id="使用innodb存储引擎">使用Innodb存储引擎<a hidden class="anchor" aria-hidden="true" href="#使用innodb存储引擎">#</a></h3>
+</li>
+</ol>
+<p>5.5版本开始mysql默认存储引擎就是InnoDB，5.7版本开始，系统表都放弃MyISAM了。</p>
+<ol start="2">
+<li>
+<h3 id="表字符集统一使用utf8mb4">表字符集统一使用UTF8MB4<a hidden class="anchor" aria-hidden="true" href="#表字符集统一使用utf8mb4">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>UTF8字符集存储汉字占用3个字节，存储英文字符占用一个字节</li>
+<li>校对字符集使用默认的 utf8mb4_general_ci。特别对于使用GUI设计表结构时，要检查它生成的sql定义</li>
+<li>连接的客户端也使用utf8，建立连接时指定charset或<code>SET NAMES UTF8;</code>。（对于已经在项目中长期使用latin1的，救不了了）</li>
+<li>如果遇到EMOJ等表情符号的存储需求，可申请使用UTF8MB4字符集</li>
+</ul>
+<ol start="3">
+<li>
+<h3 id="所有表都要添加注释">所有表都要添加注释<a hidden class="anchor" aria-hidden="true" href="#所有表都要添加注释">#</a></h3>
+<ul>
+<li>尽量给字段也添加注释</li>
+<li>类status型需指明主要值的含义，如&quot;0-离线，1-在线&quot;</li>
+</ul>
+</li>
+<li>
+<h3 id="控制单表字段数量">控制单表字段数量<a hidden class="anchor" aria-hidden="true" href="#控制单表字段数量">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>单表字段数上限30左右，再多的话考虑垂直分表，一是冷热数据分离，二是大字段分离，三是常在一起做条件和返回列的不分离。</li>
+<li>表字段控制少而精，可以提高IO效率，内存缓存更多有效数据，从而提高响应速度和并发能力，后续 alter table 也更快。</li>
+</ul>
+<ol start="5">
+<li>
+<h3 id="所有表都必须要显式指定主键">所有表都必须要显式指定主键<a hidden class="anchor" aria-hidden="true" href="#所有表都必须要显式指定主键">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>主键尽量采用自增方式，InnoDB表实际是一棵索引组织表，顺序存储可以提高存取效率，充分利用磁盘空间。还有对一些复杂查询可能需要自连接来优化时需要用到。</li>
+<li>只有需要全局唯一主键时，使用外部自增id服务</li>
+<li>如果没有主键或唯一索引，update/delete是通过所有字段来定位操作的行，相当于每行就是一次全表扫描</li>
+<li>少数情况可以使用联合唯一主键，需与DBA协商</li>
+<li>对于主键字段值是从其它地方插入（非自己使用AUTO_INCREMENT生产），去掉auto_increment定义。比如一些31天表、历史月份表上，不要auto_increment属性；再必须全局id服务获取的主键。</li>
+</ul>
+<ol start="6">
+<li>
+<h3 id="不强制使用外键参考">不强制使用外键参考<a hidden class="anchor" aria-hidden="true" href="#不强制使用外键参考">#</a></h3>
+</li>
+</ol>
+<p>即使2个表的字段有明确的外键参考关系，也不使用 FOREIGN KEY ，因为新纪录会去主键表做校验，影响性能。</p>
+<ol start="7">
+<li>
+<h3 id="适度使用存储过程视图禁止使用触发器事件">适度使用存储过程、视图，禁止使用触发器、事件<a hidden class="anchor" aria-hidden="true" href="#适度使用存储过程视图禁止使用触发器事件">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>存储过程（procedure）虽然可以简化业务端代码，在传统企业写复杂逻辑时可能会用到，而在互联网企业变更是很频繁的，在分库分表的情况下要升级一个存储过程相当麻烦。又因为它是不记录log的，所以也不方便debug性能问题。如果使用过程，一定考虑如果执行失败的情况。</li>
+<li>使用视图一定程度上也是为了降低代码里SQL的复杂度，但有时候为了视图的通用性会损失性能（比如返回不必要的字段）。</li>
+<li>触发器（trigger）也是同样，但也不应该通过它去约束数据的强一致性，mysql只支持“基于行的触发”，也就是说，触发器始终是针对一条记录的，而不是针对整个sql语句的，如果变更的数据集非常大的话，效率会很低。掩盖一条sql背后的工作，一旦出现问题将是灾难性的，但又很难快速分析和定位。再者需要ddl时无法使用pt-osc工具。放在transaction执行。</li>
+<li>事件（event）也是一种偷懒的表现，目前已经遇到数次由于定时任务执行失败影响业务的情况，而且mysql无法对它做失败预警。建立专门的 job scheduler 平台。</li>
+</ul>
+<ol start="8">
+<li>
+<h3 id="单表数据量控制在5000w以内">单表数据量控制在5000w以内<a hidden class="anchor" aria-hidden="true" href="#单表数据量控制在5000w以内">#</a></h3>
+</li>
+</ol>
+<p>表字段数量不要超过20个，如果有需要建立主副表，主键一一关联，避免单行数据过多以及修改记录binlog ROW模式导致文件过大。
+特别对于有一个text/blob或很大长度的varchar字段时，更应考虑单独存储。但也要注意查询条件尽量放在一个表上。
+9. ### 数据库中不允许存储明文密码 ###</p>
+<h2 id="3-字段规范">3. 字段规范<a hidden class="anchor" aria-hidden="true" href="#3-字段规范">#</a></h2>
+<ol>
+<li>
+<h3 id="charvarchartext等字符串类型定义">char、varchar、text等字符串类型定义<a hidden class="anchor" aria-hidden="true" href="#charvarchartext等字符串类型定义">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>对于长度基本固定的列，如果该列恰好更新又特别频繁，适合char。 utf8mb4字符集下，尽量使用varchar</li>
+<li>varchar虽然存储变长字符串，但不可太小也不可太大。UTF8最多能存21844个汉字，或65532个英文</li>
+<li>varbinary(M)保存的是二进制字符串，它保存的是字节而不是字符，所以没有字符集的概念，M长度0-255（字节）。只用于排序或比较时大小写敏感的类型，不包括密码存储</li>
+<li>TEXT类型与VARCHAR都类似，存储可变长度，最大限制也是2^16，但是它20bytes以后的内容是在数据页以外的空间存储（row_format=dynamic），对它的使用需要多一次寻址，没有默认值。
+一般用于存放容量平均都很大、操作没有其它字段那样频繁的值。
+网上部分文章说要避免使用text和blob，要知道如果纯用varchar可能会导致行溢出，效果差不多，但因为每行占用字节数过多，会导致buffer_pool能缓存的数据行、页下降。另外text和blob上面一般不会去建索引，而是利用sphinx之类的第三方全文搜索引擎，如果确实要创建（前缀）索引，那就会影响性能。凡事看具体场景。
+另外尽可能把text/blob拆到另一个表中</li>
+<li>BLOB可以看出varbinary的扩展版本，内容以二进制字符串存储，无字符集，区分大小写，有一种经常提但不用的场景：不要在数据库里存储图片。</li>
+</ul>
+<ol start="2">
+<li>
+<h3 id="inttinyintdecimal等数字类型定义">int、tinyint、decimal等数字类型定义<a hidden class="anchor" aria-hidden="true" href="#inttinyintdecimal等数字类型定义">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>使用tinyint来代替 enum和boolean
+ENUM类型在需要修改或增加枚举值时，需要在线DDL，成本较高；ENUM列值如果含有数字类型，可能会引起默认值混淆
+tinyint使用1个字节，一般用于status,type,flag的列</li>
+<li>建议使用 UNSIGNED 存储非负数值
+相比不使用 unsigned，可以扩大一倍使用数值范围</li>
+<li>int使用固定4个字节存储，int(11)与int(4)只是显示宽度的区别。但是定义是bigint(20), int(11)，不要随便改动这个显示宽度，c++里面需要这个长度去截取字段</li>
+<li>使用Decimal 代替float/double存储精确浮点数
+对于货币、金额这样的类型，使用decimal，如 decimal(9,2)。float默认只能能精确到6位有效数字</li>
+</ul>
+<ol start="3">
+<li>
+<h3 id="timestamp与datetime选择">timestamp与datetime选择<a hidden class="anchor" aria-hidden="true" href="#timestamp与datetime选择">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>datetime 和 timestamp类型所占的存储空间不同，前者5个字节(5.5是8字节)，后者4个字节，这样造成的后果是两者能表示的时间范围不同。前者范围为1000-01-01 00:00:00 ~ 9999-12-31 23:59:59，后者范围为 1970-01-01 08:00:01 到 2038-01-19 11:14:07 。所以 TIMESTAMP 支持的范围比 DATATIME 要小。</li>
+<li>timestamp可以在insert/update行时，自动更新时间字段（如 f_set_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP），但一个表只能有一个这样的定义。</li>
+<li>timestamp显示与时区有关，内部总是以 UTC 毫秒 来存的。还受到严格模式的限制</li>
+<li>优先使用timestamp，datetime也没问题</li>
+<li>默认时间，要么current_timestamp，要么'1970-01-02 01:01:01&rsquo;，不要设置为&rsquo;&lsquo;或0</li>
+<li>where条件里不要对时间列上使用时间函数</li>
+<li>如果使用int的型存储时间戳，约定统一使用 int unsigned default 0</li>
+</ul>
+<ol start="4">
+<li>
+<h3 id="建议字段都定义为not-null">建议字段都定义为NOT NULL<a hidden class="anchor" aria-hidden="true" href="#建议字段都定义为not-null">#</a></h3>
+<ul>
+<li>如果是索引字段，一定要定义为not null 。因为null值会影响cordinate统计，影响优化器对索引的选择</li>
+<li>如果不能保证insert时一定有值过来，定义时使用default &rsquo;&rsquo; ，或 0</li>
+</ul>
+</li>
+<li>
+<h3 id="同一意义的字段定义必须相同">同一意义的字段定义必须相同<a hidden class="anchor" aria-hidden="true" href="#同一意义的字段定义必须相同">#</a></h3>
+<p>比如不同表中都有 f_user_id 字段，那么它的类型、字段长度要设计成一样</p>
+</li>
+</ol>
+<h2 id="4-索引规范">4. 索引规范<a hidden class="anchor" aria-hidden="true" href="#4-索引规范">#</a></h2>
+<ol>
+<li>
+<h3 id="任何新的selectupdatedelete上线都要先explain看索引使用情况">任何新的select,update,delete上线，都要先explain，看索引使用情况<a hidden class="anchor" aria-hidden="true" href="#任何新的selectupdatedelete上线都要先explain看索引使用情况">#</a></h3>
+</li>
+</ol>
+<p>尽量避免extra列出现：Using File Sort，Using Temporary，rows超过1000的要谨慎上线。
+explain解读</p>
+<ul>
+<li><code>type</code>：ALL, index,  range, ref, eq_ref, const, system, NULL（从左到右，性能从差到好）</li>
+<li><code>possible_keys</code>：指出MySQL能使用哪个索引在表中找到记录，查询涉及到的字段上若存在索引，则该索引将被列出，但不一定被查询使用</li>
+<li><code>key</code>：表示MySQL实际决定使用的键（索引）
+如果没有选择索引，键是NULL。要想强制MySQL使用或忽视possible_keys列中的索引，在查询中使用FORCE INDEX、USE INDEX或者IGNORE INDEX</li>
+<li><code>ref</code>：表示选择 <code>key</code> 列上的索引，哪些列或常量被用于查找索引列上的值</li>
+<li><code>rows</code>：根据表统计信息及索引选用情况，估算的找到所需的记录所需要读取的行数</li>
+<li><code>Extra</code>
+<ul>
+<li><code>Using temporary</code>：表示MySQL需要使用临时表来存储结果集，常见于排序和分组查询</li>
+<li><code>Using filesort</code>：MySQL中无法利用索引完成的排序操作称为“文件排序”</li>
+</ul>
+</li>
+</ul>
+<ol start="2">
+<li>
+<h3 id="索引个数限制">索引个数限制<a hidden class="anchor" aria-hidden="true" href="#索引个数限制">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>索引是双刃剑，会增加维护负担，增大IO压力，索引占用空间是成倍增加的</li>
+<li>单张表的索引数量控制在5个以内，或不超过表字段个数的20%。若单张表多个字段在查询需求上都要单独用到索引，需要经过DBA评估。</li>
+</ul>
+<ol start="3">
+<li>
+<h3 id="避免冗余索引">避免冗余索引<a hidden class="anchor" aria-hidden="true" href="#避免冗余索引">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>InnoDB表是一棵索引组织表，主键是和数据放在一起的聚集索引，普通索引最终指向的是主键地址，所以把主键做最后一列是多余的。如f_crm_id作为主键，联合索引(f_user_id,f_crm_id)上的f_crm_id就完全多余</li>
+<li>(a,b,c)、(a,b)，后者为冗余索引。可以利用前缀索引来达到加速目的，减轻维护负担</li>
+</ul>
+<ol start="4">
+<li>
+<h3 id="没有特殊要求使用自增id作为主键">没有特殊要求，使用自增id作为主键<a hidden class="anchor" aria-hidden="true" href="#没有特殊要求使用自增id作为主键">#</a></h3>
+<ul>
+<li>主键是一种聚集索引，顺序写入。组合唯一索引作为主键的话，是随机写入，适合写少读多的表</li>
+<li>主键不允许更新</li>
+</ul>
+</li>
+<li>
+<h3 id="索引尽量建在选择性高的列上">索引尽量建在选择性高的列上<a hidden class="anchor" aria-hidden="true" href="#索引尽量建在选择性高的列上">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>不在低基数列上建立索引，例如性别、类型。但有一种情况，idx_feedbackid_type (f_feedback_id,f_type)，如果经常用 f_type=1 比较，而且能过滤掉90%行，那这个组合索引就值得创建。有时候同样的查询语句，由于条件取值不同导致使用不同的索引，也是这个道理。</li>
+<li>索引选择性计算方法（基数 ÷ 数据行数）
+Selectivity = Cardinality / Total Rows = select count(distinct col1)/count(*) from tbname，越接近1说明col1上使用索引的过滤效果越好</li>
+<li>走索引扫描行数超过30%时，改全表扫描</li>
+</ul>
+<ol start="6">
+<li>
+<h3 id="最左前缀原则">最左前缀原则<a hidden class="anchor" aria-hidden="true" href="#最左前缀原则">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>mysql使用联合索引时，从左向右匹配，遇到断开或者范围查询时，无法用到后续的索引列
+比如索引idx_c1_c2_c3 (c1,c2,c3)，相当于创建了(c1)、(c1,c2)、(c1,c2,c3)三个索引，where条件包含上面三种情况的字段比较则可以用到索引，但像 where c1=a and c3=c 只能用到c1列的索引，像 c2=b and c3=c等情况就完全用不到这个索引</li>
+<li>遇到范围查询(&gt;、&lt;、between、like)也会停止索引匹配，比如 c1=a and c2 &gt; 2 and c3=c，只有c1,c2列上的比较能用到索引，(c1,c2,c3)排列的索引才可能会都用上</li>
+<li>where条件里面字段的顺序与索引顺序无关，mysql优化器会自动调整顺序</li>
+</ul>
+<ol start="6">
+<li>
+<h3 id="前缀索引">前缀索引<a hidden class="anchor" aria-hidden="true" href="#前缀索引">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>对超过30个字符长度的列创建索引时，考虑使用前缀索引，如 idx_cs_guid2 (f_cs_guid(26))表示截取前26个字符做索引，既可以提高查找效率，也可以节省空间</li>
+<li>前缀索引也有它的缺点是，如果在该列上 ORDER BY 或 GROUP BY 时无法使用索引，也不能把它们用作覆盖索引(Covering Index)</li>
+<li>如果在varbinary或blob这种以二进制存储的列上建立前缀索引，要考虑字符集，括号里表示的是字节数</li>
+</ul>
+<ol start="7">
+<li>
+<h3 id="合理使用覆盖索引减少io">合理使用覆盖索引减少IO<a hidden class="anchor" aria-hidden="true" href="#合理使用覆盖索引减少io">#</a></h3>
+</li>
+</ol>
+<p>INNODB存储引擎中，secondary index(非主键索引，又称为辅助索引、二级索引)没有直接存储行地址，而是存储主键值。
+如果用户需要查询secondary index中所不包含的数据列，则需要先通过secondary index查找到主键值，然后再通过主键查询到其他数据列，因此需要查询两次。覆盖索引则可以在一个索引中获取所有需要的数据列，从而避免回表进行二次查找，节省IO因此效率较高。
+例如SELECT email，uid FROM user_email WHERE uid=xx，如果uid不是主键，适当时候可以将索引添加为index(uid，email)，以获得性能提升。</p>
+<ol start="8">
+<li>
+<h3 id="尽量不要在频繁更新的列上创建索引">尽量不要在频繁更新的列上创建索引<a hidden class="anchor" aria-hidden="true" href="#尽量不要在频繁更新的列上创建索引">#</a></h3>
+</li>
+</ol>
+<p>如不在定义了 ON UPDATE CURRENT_STAMP 的列上创建索引，维护成本太高（好在mysql有insert buffer，会合并索引的插入）</p>
+<ol start="9">
+<li>修改表结构时 drop colum 时要注意，与这个字段相关的索引都会改变，变化是从原索引抽掉该字段定义。这种情况有可能导致部分索引重复或失效。</li>
+</ol>
+<h2 id="5-sql设计">5. SQL设计<a hidden class="anchor" aria-hidden="true" href="#5-sql设计">#</a></h2>
+<ol>
+<li>
+<h3 id="杜绝直接-select--读取全部字段">杜绝直接 SELECT * 读取全部字段<a hidden class="anchor" aria-hidden="true" href="#杜绝直接-select--读取全部字段">#</a></h3>
+<p>即使需要所有字段，减少网络带宽消耗，能有效利用覆盖索引，表结构变更对程序基本无影响</p>
+</li>
+<li>
+<h3 id="能确定返回结果只有一条时使用-limit-1">能确定返回结果只有一条时，使用 limit 1<a hidden class="anchor" aria-hidden="true" href="#能确定返回结果只有一条时使用-limit-1">#</a></h3>
+</li>
+</ol>
+<p><strong>在保证数据不会有误的前提下</strong>，能确定结果集数量时，多使用limit，尽快的返回结果。</p>
+<ol start="3">
+<li>
+<h3 id="小心隐式类型转换">小心隐式类型转换<a hidden class="anchor" aria-hidden="true" href="#小心隐式类型转换">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>转换规则</li>
+</ul>
+<blockquote>
+<p>a. 两个参数至少有一个是 NULL 时，比较的结果也是 NULL，例外是使用 &lt;=&gt; 对两个 NULL 做比较时会返回 1，这两种情况都不需要做类型转换
+b. 两个参数都是字符串，会按照字符串来比较，不做类型转换
+c. 两个参数都是整数，按照整数来比较，不做类型转换
+d. 十六进制的值和非数字做比较时，会被当做二进制串
+e. 有一个参数是 TIMESTAMP 或 DATETIME，并且另外一个参数是常量，常量会被转换为 timestamp
+f. 有一个参数是 decimal 类型，如果另外一个参数是 decimal 或者整数，会将整数转换为 decimal 后进行比较，如果另外一个参数是浮点数，则会把 decimal 转换为浮点数进行比较
+g. 所有其他情况下，两个参数都会被转换为浮点数再进行比较。</p></blockquote>
+<ul>
+<li>如果一个索引建立在string类型上，如果这个字段和一个int类型的值比较，符合第 g 条。如f_phone定义的类型是varchar，但where使用f_phone in (098890)，两个参数都会被当成成浮点型。发生这个隐式转换并不是最糟的，最糟的是string转换后的float，mysql无法使用索引，这才导致了性能问题。如果是 f_user_id = &lsquo;1234567&rsquo; 的情况，符合第 b 条,直接把数字当字符串比较。</li>
+</ul>
+<ol start="4">
+<li>
+<h3 id="禁止在where条件列上使用函数">禁止在where条件列上使用函数<a hidden class="anchor" aria-hidden="true" href="#禁止在where条件列上使用函数">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>会导致索引失效，如lower(email)，f_qq % 4。可放到右边的常量上计算</li>
+<li>返回小结果集不是很大的情况下，可以对返回列使用函数，简化程序开发</li>
+</ul>
+<ol start="5">
+<li>
+<h3 id="使用like模糊匹配不要放首位">使用like模糊匹配，%不要放首位<a hidden class="anchor" aria-hidden="true" href="#使用like模糊匹配不要放首位">#</a></h3>
+</li>
+</ol>
+<p>会导致索引失效，有这种搜索需求是，考虑其它方案，如sphinx全文搜索</p>
+<ol start="6">
+<li>
+<h3 id="涉及到复杂sql时务必先参考已有索引设计先explain">涉及到复杂sql时，务必先参考已有索引设计，先explain<a hidden class="anchor" aria-hidden="true" href="#涉及到复杂sql时务必先参考已有索引设计先explain">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>简单SQL拆分，不以代码处理复杂为由。</li>
+<li>比如 OR 条件： f_phone=&lsquo;10000&rsquo; or f_mobile=&lsquo;10000&rsquo;，两个字段各自有索引，但只能用到其中一个。可以拆分成2个sql，或者union all。</li>
+<li>先explain的好处是可以为了利用索引，增加更多查询限制条件</li>
+</ul>
+<ol start="7">
+<li>
+<h3 id="使用join时where条件尽量使用充分利用同一表上的索引">使用join时，where条件尽量使用充分利用同一表上的索引<a hidden class="anchor" aria-hidden="true" href="#使用join时where条件尽量使用充分利用同一表上的索引">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>如 select t1.a,t2.b * from t1,t2 and t1.a=t2.a and t1.b=123 and t2.c= 4 ，如果t1.c与t2.c字段相同，那么t1上的索引(b,c)就只用到b了。此时如果把where条件中的t2.c=4改成t1.c=4，那么可以用到完整的索引</li>
+<li>这种情况可能会在字段冗余设计（反范式）时出现</li>
+<li>正确选取inner join和left join。不允许滥用left join</li>
+</ul>
+<ol start="8">
+<li>
+<h3 id="少用子查询改用join">少用子查询，改用join<a hidden class="anchor" aria-hidden="true" href="#少用子查询改用join">#</a></h3>
+</li>
+</ol>
+<p>小于5.6版本时，子查询效率很低，不像Oracle那样先计算子查询后外层查询。5.6版本开始得到优化</p>
+<ol start="9">
+<li>
+<h3 id="考虑使用union-all少使用union注意考虑去重">考虑使用union all，少使用union，注意考虑去重<a hidden class="anchor" aria-hidden="true" href="#考虑使用union-all少使用union注意考虑去重">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>union all不去重，而少了排序操作，速度相对比union要快，如果没有去重的需求，优先使用union all</li>
+<li>如果UNION结果中有使用limit，在2个子SQL可能有许多返回值的情况下，各自加上limit。如果还有order by，请找DBA。</li>
+</ul>
+<ol start="10">
+<li>
+<h3 id="in的内容尽量不超过200个">IN的内容尽量不超过200个<a hidden class="anchor" aria-hidden="true" href="#in的内容尽量不超过200个">#</a></h3>
+</li>
+</ol>
+<p>超过500个值使用批量的方式，否则一次执行会影响数据库的并发能力，因为单SQL只能且一直占用单CPU，而且可能导致主从复制延迟。</p>
+<ol start="11">
+<li>
+<h3 id="拒绝大事务">拒绝大事务<a hidden class="anchor" aria-hidden="true" href="#拒绝大事务">#</a></h3>
+</li>
+</ol>
+<p>比如在一个事务里进行多个select，多个update，如果是高频事务，会严重影响MySQL并发能力，因为事务持有的锁等资源只在事务rollback/commit时才能释放。但同时也要权衡数据写入的一致性。
+不要再事务里面做除数据库以外的操作。</p>
+<ol start="12">
+<li>
+<h3 id="避免使用is-null-is-not-null这样的比较">避免使用is null, is not null这样的比较<a hidden class="anchor" aria-hidden="true" href="#避免使用is-null-is-not-null这样的比较">#</a></h3>
+</li>
+<li>
+<h3 id="order-by--limit">order by .. limit<a hidden class="anchor" aria-hidden="true" href="#order-by--limit">#</a></h3>
+</li>
+</ol>
+<p>这种查询更多的是通过索引去优化，但order by的字段有讲究，比如主键id与f_time都是顺序递增，那就可以考虑order by id而非 f_time 。</p>
+<ol start="14">
+<li>
+<h3 id="c1--a-order-by-c2">c1 &lt; a order by c2<a hidden class="anchor" aria-hidden="true" href="#c1--a-order-by-c2">#</a></h3>
+</li>
+</ol>
+<p>与上面不同的是，order by之前有个范围查询，由前面的内容可知，用不到类似(c1,c2)的索引，但是可以利用(c2,c1)索引。另外还可以改写成join的方式实现。</p>
+<ol start="15">
+<li>
+<h3 id="分页优化">分页优化<a hidden class="anchor" aria-hidden="true" href="#分页优化">#</a></h3>
+</li>
+</ol>
+<p>建议使用合理的分页方式以提高分页效率，大页情况下不使用跳跃式分页
+假如有类似下面分页语句:
+SELECT * FROM table1 ORDER BY ftime DESC LIMIT 10000,10;
+这种分页方式会导致大量的io，因为MySQL使用的是提前读取策略。
+推荐分页方式：
+SELECT * FROM table1  WHERE ftime &lt; last_time ORDER BY ftime DESC LIMIT 10
+即传入上一次分页的界值</p>
+<p>SELECT * FROM table as t1 inner JOIN (SELECT id FROM table ORDER BY time LIMIT 10000，10) as t2 ON t1.id=t2.id</p>
+<ol start="16">
+<li>
+<h3 id="count计数">count计数<a hidden class="anchor" aria-hidden="true" href="#count计数">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>首先count(<em>)、count(1)、count(col1)是有区别的，count(</em>)表示整个结果集有多少条记录，count(1)表示结果集里以primary key统计数量，绝大多数情况下count(<em>)与count(1)效果一样的，但count(col1)表示的是结果集里 col1 列 NOT null 的记录数。优先采用count(</em>)</li>
+<li>大数据量count是消耗资源的操作，甚至会拖慢整个库，查询性能问题无法解决的，应从产品设计上进行重构。例如当频繁需要count的查询，考虑使用汇总表</li>
+<li>遇到distinct的情况，group by方式可能效率更高。</li>
+</ul>
+<ol start="18">
+<li>
+<h3 id="deleteupdate语句改成select再explain">delete,update语句改成select再explain<a hidden class="anchor" aria-hidden="true" href="#deleteupdate语句改成select再explain">#</a></h3>
+</li>
+</ol>
+<p>select最多导致数据库慢，写操作才是锁表的罪魁祸首</p>
+<ol start="19">
+<li>
+<h3 id="减少与数据库交互的次数尽量采用批量sql语句">减少与数据库交互的次数，尽量采用批量SQL语句<a hidden class="anchor" aria-hidden="true" href="#减少与数据库交互的次数尽量采用批量sql语句">#</a></h3>
+</li>
+</ol>
+<ul>
+<li><code>INSERT ... ON DUPLICATE KEY UPDATE ...</code>，插入行后会导致在一个UNIQUE索引或PRIMARY KEY中出现重复值，则执行旧行UPDATE，如果不重复则直接插入，影响1行。</li>
+<li><code>REPLACE INTO</code>类似，但它是冲突时删除旧行。<code>INSERT IGNORE</code>相反，保留旧行，丢弃要插入的新行。</li>
+<li>INSERT INTO VALUES(),(),()，合并插入。</li>
+</ul>
+<ol start="20">
+<li>
+<h3 id="杜绝危险sql">杜绝危险SQL<a hidden class="anchor" aria-hidden="true" href="#杜绝危险sql">#</a></h3>
+</li>
+</ol>
+<ul>
+<li>去掉where 1=1 这样无意义或恒真的条件，如果遇到update/delete或遭到sql注入就恐怖了</li>
+<li>SQL中不允许出现DDL语句。一般也不给予create/alter这类权限，但阿里云RDS只区分读写用户</li>
+</ul>
+<ol start="21">
+<li>
+<p>是否应该 order by 主键
+许多排序的场景，如果主键id是增长的，如果 order by f_create_time 查询慢，有可能使用了filesort，此时最简单的办法是看能否换成 order by id，因为id作为主键是递增的，并且附带在了每个二级索引后面。
+但是也要谨慎使用 order by id，特别是在explain结果看到filesort的情况下，优化器极有可能放弃这个filesort，而选择了它所认为更高效的扫描方式，实则更慢。</p>
+</li>
+<li>
+<p>使用正确的表
+比如要统计昨天的数据这类业务较多，是否可以设计一个昨天表，不在31天表上统计，在月份表上统计也行。
+或者其它组已经有“半统计”的数据，从他们那抽取数据，而不是在原始数据上统计</p>
+</li>
+</ol>
+<h2 id="6-行为规范">6. 行为规范<a hidden class="anchor" aria-hidden="true" href="#6-行为规范">#</a></h2>
+<ul>
+<li>不允许在DBA不知情的情况下导现网数据</li>
+<li>大批量更新，如修复数据，避开高峰期，并通知DBA。直接执行sql的由运维或DBA同事操作</li>
+<li>及时处理已下线业务的SQL</li>
+<li>复杂sql上线审核
+因为目前还没有SQL审查机制，复杂sql如多表join,count,group by，主动上报DBA评估。</li>
+<li>重要项目的数据库方案选型和设计必须提前通知DBA参与</li>
+</ul>
+<h2 id="7-dba运维规范">7. DBA运维规范<a hidden class="anchor" aria-hidden="true" href="#7-dba运维规范">#</a></h2>
+<p>这部分可另起一篇规范了，这里先开个头。</p>
+<ul>
+<li>安装初始化MySQL，严格安装约定的目录、配置文件、权限、参数来初始化</li>
+<li>第一时间添加监控、备份</li>
+<li>定期巡检</li>
+<li>对先上过期废弃的表，及时与开发确认归档清除，同时也要注意与它相关的视图、过程、事件等。</li>
+</ul>
+<h2 id="本文参考">本文参考<a hidden class="anchor" aria-hidden="true" href="#本文参考">#</a></h2>
+<ul>
+<li><a href="http://wangwei007.blog.51cto.com/68019/1709769">互联网MySQL开发规范</a> 这个基本也是《去哪儿MySQL开发规范.pdf》版本</li>
+<li>MySQL数据库开发的三十六条军规_石展_完整.pdf</li>
+<li><a href="http://imysql.com/2015/07/23/something-important-about-mysql-design-reference.shtml">老叶观点：MySQL开发规范之我见</a></li>
+<li><a href="http://blog.csdn.net/xlgen157387/article/details/48086607">MySQL开发规范与使用技巧总结</a></li>
+<li><a href="http://highdb.com/mysql%E5%BC%80%E5%8F%91%E8%A7%84%E8%8C%83/">http://highdb.com/mysql%E5%BC%80%E5%8F%91%E8%A7%84%E8%8C%83/</a></li>
+</ul>
+<hr>
+<p>本文链接地址：http://xgknight.com/2016/05/11/mysql-dev-principle-ec/</p>
+<hr>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://localhost:1313/tags/mysql/">Mysql</a></li>
+      <li><a href="http://localhost:1313/tags/%E8%A7%84%E8%8C%83/">规范</a></li>
+    </ul>
+<nav class="paginav">
+  <a class="prev" href="http://localhost:1313/2016/05/mysql-innodb-primary_key/">
+    <span class="title">« Prev</span>
+    <br>
+    <span>InnoDB表主键设计方案</span>
+  </a>
+  <a class="next" href="http://localhost:1313/2016/05/mysql-type-conversion/">
+    <span class="title">Next »</span>
+    <br>
+    <span>小心MySQL的隐式类型转换陷阱</span>
+  </a>
+</nav>
+
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+        <span>&copy; 2025 <a href="http://localhost:1313/">Sean&#39;s Note</a></span> · 
+
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+<script>
+    document.querySelectorAll('pre > code').forEach((codeblock) => {
+        const container = codeblock.parentNode.parentNode;
+
+        const copybutton = document.createElement('button');
+        copybutton.classList.add('copy-code');
+        copybutton.innerHTML = 'copy';
+
+        function copyingDone() {
+            copybutton.innerHTML = 'copied!';
+            setTimeout(() => {
+                copybutton.innerHTML = 'copy';
+            }, 2000);
+        }
+
+        copybutton.addEventListener('click', (cb) => {
+            if ('clipboard' in navigator) {
+                navigator.clipboard.writeText(codeblock.textContent);
+                copyingDone();
+                return;
+            }
+
+            const range = document.createRange();
+            range.selectNodeContents(codeblock);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            try {
+                document.execCommand('copy');
+                copyingDone();
+            } catch (e) { };
+            selection.removeRange(range);
+        });
+
+        if (container.classList.contains("highlight")) {
+            container.appendChild(copybutton);
+        } else if (container.parentNode.firstChild == container) {
+            
+        } else if (codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName == "TABLE") {
+            
+            codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(copybutton);
+        } else {
+            
+            codeblock.parentNode.appendChild(copybutton);
+        }
+    });
+</script>
+</body>
+
+</html>

@@ -1,3 +1,4 @@
+---
 title: iptables防火墙原理详解
 date: 2014-02-23 01:21:25
 updated: 2014-02-23-12 00:46:23
@@ -64,7 +65,7 @@ iptables中数据包和4种被跟踪连接的4种不同状态：
 - `FORWARD`链：当接收到需要通过防火墙发送给其他地址的数据包（转发）时，应用此链中的规则。
 - `PREROUTING`链：在对数据包作路由选择之前，应用此链中的规则，如DNAT。
 - `POSTROUTING`链：在对数据包作路由选择之后，应用此链中的规则，如SNAT。
- 
+
 ```
 -->PREROUTING-->[ROUTE]-->FORWARD-->POSTROUTING-->
      mangle        |       mangle        ^ mangle
@@ -85,15 +86,15 @@ iptables中数据包和4种被跟踪连接的4种不同状态：
 - `DROP`：直接丢弃数据包，不给任何回应信息
 - `REJECT`：拒绝数据包通过，必要时会给数据发送端一个响应的信息。
 
-- `SNAT`：源地址转换。在进入路由层面的route之前，重新改写源地址，目标地址不变，并在本机建立NAT表项，当数据返回时，根据NAT表将目的地址数据改写为数据发送出去时候的源地址，并发送给主机。解决内网用户用同一个公网地址上网的问题。
+- `SNAT`：源地址转换。在进入路由层面的route之后，出本地的网络栈之前，改写源地址，目标地址不变，并在本机建立NAT表项，当数据返回时，根据NAT表将目的地址数据改写为数据发送出去时候的源地址，并发送给主机。解决内网用户用同一个公网地址上网的问题。
 `MASQUERADE`，是SNAT的一种特殊形式，适用于像adsl这种临时会变的ip上
-- `DNAT`:目标地址转换。和SNAT相反，IP包经过route之后、出本地的网络栈之前，重新修改目标地址，源地址不变，在本机建立NAT表项，当数据返回时，根据NAT表将源地址修改为数据发送过来时的目标地址，并发给远程主机。可以隐藏后端服务器的真实地址。
+- `DNAT`:目标地址转换。和SNAT相反，IP包经过route之前，重新修改目标地址，源地址不变，在本机建立NAT表项，当数据返回时，根据NAT表将源地址修改为数据发送过来时的目标地址，并发给远程主机。可以隐藏后端服务器的真实地址。（感谢网友提出之前这个地方与SNAT写反了）
 `REDIRECT`：是DNAT的一种特殊形式，将网络包转发到本地host上（不管IP头部指定的目标地址是啥），方便在本机做端口转发。
 
 - `LOG`：在/var/log/messages文件中记录日志信息，然后将数据包传递给下一条规则
 
 除去最后一个`LOG`，前3条规则匹配数据包后，该数据包不会再往下继续匹配了，所以编写的规则顺序极其关键。
- 
+
 # 2.  Linux数据包路由原理 #
 我们已经知道了Netfilter和Iptables的架构和作用，并且学习了控制Netfilter行为的Xtables表的结构，那么这个Xtables表是怎么在内核协议栈的数据包路由中起作用的呢？
 
@@ -131,16 +132,16 @@ iptables中数据包和4种被跟踪连接的4种不同状态：
 - `[--dport目标端口号]`：数据包的IP的目标端口号
 - `-m`：extend matches，这个选项用于提供更多的匹配参数，如：
   - -m state --state ESTABLISHED,RELATED
-  - -m tcp --dport 22	
+  - -m tcp --dport 22
   - -m multiport --dports 80,8080
-  - -m icmp --icmp-type 8 
+  - -m icmp --icmp-type 8
 - `<-j 动作>`：处理数据包的动作，包括ACCEPT、DROP、REJECT等
 
-具体实例请参考 [iptables常用实例备查](http://seanlook.com/2014/02/26/iptables-example/)。
+具体实例请参考 [iptables常用实例备查](http://xgknight.com/2014/02/26/iptables-example/)。
 
-  [1]: http://sean-images.qiniudn.com/iptables-netfilter.png
-  [2]: http://sean-images.qiniudn.com/iptables-routing.jpg
-  [3]: http://sean-images.qiniudn.com/iptables-cli.png
+  [1]: http://github.com/seanlook/sean-notes-comment/raw/main/static/iptables-netfilter.png
+  [2]: http://github.com/seanlook/sean-notes-comment/raw/main/static/iptables-routing.jpg
+  [3]: http://github.com/seanlook/sean-notes-comment/raw/main/static/iptables-cli.png
 
 **参考**
 

@@ -1,3 +1,4 @@
+---
 title: vim编辑器技巧备忘（初级-中级）
 date: 2014-08-07 01:21:25
 updated: 2014-08-07-12 00:46:23
@@ -200,8 +201,8 @@ visual mode多用于用键盘灵活选择文本。`v`或`V`键进入，可以实
 **marker**
 注意与后文的mark不是同一东西，`:set fdm=marker` 
 
-- `zf`    创建marker，默认 `#{ { {`, `#} } }`
-- `Ctrl+v zf` 进入可视化模式，选择需要折叠的行，zc执行折叠。会自动加入 `#{ { {`  code block `#} } }`
+- `zf`    创建marker，默认 `# { { {`, `# } } }`
+- `Ctrl+v zf` 进入可视化模式，选择需要折叠的行，zc执行折叠。会自动加入 `# { { {`  code block `# } } }`
 - `zf9j`  创建从当前行起至以下9行的折叠标记，`zc`进行折叠。同`9zf`。类似有`zf30G`，从当前行折叠刀第30行
 - `zf%`   创建匹配的 `{}`, `[]`, `()`, `<>` 的fold。不用执行`zc`
 - `zd`    删除当前行上存在的折叠标记。仅当 'foldmethod' 设为 "manual" 或 "marker" 时有效
@@ -234,6 +235,6 @@ visual mode多用于用键盘灵活选择文本。`v`或`V`键进入，可以实
 - [VIM哲学](http://segmentfault.com/blog/nightire/1190000000445598)
 
 
-  [1]: http://sean-images.qiniudn.com/vim-mode.png
-  [2]: http://sean-images.qiniudn.com/Vim-mindmap.png
-  [3]: http://sean-images.qiniudn.com/vimrc
+  [1]: http://github.com/seanlook/sean-notes-comment/raw/main/static/vim-mode.png
+  [2]: http://github.com/seanlook/sean-notes-comment/raw/main/static/Vim-mindmap.png
+  [3]: http://github.com/seanlook/sean-notes-comment/raw/main/static/vimrc

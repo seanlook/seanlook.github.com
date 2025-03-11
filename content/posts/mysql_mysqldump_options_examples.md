@@ -1,3 +1,4 @@
+---
 title: MySQL备份命令mysqldump参数说明与示例
 date: 2014-12-05 20:21:25
 updated: 2014-07 17:00:46:23
@@ -102,7 +103,7 @@ $ mysql target_dbname <backup-file.sql
     mysqldump -u用户名 -p --opt dbname | mysql --host remote_host -C dbname2
 
 
-关于增量备份与恢复请参考：[MySQL增量备份与恢复实例](http://seanlook.com/2014/12/05/mysql_incremental_backup_example/)。
+关于增量备份与恢复请参考：[MySQL增量备份与恢复实例](http://xgknight.com/2014/12/05/mysql_incremental_backup_example/)。
 
 ## 参考 ##
 - [4.5.4 mysqldump — A Database Backup Program](http://dev.mysql.com/doc/refman/5.5/en/mysqldump.html)

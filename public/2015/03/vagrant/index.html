@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="noindex, nofollow">
+<title>在Mac在Mac/win7下上使用Vagrant打造本地开发环境 | Sean&#39;s Note</title>
+<meta name="keywords" content="vagrant, virtualbox, 虚拟化, 开发环境">
+<meta name="description" content="1. vagrant介绍
+1.1 vagrant能做什么
+做Web开发（java/php/python/ruby&hellip;）少不了要在本地搭建好开发环境，虽然说目前各种脚本/语言都有对应的Windows版，甚至是一键安装包，但很多时候和Windows环境的兼容性（如配置文件、编译的模块）并不是那么好，麻烦的问题是实际部署的环境通常是Linux，常常还要面临着开发和部署环境不一致，上线前还要大量的调试。而如果让每个开发人员都自己去搭建本地环境，安装虚拟机、下载ISO镜像、选择规格安装创建vm、安装OS、配置，会耗费非常多的时间，如果是团队开发应该要尽量保持每个人的运行环境一致。此时vagrant正式你所需要的。不适用正式环境部署。">
+<meta name="author" content="">
+<link rel="canonical" href="http://localhost:1313/2015/03/vagrant/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.8a19d6c7d40c68078a482516c7c2a326ccb9f6e9282cabe7240ecc1a80c6cb47.css" integrity="sha256-ihnWx9QMaAeKSCUWx8KjJsy59ukoLKvnJA7MGoDGy0c=" rel="preload stylesheet" as="style">
+<link rel="icon" href="http://localhost:1313/img/logo.gif">
+<link rel="icon" type="image/png" sizes="16x16" href="http://localhost:1313/img/logo.gif">
+<link rel="icon" type="image/png" sizes="32x32" href="http://localhost:1313/img/logo.gif">
+<link rel="apple-touch-icon" href="http://localhost:1313/logo.gif">
+<link rel="mask-icon" href="http://localhost:1313/logo.gif">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<link rel="alternate" hreflang="en" href="http://localhost:1313/2015/03/vagrant/">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --code-block-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://localhost:1313/" accesskey="h" title="Sean&#39;s Note (Alt + H)">Sean&#39;s Note</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://localhost:1313/about/" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/categories/" title="Categories">
+                    <span>Categories</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/search/" title="Search (Alt &#43; /)" accesskey=/>
+                    <span>Search</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/tags/" title="Tags">
+                    <span>Tags</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    <div class="breadcrumbs"><a href="http://localhost:1313/">Home</a>&nbsp;»&nbsp;<a href="http://localhost:1313/posts/">Posts</a></div>
+    <h1 class="post-title entry-hint-parent">
+      在Mac在Mac/win7下上使用Vagrant打造本地开发环境
+    </h1>
+    <div class="post-meta"><span title='2015-03-25 11:21:25 +0000 UTC'>2015-03-25</span>&nbsp;·&nbsp;13 min
+
+</div>
+  </header> <aside id="toc-container" class="toc-container wide">
+    <div class="toc">
+        <details  open>
+            <summary accesskey="c" title="(Alt + C)">
+                <span class="details">Table of Contents</span>
+            </summary>
+
+            <div class="inner"><ul>
+                    <li>
+                        <a href="#1-vagrant%e4%bb%8b%e7%bb%8d" aria-label="1. vagrant介绍">1. vagrant介绍</a><ul>
+                            
+                    <li>
+                        <a href="#11-vagrant%e8%83%bd%e5%81%9a%e4%bb%80%e4%b9%88" aria-label="1.1 vagrant能做什么">1.1 vagrant能做什么</a></li>
+                    <li>
+                        <a href="#12-%e5%87%a0%e4%b8%aa%e6%a6%82%e5%bf%b5" aria-label="1.2 几个概念">1.2 几个概念</a></li></ul>
+                    </li>
+                    <li>
+                        <a href="#2-%e5%ae%89%e8%a3%85vagrant" aria-label="2. 安装vagrant">2. 安装vagrant</a></li>
+                    <li>
+                        <a href="#3-%e4%bd%bf%e7%94%a8vagrant%e6%89%93%e9%80%a0%e4%b8%80%e4%b8%aa%e6%9c%ac%e5%9c%b0%e5%bc%80%e5%8f%91%e7%8e%af%e5%a2%83" aria-label="3. 使用vagrant打造一个本地开发环境">3. 使用vagrant打造一个本地开发环境</a><ul>
+                            
+                    <li>
+                        <a href="#31-%e5%88%9d%e5%a7%8b%e5%8c%96" aria-label="3.1 初始化">3.1 初始化</a><ul>
+                            
+                    <li>
+                        <a href="#311-vagrant-box-add-box-name-box-url" aria-label="3.1.1 vagrant box add {box-name} {box-url}">3.1.1 vagrant box add {box-name} {box-url}</a></li>
+                    <li>
+                        <a href="#312-vagrant-init-box-name" aria-label="3.1.2 vagrant init {box-name}">3.1.2 vagrant init {box-name}</a></li></ul>
+                    </li>
+                    <li>
+                        <a href="#32-%e5%90%af%e5%8a%a8%e8%99%9a%e6%8b%9f%e6%9c%ba" aria-label="3.2 启动虚拟机">3.2 启动虚拟机</a></li>
+                    <li>
+                        <a href="#32-%e8%bf%9e%e6%8e%a5%e8%99%9a%e6%8b%9f%e6%9c%ba%e5%88%9d%e5%a7%8b%e5%8c%96%e7%8e%af%e5%a2%83" aria-label="3.2 连接虚拟机，初始化环境">3.2 连接虚拟机，初始化环境</a><ul>
+                            
+                    <li>
+                        <a href="#vagrant-ssh" aria-label="vagrant ssh">vagrant ssh</a></li>
+                    <li>
+                        <a href="#%e5%ae%9a%e5%88%b6%e4%bd%a0%e7%9a%84%e7%8e%af%e5%a2%83" aria-label="定制你的环境">定制你的环境</a></li></ul>
+                    </li>
+                    <li>
+                        <a href="#33-%e6%89%93%e5%8c%85%e6%88%90box" aria-label="3.3 打包成box">3.3 打包成box</a><ul>
+                            
+                    <li>
+                        <a href="#331-%e5%ae%89%e8%a3%85%e5%bf%85%e8%a6%81%e8%bd%af%e4%bb%b6" aria-label="3.3.1 安装必要软件">3.3.1 安装必要软件</a></li>
+                    <li>
+                        <a href="#332-%e5%ae%89%e8%a3%85virtualbox-guest-additions" aria-label="3.3.2 安装Virtualbox Guest Additions">3.3.2 安装Virtualbox Guest Additions</a></li>
+                    <li>
+                        <a href="#333-vagrant-package" aria-label="3.3.3 vagrant package">3.3.3 vagrant package</a></li></ul>
+                    </li></ul>
+                    </li>
+                    <li>
+                        <a href="#4-%e5%85%b6%e4%bb%96" aria-label="4. 其他">4. 其他</a><ul>
+                            
+                    <li>
+                        <a href="#41-%e5%91%bd%e4%bb%a4" aria-label="4.1 命令">4.1 命令</a></li>
+                    <li>
+                        <a href="#42-%e9%97%ae%e9%a2%98%e9%9b%86" aria-label="4.2 问题集">4.2 问题集</a>
+                    </li>
+                </ul>
+                </li>
+                </ul>
+            </div>
+        </details>
+    </div>
+</aside>
+<script>
+    let activeElement;
+    let elements;
+    window.addEventListener('DOMContentLoaded', function (event) {
+        checkTocPosition();
+
+        elements = document.querySelectorAll('h1[id],h2[id],h3[id],h4[id],h5[id],h6[id]');
+         
+         activeElement = elements[0];
+         const id = encodeURI(activeElement.getAttribute('id')).toLowerCase();
+         document.querySelector(`.inner ul li a[href="#${id}"]`).classList.add('active');
+     }, false);
+
+    window.addEventListener('resize', function(event) {
+        checkTocPosition();
+    }, false);
+
+    window.addEventListener('scroll', () => {
+        
+        activeElement = Array.from(elements).find((element) => {
+            if ((getOffsetTop(element) - window.pageYOffset) > 0 && 
+                (getOffsetTop(element) - window.pageYOffset) < window.innerHeight/2) {
+                return element;
+            }
+        }) || activeElement
+
+        elements.forEach(element => {
+             const id = encodeURI(element.getAttribute('id')).toLowerCase();
+             if (element === activeElement){
+                 document.querySelector(`.inner ul li a[href="#${id}"]`).classList.add('active');
+             } else {
+                 document.querySelector(`.inner ul li a[href="#${id}"]`).classList.remove('active');
+             }
+         })
+     }, false);
+
+    const main = parseInt(getComputedStyle(document.body).getPropertyValue('--article-width'), 10);
+    const toc = parseInt(getComputedStyle(document.body).getPropertyValue('--toc-width'), 10);
+    const gap = parseInt(getComputedStyle(document.body).getPropertyValue('--gap'), 10);
+
+    function checkTocPosition() {
+        const width = document.body.scrollWidth;
+
+        if (width - main - (toc * 2) - (gap * 4) > 0) {
+            document.getElementById("toc-container").classList.add("wide");
+        } else {
+            document.getElementById("toc-container").classList.remove("wide");
+        }
+    }
+
+    function getOffsetTop(element) {
+        if (!element.getClientRects().length) {
+            return 0;
+        }
+        let rect = element.getBoundingClientRect();
+        let win = element.ownerDocument.defaultView;
+        return rect.top + win.pageYOffset;   
+    }
+</script>
+
+
+  <div class="post-content"><h1 id="1-vagrant介绍">1. vagrant介绍<a hidden class="anchor" aria-hidden="true" href="#1-vagrant介绍">#</a></h1>
+<h2 id="11-vagrant能做什么">1.1 vagrant能做什么<a hidden class="anchor" aria-hidden="true" href="#11-vagrant能做什么">#</a></h2>
+<p>做Web开发（java/php/python/ruby&hellip;）少不了要在本地搭建好开发环境，虽然说目前各种脚本/语言都有对应的Windows版，甚至是一键安装包，但很多时候和Windows环境的兼容性（如配置文件、编译的模块）并不是那么好，麻烦的问题是实际部署的环境通常是Linux，常常还要面临着开发和部署环境不一致，上线前还要大量的调试。而如果让每个开发人员都自己去搭建本地环境，安装虚拟机、下载ISO镜像、选择规格安装创建vm、安装OS、配置，会耗费非常多的时间，如果是团队开发应该要尽量保持每个人的运行环境一致。此时vagrant正式你所需要的。不适用正式环境部署。</p>
+<p>vagrant实际上一套虚拟机管理工具，基于Ruby开发，底层支持VirtualBox、VMware甚至AWS、docker等作为虚拟化系统。我们可以通过 Vagrant 封装一个 Linux 的开发环境，分发给团队成员。成员可以在自己喜欢的桌面系统（Mac/Windows/Linux）上开发程序，代码却能统一在封装好的环境里运行，“代码在我机子上运行没有问题”这种说辞将成为历史。</p>
+<p>通过上面的介绍如果你还在困惑有virtualbox或vmware为什么还要加入vagrant，纠结于要不要使用，可以参考这个问答 <a href="http://segmentfault.com/q/1010000002623455">使用vagrant的意义在哪</a>，另外docker作为后起之秀也可以做vagrant能完成的事情，stackoverflow有关于两位作者讨论各自应用场景的精彩&quot;互掐&quot;，<a href="http://stackoverflow.com/questions/16647069/should-i-use-vagrant-or-docker-io-for-creating-an-isolated-environment">传送门→</a> （<a href="http://www.cnblogs.com/vikings-blog/p/3973265.html">中文</a>）。</p>
+<h2 id="12-几个概念">1.2 几个概念<a hidden class="anchor" aria-hidden="true" href="#12-几个概念">#</a></h2>
+<ul>
+<li><code>Provider</code>：供应商，在这里指Vagrant调用的虚拟化工具。Vagrant本身并没有能力创建虚拟机，它是调用一些虚拟化工具来创建，如VirtualBox、VMWare、Xen、Docker，甚至AWS，这些虚拟化工具只要安装好了，vagrant会自动封装在底层通过统一的命令调用。也就是说使用vagrant时你电脑上还需要安装对应的Provider，默认是免费开源的virtualbox。</li>
+</ul>
+<ul>
+<li>
+<p><code>Box</code>：可被Vagrant直接使用的虚拟机镜像文件，大小根据内容的不同从200M-2G不等。针对不同的Provider，Box文件的格式是不一样的，从 <a href="https://atlas.hashicorp.com/boxes/search?utm_source=vagrantcloud.com&amp;vagrantcloud=1">vagrantcloud.com</a> 你可以找到社区维护的box。</p>
+</li>
+<li>
+<p><code>Vagrantfile</code>：Vagrant根据Vagrantfile中的配置来创建虚拟机，是Vagrant的核心。在Vagrantfile文件中你需要指明使用哪个Box（可以下载好的或自己制作，或指定在线的URL地址），虚拟机使用的内存大小和CPU，需要预安装哪些软件，虚拟机的网络配置，与host的共享目录等。</p>
+</li>
+<li>
+<p><code>Provisioner</code>：是Vagrant的插件的一种。大部分现成的box并不是你正好想要的，通过使用你熟悉的provisioner，比如<code>Puppet</code>，可以在你使用<code>vagrant up</code>启动虚拟机时自动的安装软件、修改配置等初始化操作。当然你也可以在最先启动虚拟机后，使用<code>vagrant ssh</code>进去然后手动安装软件，但毕竟不是所有人都是系统管理员，写好Vagrantfile后无需人工干预马上就可以使用vm。目前支持并实现的provisioning有Puppet、Salt、Ansible、Chef这些知名的自动化运维工具，当然需要一定的使用经验；也可以使用shell provisioner，故名思议这个插件就是通过执行shell命令完成统一的作用。</p>
+</li>
+<li>
+<p><code>Guest Additions</code>：这个是常在下载 base box 介绍里有的，一般用来实现host到vm的端口转发、目录共享，在开发环境上都建议装上以便测试。</p>
+</li>
+</ul>
+<h1 id="2-安装vagrant">2. 安装vagrant<a hidden class="anchor" aria-hidden="true" href="#2-安装vagrant">#</a></h1>
+<ul>
+<li>VirtualBox: 4.3.12，https://www.virtualbox.org/wiki/Download_Old_Builds_4_3 。我上手使用的是4.3.20，折腾出过几个问题，据说说4.3.12版本较稳定。
+建议选择VirtualBox ，即使你电脑上已经安装VMware Workstation或Fushion，它的vagrant插件还是要收费的</li>
+<li>Vagrant: 1.7.1，http://www.vagrantup.com/downloads-archive.html</li>
+</ul>
+<p>选择适合你的平台（Windows、Mac、Linux），下载对应格式的安装包。如Mac下 vagrant_1.7.1.dmg、VirtualBox-4.3.20-96997-OSX.dmg 。</p>
+<h1 id="3-使用vagrant打造一个本地开发环境">3. 使用vagrant打造一个本地开发环境<a hidden class="anchor" aria-hidden="true" href="#3-使用vagrant打造一个本地开发环境">#</a></h1>
+<p>本文将会演示从 <a href="https://atlas.hashicorp.com/nrel/boxes/CentOS-6.5-x86_64">nrel CentOS6.5</a> 开始，安装必要的开发包、python、插件、Puppet，然后打包成一个box分发给团队的全过程。你也可以在别人box的基础上进一步通过Vagrantfile定制自己的环境。</p>
+<h2 id="31-初始化">3.1 初始化<a hidden class="anchor" aria-hidden="true" href="#31-初始化">#</a></h2>
+<h3 id="311-vagrant-box-add-box-name-box-url">3.1.1 vagrant box add {box-name} {box-url}<a hidden class="anchor" aria-hidden="true" href="#311-vagrant-box-add-box-name-box-url">#</a></h3>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-gdscript3" data-lang="gdscript3"><span class="line"><span class="cl"><span class="o">$</span> <span class="n">vagrant</span> <span class="n">box</span> <span class="n">add</span> <span class="n">ct65_00</span> <span class="n">Downloads</span><span class="o">/</span><span class="n">centos65</span><span class="o">.</span><span class="n">box</span> 
+</span></span><span class="line"><span class="cl"><span class="o">==&gt;</span> <span class="n">box</span><span class="p">:</span> <span class="n">Adding</span> <span class="n">box</span> <span class="s1">&#39;ct65_00&#39;</span> <span class="p">(</span><span class="n">v0</span><span class="p">)</span> <span class="k">for</span> <span class="n">provider</span><span class="p">:</span> 
+</span></span><span class="line"><span class="cl">    <span class="n">box</span><span class="p">:</span> <span class="n">Downloading</span><span class="p">:</span> <span class="n">file</span><span class="p">:</span><span class="o">///</span><span class="n">Users</span><span class="o">/</span><span class="n">sean</span><span class="o">/</span><span class="n">Downloads</span><span class="o">/</span><span class="n">centos65</span><span class="o">.</span><span class="n">box</span>
+</span></span><span class="line"><span class="cl"><span class="o">==&gt;</span> <span class="n">box</span><span class="p">:</span> <span class="n">Successfully</span> <span class="n">added</span> <span class="n">box</span> <span class="s1">&#39;ct65_00&#39;</span> <span class="p">(</span><span class="n">v0</span><span class="p">)</span> <span class="k">for</span> <span class="s1">&#39;virtualbox&#39;</span><span class="o">!</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="o">$</span> <span class="n">ll</span> <span class="o">~/.</span><span class="n">vagrant</span><span class="o">.</span><span class="n">d</span><span class="o">/</span><span class="n">boxes</span><span class="o">/</span><span class="n">ct65_00</span>
+</span></span><span class="line"><span class="cl"><span class="o">$</span> <span class="n">vagrant</span> <span class="n">box</span> <span class="n">list</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># vagrant box list</span>
+</span></span><span class="line"><span class="cl"><span class="n">ct65_00</span>   <span class="p">(</span><span class="n">virtualbox</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="n">centos64</span><span class="o">-</span><span class="n">i386</span>  <span class="p">(</span><span class="n">virtualbox</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这一条命令就是根据给出的box（镜像）文件地址，解压一份到用户目录<code>~/.vagrant.d/boxes/{box-name}/0/virtualbox/</code>下，所以你尽量应该以同一用户来管理进行vagrant所有操作。</p>
+<p>*F*<em>K GFW</em>
+在GFW保护之下，这简单获取box文件反而一开始就难到我们了。官方提供的在线安装在墙外是极为方便的，<code>vagrant box add minimal/centos6</code>便自动从<code>vagrantcloud.com</code>(现更名为<code>https://atlas.hashicorp.com/search/boxes</code>)下载，直接进入第二步。</p>
+<p>还有一种方法是，先<code>vagrant init minimal/centos6</code>，然后直接启动<code>vagrant up --provider virtualbox</code>。当然这些都与下载boxes到本地效果是一样的，下载方法就是在vagrantcloud.com上点开你所需要的box版本，然后再URL里加入<code>/providers/virtualbox.box</code>便得到文件地址，如 <a href="https://atlas.hashicorp.com/hashicorp/boxes/precise64">https://atlas.hashicorp.com/hashicorp/boxes/precise64</a> 对应的文件为 <a href="https://atlas.hashicorp.com/hashicorp/boxes/precise64/providers/virtualbox.box">https://atlas.hashicorp.com/hashicorp/boxes/precise64/providers/virtualbox.box</a> 。</p>
+<p>在墙内直接在线安装启动box，会报错：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">The box &#39;ubuntu/trusty64&#39; could not be found or
+</span></span><span class="line"><span class="cl">could not be accessed in the remote catalog. If this is a private
+</span></span><span class="line"><span class="cl">box on HashiCorp&#39;s Atlas, please verify you&#39;re logged in via
+</span></span><span class="line"><span class="cl">`vagrant login`. Also, please double-check the name. The expanded
+</span></span><span class="line"><span class="cl">URL and error message are shown below:
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">URL: [&#34;https://atlas.hashicorp.com/ubuntu/trusty64&#34;]
+</span></span><span class="line"><span class="cl">Error:
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>一个办法是ubuntu来 <a href="http://uec-images.ubuntu.com/vagrant/">http://uec-images.ubuntu.com/vagrant/</a> 下载，centos来 <a href="http://nrel.github.io/vagrant-boxes/">http://nrel.github.io/vagrant-boxes/</a> 下载。我也从墙外下了几个典型的box放到了自己的百度云上共享了:http://pan.baidu.com/s/1sjHQBa1 。</p>
+<p><em>2015-04-01更新：无意间发现现在不用梯子也可以访问了，Happy April Fool&rsquo;s Day!</em></p>
+<h3 id="312-vagrant-init-box-name">3.1.2 vagrant init {box-name}<a hidden class="anchor" aria-hidden="true" href="#312-vagrant-init-box-name">#</a></h3>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-mysql" data-lang="mysql"><span class="line"><span class="cl"><span class="err">$</span><span class="w"> </span><span class="n">mkdir</span><span class="w"> </span><span class="o">~/</span><span class="n">vagrant</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">cd</span><span class="w"> </span><span class="o">~/</span><span class="n">vagrant</span><span class="w">  </span><span class="o">//</span><span class="err">这个目录的目的就是统一管理你的</span><span class="n">Vagrantfile</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="err">$</span><span class="w"> </span><span class="n">vagrant</span><span class="w"> </span><span class="n">init</span><span class="w"> </span><span class="n">ct65_00</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">A</span><span class="w"> </span><span class="o">`</span><span class="n">Vagrantfile</span><span class="o">`</span><span class="w"> </span><span class="n">has</span><span class="w"> </span><span class="n">been</span><span class="w"> </span><span class="n">placed</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">this</span><span class="w"> </span><span class="n">directory</span><span class="p">.</span><span class="w"> </span><span class="n">You</span><span class="w"> </span><span class="n">are</span><span class="w"> </span><span class="n">now</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">ready</span><span class="w"> </span><span class="k">to</span><span class="w"> </span><span class="o">`</span><span class="n">vagrant</span><span class="w"> </span><span class="n">up</span><span class="o">`</span><span class="w"> </span><span class="n">your</span><span class="w"> </span><span class="n">first</span><span class="w"> </span><span class="n">virtual</span><span class="w"> </span><span class="n">environment</span><span class="o">!</span><span class="w"> </span><span class="n">Please</span><span class="w"> </span><span class="k">read</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">the</span><span class="w"> </span><span class="n">comments</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">Vagrantfile</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="n">well</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="n">documentation</span><span class="w"> </span><span class="k">on</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">`</span><span class="n">vagrantup</span><span class="p">.</span><span class="n">com</span><span class="o">`</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">more</span><span class="w"> </span><span class="n">information</span><span class="w"> </span><span class="k">on</span><span class="w"> </span><span class="k">using</span><span class="w"> </span><span class="n">Vagrant</span><span class="p">.</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="err">$</span><span class="w"> </span><span class="n">vi</span><span class="w"> </span><span class="n">Vagrantfile</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">...</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">Vagrant</span><span class="p">.</span><span class="nf">configure</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="n">do</span><span class="w"> </span><span class="o">|</span><span class="n">config</span><span class="o">|</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="n">config</span><span class="p">.</span><span class="n">vm</span><span class="p">.</span><span class="n">box</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&#34;ct65_00&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="n">onfig</span><span class="p">.</span><span class="n">vm</span><span class="p">.</span><span class="n">network</span><span class="w"> </span><span class="s2">&#34;forwarded_port&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">guest</span><span class="p">:</span><span class="w"> </span><span class="mi">80</span><span class="p">,</span><span class="w"> </span><span class="n">host</span><span class="p">:</span><span class="w"> </span><span class="mi">8080</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="c1">#  config.vm.synced_folder &#34;../data&#34;, &#34;/vagrant_data&#34;
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="w">  </span><span class="n">config</span><span class="p">.</span><span class="n">vm</span><span class="p">.</span><span class="n">provider</span><span class="w"> </span><span class="s2">&#34;virtualbox&#34;</span><span class="w"> </span><span class="n">do</span><span class="w"> </span><span class="o">|</span><span class="n">vb</span><span class="o">|</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">vb</span><span class="p">.</span><span class="n">memory</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&#34;384&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">vb</span><span class="p">.</span><span class="n">cpus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="n">end</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="n">config</span><span class="p">.</span><span class="n">vm</span><span class="p">.</span><span class="n">hostname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&#34;vg-ct65_00.tp-link.net&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">...</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>init只是在当前目录生成一个<code>Vagrantfile</code>文件和<code>.vagrant/</code>目录，可以对它进行修改，比如定义 vm guest machine 的hostname、memory、cpu等，具体有关语法介绍见后文。</p>
+<p>用户后面<code>up</code>虚拟机，这个 box-name 与上面add的相同，如果是 base 则可以省略。</p>
+<h2 id="32-启动虚拟机">3.2 启动虚拟机<a hidden class="anchor" aria-hidden="true" href="#32-启动虚拟机">#</a></h2>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl"># vagrant up
+</span></span><span class="line"><span class="cl">Bringing machine &#39;default&#39; up with &#39;virtualbox&#39; provider...
+</span></span><span class="line"><span class="cl">==&gt; default: Importing base box &#39;ct65_00&#39;...
+</span></span><span class="line"><span class="cl">==&gt; default: Matching MAC address for NAT networking...
+</span></span><span class="line"><span class="cl">==&gt; default: Setting the name of the VM: v-box_default_1427284884787_97348
+</span></span><span class="line"><span class="cl">==&gt; default: Clearing any previously set network interfaces...
+</span></span><span class="line"><span class="cl">==&gt; default: Preparing network interfaces based on configuration...
+</span></span><span class="line"><span class="cl">    default: Adapter 1: nat
+</span></span><span class="line"><span class="cl">==&gt; default: Forwarding ports...
+</span></span><span class="line"><span class="cl">    default: 22 =&gt; 2222 (adapter 1)
+</span></span><span class="line"><span class="cl">==&gt; default: Booting VM...
+</span></span><span class="line"><span class="cl">==&gt; default: Waiting for machine to boot. This may take a few minutes...
+</span></span><span class="line"><span class="cl">    default: SSH address: 127.0.0.1:2222
+</span></span><span class="line"><span class="cl">    default: SSH username: vagrant
+</span></span><span class="line"><span class="cl">    default: SSH auth method: private key
+</span></span><span class="line"><span class="cl">    default: Warning: Connection timeout. Retrying...
+</span></span><span class="line"><span class="cl">    default: Warning: Connection timeout. Retrying...
+</span></span><span class="line"><span class="cl">    ...
+</span></span><span class="line"><span class="cl">    default: Warning: Remote connection disconnect. Retrying...
+</span></span><span class="line"><span class="cl">    default: Warning: Remote connection disconnect. Retrying...
+</span></span><span class="line"><span class="cl">==&gt; default: Machine booted and ready!
+</span></span><span class="line"><span class="cl">==&gt; default: Checking for guest additions in VM...
+</span></span><span class="line"><span class="cl">==&gt; default: Mounting shared folders...
+</span></span><span class="line"><span class="cl">    default: /vagrant =&gt; /root/vagrant/v-box/ct65_00
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>up过程是默认会根据当前目录下的Vagrantfile来启动vm，如果当前目录没有Vagrantfile，则去上层目录寻找，依次类推。第一次<code>vagrant up ct65_00</code>时会从<code>~/.vagrant.d/boxes</code>中导入相应的box文件到<code>~/VirtualBox VMs/</code>，可以通过<code>vboxmanage showvminfo {VM-ID}</code>看到该虚拟机的配置（Mac上为VBoxManage）。如果你想让虚拟机存储在指定位置，如我的Mac SSD硬盘空间贵，可以运行VirtualBox，手动设置存储/storage的路径。</p>
+<p>默认 localhost:2222 转发到 guest:22 以供ssh连接；用户名/密码：vagrant/vagrant；默认共享目录就是host上Vagrantfile所在目录；如果电脑配置比较低导致启动时间比较长，或者VirtualBox启动出错，可能会提示上面的 <a href="http://stackoverflow.com/questions/22575261/vagrant-stuck-connection-timeout-retrying">Connection timeout</a> 。</p>
+<p>另外提示一下，某次我在Linux上测试，由于Linux host本身也是vSphere虚拟机，通过vagrant启动virtualbox另一个虚拟机（即嵌套），一直Retrying，后来根据上面 stackoverflow 打开了VBox GUI，发现是CPU架构的问题，一直堵塞，所以就不建议虚拟机上再装虚拟机了：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">VT-x/AMD-V hardware acceleration is not available on your system. Your 64-bit guest will fail to detect a 64-bit CPU and will not be able to boot.
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h2 id="32-连接虚拟机初始化环境">3.2 连接虚拟机，初始化环境<a hidden class="anchor" aria-hidden="true" href="#32-连接虚拟机初始化环境">#</a></h2>
+<h3 id="vagrant-ssh">vagrant ssh<a hidden class="anchor" aria-hidden="true" href="#vagrant-ssh">#</a></h3>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">$ vagrant ssh
+</span></span><span class="line"><span class="cl">Last login: Tue Mar 31 02:15:38 2015 from 10.0.2.2
+</span></span><span class="line"><span class="cl">Welcome to your Vagrant-built virtual machine.
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>一般建立box时约定的用户名/密码：vagrant/vagrant，root密码也是 vagrant，默认的网络连接方式是Host-Only。</p>
+<h3 id="定制你的环境">定制你的环境<a hidden class="anchor" aria-hidden="true" href="#定制你的环境">#</a></h3>
+<p>如安装jdk，创建用户，解压tomcat，修改server.xml，添加yum源等。这里一步到位，唯一要说明的是tomcat conf/server.xml 的
+<code>&lt;Context path=&quot;&quot; docBase=&quot;/vagrant_data&quot; reloadable=&quot;true&quot; &gt;...</code>应用目录设置为共享目录。</p>
+<h2 id="33-打包成box">3.3 打包成box<a hidden class="anchor" aria-hidden="true" href="#33-打包成box">#</a></h2>
+<h3 id="331-安装必要软件">3.3.1 安装必要软件<a hidden class="anchor" aria-hidden="true" href="#331-安装必要软件">#</a></h3>
+<p>打包是为了分发出去，做扩展用</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl"># yum install -y lrzsz telnet vim puppet puppetmaster
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果你是从0开始建立一个box，当然还需要创建vagrant用户以及public key，具体可以参考<a href="http://blog.csdn.net/samxx8/article/details/38943395">如何制作一个vagrant的base box</a>。</p>
+<h3 id="332-安装virtualbox-guest-additions">3.3.2 安装Virtualbox Guest Additions<a hidden class="anchor" aria-hidden="true" href="#332-安装virtualbox-guest-additions">#</a></h3>
+<p>每个人电脑上安装的Virtualbox版本很可能不一样，<code>vagrant up</code>可能会有提示版本不兼容（同一大版本号还好，可省略这一步），导致host到guest共享目录模块失败，最终无法启动虚拟机。</p>
+<p>安装方法可以有 <a href="https://github.com/dotless-de/vagrant-vbguest">vagrant-vbguest</a>（注意这是vagrant插件，不是virtualbox插件），使用超级详细，只需执行<code>vagrant plugin install vagrant-vbguest</code>，默认从本地找 VBoxGuestAdditions.iso （各平台路径一般都可以找到），如果没找到则去<code>http://download.virtualbox.org/virtualbox/%{version}/VBoxGuestAdditions_%{version}.iso</code> 下载，直接启动vm便可安装或更新virtualbox guest additions ，甚至可以通过<code>vagrant vbguest</code>命令给正在运行的vm安装，缺点是 plugin install 得连网。下面是手动在vm内部安装：</p>
+<p>一般最小化的box不带有CDROM，需要通过VirtualBox图形化界面添加一个DVD/CD存储设备，然后在启动VM后 Devices -&gt; Insert Guest Additions CD 。（相信你可以可以找到办法直接挂载 .iso 文件到vm里面，免去添加多余设备）</p>
+<blockquote>
+<p>for linux : /usr/share/virtualbox/VBoxGuestAdditions.iso
+for Mac : /Applications/VirtualBox.app/Contents/MacOS/VBoxGuestAdditions.iso
+for Windows : %PROGRAMFILES%/Oracle/VirtualBox/VBoxGuestAdditions.iso</p></blockquote>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">$ sudo yum install linux-headers-$(uname -r) build-essential dkms 
+</span></span><span class="line"><span class="cl">$ sudo mount /dev/cdrom /media/cdrom
+</span></span><span class="line"><span class="cl">$ sudo sh /media/cdrom/VBoxLinuxAdditions.run --nox11
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>官方参考：http://docs.vagrantup.com/v2/virtualbox/boxes.html</p>
+<h3 id="333-vagrant-package">3.3.3 vagrant package<a hidden class="anchor" aria-hidden="true" href="#333-vagrant-package">#</a></h3>
+<p>打包导出：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"> <span class="nx">vagrant</span> <span class="kn">package</span> <span class="o">--</span><span class="nx">output</span> <span class="nx">sean</span><span class="o">-</span><span class="nx">vg</span><span class="o">-</span><span class="nx">ct65_ts</span><span class="p">.</span><span class="nx">box</span>
+</span></span><span class="line"><span class="cl"><span class="o">==</span><span class="p">&gt;</span> <span class="k">default</span><span class="p">:</span> <span class="nx">Attempting</span> <span class="nx">graceful</span> <span class="nx">shutdown</span> <span class="nx">of</span> <span class="nx">VM</span><span class="o">...</span>
+</span></span><span class="line"><span class="cl"><span class="o">==</span><span class="p">&gt;</span> <span class="k">default</span><span class="p">:</span> <span class="nx">Clearing</span> <span class="kt">any</span> <span class="nx">previously</span> <span class="nx">set</span> <span class="nx">forwarded</span> <span class="nx">ports</span><span class="o">...</span>
+</span></span><span class="line"><span class="cl"><span class="o">==</span><span class="p">&gt;</span> <span class="k">default</span><span class="p">:</span> <span class="nx">Exporting</span> <span class="nx">VM</span><span class="o">...</span>
+</span></span><span class="line"><span class="cl"><span class="o">==</span><span class="p">&gt;</span> <span class="k">default</span><span class="p">:</span> <span class="nx">Compressing</span> <span class="kn">package</span> <span class="nx">to</span><span class="p">:</span> <span class="o">/</span><span class="nx">Users</span><span class="o">/</span><span class="nx">sean</span><span class="o">/</span><span class="nx">vagrant</span><span class="o">/</span><span class="nx">sean</span><span class="o">-</span><span class="nx">vg</span><span class="o">-</span><span class="nx">ct65_ts</span><span class="p">.</span><span class="nx">box</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>当前目录下若存在同名package.box则会export失败。打包的来源并不是<code>.vagrant.d</code>而是VirtualBox虚拟机本身，可以通过<code>--base vm-name</code>来指定所导出的虚拟机名称，<code>--vagrantfile file-pathname</code>可以将Vagrantfile直接封进box中。以后就可以把这个 .box 文件分发给开发人员使用了。</p>
+<h1 id="4-其他">4. 其他<a hidden class="anchor" aria-hidden="true" href="#4-其他">#</a></h1>
+<h2 id="41-命令">4.1 命令<a hidden class="anchor" aria-hidden="true" href="#41-命令">#</a></h2>
+<p><code>vagrant suspend</code>将虚拟机置于休眠状态。这时候主机会保存虚拟机的当前状态。再用vagrant up启动虚拟机时能够返回之前工作的状态。这种方式优点是休眠和启动速度都很快，只有几秒钟。缺点是需要额外的磁盘空间来存储当前状态。</p>
+<p><code>vagrant halt</code>则是关机。如果想再次启动还是使用vagrant up命令，不过需要多花些时间。</p>
+<p><code>vagrant destroy</code>则会将虚拟机从磁盘中删除。如果想重新创建还是使用vagrant up命令。</p>
+<p><code>vagrant reload</code>从Vagrantfile重新启动虚拟机。</p>
+<p><code>vagrant global-status</code>输出所有虚拟机当前运行状态，关机、已启动等。</p>
+<p>另外1.2以上版本的Vagrant还引用了插件机制。可以通过vagrant plugin来添加各种各样的plugin，这给Vagrant的应用带来了更大的灵活性和针对性。比如可以添加vagrant-windows的插件来增加对windows系统的支持，通过添加vagrant-aws插件来实现给AWS创建虚拟机的功能。你也可以编写自己的插件。由于Vagrant是ruby写的一个gem，其插件的编写也是使用的Ruby语言。</p>
+<p>关于 Vagrantfile说明以及网络、多机器管理的配置，见 <a href="http://xgknight.com/2015/04/01/vagrantfile/">Varantfile说明</a>。</p>
+<h2 id="42-问题集">4.2 问题集<a hidden class="anchor" aria-hidden="true" href="#42-问题集">#</a></h2>
+<ul>
+<li>
+<p>选用配置略高一点的电脑做host，否则启动会相当慢而且会提示<code>Warning: Connection timeout. Retrying...</code>，如果在300s内没有boot up，你可能需要启用GUI界面可以帮我们诊断一些启动失败的问题，<code>vb.gui = true</code>。坚决不要在虚拟机里玩vagrant！</p>
+</li>
+<li>
+<p>不要轻易在VirtualBox图形界面下强行关闭虚拟机，可能会出现意想不到的错误，如 The guest machine entered an invalid state while waiting for it
+to boot. Valid states are &lsquo;starting, running&rsquo;. The machine is in the
+&lsquo;poweroff&rsquo; state &hellip; 针对这个问题的解决办法，<a href="https://github.com/mitchellh/vagrant/issues/2157">issue 2175</a> 没能搞定，直接destroy重来。</p>
+</li>
+<li>
+<p>我在ubuntu trustry 64-bit 安装virtualbox时，提示依赖没装（libgl1-mesa-glx libqt4-network libqt4-opengl libqtcore4 libqtgui4 libxcursor1 libxinerama1 libxmu6 libxt6），
+使用<code>apt-get install libqt4-opengl</code>来安装上面的依赖，如果报错<code>The following packages have unmet dependencies...</code>，执行<code>apt-get -f install</code> 解决。</p>
+</li>
+<li>
+<p>安装 virtualbox guest additions 失败
+在 3.3.2节安装Virtualbox Guest Additions时，运行<code>./media/cdrom/VBoxLinuxAdditions.run</code>后提示：</p>
+</li>
+</ul>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="nx">The</span> <span class="nx">headers</span> <span class="k">for</span> <span class="nx">the</span> <span class="nx">current</span> <span class="nx">running</span> <span class="nx">kernel</span> <span class="nx">were</span> <span class="nx">not</span> <span class="nx">found</span><span class="p">.</span> <span class="nx">If</span> <span class="nx">the</span> <span class="nx">following</span> <span class="nx">module</span> 
+</span></span><span class="line"><span class="cl"><span class="nx">compilation</span> <span class="nx">fails</span> <span class="nx">then</span> <span class="nx">this</span> <span class="nx">could</span> <span class="nx">be</span> <span class="nx">the</span> <span class="nx">reason</span><span class="p">.</span> <span class="nx">The</span> <span class="nx">missing</span> <span class="kn">package</span> <span class="nx">can</span> <span class="nx">be</span> <span class="nx">probably</span>
+</span></span><span class="line"><span class="cl"> <span class="nx">installed</span> <span class="nx">with</span> <span class="nx">yum</span> <span class="nx">install</span> <span class="nx">kernel</span><span class="o">-</span><span class="nx">devel</span><span class="o">-</span><span class="mf">2.6.32</span><span class="o">-</span><span class="mf">431.</span><span class="nx">el6</span><span class="p">.</span><span class="nx">x86_64</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="nx">Building</span> <span class="nx">the</span> <span class="nx">main</span> <span class="nx">Guest</span> <span class="nx">Additions</span> <span class="nx">module</span>                   <span class="p">[</span><span class="nx">FAILED</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl"><span class="o">...</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>关机后启动虚拟机，相应的会提示：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">Failed to mount folders in Linux guest. This is usually because the &#34;vboxsf&#34; file 
+</span></span><span class="line"><span class="cl">system is not available. Please verify that the guest additions are properly 
+</span></span><span class="line"><span class="cl">installed in the guest and can work properly. The command attempted was:
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">mount -t vboxsf -o uid=id -u vagrant,gid=getent group vagrant | cut -d: -f3 vagrant /vagrant
+</span></span><span class="line"><span class="cl">mount -t vboxsf -o uid=id -u vagrant,gid=id -g vagrant vagrant /vagrant
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">The error output from the last command was:
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">/sbin/mount.vboxsf: mounting failed with the error: No such device
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>原因就是旧版本卸载成功但新版本guest additions却因为<code>yum install kernel-devel</code>找不到软件包（No package available）失败。这种情况很少见，kernel-devel 一般都可以装上去解决。如果像我这样提示死活没这个软件包的，换个box吧！</p>
+<ul>
+<li>
+<p>硬盘扩容
+进入到虚拟机后，通过<code>df -h</code>你可能看到磁盘空间不足，需要扩容（不允许缩小空间），就可以通过以下方法完成。</p>
+<ol>
+<li>
+<p>手动方式，与是否使用vagrant无关
+halt关闭虚拟机虚拟机后，使用 <code>VBoxManage modifyhd box-disk1.vdi --resize 10240</code> 即完成修改。但是如果虚拟机磁盘格式创建时使用的是vmdk，则不支持直接vmdk格式修改，需要通过<code>VBoxManage clonehd box_disk1.vmdk box_disk2.vdi --format VDI</code>转换成vdi格式，然后在图形化VirtualBox中选择这个新的磁盘。另外提醒一句，这里的扩容是修改动态分配的磁盘的虚拟大小而不是实际大小，所以假如resize后的值比预分配的磁盘要小的话，会提示 Progress state: VBOX_E_NOT_SUPPORTED ..VBoxManage: error: Resize hard disk operation for this format is not implemented yet!
+相关参考：<a href="http://stackoverflow.com/questions/14917353/resizing-disk-space-on-vagrant-box">Resizing disk space on vagrant box</a>、
+<a href="http://www.streamwave.com/systems-administration/how-to-extend-your-virtualbox-virtual-hard-drive/">VirtualBox VBOX_E_NOT_SUPPORTED Drive Resize Error</a>、<a href="https://gist.github.com/christopher-hopper/9755310">Resize a Hard Disk for a Virtual Machine</a> 。</p>
+</li>
+<li>
+<p>通过Vagrantfile指令修改</p>
+</li>
+</ol>
+</li>
+</ul>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">  config.vm.provider &#34;virtualbox&#34; do |vb|
+</span></span><span class="line"><span class="cl">    vb.customize &#39;pre-boot&#39;, [&#39;modifyhd&#39;, &#39;e91678c3-b49b-489b-b280-4e138533252d&#39;, &#39;--resize&#39;, &#39;10240&#39;]
+</span></span><span class="line"><span class="cl">  end
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>上面那串数字字母，是虚拟磁盘的UUID，可以先通过<code>ps -ef|grep Virtual</code>(Mac, <code>virtualbox</code> in Linux )查到虚拟机UUID，再通过<code>VBoxManage showvminfo {VM UUID}|grep vdi</code>看到这个 disk UUID。参考 <a href="https://github.com/mitchellh/vagrant/issues/2339">Add some way to increase disk space from Vagrantfile</a>。
+扩容完成后把Vagrantfile中对应的部分去掉，以免每次启动都进行这步操作。</p>
+<ul>
+<li><a href="http://www.cnblogs.com/huang0925/p/3349841.html">Hello Vagrant</a></li>
+<li><a href="http://segmentfault.com/a/1190000000264347">使用 Vagrant 打造跨平台开发环境</a></li>
+<li><a href="https://github.com/astaxie/Go-in-Action/blob/master/ebook/zh/01.2.md">Vagrant安装配置</a></li>
+<li><a href="http://docs.vagrantup.com/v2/virtualbox/boxes.html">Creating a Base Box</a></li>
+<li><a href="http://blog.csdn.net/samxx8/article/details/38943395">如何制作一个vagrant的base box</a></li>
+<li><a href="http://blog.icodeu.com/?tag=vagrant">http://blog.icodeu.com/?tag=vagrant</a></li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://localhost:1313/tags/vagrant/">Vagrant</a></li>
+      <li><a href="http://localhost:1313/tags/virtualbox/">Virtualbox</a></li>
+      <li><a href="http://localhost:1313/tags/%E8%99%9A%E6%8B%9F%E5%8C%96/">虚拟化</a></li>
+      <li><a href="http://localhost:1313/tags/%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83/">开发环境</a></li>
+    </ul>
+<nav class="paginav">
+  <a class="prev" href="http://localhost:1313/2015/04/vmware-vcenter-vconverter/">
+    <span class="title">« Prev</span>
+    <br>
+    <span>使用vmware vconverter从物理机迁移系统到虚拟机P2V（多图）</span>
+  </a>
+  <a class="next" href="http://localhost:1313/2015/03/sleep-late-for-what/">
+    <span class="title">Next »</span>
+    <br>
+    <span>习惯晚睡</span>
+  </a>
+</nav>
+
+  </footer><script src="https://utteranc.es/client.js"
+        repo="seanlook/sean-notes-comment"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+</article>
+    </main>
+    
+<footer class="footer">
+        <span>&copy; 2025 <a href="http://localhost:1313/">Sean&#39;s Note</a></span> · 
+
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+<script>
+    document.querySelectorAll('pre > code').forEach((codeblock) => {
+        const container = codeblock.parentNode.parentNode;
+
+        const copybutton = document.createElement('button');
+        copybutton.classList.add('copy-code');
+        copybutton.innerHTML = 'copy';
+
+        function copyingDone() {
+            copybutton.innerHTML = 'copied!';
+            setTimeout(() => {
+                copybutton.innerHTML = 'copy';
+            }, 2000);
+        }
+
+        copybutton.addEventListener('click', (cb) => {
+            if ('clipboard' in navigator) {
+                navigator.clipboard.writeText(codeblock.textContent);
+                copyingDone();
+                return;
+            }
+
+            const range = document.createRange();
+            range.selectNodeContents(codeblock);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            try {
+                document.execCommand('copy');
+                copyingDone();
+            } catch (e) { };
+            selection.removeRange(range);
+        });
+
+        if (container.classList.contains("highlight")) {
+            container.appendChild(copybutton);
+        } else if (container.parentNode.firstChild == container) {
+            
+        } else if (codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName == "TABLE") {
+            
+            codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(copybutton);
+        } else {
+            
+            codeblock.parentNode.appendChild(copybutton);
+        }
+    });
+</script>
+</body>
+
+</html>

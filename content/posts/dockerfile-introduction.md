@@ -1,3 +1,4 @@
+---
 title: Dockerfile指令详解
 date: 2014-11-17 15:21:25
 updated: 2014-11-17 15:46:23
@@ -42,14 +43,13 @@ RUN ["apt-get", "install", "vim", "-y"]
 RUN ["/bin/bash", "-c", "apt-get install vim -y"]  与shell风格相同
 ```
 
-### ENTRYPORINT ###
+### ENTRYPOINT ###
 `ENTRYPOINT`命令设置在容器启动时执行命令，如果有多个`ENTRYPOINT`指令，那只有最后一个生效。有以下两种命令格式：
 ```
 ENTRYPOINT ["executable", "param1", "param2"]  数组/exec格式，推荐
 或
 ENTRYPOINT command param1 param2    shell格式
 ```
-
 
 比如：
 ```
@@ -82,13 +82,13 @@ KiB Swap:        0 total,        0 used,        0 free.   571388 cached Mem
 如果在使用的docker版本在v1.3及以上，则可以使用`docker exec`继续在容器中验证，看到完整的top命令`docker exec -it test ps aux`
 
 
-### CMD ### 
+### CMD ###
 ```
 CMD ["executable","param1","param2"]  （数组/exec格式）
 CMD ["param1","param2"]  (as default parameters to ENTRYPOINT)
 CMD command param1 param2  (shell格式)
 ```
-一个Dockerfile里只能有一个CMD，如果有多个，只有最后一个生效。`CMD`指令的主要功能是在build完成后，为了给`docker run`启动到容器时提供默认命令或参数，这些默认值可以包含可执行的命令，也可以只是参数（此时可执行命令就必须提前在`ENTRYPORINT`中指定）。
+一个Dockerfile里只能有一个CMD，如果有多个，只有最后一个生效。`CMD`指令的主要功能是在build完成后，为了给`docker run`启动到容器时提供默认命令或参数，这些默认值可以包含可执行的命令，也可以只是参数（此时可执行命令就必须提前在`ENTRYPOINT`中指定）。
 
 它与`ENTRYPOINT`的功能极为相似，区别在于如果`docker run`后面出现与`CMD`指定的相同命令，那么CMD会被覆盖；而`ENTRYPOINT`会把容器名后面的所有内容都当成参数传递给其指定的命令（不会对命令覆盖）。另外`CMD`还可以单独作为`ENTRYPOINT`的所接命令的可选参数。
 `CMD`与`RUN`的区别在于，`RUN`是在`build`成镜像时就运行的，先于`CMD`和`ENTRYPOINT`的，`CMD`会在每次启动容器的时候运行，而`RUN`只在创建镜像时执行一次，固化在image中。
@@ -157,7 +157,7 @@ Same as 'ADD' but without the tar and remote url handling.
 ```
 ENV <key> <value>
 ```
-设置了后，后续的RUN命令都可以使用，当运行生成的镜像时这些环境变量依然有效，如果需要在运行时更改这些环境变量可以在运行`docker run`时添加`-env <key>=<value>`参数来修改。 
+设置了后，后续的RUN命令都可以使用，当运行生成的镜像时这些环境变量依然有效，如果需要在运行时更改这些环境变量可以在运行`docker run`时添加`-env <key>=<value>`参数来修改。
 
 ### VOLUME ###
 VOLUME指令用来在容器中设置一个挂载点，可以用来让其他容器挂载以实现数据共享或对容器数据的备份、恢复或迁移。请参考文章[docker容器间通信](http://seanlook/2014/12/17/docker_comun)
@@ -210,7 +210,7 @@ $ cat .dockerignore
 tmp*
 ```
 
-更多内容参考[Dockerfile最佳实践](http://seanlook.com/2014/12/20/dockerfile_best_practice1)系列。官方有个[Dockerfile tutorial](格式)练习Dockerfile的写法，非常简单但对于养成良好的格式、注释有一些帮助。
+更多内容参考[Dockerfile最佳实践](http://xgknight.com/2014/12/20/dockerfile_best_practice1)系列。官方有个[Dockerfile tutorial](格式)练习Dockerfile的写法，非常简单但对于养成良好的格式、注释有一些帮助。
 
 ### Dockerfile示例 ###
 下面的`Dockerfile`是MySQL官方镜像的构建过程。从ubuntu基础镜像开始构建，安装mysql-server、配置权限、映射目录和端口，`CMD`在从这个镜像运行到容器时启动mysql。其中`VOLUME`定义的两个可挂载点，用于在host中挂载，因为数据库保存在主机上而非容器中才是比较安全的。

@@ -1,8 +1,9 @@
+---
 title: 我为何厌恶百度的产品
 date: 2015-02-28 15:21:25
 updated: 2015-02-28 16:46:23
-tags: feelings
-categories: Feel
+tags: [feelings]
+categories: [Feel]
 ---
 
 今天因为使用百度云同步盘出错，导致我的文件永远丢失，忍无可忍**又**给“百度倾听”发了条牢骚。
