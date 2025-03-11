@@ -1,6 +1,8 @@
 ---
 title: 搭建docker内网私服（docker-registry with nginx&ssl on centos）
 date: 2014-11-13 20:21:25
+aliases:
+- /2014/11/13/deploy-private-docker-registry-with-nginx-ssl/
 updated: 2014-12-25 15:46:23
 tags: [docker, centos, docker-registry, nginx, ssl]
 categories: [Virtualization, Docker]

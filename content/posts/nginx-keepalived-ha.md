@@ -1,6 +1,8 @@
 ---
 title: Nginx+Keepalived实现站点高可用
 date: 2015-05-18 01:21:25
+aliases:
+- /2015/05/18/nginx-keepalived-ha/
 updated: 2015-05-18 00:46:23
 tags: [nignx, keepalived, 高可用]
 categories: [Linux, Nginx]

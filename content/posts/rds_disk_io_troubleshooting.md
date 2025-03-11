@@ -1,6 +1,8 @@
 ---
 title: MySQL实例阻塞分析一例(线程statistics状态)
 date: 2017-09-23 16:32:49
+aliases:
+- /2017/09/23/rds_disk_io_troubleshooting/
 tags: [mysql, table_cache]
 categories:
 - MySQL

@@ -1,6 +1,8 @@
 ---
 title: Oracle单实例安装环境一键配置脚本（CentOS6 + 11gR2 ）
 date: 2014-12-02 15:21:25
+aliases:
+- /2014/12/02/oracle11gr2_installation_precheck_scripts/
 updated: 2014-12-03 00:46:23
 tags: [oracle, centos, shell, installation]
 categories: Oracle

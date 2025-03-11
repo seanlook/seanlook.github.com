@@ -1,6 +1,8 @@
 ---
 title: 【转+改】Docker核心技术预览
 date: 2014-12-18 13:21:25
+aliases:
+- /2014/12/18/docker-core-technology-preview/
 updated: 2014-12-18 15:46:23
 tags: [docker, linux, lxc, cgroup, aufs]
 categories: [Virtualization, Docker]

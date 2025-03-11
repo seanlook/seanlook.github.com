@@ -1,6 +1,8 @@
 ---
 title: nginx配置location总结及rewrite规则写法
 date: 2015-05-17 15:21:25
+aliases:
+- /2015/05/17/nginx-location-rewrite/
 updated: 2015-05-17 15:46:23
 tags: [nignx, rewrite]
 categories: [Linux, Nginx]

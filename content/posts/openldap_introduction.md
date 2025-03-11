@@ -1,6 +1,8 @@
 ---
 title: LDAP服务器的概念和原理简单介绍
 date: 2015-01-15 01:21:25
+aliases:
+- /2015/01/15/openldap_introduction/
 updated: 2015-01-15 10:46:23
 tags: [LDAP, sasl, Kerberos]
 categories: [Linux, OpenLDAP]

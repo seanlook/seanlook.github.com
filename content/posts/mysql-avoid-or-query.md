@@ -1,6 +1,8 @@
 ---
 title: MySQL避免索引列使用 OR 条件
 date: 2016-04-05 16:32:49
+aliases:
+- /2016/04/05/mysql-avoid-or-query/
 tags: [mysql, SQL优化]
 categories: 
 - MySQL

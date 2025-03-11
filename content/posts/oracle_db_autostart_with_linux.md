@@ -1,6 +1,8 @@
 ---
 title: 配置 Oracle 11gR2 在 CentOS6 上开机自启动
 date: 2015-04-11 15:21:25
+aliases:
+- /2015/04/11/oracle_db_autostart_with_linux/
 updated: 2015-04-11 15:21:25
 tags: [oracle, linux]
 categories: Oracle

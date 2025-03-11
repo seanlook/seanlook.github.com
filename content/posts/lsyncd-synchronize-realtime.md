@@ -1,6 +1,8 @@
 ---
 title: lsyncd实时同步搭建指南——取代rsync+inotify
 date: 2015-05-06 01:21:25
+aliases:
+- /2015/05/06/lsyncd-synchronize-realtime/
 updated: 2015-05-07 12:46:23
 tags: [rsync,inotify,lsyncd，文件同步]
 categories: Linux

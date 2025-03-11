@@ -1,6 +1,8 @@
 ---
 title: 解答一个关于日志系统的思路
 date: 2015-06-09 16:32:49
+aliases:
+- /2015/06/09/gongshi-logsystem-elk-preview/
 tags: [linux, logsystem]
 categories: 
 - Linux

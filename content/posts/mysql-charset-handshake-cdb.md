@@ -1,6 +1,8 @@
 ---
 title: 遇到腾讯云CDB连接字符集设置一个坑
 date: 2016-10-17 16:32:49
+aliases:
+- /2016/10/17/mysql-charset-handshake-cdb/
 tags: [mysql, 腾讯云, 字符集]
 categories:
 - MySQL

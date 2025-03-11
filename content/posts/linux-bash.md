@@ -1,6 +1,8 @@
 ---
 title: 高效Linux bash快捷键及alias总结
 date: 2014-03-09 01:21:25
+aliases:
+- /2014/03/09/linux-bash/
 updated: 2015-05-10 00:46:23
 tags: [bash,linux]
 categories: Linux

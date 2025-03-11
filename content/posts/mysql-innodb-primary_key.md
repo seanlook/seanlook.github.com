@@ -1,6 +1,8 @@
 ---
 title: InnoDB表主键设计方案
 date: 2016-05-13 15:32:49
+aliases:
+- /2016/05/13/mysql-innodb-primary_key/
 tags: [mysql, 主键]
 categories:
 - MySQL

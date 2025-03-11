@@ -1,6 +1,8 @@
 ---
 title: markdown语法备忘笔记
 date: 2014-10-25 01:21:25
+aliases:
+- /2014/10/25/markdown-tips/
 tags: [markdown, hexo博客]
 categories: 
 - 其它

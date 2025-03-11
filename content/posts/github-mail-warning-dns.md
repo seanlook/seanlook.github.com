@@ -1,6 +1,8 @@
 ---
 title: 完全解决Github Pages邮件两次warning（DNS解析问题）
 date: 2014-11-08 01:21:25
+aliases:
+- /2014/11/08/github-mail-warning-dns/
 updated: 2014-11-09 00:46:23
 tags: [github,troubleshooting]
 categories: Github

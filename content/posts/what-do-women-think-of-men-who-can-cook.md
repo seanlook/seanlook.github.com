@@ -1,6 +1,8 @@
 ---
 title: 在女性眼里，男人会做饭是种什么体验？
 date: 2015-10-21 23:56:25
+aliases:
+- /2015/10/21/what-do-women-think-of-men-who-can-cook/
 tags: [生活, 翻译, 做饭]
 categories: 
 - 生活

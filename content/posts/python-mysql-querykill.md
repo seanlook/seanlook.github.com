@@ -1,6 +1,8 @@
 ---
 title: 你可能需要一个实时抓取MySQL慢查询现场的程序
 date: 2016-09-27 16:32:49
+aliases:
+- /2016/09/27/python-mysql-querykill/
 tags: [mysql, python]
 categories:
 - Python

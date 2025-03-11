@@ -1,6 +1,8 @@
 ---
 title: ProxySQL监控方案
 date: 2017-07-16 21:32:49
+aliases:
+- /2017/07/16/mysql-proxysql-monitor/
 tags: [mysql, middleware, proxysql]
 categories:
 - MySQL

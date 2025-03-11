@@ -1,6 +1,8 @@
 ---
 title: 让mysqldump变成并发导出导入的魔法
 date: 2016-11-17 16:32:49
+aliases:
+- /2016/11/17/python-mysqldump-out-in-concurrency-magic/
 tags: [mysql, python, mysqldump]
 categories:
 - Python

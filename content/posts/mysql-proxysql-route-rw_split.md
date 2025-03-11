@@ -1,6 +1,8 @@
 ---
 title: ProxySQL之读写分离与分库路由演示
 date: 2017-04-17 15:32:49
+aliases:
+- /2017/04/17/mysql-proxysql-route-rw_split/
 tags: [mysql, 中间件, proxysql]
 categories:
 - MySQL

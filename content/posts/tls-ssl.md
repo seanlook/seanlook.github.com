@@ -1,6 +1,8 @@
 ---
 title: SSL/TLS原理详解
 date: 2015-01-07 01:21:25
+aliases:
+- /2015/01/07/tls-ssl/
 updated: 2015-01-07 10:46:23
 tags: [ssl, tls, 安全]
 categories: Linux

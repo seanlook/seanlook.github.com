@@ -1,6 +1,8 @@
 ---
 title: MySQL非主从环境下数据一致性校验及修复程序
 date: 2016-11-20 16:32:49
+aliases:
+- /2016/11/20/py-mysql-table-checksum-non-replicas/
 tags: [mysql, python, pt-table-checksum]
 categories:
 - Python
@@ -120,11 +122,15 @@ Start compare chunk's crc32 for table: [ db1.t_test_201408 ]
 该chunk [1] 存在行内容不一致, CRC32: src(828649697) rgt(-1396224393)
 去源库和目标库获取chunk[1]不一致行：
   TO insert or update:  [u'3761994']
+aliases:
+- /2016/11/20/py-mysql-table-checksum-non-replicas/
   TO delete:  []
 
 该chunk [5] 存在行内容不一致, CRC32: src(1513453680) rgt(-1614463460)
 去源库和目标库获取chunk[5]不一致行：
   TO insert or update:  [u'3806841']
+aliases:
+- /2016/11/20/py-mysql-table-checksum-non-replicas/
   TO delete:  []
 ```
 

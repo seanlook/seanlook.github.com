@@ -1,6 +1,8 @@
 ---
 title: 监控MySQL你还应该收集表信息
 date: 2016-12-04 16:32:49
+aliases:
+- /2016/12/04/mysql-schema-gather-statistics/
 updated: 2016-12-04 16:32:49
 tags: [mysql, monitor]
 categories:

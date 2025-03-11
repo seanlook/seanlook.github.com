@@ -1,6 +1,8 @@
 ---
 title: 基于MySQL binlog增量数据同步方案(maxwell+rabbimt+pydbsync)
 date: 2018-01-14 15:32:49
+aliases:
+- /2018/01/14/rabbitmq-maxwell-consumer/
 tags: [mysql, maxwell, rabbitmq, binlog]
 categories:
 - MySQL

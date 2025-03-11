@@ -1,6 +1,8 @@
 ---
 title: 关于MySQL自增主键的几点问题（上）
 date: 2017-02-16 16:32:49
+aliases:
+- /2017/02/16/mysql-autoincrement/
 tags: [mysql, schema设计]
 categories:
 - MySQL

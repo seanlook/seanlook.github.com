@@ -1,6 +1,8 @@
 ---
 title: docker常用管理命令（上）
 date: 2014-10-31 20:21:25
+aliases:
+- /2014/10/31/docker-command-best-use-1/
 updated: 2014-11-05 15:46:23
 tags: [docker, command]
 categories: [Linux, Docker]

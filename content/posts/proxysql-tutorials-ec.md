@@ -1,6 +1,8 @@
 ---
 title: ProxySQL PPT分享
 date: 2017-07-19 21:32:49
+aliases:
+- /2017/07/19/proxysql-tutorials-ec/
 tags: [mysql, 分享]
 categories:
 - MySQL

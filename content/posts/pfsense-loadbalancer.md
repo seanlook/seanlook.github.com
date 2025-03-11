@@ -1,6 +1,8 @@
 ---
 title: 怎么用pfSense为你的web服务做负载均衡（翻译）
 date: 2015-04-24 15:21:25
+aliases:
+- /2015/04/24/pfsense-loadbalancer/
 updated: 2015-04-25 00:46:23
 tags: [pfsense,vmware]
 categories: Linux

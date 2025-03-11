@@ -1,6 +1,8 @@
 ---
 title: 自建Binlog订阅服务 —— Maxwell
 date: 2018-01-13 15:32:49
+aliases:
+- /2018/01/13/maxwell-binlog/
 tags: [mysql, binlog]
 categories:
 - MySQL

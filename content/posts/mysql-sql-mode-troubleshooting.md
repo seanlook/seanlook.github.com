@@ -1,6 +1,8 @@
 ---
 title: MySQL sql_mode 说明（及处理一起 sql_mode 引发的问题）
 date: 2016-04-22 16:32:49
+aliases:
+- /2016/04/22/mysql-sql-mode-troubleshooting/
 tags: [mysql, sql_mode]
 categories: 
 - MySQL

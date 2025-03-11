@@ -1,6 +1,8 @@
 ---
 title: iptables常用实例备查（更新中）
 date: 2014-02-26 01:21:25
+aliases:
+- /2014/02/26/iptables-example/
 updated: 2014-02-26-12 00:46:23
 tags: [iptables,安全]
 categories: Linux

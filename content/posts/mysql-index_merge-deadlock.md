@@ -1,6 +1,8 @@
 ---
 title: index merge 引起的死锁分析
 date: 2017-03-11 16:32:49
+aliases:
+- /2017/03/11/mysql-index_merge-deadlock/
 tags: [mysql, mysql优化]
 categories:
 - MySQL

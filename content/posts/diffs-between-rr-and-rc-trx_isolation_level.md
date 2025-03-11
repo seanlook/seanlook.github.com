@@ -1,6 +1,8 @@
 ---
 title: READ-COMMITED 与 REPEATABLE-READ 事务隔离级别之间的异同
 date: 2016-09-03 16:32:49
+aliases:
+- /2016/09/03/diffs-between-rr-and-rc-trx_isolation_level/
 tags: [mysql, 事务]
 categories:
 - MySQL

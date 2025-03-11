@@ -1,6 +1,8 @@
 ---
 title: table_open_cache 与 table_definition_cache 对MySQL(内存)的影响
 date: 2017-10-13 16:32:49
+aliases:
+- /2017/10/13/mysql-table_open_cache_file_limits/
 tags: [mysql, table_cache]
 categories:
 - MySQL

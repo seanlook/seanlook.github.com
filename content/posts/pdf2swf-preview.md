@@ -1,6 +1,8 @@
 ---
 title: 仿豆丁网文件在线浏览解决方案搭建
 date: 2015-05-13 01:21:25
+aliases:
+- /2015/05/13/pdf2swf-preview/
 updated: 2015-05-13 00:46:23
 tags: [linux]
 categories: [Linux]

@@ -1,6 +1,8 @@
 ---
 title: LDIF修改ldap记录或配置示例
 date: 2015-01-22 01:21:25
+aliases:
+- /2015/01/22/openldap_ldif_example/
 updated: 2015-01-22 10:46:23
 tags: [LDAP, ldif]
 categories: [Linux, OpenLDAP]

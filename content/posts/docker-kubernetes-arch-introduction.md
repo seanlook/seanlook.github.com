@@ -1,6 +1,8 @@
 ---
 title: 开源容器集群管理系统Kubernetes架构及组件介绍
 date: 2015-02-03 13:21:25
+aliases:
+- /2015/02/03/docker-kubernetes-arch-introduction/
 updated: 2014-02-03 15:46:23
 tags: [docker, linux, kubernetes]
 categories: [Virtualization, Docker]

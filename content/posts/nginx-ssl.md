@@ -1,6 +1,8 @@
 ---
 title: nginx配置ssl加密（单双向认证、部分https）
 date: 2015-05-28 15:21:25
+aliases:
+- /2015/05/28/nginx-ssl/
 updated: 2015-05-28 15:46:23
 tags: [nignx, ssl]
 categories: [Linux, Nginx]

@@ -1,6 +1,8 @@
 ---
 title: php5.3连接oracle的客户端及pdo_oci模块安装
 date: 2015-03-10 01:21:25
+aliases:
+- /2015/03/10/install-pdo-oci-oci8-phpext/
 updated: 2015-03-10 10:46:23
 tags: [oracle, php]
 categories: Linux

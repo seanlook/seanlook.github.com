@@ -1,6 +1,8 @@
 ---
 title: InnoDB行格式对text/blob大变长字段的影响
 date: 2016-05-18 16:32:49
+aliases:
+- /2016/05/18/mysql-blob-row_format/
 tags: [mysql, schema设计]
 categories: 
 - MySQL

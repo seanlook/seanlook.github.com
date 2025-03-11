@@ -1,6 +1,8 @@
 ---
 title: 五一去哪儿
 date: 2015-05-01 11:01:25
+aliases:
+- /2015/05/01/feel-wuyi-go/
 updated: 2015-05-01 11:01:25
 tags: [feelings]
 categories: [Feel]

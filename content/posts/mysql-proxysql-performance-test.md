@@ -1,6 +1,8 @@
 ---
 title: ProxySQL之性能测试对比
 date: 2017-04-20 21:32:49
+aliases:
+- /2017/04/20/mysql-proxysql-performance-test/
 tags: [mysql, 中间件, proxysql]
 categories:
 - MySQL

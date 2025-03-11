@@ -1,6 +1,8 @@
 ---
 title: tar命令高级用法——备份数据
 date: 2014-12-08 01:21:25
+aliases:
+- /2014/12/08/tar_backup_filesystem/
 updated: 2014-12-09 00:46:23
 tags: [linux命令,tar,backup]
 categories: Linux

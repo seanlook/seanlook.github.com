@@ -1,6 +1,8 @@
 ---
 title: 南山南
 date: 2015-11-01 11:59:31
+aliases:
+- /2015/11/01/nan-shan-hike/
 tags: [生活]
 categories: 
 - 生活

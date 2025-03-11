@@ -1,6 +1,8 @@
 ---
 title: 回家看看（国庆）
 date: 2015-09-30 11:59:31
+aliases:
+- /2015/09/30/the-way-home-20151001/
 tags: [生活]
 categories: 
 - 生活

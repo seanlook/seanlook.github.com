@@ -1,6 +1,8 @@
 ---
 title: ProxySQL之安装及配置详解
 date: 2017-04-10 21:32:49
+aliases:
+- /2017/04/10/mysql-proxysql-install-config/
 tags: [mysql, 中间件, proxysql]
 categories:
 - MySQL

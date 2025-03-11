@@ -1,6 +1,8 @@
 ---
 title: MySQL备份命令mysqldump参数说明与示例
 date: 2014-12-05 20:21:25
+aliases:
+- /2014/12/05/mysql_mysqldump_options_examples/
 updated: 2014-07 17:00:46:23
 tags: [mysql, database, mysqldump, backup]
 categories: MySQL

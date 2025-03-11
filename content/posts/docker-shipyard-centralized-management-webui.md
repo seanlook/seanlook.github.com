@@ -1,6 +1,8 @@
 ---
 title: Docker集中化web界面管理平台shipyard
 date: 2014-12-29 13:21:25
+aliases:
+- /2014/12/29/docker-shipyard-centralized-management-webui/
 updated: 2014-12-29 15:46:23
 tags: [docker, linux, shipyard]
 categories: [Virtualization, Docker]

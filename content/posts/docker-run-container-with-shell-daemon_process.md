@@ -1,6 +1,8 @@
 ---
 title: docker如何创建一个运行后台进程的容器并同时提供shell终端
 date: 2014-11-03 20:21:25
+aliases:
+- /2014/11/03/docker-run-container-with-shell-daemon_process/
 updated: 2014-11-07 15:46:23
 tags: [docker, shell, linux]
 categories: [Virtualization, Docker]

@@ -1,6 +1,8 @@
 ---
 title: ProxySQL高可用方案
 date: 2017-07-15 21:32:49
+aliases:
+- /2017/07/15/mysql-proxysql-ha-consul/
 tags: [mysql, 中间件, proxysql]
 categories:
 - MySQL

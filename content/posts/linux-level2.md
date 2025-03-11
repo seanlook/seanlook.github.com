@@ -1,6 +1,8 @@
 ---
 title: Linux进阶培训-tplink
 date: 2014-10-06 16:32:49
+aliases:
+- /2014/10/06/linux-level2/
 tags: [linux,磁盘,内存,网络,进程管理]
 categories: 
 - Linux

@@ -1,6 +1,8 @@
 ---
 title: OpenSSL 与 SSL 数字证书概念贴
 date: 2015-01-15 01:21:25
+aliases:
+- /2015/01/15/openssl-certificate-encryption/
 updated: 2015-01-15 10:46:23
 tags: [openssl, ssl,加密]
 categories: 安全

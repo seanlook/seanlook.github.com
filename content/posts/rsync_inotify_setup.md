@@ -1,6 +1,8 @@
 ---
 title: Linux下同步工具inotify+rsync使用详解
 date: 2014-12-12 01:21:25
+aliases:
+- /2014/12/12/rsync_inotify_setup/
 updated: 2015-05-05 12:46:23
 tags: [rsync,inotify,backup，文件同步]
 categories: Linux

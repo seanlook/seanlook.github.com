@@ -1,6 +1,8 @@
 ---
 title: MySQL数据库表结构同步之SchemaSync
 date: 2017-11-02 15:32:49
+aliases:
+- /2017/11/02/mysql_schemasync/
 tags: [mysql, 表结构]
 categories:
 - MySQL

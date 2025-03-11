@@ -1,6 +1,8 @@
 ---
 title: RabbitMQ 入门
 date: 2018-01-06 15:32:49
+aliases:
+- /2018/01/06/rabbitmq-introduce/
 tags: [消息队列, rabbitmq]
 categories:
 - MQ

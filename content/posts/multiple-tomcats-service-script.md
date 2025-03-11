@@ -1,6 +1,8 @@
 ---
 title: 管理多tomcat服务shell脚本（CentOS）
 date: 2014-10-29 18:21:25
+aliases:
+- /2014/10/29/multiple-tomcats-service-script/
 updated: 2014-10-29 11:46:23
 tags: [tomcat, script, shell]
 categories: Tomcat

@@ -1,6 +1,8 @@
 ---
 title: Advanced MySQL Query Tuning .pdf
 date: 2016-06-11 16:32:49
+aliases:
+- /2016/06/11/mysql-advanced-query-tuning-percona/
 tags: [mysql, SQL优化]
 categories: 
 - MySQL

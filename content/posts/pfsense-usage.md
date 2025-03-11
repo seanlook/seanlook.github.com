@@ -1,6 +1,8 @@
 ---
 title: 图解pfSense软路由系统的使用（NAT功能）
 date: 2015-04-23 15:21:25
+aliases:
+- /2015/04/23/pfsense-usage/
 updated: 2015-04-24 00:46:23
 tags: [pfsense,vmware]
 categories: Linux

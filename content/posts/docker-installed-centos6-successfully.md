@@ -1,6 +1,8 @@
 ---
 title: 在 CentOS 6.x上安装 docker.io成功
 date: 2014-10-26 19:45:25
+aliases:
+- /2014/10/26/docker-installed-centos6-successfully/
 updated: 2014-10-27 10:46:23
 tags: [docker, centos,linux]
 categories: [Virtualization, Docker]

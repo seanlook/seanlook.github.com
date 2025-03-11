@@ -1,6 +1,8 @@
 ---
 title: CentOS 6.x 内核升级（2.6.32 -> 3.10.58）过程记录
 date: 2014-10-24 01:21:25
+aliases:
+- /2014/10/24/upgrade-centos6_kernel-to-3.10.x/
 updated: 2014-10-27 10:46:23
 tags: [docker, Linux内核, upgrade]
 categories: [Linux, CentOS]

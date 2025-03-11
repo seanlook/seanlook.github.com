@@ -1,6 +1,8 @@
 ---
 title: iscsi网络存储介绍及客户端配置操作
 date: 2015-04-28 01:21:25
+aliases:
+- /2015/04/28/iscsi-san-initiator/
 updated: 2015-04-29 10:46:23
 tags: [iscsi]
 categories: [Linux]

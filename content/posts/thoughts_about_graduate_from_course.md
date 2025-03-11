@@ -1,6 +1,8 @@
 ---
 title: 关于研究生的一点担忧
 date: 2014-11-30 18:21:25
+aliases:
+- /2014/11/30/thoughts_about_graduate_from_course/
 updated: 2014-11-30 20:46:23
 tags: [feelings, graduate]
 categories: Feel

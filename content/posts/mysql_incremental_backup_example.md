@@ -1,6 +1,8 @@
 ---
 title: MySQL增量备份与恢复实例
 date: 2014-12-05 09:21:25
+aliases:
+- /2014/12/05/mysql_incremental_backup_example/
 updated: 2014-05 17:00:46:23
 tags: [mysql, database, binlog, backup]
 categories: MySQL

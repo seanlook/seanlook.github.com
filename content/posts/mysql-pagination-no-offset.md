@@ -1,6 +1,8 @@
 ---
 title: MySQL分页优化
 date: 2018-03-21 16:32:49
+aliases:
+- /2018/03/21/mysql-pagination-no-offset/
 tags: [mysql, 分页]
 categories: 
 - MySQL

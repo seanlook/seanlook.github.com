@@ -1,6 +1,8 @@
 ---
 title: MySQL主从复制idempotent模式以及同步错误处理预案
 date: 2018-03-11 16:32:49
+aliases:
+- /2018/03/11/mysql-replication-error-and-idempotent/
 tags: [mysql, replication]
 categories: 
 - MySQL

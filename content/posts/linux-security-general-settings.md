@@ -1,6 +1,8 @@
 ---
 title: CentOS 6 服务器安全配置指南（通用）
 date: 2014-09-07 01:21:25
+aliases:
+- /2014/09/07/linux-security-general-settings/
 updated: 2014-09-07-12 00:46:23
 tags: [安全,ssh]
 categories: Linux

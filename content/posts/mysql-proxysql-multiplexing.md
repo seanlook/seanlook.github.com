@@ -1,6 +1,8 @@
 ---
 title: ProxySQL之连接复用（multiplexing）以及相关问题说明
 date: 2017-04-17 21:32:49
+aliases:
+- /2017/04/17/mysql-proxysql-multiplexing/
 tags: [mysql, 中间件, proxysql]
 categories:
 - MySQL

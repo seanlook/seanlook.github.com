@@ -1,6 +1,8 @@
 ---
 title: EC的第一天
 date: 2015-07-07 00:49:31
+aliases:
+- /2015/07/07/ec-the-first-day/
 tags: [EC, 生活]
 categories: 
 - 生活

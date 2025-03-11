@@ -1,6 +1,8 @@
 ---
 title: vim编辑器技巧备忘（初级-中级）
 date: 2014-08-07 01:21:25
+aliases:
+- /2014/08/07/vim-tips/
 updated: 2014-08-07-12 00:46:23
 tags: [vim,编辑器]
 categories: Linux

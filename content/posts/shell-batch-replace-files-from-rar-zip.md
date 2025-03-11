@@ -1,6 +1,8 @@
 ---
 title: Linux下rar及zip压缩包中批量替换某文件脚本
 date: 2015-01-29 18:21:25
+aliases:
+- /2015/01/29/shell-batch-replace-files-from-rar-zip/
 updated: 2015-01-30 11:46:23
 tags: [script, shell]
 categories: Linux

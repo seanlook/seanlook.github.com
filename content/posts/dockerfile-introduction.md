@@ -1,6 +1,8 @@
 ---
 title: Dockerfile指令详解
 date: 2014-11-17 15:21:25
+aliases:
+- /2014/11/17/dockerfile-introduction/
 updated: 2014-11-17 15:46:23
 tags: [docker, dockerfile, linux]
 categories: [Virtualization, Docker]

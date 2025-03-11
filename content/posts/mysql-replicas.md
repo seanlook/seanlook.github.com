@@ -1,6 +1,8 @@
 ---
 title: 使用 Xtrabackup 在线对MySQL做主从复制
 date: 2015-12-14 10:21:25
+aliases:
+- /2015/12/14/mysql-replicas/
 updated: 2015-12-14 00:46:23
 tags: [mysql, 主从复制, 备份]
 categories: 

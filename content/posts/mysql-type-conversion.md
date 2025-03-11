@@ -1,6 +1,8 @@
 ---
 title: 小心MySQL的隐式类型转换陷阱
 date: 2016-05-05 16:32:49
+aliases:
+- /2016/05/05/mysql-type-conversion/
 tags: [mysql, schema设计]
 categories: 
 - MySQL

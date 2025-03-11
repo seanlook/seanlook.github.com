@@ -1,6 +1,8 @@
 ---
 title: MySQL数据库开发规范-EC
 date: 2016-05-11 16:32:49
+aliases:
+- /2016/05/11/mysql-dev-principle-ec/
 tags: [mysql, 规范]
 categories: 
 - MySQL

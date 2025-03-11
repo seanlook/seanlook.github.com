@@ -1,6 +1,8 @@
 ---
 title: 我为何厌恶百度的产品
 date: 2015-02-28 15:21:25
+aliases:
+- /2015/02/28/baidu-complain/
 updated: 2015-02-28 16:46:23
 tags: [feelings]
 categories: [Feel]

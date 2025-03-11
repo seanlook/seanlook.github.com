@@ -1,6 +1,8 @@
 ---
 title: “大”事务引起的锁等待分析案例
 date: 2017-10-17 16:32:49
+aliases:
+- /2017/10/17/mysql-big-trx-lock-case/
 tags: [mysql, lock]
 categories:
 - MySQL

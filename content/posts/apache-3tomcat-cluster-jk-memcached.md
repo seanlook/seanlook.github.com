@@ -1,6 +1,8 @@
 ---
 title: apache+3tomcat+jk+memcached集群环境搭建
 date: 2014-10-29 10:21:25
+aliases:
+- /2014/10/29/apache-3tomcat-cluster-jk-memcached/
 updated: 2015-03-26 00:46:23
 tags: [apache, tomcat, 集群, mod_jk, memcached, centos]
 categories: [Linux, Web_Server]

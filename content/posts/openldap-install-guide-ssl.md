@@ -1,6 +1,8 @@
 ---
 title: OpenLDAP(2.4.3x)服务器搭建及配置说明
 date: 2015-01-21 01:21:25
+aliases:
+- /2015/01/21/openldap-install-guide-ssl/
 updated: 2015-01-21 10:46:23
 tags: [LDAP, slapd]
 categories: [Linux, OpenLDAP]

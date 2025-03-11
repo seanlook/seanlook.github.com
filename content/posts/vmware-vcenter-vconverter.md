@@ -1,6 +1,8 @@
 ---
 title: 使用vmware vconverter从物理机迁移系统到虚拟机P2V（多图）
 date: 2015-04-05 15:21:25
+aliases:
+- /2015/04/05/vmware-vcenter-vconverter/
 updated: 2015-04-06 00:46:23
 tags: [vsphere, 虚拟化,vmware]
 categories: Virtualization

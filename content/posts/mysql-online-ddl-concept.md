@@ -1,6 +1,8 @@
 ---
 title: mysql 5.6 原生Online DDL解析
 date: 2016-05-24 16:32:49
+aliases:
+- /2016/05/24/mysql-online-ddl-concept/
 tags: [mysql, Percona-toolkit]
 categories:
 - MySQL

@@ -1,6 +1,8 @@
 ---
 title: nice is not nice
 date: 2015-07-14 00:49:31
+aliases:
+- /2015/07/14/nice-is-not-nice/
 tags: [生活]
 categories: 
 - 生活

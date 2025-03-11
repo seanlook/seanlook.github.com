@@ -1,6 +1,8 @@
 ---
 title: 使用pt-osc修改主键时注意
 date: 2016-05-27 16:32:49
+aliases:
+- /2016/05/27/mysql-pt-osc-add-primarykey/
 tags: [mysql, Percona-toolkit]
 categories: 
 - MySQL

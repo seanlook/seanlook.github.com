@@ -1,6 +1,8 @@
 ---
 title: mysql使用utf8mb4经验吐血总结
 date: 2016-10-23 16:32:49
+aliases:
+- /2016/10/23/mysql-utf8mb4/
 tags: [mysql, 字符集]
 categories:
 - MySQL

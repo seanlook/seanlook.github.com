@@ -1,6 +1,8 @@
 ---
 title: 在Linux上使用logwatch分析监控日志文件
 date: 2014-08-23 01:21:25
+aliases:
+- /2014/08/23/linux-logwatch-usage/
 updated: 2014-08-23 10:46:23
 tags: [logwatch, linux,日志]
 categories: [Linux]

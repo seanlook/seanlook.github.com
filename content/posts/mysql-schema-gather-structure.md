@@ -1,6 +1,8 @@
 ---
 title: 一种直观记录表结构变更历史的方法
 date: 2016-11-28 16:32:49
+aliases:
+- /2016/11/28/mysql-schema-gather-structure/
 tags: [mysql, 监控]
 categories:
 - MySQL

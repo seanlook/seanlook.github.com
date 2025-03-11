@@ -1,6 +1,8 @@
 ---
 title: nginx服务器安装及配置文件详解
 date: 2015-05-17 01:21:25
+aliases:
+- /2015/05/17/nginx-install-and-config/
 updated: 2015-05-28 00:46:23
 tags: [nignx]
 categories: [Linux, Nginx]

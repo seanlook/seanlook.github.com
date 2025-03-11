@@ -1,6 +1,8 @@
 ---
 title: 只怕时间走的太过匆忙，忘记了躲在角落中的我
 date: 2014-12-31 00:21:25
+aliases:
+- /2014/12/31/feel-2014-end/
 updated: 2014-12-31 00:46:23
 tags: [feelings, 总结]
 categories: Feel

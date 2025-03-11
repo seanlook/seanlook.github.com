@@ -1,6 +1,8 @@
 ---
 title: 记一次Mac mini折腾过程（鼠键共享，更换SSD）
 date: 2016-01-18 16:32:49
+aliases:
+- /2016/01/18/mac-mini-zturn/
 tags: [Mac, 鼠标键盘, synergy]
 categories: 
 - Mac OSX

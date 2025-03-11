@@ -1,6 +1,8 @@
 ---
 title: 一个简单的数据订阅程序(for DBA)
 date: 2017-09-05 16:32:49
+aliases:
+- /2017/09/05/mysql-binlog-subscribe-simple-for-dba/
 tags: [mysql, table_cache]
 categories:
 - MySQL

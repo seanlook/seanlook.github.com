@@ -1,6 +1,8 @@
 ---
 title: MySQL复制与数据一致性 分享
 date: 2018-03-22 21:32:49
+aliases:
+- /2018/03/22/mysql-ppt-replication-and-consistency/
 tags: [mysql, 分享]
 categories:
 - MySQL

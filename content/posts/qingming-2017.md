@@ -1,6 +1,8 @@
 ---
 title: 清明闲扯
 date: 2017-04-02 16:32:49
+aliases:
+- /2017/04/02/qingming-2017/
 tags: [杂说]
 categories:
 - Feel

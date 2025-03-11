@@ -1,6 +1,8 @@
 ---
 title: MySQL数据库表结构同步之mysqldiff
 date: 2017-08-05 15:32:49
+aliases:
+- /2017/08/05/mysql_mysqldiff/
 tags: [mysql, 表结构]
 categories:
 - MySQL

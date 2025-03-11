@@ -1,6 +1,8 @@
 ---
 title: 生产环境使用 pt-table-checksum 检查MySQL数据一致性
 date: 2015-12-29 10:21:25
+aliases:
+- /2015/12/29/mysql_replica_pt-table-checksum/
 updated: 2015-12-29 00:46:23
 tags: [mysql, 主从复制, percona]
 categories: 

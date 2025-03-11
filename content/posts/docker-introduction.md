@@ -1,6 +1,8 @@
 ---
 title: Docker简介
 date: 2014-12-18 11:21:25
+aliases:
+- /2014/12/18/docker-introduction/
 updated: 2014-12-18 18:46:23
 tags: [docker, linux]
 categories: [Virtualization, Docker]

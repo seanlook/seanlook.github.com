@@ -1,6 +1,8 @@
 ---
 title: 五一回来了
 date: 2015-05-03 07:01:25
+aliases:
+- /2015/05/03/feel-wuyi-back/
 updated: 2015-05-04 00:01:25
 tags: [feelings]
 categories: [Feel]

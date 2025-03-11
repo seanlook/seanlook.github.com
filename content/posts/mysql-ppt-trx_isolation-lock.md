@@ -1,6 +1,8 @@
 ---
 title: 浅析MySQL事务隔离级别与锁 分享
 date: 2016-08-30 21:32:49
+aliases:
+- /2016/08/30/mysql-ppt-trx_isolation-lock/
 tags: [mysql, 事务]
 categories:
 - MySQL

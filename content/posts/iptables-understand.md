@@ -1,6 +1,8 @@
 ---
 title: iptables防火墙原理详解
 date: 2014-02-23 01:21:25
+aliases:
+- /2014/02/23/iptables-understand/
 updated: 2014-02-23-12 00:46:23
 tags: [iptables,安全]
 categories: Linux

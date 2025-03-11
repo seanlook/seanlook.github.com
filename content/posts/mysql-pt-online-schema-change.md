@@ -1,6 +1,8 @@
 ---
 title: pt-online-schema-change使用说明、限制与比较
 date: 2016-05-27 16:32:49
+aliases:
+- /2016/05/27/mysql-pt-online-schema-change/
 tags: [mysql, Percona-toolkit]
 categories: 
 - MySQL

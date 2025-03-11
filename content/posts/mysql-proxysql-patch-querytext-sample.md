@@ -1,6 +1,8 @@
 ---
 title: ProxySQL之改进patch：记录查询sql完整样例与合并digest多个?
 date: 2017-04-27 15:32:49
+aliases:
+- /2017/04/27/mysql-proxysql-patch-querytext-sample/
 tags: [mysql, 中间件, proxysql]
 categories:
 - MySQL

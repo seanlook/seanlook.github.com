@@ -1,6 +1,8 @@
 ---
 title: 基于OpenSSL自建CA和颁发SSL证书 
 date: 2015-01-18 01:21:25
+aliases:
+- /2015/01/18/openssl-self-sign-ca/
 updated: 2015-01-18 10:46:23
 tags: [openssl, ssl,ca]
 categories: 安全

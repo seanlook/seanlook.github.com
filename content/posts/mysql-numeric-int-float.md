@@ -1,6 +1,8 @@
 ---
 title: MySQL数字类型int与tinyint、float与decimal如何选择
 date: 2016-04-29 16:32:49
+aliases:
+- /2016/04/29/mysql-numeric-int-float/
 tags: [mysql, schema设计]
 categories:
 - MySQL

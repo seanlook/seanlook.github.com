@@ -1,6 +1,8 @@
 ---
 title: 误删vSphere虚拟机.vmdk文件的恢复
 date: 2014-10-28 15:21:25
+aliases:
+- /2014/10/28/vsphere-recover-from-missing-vmdk/
 updated: 2014-10-28 00:46:23
 tags: [vsphere, 虚拟化,troubleshooting]
 categories: Virtualization

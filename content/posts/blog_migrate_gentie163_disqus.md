@@ -1,6 +1,8 @@
 ---
 title: 网易云跟帖迁移评论到disqus
 date: 2017-08-29 16:32:49
+aliases:
+- /2017/08/29/blog_migrate_gentie163_disqus/
 tags: [mysql, blog]
 categories:
 - MySQL

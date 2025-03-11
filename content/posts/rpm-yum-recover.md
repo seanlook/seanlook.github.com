@@ -1,6 +1,8 @@
 ---
 title: rpm或yum安装软件提示error-rpmts_HdrFromFdno-key-ID-BAD
 date: 2015-03-02 01:21:25
+aliases:
+- /2015/03/02/rpm-yum-recover/
 updated: 2015-03-02 00:46:23
 tags: [linux, 软件包,troubleshooting]
 categories: Linux

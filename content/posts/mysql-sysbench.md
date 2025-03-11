@@ -1,6 +1,8 @@
 ---
 title: 使用sysbench对mysql压力测试
 date: 2016-03-28 16:32:49
+aliases:
+- /2016/03/28/mysql-sysbench/
 tags: [mysql, sysbench]
 categories: 
 - MySQL
@@ -125,6 +127,8 @@ ps2: 我在用sysbench压的时候，在mysql后端会话里有时看到大量�
 然而`oltp-test-mode=nontrx`一直没有跟着我预期的去走，在mysql general log里面看到的sql记录与`complex`模式相同。所以上面示例中的`--oltp-test-mode=nontrx --oltp-nontrx-mode=select`可以删掉。
 
 **update: **
+aliases:
+- /2016/03/28/mysql-sysbench/
 sysbench作者 akopytov 对我这个疑问有了回复：https://github.com/akopytov/sysbench/issues/34 ，原来sysbench 0.5版本去掉了这个选项，因为作者正在准备1.0版本，所以也就没有更新0.5版本的doc。网上的博客漫天飞，就没有一个提出来的，也是没谁了。
 
 分析一下oltp.lua脚本内容，可以清楚单个事务各操作的默认比例：select:update_key:update_non_key:delete:insert = 14:1:1:1:1，可通过`oltp-point-selects`、`oltp-simple-ranges`、`oltp-sum-ranges`、`oltp-order-ranges`、`oltp-distinct-ranges`，`oltp-index-updates`、`oltp-non-index-updates`这些选项去调整读写权重。

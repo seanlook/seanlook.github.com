@@ -1,6 +1,8 @@
 ---
 title: nginx做负载均衡器以及proxy缓存配置
 date: 2015-06-02 01:21:25
+aliases:
+- /2015/06/02/nginx-cache-check/
 updated: 2015-06-02 00:46:23
 tags: [nignx, 负载均衡, 缓存]
 categories: [Linux, Nginx]

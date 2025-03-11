@@ -1,6 +1,8 @@
 ---
 title: MySQL order by limit 走错索引(range->indexscan)
 date: 2017-10-26 15:32:49
+aliases:
+- /2017/10/26/mysql-bad-plan-order_by-limit/
 tags: [mysql, 优化]
 categories:
 - MySQL

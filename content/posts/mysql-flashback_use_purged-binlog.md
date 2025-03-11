@@ -1,6 +1,8 @@
 ---
 title: MySQL根据离线binlog快速“闪回”
 date: 2017-03-03 16:32:49
+aliases:
+- /2017/03/03/mysql-flashback_use_purged-binlog/
 tags: [mysql]
 categories:
 - MySQL

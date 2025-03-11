@@ -1,6 +1,8 @@
 ---
 title: 在ubuntu上部署Kubernetes管理docker集群示例
 date: 2015-02-07 13:21:25
+aliases:
+- /2015/02/07/docker-kubernetes-deploy2/
 updated: 2014-02-07 15:46:23
 tags: [docker, linux, kubernetes]
 categories: [Virtualization, Docker]

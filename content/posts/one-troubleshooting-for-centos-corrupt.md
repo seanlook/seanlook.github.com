@@ -1,6 +1,8 @@
 ---
 title: 记一次错误卸载软件包导致Linux系统崩溃的修复解决过程
 date: 2014-11-03 01:21:25
+aliases:
+- /2014/11/03/one-troubleshooting-for-centos-corrupt/
 updated: 2014-11-07 00:46:23
 tags: [linux, 系统管理,troubleshooting]
 categories: Linux

@@ -1,6 +1,8 @@
 ---
 title: Binlog可视化搜索：实现类似阿里RDS数据追踪功能
 date: 2018-01-25 15:32:49
+aliases:
+- /2018/01/25/maxwell-graylog/
 tags: [mysql, binlog]
 categories:
 - MySQL

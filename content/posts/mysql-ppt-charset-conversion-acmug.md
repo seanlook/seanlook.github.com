@@ -1,6 +1,8 @@
 ---
 title: 一次艰辛的字符集转换历程 ACMUG分享
 date: 2017-03-27 21:32:49
+aliases:
+- /2017/03/27/mysql-ppt-charset-conversion-acmug/
 tags: [mysql, 分享]
 categories:
 - MySQL

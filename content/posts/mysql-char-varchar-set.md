@@ -1,6 +1,8 @@
 ---
 title: MySQL字符数据类型char与varchar的区别
 date: 2016-04-28 16:32:49
+aliases:
+- /2016/04/28/mysql-char-varchar-set/
 tags: [mysql, schema设计]
 categories:
 - MySQL

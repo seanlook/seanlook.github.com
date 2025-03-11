@@ -1,6 +1,8 @@
 ---
 title: 在Mac在Mac/win7下上使用Vagrant打造本地开发环境
 date: 2015-03-25 11:21:25
+aliases:
+- /2015/03/25/vagrant/
 updated: 2015-03-27 18:46:23
 tags: [vagrant, virtualbox, 虚拟化,开发环境]
 categories: Virtualization

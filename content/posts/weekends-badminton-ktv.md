@@ -1,6 +1,8 @@
 ---
 title: 周末腐败地
 date: 2015-10-25 15:44:31
+aliases:
+- /2015/10/25/weekends-badminton-ktv/
 tags: [生活]
 categories: 
 - 生活

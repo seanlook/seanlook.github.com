@@ -1,6 +1,8 @@
 ---
 title: linux进程后台运行的几种方式
 date: 2014-02-20 11:21:25
+aliases:
+- /2014/02/20/linux-process-running-background-screen/
 updated: 2014-02-20 18:46:23
 tags: [linux, shell, 后台进程,screen]
 categories: Linux
